@@ -83,8 +83,7 @@ pub fn bind<'a>(
         registered_variables: HashMap::new(),
         print_variable_table: debug_flags.print_variable_table(),
     };
-    let result = bind_node(node, &mut binder);
-    result
+    bind_node(node, &mut binder)
 }
 
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'b, 'a>) -> BoundNode<'a> {
@@ -111,7 +110,7 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'b, 'a>) ->
     }
 }
 
-fn bind_literal<'a, 'b>(
+fn bind_literal<'a>(
     span: TextSpan,
     literal: LiteralNodeKind<'a>,
     _: &mut BindingState,
@@ -260,7 +259,9 @@ fn bind_variable_declaration<'a, 'b>(
         variable_declaration.identifier.lexeme,
         initializer.type_.clone(),
     );
-    if variable_index.is_none() {
+    if let Some(variable_index) = variable_index {
+        BoundNode::variable_declaration(span, variable_index, initializer)
+    } else {
         let span = TextSpan::bounds(
             variable_declaration.let_keyword.span(),
             variable_declaration.identifier.span(),
@@ -269,9 +270,6 @@ fn bind_variable_declaration<'a, 'b>(
             .diagnostic_bag
             .report_cannot_declare_variable(span, variable_declaration.identifier.lexeme);
         BoundNode::error(span)
-    } else {
-        let variable_index = variable_index.unwrap();
-        BoundNode::variable_declaration(span, variable_index, initializer)
     }
 }
 

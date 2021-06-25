@@ -47,9 +47,9 @@ impl<'a> SyntaxToken<'a> {
     pub fn keyword(start: usize, lexeme: &'a str) -> Self {
         let kind = SyntaxTokenKind::keyword(lexeme).expect(lexeme);
         Self {
-            start,
-            lexeme,
             kind,
+            lexeme,
+            start,
         }
     }
 

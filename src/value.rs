@@ -7,7 +7,7 @@ pub enum Value {
 #[allow(dead_code)]
 impl Value {
     pub fn as_integer(&self) -> Option<i64> {
-        if let &Self::Integer(v) = self {
+        if let Self::Integer(v) = *self {
             Some(v)
         } else {
             None
@@ -15,7 +15,7 @@ impl Value {
     }
 
     pub fn as_boolean(&self) -> Option<bool> {
-        if let &Self::Boolean(v) = self {
+        if let Self::Boolean(v) = *self {
             Some(v)
         } else {
             None

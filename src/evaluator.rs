@@ -32,7 +32,7 @@ pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> Resu
     }
     if state.stack.len() == 1 {
         (state.stack.pop().unwrap() as i64).into()
-    } else if state.stack.len() == 0 {
+    } else if state.stack.is_empty() {
         for (variable, &value) in state.registers.iter().enumerate() {
             println!("{:00}: {}", variable, value as i64)
         }
