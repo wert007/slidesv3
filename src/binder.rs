@@ -89,7 +89,7 @@ fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
     println!();
 }
 
-pub fn bind<'a, 'b>(
+pub fn bind<'a>(
     source_text: &'a SourceText<'a, 'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
@@ -134,7 +134,7 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
     }
 }
 
-fn bind_literal<'a, 'b>(
+fn bind_literal<'a>(
     span: TextSpan,
     literal: LiteralNodeKind<'a>,
     _: &mut BindingState,

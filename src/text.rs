@@ -35,7 +35,7 @@ impl<'a, 'b> SourceText<'a, 'b> {
     }
 }
 
-fn parse_text_lines<'a>(text: &'a str) -> Vec<TextLine<'a>> {
+fn parse_text_lines(text: &str) -> Vec<TextLine> {
     let mut result = vec![];
     let mut line_start = 0;
     let mut line_break_width = 0;

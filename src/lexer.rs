@@ -22,7 +22,7 @@ struct TextIndex {
     char_index: usize,
 }
 
-pub fn lex<'a, 'b>(
+pub fn lex<'a>(
     content: &'a SourceText<'a, 'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> VecDeque<SyntaxToken<'a>> {
