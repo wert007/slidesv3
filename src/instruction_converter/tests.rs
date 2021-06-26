@@ -26,6 +26,20 @@ fn instruction_converter_success() {
     assert_matches!(instructions[1], Instruction { op_code: OpCode::LoadImmediate, arg: 99});
     assert_matches!(instructions[2], Instruction { op_code: OpCode::NotEquals, arg: 0});
     assert_matches!(instructions[3], Instruction { op_code: OpCode::Pop, arg: 0});
+
+    let instructions = converter_helper("if true { let a = 3; }", 4);
+    assert_matches!(instructions[0], Instruction { op_code: OpCode::LoadImmediate, arg: 1});
+    assert_matches!(instructions[1], Instruction { op_code: OpCode::JmpIfFalse, arg: 2});
+    assert_matches!(instructions[2], Instruction { op_code: OpCode::LoadImmediate, arg: 3});
+    assert_matches!(instructions[3], Instruction { op_code: OpCode::StoreInRegister, arg: 0});
+
+    let instructions = converter_helper("while false { let a = 3; }", 5);
+    assert_matches!(instructions[0], Instruction { op_code: OpCode::LoadImmediate, arg: 0});
+    assert_matches!(instructions[1], Instruction { op_code: OpCode::JmpIfFalse, arg: 3});
+    assert_matches!(instructions[2], Instruction { op_code: OpCode::LoadImmediate, arg: 3});
+    assert_matches!(instructions[3], Instruction { op_code: OpCode::StoreInRegister, arg: 0});
+    // 18446744073709551611 == -5
+    assert_matches!(instructions[4], Instruction { op_code: OpCode::JmpRelative, arg: 18446744073709551611});
 }
 
 fn converter_helper(input: &str, expected_instruction_length: usize) -> Vec<Instruction> {

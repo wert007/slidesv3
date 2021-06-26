@@ -1,6 +1,7 @@
 use super::{syntax_nodes::SyntaxNodeKind, *};
 use crate::const_number_literal_syntax_token;
 use crate::diagnostics::Diagnostic;
+use crate::lexer::syntax_token::NumberLiteralKind;
 use crate::parser::syntax_nodes::LiteralNodeKind;
 use crate::parser::syntax_nodes::VariableNodeKind;
 use crate::value::Value;
@@ -74,7 +75,6 @@ fn parser_precedence() {
         });
     });
 
-
     let node = parse_helper("a = b + c;");
     assert_matches!(node.kind, SyntaxNodeKind::Assignment(assignment) => {
         assert_matches!(assignment.lhs.kind, SyntaxNodeKind::Variable(VariableNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::Identifier, lexeme: "a", start: 0 } }));
@@ -106,18 +106,21 @@ fn parse_helper<'a>(input: &'a str) -> SyntaxNode<'a> {
 fn parser_error() {
     let (node, diagnostics) = parse_helper_error("");
     assert_matches!(
-        node.kind,
-        SyntaxNodeKind::ExpressionStatement(expression_statement) => {
-            assert_matches!(
-                expression_statement.expression.kind, 
-                SyntaxNodeKind::Literal(LiteralNodeKind { 
-                    token: const_number_literal_syntax_token!(0, 0), 
-                    value: Value::Integer(0) }));
-            assert_matches!(expression_statement.semicolon_token.kind, SyntaxTokenKind::Semicolon);
-        });
+    node.kind,
+    SyntaxNodeKind::ExpressionStatement(expression_statement) => {
+        assert_matches!(
+            expression_statement.expression.kind,
+            SyntaxNodeKind::Literal(LiteralNodeKind {
+                token: const_number_literal_syntax_token!(0, 0),
+                value: Value::Integer(0) }));
+        assert_matches!(expression_statement.semicolon_token.kind, SyntaxTokenKind::Semicolon);
+    });
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(diagnostics[0].to_string(), "Error at 0-0: Expected token kind NumberLiteralKind(0) but actually found End-of-Input-Token.");
-    assert_eq!(diagnostics[1].to_string(), "Error at 0-0: Expected token kind SemicolonToken but actually found End-of-Input-Token.");
+    assert_eq!(
+        diagnostics[1].to_string(),
+        "Error at 0-0: Expected token kind SemicolonToken but actually found End-of-Input-Token."
+    );
 
     let (node, diagnostics) = parse_helper_error_expression("1 +;");
     assert_matches!(node.kind, SyntaxNodeKind::Binary(binary) => {
@@ -126,7 +129,10 @@ fn parser_error() {
         assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind {token: const_number_literal_syntax_token!(3, 0), value: Value::Integer(0)}));
     });
     assert_eq!(diagnostics.len(), 1);
-    assert_eq!(diagnostics[0].to_string(), "Error at 3-4: Expected token kind NumberLiteralKind(0) but actually found SemicolonToken.");
+    assert_eq!(
+        diagnostics[0].to_string(),
+        "Error at 3-4: Expected token kind NumberLiteralKind(0) but actually found SemicolonToken."
+    );
 
     let (node, diagnostics) = parse_helper_error_expression("*42;");
     assert_matches!(node.kind, SyntaxNodeKind::Binary(binary) => {
@@ -153,8 +159,8 @@ fn parser_error() {
 
     let (node, diagnostics) = parse_helper_error_expression("1/*2;");
     // assert_matches!(node.kind, SyntaxNodeKind::Binary(binary) => {
-        // });
-        assert_matches!(node.kind, SyntaxNodeKind::Binary(binary) => {
+    // });
+    assert_matches!(node.kind, SyntaxNodeKind::Binary(binary) => {
             assert_matches!(binary.lhs.kind, SyntaxNodeKind::Binary(binary) => {
                 assert_matches!(binary.lhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind {token: const_number_literal_syntax_token!(0, 1), value: Value::Integer(1)}));
                 assert_matches!(binary.operator_token, SyntaxToken { kind: SyntaxTokenKind::Slash, lexeme: "/", start: 1 });
@@ -177,6 +183,27 @@ fn parser_error() {
     assert_eq!(
         diagnostics[0].to_string(),
         "Error at 4-8: 'true' is a keyword and cannot be overwritten."
+    );
+
+    let (node, diagnostics) = parse_helper_error("if a = 4 { a = 0; }");
+    assert_matches!(node.kind, SyntaxNodeKind::IfStatement(if_statement) => {
+        assert_matches!(if_statement.condition.kind, SyntaxNodeKind::Binary(binary) => {
+            assert_matches!(binary.lhs.kind, SyntaxNodeKind::Variable(VariableNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::Identifier, lexeme: "a", start:3 } }));
+            assert_matches!(binary.operator_token, SyntaxToken { kind: SyntaxTokenKind::Equals, lexeme: "=", start:5 });
+            assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 4 }), lexeme: "4", start:7 }, value: Value::Integer(4) }));
+        });
+        assert_matches!(if_statement.body.kind, SyntaxNodeKind::BlockStatement(block_statement) => {
+            assert_eq!(block_statement.statements.len(), 1);
+            assert_matches!(&block_statement.statements[0].kind, SyntaxNodeKind::Assignment(assignment) => {
+                assert_matches!(assignment.lhs.kind, SyntaxNodeKind::Variable(VariableNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::Identifier, lexeme: "a", start: 11 } }));
+                assert_matches!(assignment.expression.kind, SyntaxNodeKind::Literal(LiteralNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 0 }), lexeme: "0", start: 15 }, value: Value::Integer(0) }));
+            })
+        })
+    });
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].to_string(),
+        "Error at 3-4: Only variables can be assigned to. Did you mean to use ==?"
     );
 }
 

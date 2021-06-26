@@ -55,6 +55,29 @@ fn successful_binding() {
         assert_matches!(variable_declaration.initializer.type_, Type::Integer);
     });
     assert_matches!(node.type_, Type::Void);
+
+    let node = bind_helper("if 9 == 12 { let a = 14; }");
+    assert_matches!(node.kind, BoundNodeKind::IfStatement(if_statement) => {
+        assert_matches!(if_statement.condition.kind, BoundNodeKind::BinaryExpression(binary) => {
+            assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(9), .. }));
+            assert_matches!(binary.lhs.type_, Type::Integer);
+            assert_matches!(binary.operator_token, BoundBinaryOperator::Equals);
+            assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(12), .. }));
+            assert_matches!(binary.rhs.type_, Type::Integer);
+        });
+        assert_matches!(if_statement.condition.type_, Type::Boolean);
+        assert_matches!(if_statement.body.kind, BoundNodeKind::BlockStatement(block_statement) => {
+            assert_eq!(block_statement.statements.len(), 1);
+            assert_matches!(&block_statement.statements[0].kind, BoundNodeKind::VariableDeclaration(variable_declaration) => {
+                assert_matches!(variable_declaration.variable_index, 0);
+                assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(14), .. }));
+                assert_matches!(variable_declaration.initializer.type_, Type::Integer);
+            });
+            assert_matches!(block_statement.statements[0].type_, Type::Void);
+        });
+        assert_matches!(if_statement.body.type_, Type::Void);
+    });
+    assert_matches!(node.type_, Type::Void);
 }
 
 fn bind_helper(input: &str) -> BoundNode {
@@ -79,6 +102,11 @@ fn failed_binding() {
     let (node, diagnostics) = bind_helper_errors_expression("(1 == 2 == 3) + 4;");
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].to_string(), "Error at 1-12: No binary operator == for types bool and int.");
+    assert_matches!(node.kind, BoundNodeKind::ErrorExpression);
+
+    let (node, diagnostics) = bind_helper_errors_expression("let a = a + 3;");
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].to_string(), "Error at 8-9: No variable named 'a' could be found.");
     assert_matches!(node.kind, BoundNodeKind::ErrorExpression);
 }
 
