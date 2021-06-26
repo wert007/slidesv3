@@ -146,6 +146,10 @@ impl Instruction {
 
 impl std::fmt::Debug for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} arg: {} ({})", self.op_code, self.arg, self.arg as i64)
+        write!(
+            f,
+            "{:?} arg: {} ({})",
+            self.op_code, self.arg, self.arg as i64
+        )
     }
 }

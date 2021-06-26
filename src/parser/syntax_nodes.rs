@@ -69,7 +69,7 @@ impl<'a> SyntaxNode<'a> {
     pub fn variable(token: SyntaxToken<'a>) -> Self {
         Self {
             span: token.span(),
-            kind: SyntaxNodeKind::Variable(VariableNodeKind {token}),
+            kind: SyntaxNodeKind::Variable(VariableNodeKind { token }),
             is_inserted: false,
         }
     }
@@ -214,9 +214,7 @@ impl<'a> SyntaxNode<'a> {
 
 #[derive(Debug)]
 pub enum SyntaxNodeKind<'a> {
-
     //Expressions
-
     Literal(LiteralNodeKind<'a>),
     Variable(VariableNodeKind<'a>),
     Binary(BinaryNodeKind<'a>),
@@ -224,7 +222,6 @@ pub enum SyntaxNodeKind<'a> {
     Parenthesized(ParenthesizedNodeKind<'a>),
 
     // Statements
-
     BlockStatement(BlockStatementNodeKind<'a>),
     IfStatement(IfStatementNodeKind<'a>),
     VariableDeclaration(VariableDeclarationNodeKind<'a>),

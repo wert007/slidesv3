@@ -1,6 +1,9 @@
 use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
 
-use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::Type};
+use super::{
+    operators::{BoundBinaryOperator, BoundUnaryOperator},
+    typing::Type,
+};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -10,9 +13,7 @@ pub struct BoundConstant {
 
 impl From<Value> for BoundConstant {
     fn from(value: Value) -> Self {
-        Self {
-            value
-        }
+        Self { value }
     }
 }
 
@@ -48,15 +49,19 @@ impl<'a> BoundNode<'a> {
     pub fn variable(span: TextSpan, variable_index: u64, type_: Type) -> Self {
         Self {
             span,
-            kind: BoundNodeKind::VariableExpression(BoundVariableNodeKind {
-                variable_index
-            }),
+            kind: BoundNodeKind::VariableExpression(BoundVariableNodeKind { variable_index }),
             type_,
             constant_value: None,
         }
     }
 
-    pub fn binary(span: TextSpan, lhs: BoundNode<'a>, operator_token: BoundBinaryOperator, rhs: BoundNode<'a>, type_: Type) -> Self {
+    pub fn binary(
+        span: TextSpan,
+        lhs: BoundNode<'a>,
+        operator_token: BoundBinaryOperator,
+        rhs: BoundNode<'a>,
+        type_: Type,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::BinaryExpression(BoundBinaryNodeKind {
@@ -69,7 +74,12 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn unary(span: TextSpan, operator_token: BoundUnaryOperator, operand: BoundNode<'a>, type_: Type) -> Self {
+    pub fn unary(
+        span: TextSpan,
+        operator_token: BoundUnaryOperator,
+        operand: BoundNode<'a>,
+        type_: Type,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::UnaryExpression(BoundUnaryNodeKind {
@@ -93,7 +103,11 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn variable_declaration(span: TextSpan, variable_index: u64, initializer: BoundNode<'a>) -> Self {
+    pub fn variable_declaration(
+        span: TextSpan,
+        variable_index: u64,
+        initializer: BoundNode<'a>,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::VariableDeclaration(BoundVariableDeclarationNodeKind {
@@ -101,7 +115,7 @@ impl<'a> BoundNode<'a> {
                 initializer: Box::new(initializer),
             }),
             type_: Type::Void,
-            constant_value: None
+            constant_value: None,
         }
     }
 
@@ -132,9 +146,7 @@ impl<'a> BoundNode<'a> {
     pub fn block_statement(span: TextSpan, statements: Vec<BoundNode<'a>>) -> Self {
         Self {
             span,
-            kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind {
-                statements,
-            }),
+            kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind { statements }),
             type_: Type::Void,
             constant_value: None,
         }

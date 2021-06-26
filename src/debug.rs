@@ -7,7 +7,11 @@ pub struct DebugFlags {
 
 impl Default for DebugFlags {
     fn default() -> Self {
-        Self { print_instructions: false, print_variable_table: false, print_current_instruction: false }
+        Self {
+            print_instructions: false,
+            print_variable_table: false,
+            print_current_instruction: false,
+        }
     }
 }
 
@@ -25,4 +29,3 @@ impl DebugFlags {
         self.print_variable_table
     }
 }
-

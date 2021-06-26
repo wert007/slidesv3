@@ -1,4 +1,8 @@
-use crate::{binder::typing::Type, lexer::syntax_token::SyntaxTokenKind, text::{SourceText, TextLocation, TextSpan}};
+use crate::{
+    binder::typing::Type,
+    lexer::syntax_token::SyntaxTokenKind,
+    text::{SourceText, TextLocation, TextSpan},
+};
 
 #[derive(Debug)]
 pub struct Diagnostic<'a> {

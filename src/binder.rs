@@ -8,7 +8,22 @@ use std::collections::HashMap;
 
 use assert_matches::assert_matches;
 
-use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::TextSpan};
+use crate::{
+    binder::{operators::BoundUnaryOperator, typing::Type},
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    parser::{
+        self,
+        syntax_nodes::{
+            AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind,
+            ExpressionStatementNodeKind, IfStatementNodeKind, LiteralNodeKind,
+            ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind,
+            VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
+        },
+    },
+    text::{SourceText, TextSpan},
+    DebugFlags,
+};
 
 use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator};
 
@@ -45,7 +60,9 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn delete_variables_until(&mut self, index: usize) {
-        if self.registered_variables.is_empty() { return; }
+        if self.registered_variables.is_empty() {
+            return;
+        }
         let current = self.registered_variables.len() - 1;
         for i in index..=current {
             self.registered_variables.remove(&(i as _));
@@ -53,12 +70,15 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn look_up_variable_by_name(&self, name: &str) -> Option<(u64, Type)> {
-        self.registered_variables.iter().find(|(_, v)| v.identifier == name).map(|(&i, v)| (i, v.type_.clone()))
+        self.registered_variables
+            .iter()
+            .find(|(_, v)| v.identifier == name)
+            .map(|(&i, v)| (i, v.type_.clone()))
     }
 }
 
 fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
-    let mut variable_table : Vec<_> = variable_table.iter().collect();
+    let mut variable_table: Vec<_> = variable_table.iter().collect();
     variable_table.sort_unstable_by_key(|f| f.0);
     for (index, variable) in variable_table {
         println!(
@@ -70,11 +90,11 @@ fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
 }
 
 pub fn bind<'a, 'b>(
-    input: &'a str,
+    source_text: &'a SourceText<'a, 'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundNode<'a> {
-    let node = parser::parse(input, diagnostic_bag);
+    let node = parser::parse(source_text, diagnostic_bag);
     if diagnostic_bag.has_errors() {
         return BoundNode::error(TextSpan::new(0, 0));
     }
@@ -98,11 +118,15 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::BlockStatement(block_statement) => {
             bind_block_statement(node.span, block_statement, binder)
         }
-        SyntaxNodeKind::IfStatement(if_statement) => bind_if_statement(node.span, if_statement, binder),
+        SyntaxNodeKind::IfStatement(if_statement) => {
+            bind_if_statement(node.span, if_statement, binder)
+        }
         SyntaxNodeKind::VariableDeclaration(variable_declaration) => {
             bind_variable_declaration(node.span, variable_declaration, binder)
         }
-        SyntaxNodeKind::WhileStatement(while_statement) => bind_while_statement(node.span, while_statement, binder),
+        SyntaxNodeKind::WhileStatement(while_statement) => {
+            bind_while_statement(node.span, while_statement, binder)
+        }
         SyntaxNodeKind::Assignment(assignment) => bind_assignment(node.span, assignment, binder),
         SyntaxNodeKind::ExpressionStatement(expression_statement) => {
             bind_expression_statement(node.span, expression_statement, binder)
@@ -126,7 +150,9 @@ fn bind_variable<'a, 'b>(
     match binder.look_up_variable_by_name(variable.token.lexeme) {
         Some((index, type_)) => BoundNode::variable(span, index, type_),
         None => {
-            binder.diagnostic_bag.report_variable_not_found(span, variable.token.lexeme);
+            binder
+                .diagnostic_bag
+                .report_variable_not_found(span, variable.token.lexeme);
             BoundNode::error(span)
         }
     }
@@ -169,14 +195,22 @@ fn bind_binary_operator<'a, 'b>(
         (lhs, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, rhs) if lhs == rhs => {
             Some((result, Type::Boolean))
         }
-        (Type::Integer, BoundBinaryOperator::ArithmeticAddition 
-                    | BoundBinaryOperator::ArithmeticSubtraction 
-                    | BoundBinaryOperator::ArithmeticMultiplication 
-                    | BoundBinaryOperator::ArithmeticDivision, Type::Integer) => Some((result, Type::Integer)),
-        (Type::Integer, BoundBinaryOperator::LessThan
-                    | BoundBinaryOperator::GreaterThan
-                    | BoundBinaryOperator::LessThanEquals
-                    | BoundBinaryOperator::GreaterThanEquals, Type::Integer) => Some((result, Type::Boolean)),
+        (
+            Type::Integer,
+            BoundBinaryOperator::ArithmeticAddition
+            | BoundBinaryOperator::ArithmeticSubtraction
+            | BoundBinaryOperator::ArithmeticMultiplication
+            | BoundBinaryOperator::ArithmeticDivision,
+            Type::Integer,
+        ) => Some((result, Type::Integer)),
+        (
+            Type::Integer,
+            BoundBinaryOperator::LessThan
+            | BoundBinaryOperator::GreaterThan
+            | BoundBinaryOperator::LessThanEquals
+            | BoundBinaryOperator::GreaterThanEquals,
+            Type::Integer,
+        ) => Some((result, Type::Boolean)),
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
             binder.diagnostic_bag.report_no_binary_operator(
@@ -243,7 +277,11 @@ fn bind_if_statement<'a, 'b>(
 ) -> BoundNode<'a> {
     let condition = bind_node(*if_statement.condition, binder);
     if !matches!(condition.type_, Type::Boolean) {
-        binder.diagnostic_bag.report_cannot_convert(condition.span, &condition.type_, &Type::Boolean);
+        binder.diagnostic_bag.report_cannot_convert(
+            condition.span,
+            &condition.type_,
+            &Type::Boolean,
+        );
     }
     let body = bind_node(*if_statement.body, binder);
     BoundNode::if_statement(span, condition, body)
@@ -280,7 +318,11 @@ fn bind_while_statement<'a, 'b>(
 ) -> BoundNode<'a> {
     let condition = bind_node(*while_statement.condition, binder);
     if !matches!(condition.type_, Type::Boolean) {
-        binder.diagnostic_bag.report_cannot_convert(condition.span, &condition.type_, &Type::Boolean);
+        binder.diagnostic_bag.report_cannot_convert(
+            condition.span,
+            &condition.type_,
+            &Type::Boolean,
+        );
     }
     let body = bind_node(*while_statement.body, binder);
     BoundNode::while_statement(span, condition, body)
@@ -292,11 +334,14 @@ fn bind_assignment<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let variable_span = assignment.lhs.span();
-    let variable = assert_matches!(assignment.lhs.kind, SyntaxNodeKind::Variable(variable) => variable);
+    let variable =
+        assert_matches!(assignment.lhs.kind, SyntaxNodeKind::Variable(variable) => variable);
     let variable = bind_variable(variable_span, variable, binder);
     let expression = bind_node(*assignment.expression, binder);
     if !expression.type_.can_be_converted_to(&variable.type_) {
-        binder.diagnostic_bag.report_cannot_convert(span, &expression.type_, &variable.type_);
+        binder
+            .diagnostic_bag
+            .report_cannot_convert(span, &expression.type_, &variable.type_);
     }
     BoundNode::assignment(span, variable, expression)
 }

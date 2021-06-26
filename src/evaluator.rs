@@ -1,4 +1,8 @@
-use crate::{DebugFlags, instruction_converter::instruction::{op_codes::OpCode, Instruction}, value::Value};
+use crate::{
+    instruction_converter::instruction::{op_codes::OpCode, Instruction},
+    value::Value,
+    DebugFlags,
+};
 
 type ResultType = Value;
 
@@ -11,7 +15,9 @@ struct EvaluatorState {
 impl EvaluatorState {
     fn set_variable(&mut self, variable: u64, value: u64) {
         let variable = variable as usize;
-        while self.registers.len() <= variable {self.registers.push(0);}
+        while self.registers.len() <= variable {
+            self.registers.push(0);
+        }
         self.registers[variable] = value;
     }
 }
@@ -43,16 +49,13 @@ pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> Resu
 }
 
 fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
-
     match instruction.op_code {
         OpCode::NoOp => {}
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),
         OpCode::Pop => evaluate_pop(state, instruction),
         OpCode::LoadRegister => evaluate_load_register(state, instruction),
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
-        OpCode::BitwiseTwosComplement => {
-            evaluate_bitwise_twos_complement(state, instruction)
-        }
+        OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
         OpCode::BitwiseNxor => evaluate_bitwise_nxor(state, instruction),
         OpCode::Addition => evaluate_addition(state, instruction),

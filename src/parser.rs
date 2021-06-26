@@ -67,7 +67,10 @@ fn parse_block_statement<'a, 'b>(
 ) -> SyntaxNode<'a> {
     let open_brace_token = match_token!(tokens, diagnostic_bag, LBrace);
     let mut statements = vec![];
-    while !matches!(peek_token(tokens).kind, SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi) {
+    while !matches!(
+        peek_token(tokens).kind,
+        SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi
+    ) {
         statements.push(parse_statement(tokens, diagnostic_bag));
     }
     let close_brace_token = match_token!(tokens, diagnostic_bag, RBrace);
@@ -100,7 +103,13 @@ fn parse_variable_declaration<'a, 'b>(
     let equals_token = match_token!(tokens, diagnostic_bag, Equals);
     let initializer = parse_expression(tokens, diagnostic_bag);
     let semicolon_token = match_token!(tokens, diagnostic_bag, Semicolon);
-    SyntaxNode::variable_declaration(let_keyword, identifier, equals_token, initializer, semicolon_token)
+    SyntaxNode::variable_declaration(
+        let_keyword,
+        identifier,
+        equals_token,
+        initializer,
+        semicolon_token,
+    )
 }
 
 fn parse_while_statement<'a, 'b>(
@@ -188,12 +197,18 @@ fn parse_primary<'a, 'b>(
             let expression = parse_expression(tokens, diagnostic_bag);
             let rparen = match_token!(tokens, diagnostic_bag, RParen);
             SyntaxNode::parenthesized(lparen, expression, rparen)
-        },
+        }
         SyntaxTokenKind::NumberLiteral(_) => parse_number_literal(tokens, diagnostic_bag),
-        SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => parse_boolean_literal(tokens, diagnostic_bag),
+        SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => {
+            parse_boolean_literal(tokens, diagnostic_bag)
+        }
         SyntaxTokenKind::Identifier => parse_identifier(tokens, diagnostic_bag),
         unexpected_token => {
-            diagnostic_bag.report_unexpected_token_kind(span, unexpected_token, &SyntaxTokenKind::default_number_literal());
+            diagnostic_bag.report_unexpected_token_kind(
+                span,
+                unexpected_token,
+                &SyntaxTokenKind::default_number_literal(),
+            );
             // next_token(tokens);
             SyntaxNode::error(span.start())
         }
@@ -209,7 +224,7 @@ fn parse_number_literal<'a, 'b>(
 
 fn parse_boolean_literal<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    _: &mut DiagnosticBag<'a>
+    _: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let token = next_token(tokens);
     match token.kind {

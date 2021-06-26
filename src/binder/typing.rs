@@ -25,11 +25,15 @@ impl From<Value> for Type {
 
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Type::Error => "error",
-            Type::Void => "void",
-            Type::Integer => "int",
-            Type::Boolean => "bool",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Type::Error => "error",
+                Type::Void => "void",
+                Type::Integer => "int",
+                Type::Boolean => "bool",
+            }
+        )
     }
 }
