@@ -24,10 +24,10 @@ macro_rules! const_number_literal_syntax_token {
 }
 
 impl<'a> SyntaxToken<'a> {
-    pub fn number_literal(
+    pub fn number_literal<'b>(
         start: usize,
         lexeme: &'a str,
-        diagnostic_bag: &mut DiagnosticBag,
+        diagnostic_bag: &mut DiagnosticBag<'a>,
     ) -> Self {
         let value = match lexeme.parse::<u64>() {
             Ok(value) => value,

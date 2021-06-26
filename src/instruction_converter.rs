@@ -22,9 +22,9 @@ use crate::{
 
 use self::instruction::Instruction;
 
-pub fn convert(
-    input: &str,
-    diagnostic_bag: &mut DiagnosticBag,
+pub fn convert<'a>(
+    input: &'a str,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> Vec<Instruction> {
     let bound_node = binder::bind(input, diagnostic_bag, debug_flags);

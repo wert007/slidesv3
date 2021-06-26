@@ -4,6 +4,7 @@ use crate::diagnostics::Diagnostic;
 use crate::lexer::syntax_token::NumberLiteralKind;
 use crate::parser::syntax_nodes::LiteralNodeKind;
 use crate::parser::syntax_nodes::VariableNodeKind;
+use crate::text::SourceText;
 use crate::value::Value;
 use assert_matches::assert_matches;
 
@@ -96,7 +97,7 @@ fn parse_helper_expression<'a>(input: &'a str) -> SyntaxNode<'a> {
 }
 
 fn parse_helper<'a>(input: &'a str) -> SyntaxNode<'a> {
-    let mut diagnostic_bag = DiagnosticBag::new();
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
     let result = parse(input, &mut diagnostic_bag);
     assert!(!diagnostic_bag.has_errors());
     result
@@ -208,7 +209,7 @@ fn parser_error() {
 }
 
 fn parse_helper_error<'a>(input: &'a str) -> (SyntaxNode<'a>, Vec<Diagnostic>) {
-    let mut diagnostic_bag = DiagnosticBag::new();
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
     let result = parse(input, &mut diagnostic_bag);
     assert!(diagnostic_bag.has_errors());
     (result, diagnostic_bag.diagnostics)

@@ -1,6 +1,6 @@
 use assert_matches::assert_matches;
 
-use crate::lexer::syntax_token::{NumberLiteralKind, SyntaxTokenKind};
+use crate::{lexer::syntax_token::{NumberLiteralKind, SyntaxTokenKind}, text::SourceText};
 
 use super::*;
 
@@ -56,7 +56,7 @@ fn lexer_successfull() {
 }
 
 fn lex_helper_successfull(input: &str) -> VecDeque<SyntaxToken> {
-    let mut diagnostic_bag = DiagnosticBag::new();
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
     let result = lex(input, &mut diagnostic_bag);
     assert!(!diagnostic_bag.has_errors());
     result
@@ -83,7 +83,7 @@ fn lex_helper_error(
     input: &str,
     expected_success_length: usize,
 ) -> Vec<crate::diagnostics::Diagnostic> {
-    let mut diagnostic_bag = DiagnosticBag::new();
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
     let result = lex(input, &mut diagnostic_bag);
     assert!(diagnostic_bag.has_errors(), "input: {}", input);
     assert_eq!(result.len(), expected_success_length);

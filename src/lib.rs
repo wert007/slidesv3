@@ -8,12 +8,14 @@ mod parser;
 mod text;
 mod value;
 
-use crate::{diagnostics::DiagnosticBag};
+use crate::{diagnostics::DiagnosticBag, text::SourceText};
 
 pub use debug::DebugFlags;
 
-pub fn evaluate(input: &str, debug_flags: DebugFlags) {
-    let mut diagnostic_bag = DiagnosticBag::new();
+pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
+    let source_text = SourceText::new(input, "this_is_a_file.txt");
+    dbg!(source_text);
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, file_name));
     let result = instruction_converter::convert(input, &mut diagnostic_bag, debug_flags);
     // let result = binder::bind(input, &mut diagnostic_bag);
     if diagnostic_bag.has_errors() {

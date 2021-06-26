@@ -22,7 +22,7 @@ struct TextIndex {
     char_index: usize,
 }
 
-pub fn lex<'a>(content: &'a str, diagnostic_bag: &mut DiagnosticBag) -> VecDeque<SyntaxToken<'a>> {
+pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> VecDeque<SyntaxToken<'a>> {
     let mut result = VecDeque::new();
     let mut state = State::Default;
     for (char_index, (byte_index, character)) in content.char_indices().enumerate() {

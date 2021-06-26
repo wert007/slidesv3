@@ -1,6 +1,6 @@
 use assert_matches::assert_matches;
 
-use crate::{binder::bound_nodes::BoundNodeKind, diagnostics::Diagnostic, value::Value};
+use crate::{binder::bound_nodes::BoundNodeKind, diagnostics::Diagnostic, text::SourceText, value::Value};
 
 use super::*;
 
@@ -81,7 +81,7 @@ fn successful_binding() {
 }
 
 fn bind_helper(input: &str) -> BoundNode {
-    let mut diagnostic_bag = DiagnosticBag::new();
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
     let result = bind(input, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
     result
@@ -111,10 +111,9 @@ fn failed_binding() {
 }
 
 fn bind_helper_errors_expression(input: &str) -> (BoundNode, Vec<Diagnostic>) {
-    let mut diagnostic_bag = DiagnosticBag::new();
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
     let node = bind(input, &mut diagnostic_bag, DebugFlags::default());
     let node = assert_matches!(node.kind, BoundNodeKind::ExpressionStatement(expression_statement) => *expression_statement.expression);
     assert!(diagnostic_bag.has_errors());
     (node, diagnostic_bag.diagnostics)
-    
 }

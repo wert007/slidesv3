@@ -16,7 +16,7 @@ use crate::{
 use self::syntax_nodes::SyntaxNode;
 use crate::match_token;
 
-pub fn parse<'a>(input: &'a str, diagnostic_bag: &mut DiagnosticBag) -> SyntaxNode<'a> {
+pub fn parse<'a, 'b>(input: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> SyntaxNode<'a> {
     let mut tokens = lexer::lex(input, diagnostic_bag);
     if diagnostic_bag.has_errors() {
         return SyntaxNode::error(0);
@@ -26,7 +26,7 @@ pub fn parse<'a>(input: &'a str, diagnostic_bag: &mut DiagnosticBag) -> SyntaxNo
     result
 }
 
-fn parse_statement<'a>(tokens: &mut VecDeque<SyntaxToken<'a>>, diagnostic_bag: &mut DiagnosticBag) -> SyntaxNode<'a> {
+fn parse_statement<'a, 'b>(tokens: &mut VecDeque<SyntaxToken<'a>>, diagnostic_bag: &mut DiagnosticBag<'a>) -> SyntaxNode<'a> {
     match &peek_token(tokens).kind {
         SyntaxTokenKind::LBrace => parse_block_statement(tokens, diagnostic_bag),
         SyntaxTokenKind::IfKeyword => parse_if_statement(tokens, diagnostic_bag),
@@ -36,7 +36,7 @@ fn parse_statement<'a>(tokens: &mut VecDeque<SyntaxToken<'a>>, diagnostic_bag: &
     }
 }
 
-fn next_token<'a>(tokens: &mut VecDeque<SyntaxToken<'a>>) -> SyntaxToken<'a> {
+fn next_token<'a, 'b>(tokens: &mut VecDeque<SyntaxToken<'a>>) -> SyntaxToken<'a> {
     if tokens.is_empty() {
         panic!("No tokens could be found!")
     } else if tokens.len() == 1 {
@@ -54,9 +54,9 @@ fn peek_token<'a, 'b>(tokens: &'b mut VecDeque<SyntaxToken<'a>>) -> &'b SyntaxTo
     }
 }
 
-fn parse_block_statement<'a>(
+fn parse_block_statement<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let open_brace_token = match_token!(tokens, diagnostic_bag, LBrace);
     let mut statements = vec![];
@@ -67,9 +67,9 @@ fn parse_block_statement<'a>(
     SyntaxNode::block_statement(open_brace_token, statements, close_brace_token)
 }
 
-fn parse_if_statement<'a>(
+fn parse_if_statement<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let if_keyword = match_token!(tokens, diagnostic_bag, IfKeyword);
     let condition = parse_expression(tokens, diagnostic_bag);
@@ -78,9 +78,9 @@ fn parse_if_statement<'a>(
     SyntaxNode::if_statement(if_keyword, condition, body)
 }
 
-fn parse_variable_declaration<'a>(
+fn parse_variable_declaration<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let let_keyword = match_token!(tokens, diagnostic_bag, LetKeyword);
     let identifier = if peek_token(tokens).kind.is_keyword() {
@@ -96,9 +96,9 @@ fn parse_variable_declaration<'a>(
     SyntaxNode::variable_declaration(let_keyword, identifier, equals_token, initializer, semicolon_token)
 }
 
-fn parse_while_statement<'a>(
+fn parse_while_statement<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let while_keyword = match_token!(tokens, diagnostic_bag, WhileKeyword);
     let condition = parse_expression(tokens, diagnostic_bag);
@@ -106,9 +106,9 @@ fn parse_while_statement<'a>(
     SyntaxNode::while_statement(while_keyword, condition, body)
 }
 
-fn parse_assignment_statement<'a>(
+fn parse_assignment_statement<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let lhs = parse_binary_with_parent_precedence(tokens, diagnostic_bag, 1);
     if matches!(peek_token(tokens).kind, SyntaxTokenKind::Equals) {
@@ -125,23 +125,23 @@ fn parse_assignment_statement<'a>(
     }
 }
 
-fn parse_expression<'a>(
+fn parse_expression<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     parse_binary(tokens, diagnostic_bag)
 }
 
-fn parse_binary<'a>(
+fn parse_binary<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     parse_binary_with_parent_precedence(tokens, diagnostic_bag, 0)
 }
 
-fn parse_binary_with_parent_precedence<'a>(
+fn parse_binary_with_parent_precedence<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
     parent_precedence: u32,
 ) -> SyntaxNode<'a> {
     let mut lhs;
@@ -170,9 +170,9 @@ fn parse_binary_with_parent_precedence<'a>(
     lhs
 }
 
-fn parse_primary<'a>(
+fn parse_primary<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let span = peek_token(tokens).span();
     match &peek_token(tokens).kind {
@@ -193,16 +193,16 @@ fn parse_primary<'a>(
     }
 }
 
-fn parse_number_literal<'a>(
+fn parse_number_literal<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     SyntaxNode::literal(match_token!(tokens, diagnostic_bag, NumberLiteral))
 }
 
-fn parse_boolean_literal<'a>(
+fn parse_boolean_literal<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    _: &mut DiagnosticBag
+    _: &mut DiagnosticBag<'a>
 ) -> SyntaxNode<'a> {
     let token = next_token(tokens);
     match token.kind {
@@ -212,9 +212,9 @@ fn parse_boolean_literal<'a>(
     }
 }
 
-fn parse_identifier<'a>(
+fn parse_identifier<'a, 'b>(
     tokens: &mut VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &mut DiagnosticBag,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     SyntaxNode::variable(match_token!(tokens, diagnostic_bag, Identifier))
 }

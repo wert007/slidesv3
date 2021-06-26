@@ -1,6 +1,6 @@
 use assert_matches::assert_matches;
 
-use crate::instruction_converter::instruction::op_codes::OpCode;
+use crate::{instruction_converter::instruction::op_codes::OpCode, text::SourceText};
 
 use super::*;
 
@@ -43,7 +43,7 @@ fn instruction_converter_success() {
 }
 
 fn converter_helper(input: &str, expected_instruction_length: usize) -> Vec<Instruction> {
-    let mut diagnostic_bag = DiagnosticBag::new();
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
     let result = convert(input, &mut diagnostic_bag, DebugFlags::default());
     assert_eq!(result.len(), expected_instruction_length);
     assert!(!diagnostic_bag.has_errors());
