@@ -1,31 +1,33 @@
-use crate::{binder::typing::Type, lexer::syntax_token::SyntaxTokenKind, text::TextSpan};
+use crate::{binder::typing::Type, lexer::syntax_token::SyntaxTokenKind, text::{SourceText, TextLocation, TextSpan}};
 
 #[derive(Debug)]
-pub struct Diagnostic {
+pub struct Diagnostic<'a> {
     message: String,
-    span: TextSpan,
+    location: TextLocation<'a>,
 }
 
-impl std::fmt::Display for Diagnostic {
+impl std::fmt::Display for Diagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "Error at {}-{}: {}",
-            self.span.start(),
-            self.span.end(),
+            self.location.span.start(),
+            self.location.span.end(),
             self.message
         )
     }
 }
 
-pub struct DiagnosticBag {
-    pub diagnostics: Vec<Diagnostic>,
+pub struct DiagnosticBag<'a> {
+    pub diagnostics: Vec<Diagnostic<'a>>,
+    pub source_text: SourceText<'a, 'a>,
 }
 
-impl DiagnosticBag {
-    pub fn new() -> Self {
+impl<'a> DiagnosticBag<'a> {
+    pub fn new(source_text: SourceText<'a, 'a>) -> Self {
         Self {
             diagnostics: vec![],
+            source_text,
         }
     }
 
@@ -39,19 +41,26 @@ impl DiagnosticBag {
         }
     }
 
-    fn report(&mut self, diagnostic: Diagnostic) {
+    fn report(&mut self, message: String, span: TextSpan) {
+        let diagnostic = Diagnostic {
+            message,
+            location: TextLocation {
+                span,
+                file_name: self.source_text.file_name,
+            }
+        };
         self.diagnostics.push(diagnostic);
     }
 
     pub fn report_bad_input(&mut self, start: usize, character: char) {
         let message = format!("Bad character in input: {}", character);
         let span = TextSpan::new(start, 1);
-        self.report(Diagnostic { message, span })
+        self.report(message, span)
     }
     pub fn report_bad_integer(&mut self, start: usize, text: &str) {
         let message = format!("'{}' is no valid u64 integer.", text);
         let span = TextSpan::new(start, text.len());
-        self.report(Diagnostic { message, span })
+        self.report(message, span)
     }
 
     pub fn report_unexpected_token_kind(
@@ -64,18 +73,18 @@ impl DiagnosticBag {
             "Expected token kind {:?} but actually found {:?}.",
             expected_token_kind, actual_token_kind
         );
-        self.report(Diagnostic { message, span })
+        self.report(message, span)
     }
 
     #[allow(dead_code)]
     pub fn report_cannot_convert(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
         let message = format!("Cannot convert type {} to type {}.", from_type, to_type);
-        self.report(Diagnostic { message, span })
+        self.report(message, span)
     }
 
     pub fn report_no_unary_operator(&mut self, span: TextSpan, operator: &str, type_: &Type) {
         let message = format!("No unary operator {} for type {}.", operator, type_);
-        self.report(Diagnostic { message, span });
+        self.report(message, span);
     }
 
     pub fn report_no_binary_operator(
@@ -89,13 +98,13 @@ impl DiagnosticBag {
             "No binary operator {} for types {} and {}.",
             operator, lhs_type, rhs_type
         );
-        self.report(Diagnostic { message, span });
+        self.report(message, span);
     }
 
     #[allow(dead_code)]
     pub fn report_not_supported(&mut self, span: TextSpan, unsupported: &str) {
         let message = format!("Currently {} are not supported!", unsupported);
-        self.report(Diagnostic { message, span });
+        self.report(message, span);
     }
 
     pub fn report_cannot_declare_variable(&mut self, span: TextSpan, variable_name: &str) {
@@ -103,7 +112,7 @@ impl DiagnosticBag {
             "A variable named '{}' cannot be declared here.",
             variable_name
         );
-        self.report(Diagnostic { message, span });
+        self.report(message, span);
     }
 
     pub fn report_cannot_declare_keyword_as_variable(
@@ -115,16 +124,16 @@ impl DiagnosticBag {
             "'{}' is a keyword and cannot be overwritten.",
             variable_name
         );
-        self.report(Diagnostic { message, span });
+        self.report(message, span);
     }
 
     pub fn report_variable_not_found(&mut self, span: TextSpan, variable_name: &str) {
         let message = format!("No variable named '{}' could be found.", variable_name);
-        self.report(Diagnostic { message, span });
+        self.report(message, span);
     }
 
     pub fn report_cannot_assign_to(&mut self, span: TextSpan) {
         let message = "Only variables can be assigned to. Did you mean to use ==?".into();
-        self.report(Diagnostic { message, span });
+        self.report(message, span);
     }
 }
