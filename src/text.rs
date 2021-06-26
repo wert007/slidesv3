@@ -118,7 +118,10 @@ pub struct TextSpan {
 #[allow(dead_code)]
 impl TextSpan {
     pub fn bounds(start: Self, end: Self) -> Self {
-        Self {start: start.start, length: end.end() - start.start}
+        Self {
+            start: start.start,
+            length: end.end() - start.start,
+        }
     }
 
     pub fn new(start: usize, length: usize) -> Self {
