@@ -44,10 +44,7 @@ impl<'a> SyntaxToken<'a> {
         }
     }
 
-    pub fn number_literal_no_diagnostics(
-        start: usize,
-        lexeme: &'a str,
-    ) -> Self {
+    pub fn number_literal_no_diagnostics(start: usize, lexeme: &'a str) -> Self {
         let value = lexeme.parse::<u64>().unwrap();
         Self {
             start,

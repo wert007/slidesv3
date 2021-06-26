@@ -4,7 +4,7 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken};
+use crate::{diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::SourceText};
 
 use self::syntax_token::SyntaxTokenKind;
 
@@ -22,10 +22,14 @@ struct TextIndex {
     char_index: usize,
 }
 
-pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> VecDeque<SyntaxToken<'a>> {
+pub fn lex<'a, 'b>(
+    content: &'a SourceText<'a, 'a>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> VecDeque<SyntaxToken<'a>> {
     let mut result = VecDeque::new();
     let mut state = State::Default;
-    for (char_index, (byte_index, character)) in content.char_indices().enumerate() {
+    let text = content.text;
+    for (char_index, (byte_index, character)) in text.char_indices().enumerate() {
         let index = TextIndex {
             byte_index,
             char_index,
@@ -40,10 +44,7 @@ pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> 
                 }
                 (State::Default, ws) if ws.is_whitespace() => {}
                 (State::Default, o) if is_operator(o) => {
-                    result.push_back(SyntaxToken::operator(
-                        byte_index,
-                        &content[byte_index..][..1],
-                    ));
+                    result.push_back(SyntaxToken::operator(byte_index, &text[byte_index..][..1]));
                 }
                 (State::Default, o) if is_multi_char_operator(o) => {
                     state = State::MultiCharOperator(index);
@@ -53,7 +54,7 @@ pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> 
                         state = State::Default;
                         result.push_back(SyntaxToken::number_literal(
                             start.char_index,
-                            &content[start.byte_index..byte_index],
+                            &text[start.byte_index..byte_index],
                             diagnostic_bag,
                         ));
                         continue 'start;
@@ -62,7 +63,7 @@ pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> 
                 (State::Identifier(start), c) => {
                     if !c.is_alphanumeric() && c != '_' {
                         state = State::Default;
-                        let lexeme = &content[start.byte_index..byte_index];
+                        let lexeme = &text[start.byte_index..byte_index];
                         result.push_back(if SyntaxTokenKind::keyword(lexeme).is_some() {
                             SyntaxToken::keyword(start.char_index, lexeme)
                         } else {
@@ -74,13 +75,13 @@ pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> 
                 (State::MultiCharOperator(start), o) => {
                     if !is_multi_char_operator(o) || char_index - start.char_index > 2 {
                         state = State::Default;
-                        let lexeme = &content[start.byte_index..byte_index];
+                        let lexeme = &text[start.byte_index..byte_index];
                         if is_valid_operator(lexeme) {
                             result.push_back(SyntaxToken::operator(start.char_index, lexeme));
                         } else {
                             diagnostic_bag.report_bad_input(
                                 start.char_index,
-                                content.as_bytes()[start.byte_index] as _,
+                                text.as_bytes()[start.byte_index] as _,
                             )
                         }
                         continue 'start;
@@ -98,12 +99,12 @@ pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> 
         State::DecimalNumber(start) => {
             result.push_back(SyntaxToken::number_literal(
                 start.char_index,
-                &content[start.byte_index..],
+                &text[start.byte_index..],
                 diagnostic_bag,
             ));
         }
         State::Identifier(start) => {
-            let lexeme = &content[start.byte_index..];
+            let lexeme = &text[start.byte_index..];
             result.push_back(if SyntaxTokenKind::keyword(lexeme).is_some() {
                 SyntaxToken::keyword(start.char_index, lexeme)
             } else {
@@ -111,21 +112,24 @@ pub fn lex<'a, 'b>(content: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> 
             });
         }
         State::MultiCharOperator(start) => {
-            let lexeme = &content[start.byte_index..];
+            let lexeme = &text[start.byte_index..];
             if !is_valid_operator(lexeme) {
                 diagnostic_bag
-                    .report_bad_input(start.char_index, content.as_bytes()[start.byte_index] as _)
+                    .report_bad_input(start.char_index, text.as_bytes()[start.byte_index] as _)
             } else {
                 result.push_back(SyntaxToken::operator(start.char_index, lexeme));
             }
         }
     }
-    result.push_back(SyntaxToken::eoi(content.len()));
+    result.push_back(SyntaxToken::eoi(text.len()));
     result
 }
 
 fn is_operator(character: char) -> bool {
-    matches!(character, '+' | '-' | '*' | '/' | '(' | ')' | ';' | '{' | '}')
+    matches!(
+        character,
+        '+' | '-' | '*' | '/' | '(' | ')' | ';' | '{' | '}'
+    )
 }
 
 fn is_multi_char_operator(character: char) -> bool {

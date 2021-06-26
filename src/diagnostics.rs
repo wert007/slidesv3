@@ -8,23 +8,17 @@ pub struct Diagnostic<'a> {
 
 impl std::fmt::Display for Diagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Error at {}-{}: {}",
-            self.location.span.start(),
-            self.location.span.end(),
-            self.message
-        )
+        write!(f, "Error {}: {}", self.location, self.message)
     }
 }
 
 pub struct DiagnosticBag<'a> {
     pub diagnostics: Vec<Diagnostic<'a>>,
-    pub source_text: SourceText<'a, 'a>,
+    pub source_text: &'a SourceText<'a, 'a>,
 }
 
 impl<'a> DiagnosticBag<'a> {
-    pub fn new(source_text: SourceText<'a, 'a>) -> Self {
+    pub fn new(source_text: &'a SourceText<'a, 'a>) -> Self {
         Self {
             diagnostics: vec![],
             source_text,
@@ -46,8 +40,8 @@ impl<'a> DiagnosticBag<'a> {
             message,
             location: TextLocation {
                 span,
-                file_name: self.source_text.file_name,
-            }
+                source_text: self.source_text,
+            },
         };
         self.diagnostics.push(diagnostic);
     }

@@ -17,17 +17,18 @@ use crate::{
     debug::DebugFlags,
     diagnostics::DiagnosticBag,
     parser::syntax_nodes::LiteralNodeKind,
+    text::SourceText,
     value::Value,
 };
 
 use self::instruction::Instruction;
 
 pub fn convert<'a>(
-    input: &'a str,
+    source_text: &'a SourceText<'a, 'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> Vec<Instruction> {
-    let bound_node = binder::bind(input, diagnostic_bag, debug_flags);
+    let bound_node = binder::bind(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return vec![];
     }

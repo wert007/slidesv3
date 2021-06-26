@@ -11,13 +11,17 @@ use crate::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
     },
+    text::SourceText,
 };
 
 use self::syntax_nodes::SyntaxNode;
 use crate::match_token;
 
-pub fn parse<'a, 'b>(input: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> SyntaxNode<'a> {
-    let mut tokens = lexer::lex(input, diagnostic_bag);
+pub fn parse<'a, 'b>(
+    source_text: &'a SourceText<'a, 'a>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let mut tokens = lexer::lex(source_text, diagnostic_bag);
     if diagnostic_bag.has_errors() {
         return SyntaxNode::error(0);
     }
@@ -26,7 +30,10 @@ pub fn parse<'a, 'b>(input: &'a str, diagnostic_bag: &mut DiagnosticBag<'a>) -> 
     result
 }
 
-fn parse_statement<'a, 'b>(tokens: &mut VecDeque<SyntaxToken<'a>>, diagnostic_bag: &mut DiagnosticBag<'a>) -> SyntaxNode<'a> {
+fn parse_statement<'a, 'b>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
     match &peek_token(tokens).kind {
         SyntaxTokenKind::LBrace => parse_block_statement(tokens, diagnostic_bag),
         SyntaxTokenKind::IfKeyword => parse_if_statement(tokens, diagnostic_bag),
