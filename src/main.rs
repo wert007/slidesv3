@@ -28,13 +28,13 @@ fn repl(debug_flags: DebugFlags) -> Result<(), std::io::Error> {
         if buf.is_empty() {
             break;
         }
-        slides::evaluate(&buf, debug_flags);
+        slides::evaluate(&buf, "", debug_flags);
     }
     Ok(())
 }
 
 fn compile(file_path: &str, debug_flags: DebugFlags) -> Result<(), std::io::Error> {
     let file = std::fs::read_to_string(file_path)?;
-    slides::evaluate(&file, debug_flags);
+    slides::evaluate(&file, file_path, debug_flags);
     Ok(())
 }
