@@ -5,7 +5,8 @@ use assert_matches::assert_matches;
 
 #[test]
 fn number_literal() {
-    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new("4312", ""));
+    let source_text = SourceText::new("4312", "");
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let number_literal = SyntaxToken::number_literal(0, "4312", &mut diagnostic_bag);
     assert!(!diagnostic_bag.has_errors());
     if let SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value }) = number_literal.kind {
@@ -14,7 +15,8 @@ fn number_literal() {
         panic!("number_literal.kind is wrong: {:?}", number_literal.kind);
     }
 
-    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new("431243124312431243124312431243124312", ""));
+    let source_text = SourceText::new("431243124312431243124312431243124312", "");
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let number_literal = SyntaxToken::number_literal(
         0,
         "431243124312431243124312431243124312",
