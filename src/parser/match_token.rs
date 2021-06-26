@@ -10,7 +10,7 @@ macro_rules! match_token {
                 &current.kind,
                 &SyntaxTokenKind::default_number_literal(),
             );
-            SyntaxToken::number_literal(current.span().start(), "0", &mut DiagnosticBag::new())
+            SyntaxToken::number_literal_no_diagnostics(current.span().start(), "0")
         }
     };
     ($tokens:expr, $diagnostic_bag:expr, Eoi) => {

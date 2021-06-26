@@ -44,6 +44,18 @@ impl<'a> SyntaxToken<'a> {
         }
     }
 
+    pub fn number_literal_no_diagnostics(
+        start: usize,
+        lexeme: &'a str,
+    ) -> Self {
+        let value = lexeme.parse::<u64>().unwrap();
+        Self {
+            start,
+            lexeme,
+            kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value }),
+        }
+    }
+
     pub fn keyword(start: usize, lexeme: &'a str) -> Self {
         let kind = SyntaxTokenKind::keyword(lexeme).expect(lexeme);
         Self {

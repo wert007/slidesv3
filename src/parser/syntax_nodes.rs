@@ -32,8 +32,7 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn error(start: usize) -> Self {
-        let mut diagnostic_bag = crate::diagnostics::DiagnosticBag::new();
-        let mut result = Self::literal(SyntaxToken::number_literal(start, "0", &mut diagnostic_bag));
+        let mut result = Self::literal(SyntaxToken::number_literal_no_diagnostics(start, "0"));
         result.is_inserted = true;
         result
     }
