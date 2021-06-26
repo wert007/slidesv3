@@ -1,6 +1,6 @@
 #[derive(Debug, Clone)]
 pub struct SourceText<'a, 'b> {
-    text: &'a str,
+    pub text: &'a str,
     pub file_name: &'b str,
     lines: Vec<TextLine<'a>>,
 }
@@ -28,6 +28,10 @@ impl<'a, 'b> SourceText<'a, 'b> {
             }
         }
         lower - 1
+    }
+
+    pub fn column_index(&self, position: usize) -> usize {
+        position - self.lines[self.line_index(position)].start
     }
 }
 
@@ -96,18 +100,37 @@ impl std::fmt::Debug for TextLine<'_> {
             .field("text", &self.line_text())
             .field("start", &self.start)
             .field("length", &self.length)
-            .field("length_including_line_break", &self.length_including_line_break)
+            .field(
+                "length_including_line_break",
+                &self.length_including_line_break,
+            )
             .finish()
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct TextLocation<'a> {
     pub span: TextSpan,
-    pub file_name: &'a str
+    pub source_text: &'a SourceText<'a, 'a>,
 }
 
+impl std::fmt::Display for TextLocation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.source_text.file_name.is_empty() {
+            write!(f, "at {}-{}", self.span.start(), self.span.end())
+        } else {
+            let start_line = self.source_text.line_index(self.span.start()) + 1;
+            let start_column = self.source_text.column_index(self.span.start()) + 1;
+            // let end_line = self.source_text.line_index(self.span.end()) + 1;
+            // let end_column = self.source_text.column_index(self.span.end()) + 1;
+            write!(
+                f,
+                "in {}:{}:{}",
+                self.source_text.file_name, start_line, start_column
+            )
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct TextSpan {
