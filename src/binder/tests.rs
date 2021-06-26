@@ -104,10 +104,20 @@ fn failed_binding() {
     assert_eq!(diagnostics[0].to_string(), "Error at 1-12: No binary operator == for types bool and int.");
     assert_matches!(node.kind, BoundNodeKind::ErrorExpression);
 
-    let (node, diagnostics) = bind_helper_errors_expression("let a = a + 3;");
+    let (node, diagnostics) = bind_helper_errors("let a = a + 3;");
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].to_string(), "Error at 8-9: No variable named 'a' could be found.");
-    assert_matches!(node.kind, BoundNodeKind::ErrorExpression);
+    assert_matches!(node.kind, BoundNodeKind::VariableDeclaration(variable_declaration) => {
+        assert_eq!(variable_declaration.variable_index, 0);
+        assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::ErrorExpression);
+    });
+}
+
+fn bind_helper_errors(input: &str) -> (BoundNode, Vec<Diagnostic>) {
+    let mut diagnostic_bag = DiagnosticBag::new(SourceText::new(input, ""));
+    let node = bind(input, &mut diagnostic_bag, DebugFlags::default());
+    assert!(diagnostic_bag.has_errors());
+    (node, diagnostic_bag.diagnostics)
 }
 
 fn bind_helper_errors_expression(input: &str) -> (BoundNode, Vec<Diagnostic>) {
