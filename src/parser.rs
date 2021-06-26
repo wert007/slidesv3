@@ -18,7 +18,7 @@ use self::syntax_nodes::SyntaxNode;
 use crate::match_token;
 
 pub fn parse<'a>(
-    source_text: &'a SourceText<'a, 'a>,
+    source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let mut tokens = lexer::lex(source_text, diagnostic_bag);

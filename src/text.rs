@@ -1,12 +1,12 @@
 #[derive(Debug, Clone)]
-pub struct SourceText<'a, 'b> {
+pub struct SourceText<'a> {
     pub text: &'a str,
-    pub file_name: &'b str,
+    pub file_name: &'a str,
     lines: Vec<TextLine<'a>>,
 }
 
-impl<'a, 'b> SourceText<'a, 'b> {
-    pub fn new(text: &'a str, file_name: &'b str) -> Self {
+impl<'a> SourceText<'a> {
+    pub fn new(text: &'a str, file_name: &'a str) -> Self {
         let lines = parse_text_lines(text);
         Self {
             text,
@@ -111,7 +111,7 @@ impl std::fmt::Debug for TextLine<'_> {
 #[derive(Debug, Clone)]
 pub struct TextLocation<'a> {
     pub span: TextSpan,
-    pub source_text: &'a SourceText<'a, 'a>,
+    pub source_text: &'a SourceText<'a>,
 }
 
 impl std::fmt::Display for TextLocation<'_> {

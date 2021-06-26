@@ -90,7 +90,7 @@ fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
 }
 
 pub fn bind<'a>(
-    source_text: &'a SourceText<'a, 'a>,
+    source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundNode<'a> {

@@ -18,11 +18,11 @@ impl std::fmt::Display for Diagnostic<'_> {
 
 pub struct DiagnosticBag<'a> {
     pub diagnostics: Vec<Diagnostic<'a>>,
-    pub source_text: &'a SourceText<'a, 'a>,
+    pub source_text: &'a SourceText<'a>,
 }
 
 impl<'a> DiagnosticBag<'a> {
-    pub fn new(source_text: &'a SourceText<'a, 'a>) -> Self {
+    pub fn new(source_text: &'a SourceText<'a>) -> Self {
         Self {
             diagnostics: vec![],
             source_text,

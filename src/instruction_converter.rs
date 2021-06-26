@@ -24,7 +24,7 @@ use crate::{
 use self::instruction::Instruction;
 
 pub fn convert<'a>(
-    source_text: &'a SourceText<'a, 'a>,
+    source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> Vec<Instruction> {
