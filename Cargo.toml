@@ -7,3 +7,4 @@ edition = "2018"
 
 [dependencies]
 assert_matches = "1.5"
+num_enum = "0.5"
