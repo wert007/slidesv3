@@ -167,7 +167,7 @@ fn parse_binary_with_parent_precedence<'a>(
         let operand = parse_binary_with_parent_precedence(tokens, diagnostic_bag, unary_precedence);
         lhs = SyntaxNode::unary(operator_token, operand);
     } else {
-        lhs = parse_primary(tokens, diagnostic_bag);
+        lhs = parse_function_call(tokens, diagnostic_bag);
     }
 
     loop {
@@ -184,6 +184,33 @@ fn parse_binary_with_parent_precedence<'a>(
         lhs = SyntaxNode::binary(lhs, operator_token, rhs)
     }
     lhs
+}
+
+fn parse_function_call<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let base = parse_primary(tokens, diagnostic_bag);
+    if matches!(peek_token(tokens).kind, SyntaxTokenKind::LParen) {
+        let open_parenthesis_token = next_token(tokens);
+        let mut arguments = vec![];
+        let mut comma_tokens = vec![];
+        while !matches!(
+            peek_token(tokens).kind,
+            // Currently there are no statements allowed as arguments to a
+            // function. This may change..
+            SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi | SyntaxTokenKind::Semicolon
+        ) {
+            arguments.push(parse_expression(tokens, diagnostic_bag));
+            if !matches!(peek_token(tokens).kind, SyntaxTokenKind::RParen) {
+                comma_tokens.push(match_token!(tokens, diagnostic_bag, Comma));
+            }
+        }
+        let close_parenthesis_token = match_token!(tokens, diagnostic_bag, RParen);
+        SyntaxNode::function_call(base, open_parenthesis_token, arguments, comma_tokens, close_parenthesis_token)
+    } else {
+        base
+    }
 }
 
 fn parse_primary<'a>(

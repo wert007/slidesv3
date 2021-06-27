@@ -103,6 +103,27 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn function_call(
+        base: SyntaxNode<'a>,
+        open_parenthesis_token: SyntaxToken<'a>,
+        arguments: Vec<SyntaxNode<'a>>,
+        comma_tokens: Vec<SyntaxToken<'a>>,
+        close_parenthesis_token: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(base.span(), close_parenthesis_token.span());
+        Self {
+            kind: SyntaxNodeKind::FunctionCall(FunctionCallNodeKind {
+                base: Box::new(base),
+                open_parenthesis_token,
+                arguments,
+                comma_tokens,
+                close_parenthesis_token,
+            }),
+            span,
+            is_inserted: false,
+        }
+    }
+
     pub fn if_statement(
         if_keyword: SyntaxToken<'a>,
         condition: SyntaxNode<'a>,
@@ -220,6 +241,7 @@ pub enum SyntaxNodeKind<'a> {
     Binary(BinaryNodeKind<'a>),
     Unary(UnaryNodeKind<'a>),
     Parenthesized(ParenthesizedNodeKind<'a>),
+    FunctionCall(FunctionCallNodeKind<'a>),
 
     // Statements
     BlockStatement(BlockStatementNodeKind<'a>),
@@ -265,6 +287,21 @@ pub struct ParenthesizedNodeKind<'a> {
     pub lparen: SyntaxToken<'a>,
     pub expression: Box<SyntaxNode<'a>>,
     pub rparen: SyntaxToken<'a>,
+}
+
+#[derive(Debug)]
+pub struct FunctionCallNodeKind<'a> {
+    pub base: Box<SyntaxNode<'a>>,
+    pub open_parenthesis_token: SyntaxToken<'a>,
+    pub arguments: Vec<SyntaxNode<'a>>,
+    pub comma_tokens: Vec<SyntaxToken<'a>>,
+    pub close_parenthesis_token: SyntaxToken<'a>,
+}
+
+impl FunctionCallNodeKind<'_> {
+    pub fn argument_span(&self) -> TextSpan {
+        TextSpan::bounds(self.open_parenthesis_token.span(), self.close_parenthesis_token.span())
+    }
 }
 
 #[derive(Debug)]
