@@ -1,7 +1,10 @@
+use crate::binder::typing::SystemCallKind;
+
 #[derive(Debug, Clone, Copy)]
 pub enum Value {
     Integer(i64),
     Boolean(bool),
+    SystemCall(SystemCallKind),
 }
 
 #[allow(dead_code)]
@@ -40,6 +43,7 @@ impl std::fmt::Display for Value {
         match self {
             Value::Integer(value) => write!(f, "{}", value),
             Value::Boolean(value) => write!(f, "{}", value),
+            Value::SystemCall(value) => write!(f, "system call {}", value),
         }
     }
 }
