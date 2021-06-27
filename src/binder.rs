@@ -108,7 +108,34 @@ pub fn bind<'a>(
         variable_table: HashMap::new(),
         print_variable_table: debug_flags.print_variable_table(),
     };
-    bind_node(node, &mut binder)
+    let mut statements = default_statements(&mut binder);
+    let span = node.span();
+    statements.push(bind_node(node, &mut binder));
+    BoundNode::block_statement(span, statements)
+}
+
+fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {
+    let span = TextSpan::new(0, 0);
+    let variable_index = binder
+        .register_variable("print", Type::SystemCall(SystemCallKind::Print))
+        .unwrap();
+    let token = SyntaxToken {
+        kind: SyntaxTokenKind::Eoi,
+        lexeme: "",
+        start: 0,
+    };
+    let print_statement = BoundNode::variable_declaration(
+        span,
+        variable_index,
+        BoundNode::literal(
+            span,
+            LiteralNodeKind {
+                token,
+                value: Value::SystemCall(SystemCallKind::Print),
+            },
+        ),
+    );
+    vec![print_statement]
 }
 
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
@@ -359,6 +386,11 @@ fn bind_variable_declaration<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let initializer = bind_node(*variable_declaration.initializer, binder);
+    if matches!(initializer.type_, Type::Void) {
+        binder
+            .diagnostic_bag
+            .report_invalid_void_expression(initializer.span);
+    }
     let variable_index = binder.register_variable(
         variable_declaration.identifier.lexeme,
         initializer.type_.clone(),

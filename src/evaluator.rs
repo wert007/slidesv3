@@ -1,8 +1,6 @@
-use crate::{
-    instruction_converter::instruction::{op_codes::OpCode, Instruction},
-    value::Value,
-    DebugFlags,
-};
+use num_enum::TryFromPrimitive;
+
+use crate::{DebugFlags, binder::typing::SystemCallKind, instruction_converter::instruction::{op_codes::OpCode, Instruction}, value::Value};
 
 type ResultType = Value;
 
@@ -70,6 +68,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
         OpCode::JmpRelative => evaluate_jmp_relative(state, instruction),
         OpCode::JmpIfFalse => evaluate_jmp_if_false(state, instruction),
+        OpCode::SysCall => evaluate_sys_call(state, instruction),
     }
 }
 
@@ -176,5 +175,17 @@ fn evaluate_jmp_if_false(state: &mut EvaluatorState, instruction: Instruction) {
     let condition = state.stack.pop().unwrap();
     if condition == 0 {
         state.pc = ((state.pc as i64) + (instruction.arg as i64)) as usize;
+    }
+}
+
+fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
+    let sys_call_kind = SystemCallKind::try_from_primitive((instruction.arg & 0xFF) as u8).unwrap();
+    let argument_count = (instruction.arg >> 8) as usize;
+    let mut arguments = Vec::with_capacity(argument_count);
+    for _ in 0..argument_count {
+        arguments.push(state.stack.pop().unwrap());
+    }
+    match sys_call_kind {
+        SystemCallKind::Print => println!("PRINT {}", arguments[0]),
     }
 }

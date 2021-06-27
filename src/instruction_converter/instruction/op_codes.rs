@@ -24,4 +24,5 @@ pub enum OpCode {
     //Jumps
     JmpRelative = 18,
     JmpIfFalse = 19,
+    SysCall = 20,
 }

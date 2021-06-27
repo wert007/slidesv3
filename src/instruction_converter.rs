@@ -7,9 +7,9 @@ use crate::{
         self,
         bound_nodes::{
             BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind,
-            BoundExpressionStatementNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind,
-            BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind,
-            BoundWhileStatementNodeKind,
+            BoundExpressionStatementNodeKind, BoundFunctionCallNodeKind, BoundIfStatementNodeKind,
+            BoundNode, BoundNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
+            BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind,
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         typing::Type,
@@ -32,6 +32,7 @@ pub fn convert<'a>(
     if diagnostic_bag.has_errors() {
         return vec![];
     }
+
     let result = convert_node(bound_node, diagnostic_bag);
     if debug_flags.print_instructions() {
         for (i, instruction) in result.iter().enumerate() {
@@ -48,6 +49,10 @@ fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Inst
         BoundNodeKind::VariableExpression(variable) => convert_variable(variable, diagnostic_bag),
         BoundNodeKind::UnaryExpression(unary) => convert_unary(unary, diagnostic_bag),
         BoundNodeKind::BinaryExpression(binary) => convert_binary(binary, diagnostic_bag),
+        BoundNodeKind::FunctionCall(function_call) => {
+            convert_function_call(function_call, diagnostic_bag)
+        }
+        BoundNodeKind::SystemCall(system_call) => convert_system_call(system_call, diagnostic_bag),
 
         BoundNodeKind::BlockStatement(block_statement) => {
             convert_block_statement(block_statement, diagnostic_bag)
@@ -90,6 +95,7 @@ fn convert_literal(literal: LiteralNodeKind, _: &mut DiagnosticBag) -> Vec<Instr
                 0
             }
         }
+        Value::SystemCall(kind) => kind as u64,
     };
     vec![Instruction::load_immediate(value)]
 }
@@ -135,6 +141,26 @@ fn convert_binary(
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(),
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
     });
+    result
+}
+
+fn convert_function_call(
+    _function_call: BoundFunctionCallNodeKind,
+    _diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<Instruction> {
+    todo!()
+}
+
+fn convert_system_call(
+    system_call: BoundSystemCallNodeKind,
+    diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<Instruction> {
+    let mut result = vec![];
+    let argument_count = system_call.arguments.len();
+    for argument in system_call.arguments {
+        result.append(&mut convert_node(argument, diagnostic_bag));
+    }
+    result.push(Instruction::system_call(system_call.base, argument_count));
     result
 }
 

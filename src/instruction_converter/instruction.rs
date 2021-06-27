@@ -1,3 +1,5 @@
+use crate::binder::typing::SystemCallKind;
+
 use self::op_codes::OpCode;
 
 pub mod op_codes;
@@ -140,6 +142,14 @@ impl Instruction {
         Self {
             op_code: OpCode::JmpIfFalse,
             arg: relative_address as _,
+        }
+    }
+
+    pub const fn system_call(call_kind: SystemCallKind, argument_count: usize) -> Self {
+        let arg = (argument_count << 8) as u64 | call_kind as u64;
+        Self {
+            op_code: OpCode::SysCall,
+            arg,
         }
     }
 }
