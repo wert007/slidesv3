@@ -1,6 +1,11 @@
 use num_enum::TryFromPrimitive;
 
-use crate::{DebugFlags, binder::typing::SystemCallKind, instruction_converter::instruction::{op_codes::OpCode, Instruction}, value::Value};
+use crate::{
+    binder::typing::SystemCallKind,
+    instruction_converter::instruction::{op_codes::OpCode, Instruction},
+    value::Value,
+    DebugFlags,
+};
 
 type ResultType = Value;
 

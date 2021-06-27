@@ -1,6 +1,9 @@
 use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
 
-use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}};
+use super::{
+    operators::{BoundBinaryOperator, BoundUnaryOperator},
+    typing::{SystemCallKind, Type},
+};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -88,7 +91,12 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn function_call(span: TextSpan, base: BoundNode<'a>, arguments: Vec<BoundNode<'a>>, type_: Type) -> Self {
+    pub fn function_call(
+        span: TextSpan,
+        base: BoundNode<'a>,
+        arguments: Vec<BoundNode<'a>>,
+        type_: Type,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
@@ -100,13 +108,15 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn system_call(span: TextSpan, base: SystemCallKind, arguments: Vec<BoundNode<'a>>, type_: Type) -> Self {
+    pub fn system_call(
+        span: TextSpan,
+        base: SystemCallKind,
+        arguments: Vec<BoundNode<'a>>,
+        type_: Type,
+    ) -> Self {
         Self {
             span,
-            kind: BoundNodeKind::SystemCall(BoundSystemCallNodeKind {
-                base,
-                arguments,
-            }),
+            kind: BoundNodeKind::SystemCall(BoundSystemCallNodeKind { base, arguments }),
             type_,
             constant_value: None,
         }

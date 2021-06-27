@@ -207,7 +207,13 @@ fn parse_function_call<'a>(
             }
         }
         let close_parenthesis_token = match_token!(tokens, diagnostic_bag, RParen);
-        SyntaxNode::function_call(base, open_parenthesis_token, arguments, comma_tokens, close_parenthesis_token)
+        SyntaxNode::function_call(
+            base,
+            open_parenthesis_token,
+            arguments,
+            comma_tokens,
+            close_parenthesis_token,
+        )
     } else {
         base
     }

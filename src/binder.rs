@@ -227,7 +227,9 @@ fn bind_binary_operator<'a, 'b>(
         _ => unreachable!(),
     };
     match (&lhs.type_, result, &rhs.type_) {
-        (lhs, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, rhs) if lhs == rhs && lhs != &Type::Void => {
+        (lhs, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, rhs)
+            if lhs == rhs && lhs != &Type::Void =>
+        {
             Some((result, Type::Boolean))
         }
         (
@@ -285,8 +287,7 @@ fn bind_unary_operator<'a, 'b>(
     };
     match operand.type_ {
         Type::Integer => Some((result, Type::Integer)),
-        Type::Error | Type::Void | Type::Any | Type::SystemCall(_) |
-        Type::Boolean => {
+        Type::Error | Type::Void | Type::Any | Type::SystemCall(_) | Type::Boolean => {
             binder.diagnostic_bag.report_no_unary_operator(
                 span,
                 operator_token.lexeme,

@@ -300,7 +300,10 @@ pub struct FunctionCallNodeKind<'a> {
 
 impl FunctionCallNodeKind<'_> {
     pub fn argument_span(&self) -> TextSpan {
-        TextSpan::bounds(self.open_parenthesis_token.span(), self.close_parenthesis_token.span())
+        TextSpan::bounds(
+            self.open_parenthesis_token.span(),
+            self.close_parenthesis_token.span(),
+        )
     }
 }
 

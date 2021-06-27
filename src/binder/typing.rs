@@ -8,7 +8,7 @@ pub enum Type {
     Any,
     Integer,
     Boolean,
-    SystemCall(SystemCallKind)
+    SystemCall(SystemCallKind),
 }
 
 impl Type {
@@ -56,9 +56,13 @@ pub enum SystemCallKind {
 
 impl std::fmt::Display for SystemCallKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            SystemCallKind::Print => "print",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                SystemCallKind::Print => "print",
+            }
+        )
     }
 }
 
