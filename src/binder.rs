@@ -16,16 +16,21 @@ use crate::{
         self,
         syntax_nodes::{
             AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind,
-            ExpressionStatementNodeKind, IfStatementNodeKind, LiteralNodeKind,
-            ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind,
+            ExpressionStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind,
+            LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind,
             VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
         },
     },
     text::{SourceText, TextSpan},
+    value::Value,
     DebugFlags,
 };
 
-use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator};
+use self::{
+    bound_nodes::BoundNode,
+    operators::BoundBinaryOperator,
+    typing::{FunctionType, SystemCallKind},
+};
 
 struct BoundVariableName<'a> {
     pub identifier: &'a str,
@@ -34,21 +39,21 @@ struct BoundVariableName<'a> {
 
 struct BindingState<'a, 'b> {
     diagnostic_bag: &'b mut DiagnosticBag<'a>,
-    registered_variables: HashMap<u64, BoundVariableName<'a>>,
+    variable_table: HashMap<u64, BoundVariableName<'a>>,
     print_variable_table: bool,
 }
 
 impl<'a> BindingState<'a, '_> {
     fn register_variable(&mut self, name: &'a str, type_: Type) -> Option<u64> {
-        let index = self.registered_variables.len() as u64;
+        let index = self.variable_table.len() as u64;
         let variable_already_registered = self
-            .registered_variables
+            .variable_table
             .values()
             .any(|variable| variable.identifier == name);
         if variable_already_registered {
             None
         } else {
-            self.registered_variables.insert(
+            self.variable_table.insert(
                 index,
                 BoundVariableName {
                     identifier: name,
@@ -60,17 +65,17 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn delete_variables_until(&mut self, index: usize) {
-        if self.registered_variables.is_empty() {
+        if self.variable_table.is_empty() {
             return;
         }
-        let current = self.registered_variables.len() - 1;
+        let current = self.variable_table.len() - 1;
         for i in index..=current {
-            self.registered_variables.remove(&(i as _));
+            self.variable_table.remove(&(i as _));
         }
     }
 
     fn look_up_variable_by_name(&self, name: &str) -> Option<(u64, Type)> {
-        self.registered_variables
+        self.variable_table
             .iter()
             .find(|(_, v)| v.identifier == name)
             .map(|(&i, v)| (i, v.type_.clone()))
@@ -100,7 +105,7 @@ pub fn bind<'a>(
     }
     let mut binder = BindingState {
         diagnostic_bag,
-        registered_variables: HashMap::new(),
+        variable_table: HashMap::new(),
         print_variable_table: debug_flags.print_variable_table(),
     };
     bind_node(node, &mut binder)
@@ -351,13 +356,13 @@ fn bind_block_statement<'a, 'b>(
     block_statement: BlockStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    let variable_count = binder.registered_variables.len();
+    let variable_count = binder.variable_table.len();
     let mut statements = vec![];
     for node in block_statement.statements {
         statements.push(bind_node(node, binder));
     }
     if binder.print_variable_table {
-        print_variable_table(&binder.registered_variables);
+        print_variable_table(&binder.variable_table);
     }
     binder.delete_variables_until(variable_count);
     BoundNode::block_statement(span, statements)
