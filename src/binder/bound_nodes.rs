@@ -1,9 +1,6 @@
 use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
 
-use super::{
-    operators::{BoundBinaryOperator, BoundUnaryOperator},
-    typing::Type,
-};
+use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -91,6 +88,30 @@ impl<'a> BoundNode<'a> {
         }
     }
 
+    pub fn function_call(span: TextSpan, base: BoundNode<'a>, arguments: Vec<BoundNode<'a>>, type_: Type) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
+                base: Box::new(base),
+                arguments,
+            }),
+            type_,
+            constant_value: None,
+        }
+    }
+
+    pub fn system_call(span: TextSpan, base: SystemCallKind, arguments: Vec<BoundNode<'a>>, type_: Type) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::SystemCall(BoundSystemCallNodeKind {
+                base,
+                arguments,
+            }),
+            type_,
+            constant_value: None,
+        }
+    }
+
     pub fn while_statement(span: TextSpan, condition: BoundNode<'a>, body: BoundNode<'a>) -> Self {
         Self {
             span,
@@ -172,6 +193,9 @@ pub enum BoundNodeKind<'a> {
     VariableExpression(BoundVariableNodeKind),
     UnaryExpression(BoundUnaryNodeKind<'a>),
     BinaryExpression(BoundBinaryNodeKind<'a>),
+    FunctionCall(BoundFunctionCallNodeKind<'a>),
+    SystemCall(BoundSystemCallNodeKind<'a>),
+
     // Statements
     BlockStatement(BoundBlockStatementNodeKind<'a>),
     IfStatement(BoundIfStatementNodeKind<'a>),
@@ -197,6 +221,18 @@ pub struct BoundBinaryNodeKind<'a> {
     pub lhs: Box<BoundNode<'a>>,
     pub operator_token: BoundBinaryOperator,
     pub rhs: Box<BoundNode<'a>>,
+}
+
+#[derive(Debug)]
+pub struct BoundFunctionCallNodeKind<'a> {
+    pub base: Box<BoundNode<'a>>,
+    pub arguments: Vec<BoundNode<'a>>,
+}
+
+#[derive(Debug)]
+pub struct BoundSystemCallNodeKind<'a> {
+    pub base: SystemCallKind,
+    pub arguments: Vec<BoundNode<'a>>,
 }
 
 #[derive(Debug)]

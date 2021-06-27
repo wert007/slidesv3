@@ -74,9 +74,13 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span)
     }
 
-    #[allow(dead_code)]
     pub fn report_cannot_convert(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
         let message = format!("Cannot convert type {} to type {}.", from_type, to_type);
+        self.report(message, span)
+    }
+
+    pub fn report_invalid_void_expression(&mut self, span: TextSpan) {
+        let message = "Expected value type, but expression is of type void.".into();
         self.report(message, span)
     }
 
@@ -133,5 +137,18 @@ impl<'a> DiagnosticBag<'a> {
     pub fn report_cannot_assign_to(&mut self, span: TextSpan) {
         let message = "Only variables can be assigned to. Did you mean to use ==?".into();
         self.report(message, span);
+    }
+
+    pub fn report_unexpected_argument_count(
+        &mut self,
+        span: TextSpan,
+        actual_argument_count: usize,
+        expected_argument_count: usize,
+    ) {
+        let message = format!(
+            "Expected {} arguments, but actually found {}.",
+            expected_argument_count, actual_argument_count
+        );
+        self.report(message, span)
     }
 }

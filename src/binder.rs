@@ -120,6 +120,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::Parenthesized(parenthesized) => {
             bind_parenthesized(node.span, parenthesized, binder)
         }
+        SyntaxNodeKind::FunctionCall(function_call) => {
+            bind_function_call(node.span, function_call, binder)
+        }
         SyntaxNodeKind::BlockStatement(block_statement) => {
             bind_block_statement(node.span, block_statement, binder)
         }
@@ -273,6 +276,64 @@ fn bind_parenthesized<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     bind_node(*parenthesized.expression, binder)
+}
+
+fn function_type(type_: &Type) -> FunctionType {
+    match type_ {
+        Type::SystemCall(SystemCallKind::Print) => FunctionType {
+            parameter_types: vec![Type::Any],
+            return_type: Type::Void,
+            system_call_kind: type_.as_system_call(),
+        },
+
+        _ => unimplemented!(),
+    }
+}
+
+fn bind_function_call<'a, 'b>(
+    span: TextSpan,
+    function_call: FunctionCallNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let argument_span = function_call.argument_span();
+    let base = bind_node(*function_call.base, binder);
+    let function_type = function_type(&base.type_);
+    let arguments = bind_arguments_for_function(
+        argument_span,
+        function_call.arguments,
+        &function_type,
+        binder,
+    );
+    if let Type::SystemCall(system_call) = base.type_ {
+        return BoundNode::system_call(span, system_call, arguments, function_type.return_type);
+    }
+    BoundNode::function_call(span, base, arguments, function_type.return_type)
+}
+
+fn bind_arguments_for_function<'a, 'b>(
+    span: TextSpan,
+    arguments: Vec<SyntaxNode<'a>>,
+    function_type: &FunctionType,
+    binder: &mut BindingState<'a, 'b>,
+) -> Vec<BoundNode<'a>> {
+    let mut result = vec![];
+    if matches!(function_type.system_call_kind, Some(SystemCallKind::Print)) {
+        if arguments.len() != 1 {
+            binder
+                .diagnostic_bag
+                .report_unexpected_argument_count(span, arguments.len(), 1);
+        }
+    }
+    for argument in arguments {
+        let argument = bind_node(argument, binder);
+        if matches!(argument.type_, Type::Void) {
+            binder
+                .diagnostic_bag
+                .report_invalid_void_expression(argument.span);
+        }
+        result.push(argument);
+    }
+    result
 }
 
 fn bind_if_statement<'a, 'b>(
