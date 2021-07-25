@@ -7,6 +7,7 @@ fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().collect();
     let debug_flags = DebugFlags {
         print_instructions: args.contains(&String::from("-di")),
+        print_tokens: args.contains(&String::from("-dt")),
         print_current_instruction: args.contains(&String::from("-dci")),
         print_variable_table: args.contains(&String::from("-dbv")),
     };
