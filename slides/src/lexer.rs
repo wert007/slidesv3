@@ -4,7 +4,7 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::SourceText};
+use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::SourceText};
 
 use self::syntax_token::SyntaxTokenKind;
 
@@ -25,6 +25,7 @@ struct TextIndex {
 pub fn lex<'a>(
     content: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
+    debug_flags: DebugFlags,
 ) -> VecDeque<SyntaxToken<'a>> {
     let mut result = VecDeque::new();
     let mut state = State::Default;
@@ -122,6 +123,11 @@ pub fn lex<'a>(
         }
     }
     result.push_back(SyntaxToken::eoi(text.len()));
+    if debug_flags.print_tokens() {
+        for token in &result {
+            println!("{:?}", token);
+        }
+    }
     result
 }
 

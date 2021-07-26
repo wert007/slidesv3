@@ -5,14 +5,10 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{
-    diagnostics::DiagnosticBag,
-    lexer::{
+use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    },
-    text::SourceText,
-};
+    }, text::SourceText};
 
 use self::syntax_nodes::SyntaxNode;
 use crate::match_token;
@@ -20,8 +16,9 @@ use crate::match_token;
 pub fn parse<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
+    debug_flags: DebugFlags,
 ) -> SyntaxNode<'a> {
-    let mut tokens = lexer::lex(source_text, diagnostic_bag);
+    let mut tokens = lexer::lex(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return SyntaxNode::error(0);
     }

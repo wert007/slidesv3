@@ -3,6 +3,7 @@ pub struct DebugFlags {
     pub print_instructions: bool,
     pub print_current_instruction: bool,
     pub print_variable_table: bool,
+    pub print_tokens: bool,
 }
 
 impl Default for DebugFlags {
@@ -11,6 +12,7 @@ impl Default for DebugFlags {
             print_instructions: false,
             print_variable_table: false,
             print_current_instruction: false,
+            print_tokens: false,
         }
     }
 }
@@ -27,5 +29,10 @@ impl DebugFlags {
     /// Get a reference to the debug flags's print variable table.
     pub fn print_variable_table(&self) -> bool {
         self.print_variable_table
+    }
+
+    /// Get a reference to the debug flags's print tokens.
+    pub fn print_tokens(&self) -> bool {
+        self.print_tokens
     }
 }

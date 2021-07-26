@@ -99,7 +99,7 @@ pub fn bind<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundNode<'a> {
-    let node = parser::parse(source_text, diagnostic_bag);
+    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return BoundNode::error(TextSpan::new(0, 0));
     }

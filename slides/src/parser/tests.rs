@@ -101,7 +101,7 @@ fn parser_precedence() {
 fn parse_helper_expression(input: &str, callback: impl FnOnce(SyntaxNode) -> ()) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = parse(&source_text, &mut diagnostic_bag);
+    let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
     let result = assert_matches!(result.kind, SyntaxNodeKind::ExpressionStatement(expression_statement) => *expression_statement.expression);
     callback(result)
@@ -110,7 +110,7 @@ fn parse_helper_expression(input: &str, callback: impl FnOnce(SyntaxNode) -> ())
 fn parse_helper(input: &str, callback: impl FnOnce(SyntaxNode) -> ()) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = parse(&source_text, &mut diagnostic_bag);
+    let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
     callback(result)
 }
@@ -229,7 +229,7 @@ fn parser_error() {
 fn parse_helper_error(input: &str, callback: impl FnOnce(SyntaxNode, Vec<Diagnostic>) -> ()) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = parse(&source_text, &mut diagnostic_bag);
+    let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(diagnostic_bag.has_errors());
     callback(result, diagnostic_bag.diagnostics)
 }
@@ -240,7 +240,7 @@ fn parse_helper_error_expression(
 ) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = parse(&source_text, &mut diagnostic_bag);
+    let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(diagnostic_bag.has_errors());
     let result = assert_matches!(result.kind, SyntaxNodeKind::ExpressionStatement(expression_statement) => *expression_statement.expression);
     callback(result, diagnostic_bag.diagnostics)
