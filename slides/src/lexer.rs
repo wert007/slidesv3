@@ -4,7 +4,9 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::SourceText};
+use crate::{
+    diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::SourceText, DebugFlags,
+};
 
 use self::syntax_token::SyntaxTokenKind;
 

@@ -345,12 +345,11 @@ fn bind_arguments_for_function<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> Vec<BoundNode<'a>> {
     let mut result = vec![];
-    if matches!(function_type.system_call_kind, Some(SystemCallKind::Print)) {
-        if arguments.len() != 1 {
-            binder
-                .diagnostic_bag
-                .report_unexpected_argument_count(span, arguments.len(), 1);
-        }
+    if matches!(function_type.system_call_kind, Some(SystemCallKind::Print)) && arguments.len() != 1
+    {
+        binder
+            .diagnostic_bag
+            .report_unexpected_argument_count(span, arguments.len(), 1);
     }
     for argument in arguments {
         let argument = bind_node(argument, binder);

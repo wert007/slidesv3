@@ -5,10 +5,15 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
+use crate::{
+    diagnostics::DiagnosticBag,
+    lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    }, text::SourceText};
+    },
+    text::SourceText,
+    DebugFlags,
+};
 
 use self::syntax_nodes::SyntaxNode;
 use crate::match_token;
