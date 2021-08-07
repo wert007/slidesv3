@@ -258,7 +258,7 @@ impl SyntaxNodeKind<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LiteralNodeKind<'a> {
     pub token: SyntaxToken<'a>,
     pub value: Value,

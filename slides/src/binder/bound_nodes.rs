@@ -6,7 +6,7 @@ use super::{
 };
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundConstant {
     value: Value,
 }
@@ -18,7 +18,7 @@ impl From<Value> for BoundConstant {
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundNode<'a> {
     pub span: TextSpan,
     pub kind: BoundNodeKind<'a>,
@@ -195,7 +195,7 @@ impl<'a> BoundNode<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BoundNodeKind<'a> {
     // Expressions
     ErrorExpression,
@@ -215,66 +215,66 @@ pub enum BoundNodeKind<'a> {
     ExpressionStatement(BoundExpressionStatementNodeKind<'a>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundVariableNodeKind {
     pub variable_index: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundUnaryNodeKind<'a> {
     pub operator_token: BoundUnaryOperator,
     pub operand: Box<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundBinaryNodeKind<'a> {
     pub lhs: Box<BoundNode<'a>>,
     pub operator_token: BoundBinaryOperator,
     pub rhs: Box<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundFunctionCallNodeKind<'a> {
     pub base: Box<BoundNode<'a>>,
     pub arguments: Vec<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundSystemCallNodeKind<'a> {
     pub base: SystemCallKind,
     pub arguments: Vec<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundIfStatementNodeKind<'a> {
     pub condition: Box<BoundNode<'a>>,
     pub body: Box<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundVariableDeclarationNodeKind<'a> {
     pub variable_index: u64,
     pub initializer: Box<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundWhileStatementNodeKind<'a> {
     pub condition: Box<BoundNode<'a>>,
     pub body: Box<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundAssignmentNodeKind<'a> {
     pub variable: Box<BoundNode<'a>>,
     pub expression: Box<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundBlockStatementNodeKind<'a> {
     pub statements: Vec<BoundNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoundExpressionStatementNodeKind<'a> {
     pub expression: Box<BoundNode<'a>>,
 }
