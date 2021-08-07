@@ -186,10 +186,10 @@ fn instruction_converter_success() {
     });
 }
 
-fn converter_helper(input: &str, callback: impl FnOnce(Vec<Instruction>) -> ()) {
+fn converter_helper(input: &str, callback: impl FnOnce(&[Instruction]) -> ()) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = convert(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
-    callback(result)
+    callback(&result[2..])
 }
