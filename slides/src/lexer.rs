@@ -16,6 +16,10 @@ enum State {
     DecimalNumber(TextIndex),
     Identifier(TextIndex),
     MultiCharOperator(TextIndex),
+    MaybeComment(TextIndex),
+    SingleLineComment(TextIndex),
+    MultiLineComment(TextIndex),
+    MaybeCloseMultiLineComment(TextIndex),
 }
 
 #[derive(Clone, Copy)]
@@ -31,6 +35,7 @@ pub fn lex<'a>(
 ) -> VecDeque<SyntaxToken<'a>> {
     let mut result = VecDeque::new();
     let mut state = State::Default;
+    let mut nested_comments_depth = 0;
     let text = content.text;
     for (char_index, (byte_index, character)) in text.char_indices().enumerate() {
         let index = TextIndex {
@@ -39,6 +44,9 @@ pub fn lex<'a>(
         };
         'start: loop {
             match (state, character) {
+                (State::Default, '/') => {
+                    state = State::MaybeComment(index);
+                }
                 (State::Default, d) if d.is_digit(10) => {
                     state = State::DecimalNumber(index);
                 }
@@ -47,10 +55,47 @@ pub fn lex<'a>(
                 }
                 (State::Default, ws) if ws.is_whitespace() => {}
                 (State::Default, o) if is_operator(o) => {
-                    result.push_back(SyntaxToken::operator(byte_index, &text[byte_index..][..1]));
+                    result.push_back(SyntaxToken::operator(char_index, &text[byte_index..][..1]));
                 }
                 (State::Default, o) if is_multi_char_operator(o) => {
                     state = State::MultiCharOperator(index);
+                }
+                (State::MaybeComment(start), '/') if nested_comments_depth == 0 => {
+                    state = State::SingleLineComment(start);
+                }
+                (State::MaybeComment(start), '*') => {
+                    state = State::MultiLineComment(start);
+                    nested_comments_depth += 1;
+                }
+                (State::MaybeComment(start), _) if nested_comments_depth > 0 => {
+                    state = State::MultiLineComment(start);
+                }
+                (State::MaybeComment(start), _) => {
+                    result.push_back(SyntaxToken::operator(start.char_index, &text[start.byte_index..][..1]));
+                    state = State::Default;
+                    continue 'start;
+                }
+                (State::SingleLineComment(_start), '\n') => {
+                    // Here you would emit a token.
+                    state = State::Default;
+                }
+                (State::MultiLineComment(start), '*') => {
+                    state = State::MaybeCloseMultiLineComment(start);
+                }
+                (State::MultiLineComment(start), '/')  => {
+                    state = State::MaybeComment(start);
+                }
+                (State::MaybeCloseMultiLineComment(start), '/') => {
+                    // Here you would emit a token.
+                    nested_comments_depth -= 1;
+                    if nested_comments_depth == 0 {
+                        state = State::Default;
+                    } else {
+                        state = State::MultiLineComment(start);
+                    }
+                }
+                (State::MaybeCloseMultiLineComment(start), _) => {
+                    state = State::MultiLineComment(start);
                 }
                 (State::DecimalNumber(start), d) => {
                     if !d.is_digit(10) {
@@ -90,6 +135,7 @@ pub fn lex<'a>(
                         continue 'start;
                     }
                 }
+                (State::SingleLineComment(_) | State::MultiLineComment(_), _) => {}
                 (_, bad_character) => {
                     diagnostic_bag.report_bad_input(char_index, bad_character);
                 }
@@ -123,6 +169,16 @@ pub fn lex<'a>(
                 result.push_back(SyntaxToken::operator(start.char_index, lexeme));
             }
         }
+        State::MaybeComment(start) => {
+            result.push_back(SyntaxToken::operator(start.char_index, &text[start.byte_index..]))
+        },
+        State::SingleLineComment(_start) => {
+            // Here you would emit a token.
+        },
+        State::MaybeCloseMultiLineComment(start) |
+        State::MultiLineComment(start) => {
+            diagnostic_bag.report_unterminated_comment(start.char_index, &text[start.byte_index..])
+        },
     }
     result.push_back(SyntaxToken::eoi(text.len()));
     if debug_flags.print_tokens() {
@@ -136,7 +192,7 @@ pub fn lex<'a>(
 fn is_operator(character: char) -> bool {
     matches!(
         character,
-        '+' | '-' | '*' | '/' | '(' | ')' | ';' | '{' | '}' | ','
+        '+' | '-' | '*' | '(' | ')' | ';' | '{' | '}' | ','
     )
 }
 
