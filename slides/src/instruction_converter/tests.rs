@@ -140,7 +140,7 @@ fn instruction_converter_success() {
             instructions[3],
             Instruction {
                 op_code: OpCode::StoreInRegister,
-                arg: 0
+                arg: 1
             }
         );
     });
@@ -172,7 +172,7 @@ fn instruction_converter_success() {
             instructions[3],
             Instruction {
                 op_code: OpCode::StoreInRegister,
-                arg: 0
+                arg: 1
             }
         );
         // 18446744073709551611 == -5

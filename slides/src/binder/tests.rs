@@ -55,7 +55,7 @@ fn successful_binding() {
 
     bind_helper("let a = 99;", |node| {
         assert_matches!(node.kind, BoundNodeKind::VariableDeclaration(variable_declaration) => {
-            assert_matches!(variable_declaration.variable_index, 0);
+            assert_matches!(variable_declaration.variable_index, 1);
             assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(99), .. }));
             assert_matches!(variable_declaration.initializer.type_, Type::Integer);
         });
@@ -75,7 +75,7 @@ fn successful_binding() {
             assert_matches!(if_statement.body.kind, BoundNodeKind::BlockStatement(block_statement) => {
                 assert_eq!(block_statement.statements.len(), 1);
                 assert_matches!(&block_statement.statements[0].kind, BoundNodeKind::VariableDeclaration(variable_declaration) => {
-                    assert_matches!(variable_declaration.variable_index, 0);
+                    assert_matches!(variable_declaration.variable_index, 1);
                     assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(14), .. }));
                     assert_matches!(variable_declaration.initializer.type_, Type::Integer);
                 });
@@ -135,7 +135,7 @@ fn failed_binding() {
             "Error at 8-9: No variable named 'a' could be found."
         );
         assert_matches!(node.kind, BoundNodeKind::VariableDeclaration(variable_declaration) => {
-            assert_eq!(variable_declaration.variable_index, 0);
+            assert_eq!(variable_declaration.variable_index, 1);
             assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::ErrorExpression);
         });
     });
