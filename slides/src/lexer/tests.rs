@@ -204,6 +204,40 @@ fn lexer_successfull() {
             }
         );
     });
+
+    lex_helper_successfull("//This is a comment\n", |token| {
+        assert_eq!(token.len(), 1);
+        assert_matches!(
+            token[0],
+            SyntaxToken {
+                kind: SyntaxTokenKind::Eoi,
+                lexeme: "",
+                start: 20
+            }
+        );
+    });
+    lex_helper_successfull("//This is a comment", |token| {
+        assert_eq!(token.len(), 1);
+        assert_matches!(
+            token[0],
+            SyntaxToken {
+                kind: SyntaxTokenKind::Eoi,
+                lexeme: "",
+                start: 19
+            }
+        );
+    });
+    lex_helper_successfull("/*This*/ /*is a /*comment*/*/", |token| {
+        assert_eq!(token.len(), 1);
+        assert_matches!(
+            token[0],
+            SyntaxToken {
+                kind: SyntaxTokenKind::Eoi,
+                lexeme: "",
+                start: 29
+            }
+        );
+    });
 }
 
 fn lex_helper_successfull(input: &str, callback: impl FnOnce(VecDeque<SyntaxToken>) -> ()) {
@@ -231,6 +265,24 @@ fn lexer_error() {
         assert_eq!(
             format!("{}", diagnostics[0]),
             "Error at 1-2: Bad character in input: %"
+        );
+    });
+
+    lex_helper_errors("/* this is a comment", |token, diagnostics| {
+        assert_eq!(token.len(), 1);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            format!("{}", diagnostics[0]),
+            "Error at 0-20: Unterminated comment found here."
+        );
+    });
+
+    lex_helper_errors("1 /* 2", |token, diagnostics| {
+        assert_eq!(token.len(), 2);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(
+            format!("{}", diagnostics[0]),
+            "Error at 2-6: Unterminated comment found here."
         );
     });
 }

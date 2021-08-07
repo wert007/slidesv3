@@ -173,22 +173,22 @@ fn parser_error() {
         // );
     });
 
-    parse_helper_error_expression("1/*2;", |node, diagnostics| {
+    parse_helper_error_expression("1/ *2;", |node, diagnostics| {
         // assert_matches!(node.kind, SyntaxNodeKind::Binary(binary) => {
         // });
         assert_matches!(node.kind, SyntaxNodeKind::Binary(binary) => {
                 assert_matches!(binary.lhs.kind, SyntaxNodeKind::Binary(binary) => {
                     assert_matches!(binary.lhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind {token: const_number_literal_syntax_token!(0, 1), value: Value::Integer(1)}));
                     assert_matches!(binary.operator_token, SyntaxToken { kind: SyntaxTokenKind::Slash, lexeme: "/", start: 1 });
-                    assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind {token: const_number_literal_syntax_token!(2, 0), value: Value::Integer(0)}));
+                    assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind {token: const_number_literal_syntax_token!(3, 0), value: Value::Integer(0)}));
             });
-            assert_matches!(binary.operator_token, SyntaxToken { kind: SyntaxTokenKind::Star, lexeme: "*", start: 2 });
-            assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind {token: const_number_literal_syntax_token!(3, 2), value: Value::Integer(2)}));
+            assert_matches!(binary.operator_token, SyntaxToken { kind: SyntaxTokenKind::Star, lexeme: "*", start: 3 });
+            assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind {token: const_number_literal_syntax_token!(4, 2), value: Value::Integer(2)}));
         });
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(
             diagnostics[0].to_string(),
-            "Error at 2-3: Expected token kind NumberLiteralKind(0) but actually found StarToken."
+            "Error at 3-4: Expected token kind NumberLiteralKind(0) but actually found StarToken."
         );
     });
 
