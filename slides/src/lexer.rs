@@ -192,7 +192,7 @@ pub fn lex<'a>(
 fn is_operator(character: char) -> bool {
     matches!(
         character,
-        '+' | '-' | '*' | '(' | ')' | ';' | '{' | '}' | ','
+        '+' | '-' | '*' | '(' | ')' | ';' | '{' | '}' | ',' | '[' | ']'
     )
 }
 
