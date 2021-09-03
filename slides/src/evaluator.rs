@@ -12,18 +12,18 @@ type ResultType = Value;
 
 struct EvaluatorState {
     stack: Vec<u64>,
-    registers: Vec<u64>,
+    registers: Vec<TypedU64>,
     pc: usize,
     pointers: Vec<usize>,
 }
 
 impl EvaluatorState {
-    fn set_variable(&mut self, variable: u64, value: u64) {
+    fn set_variable(&mut self, variable: u64, value: u64, is_pointer: bool) {
         let variable = variable as usize;
         while self.registers.len() <= variable {
-            self.registers.push(0);
+            self.registers.push(TypedU64 {value: 0, is_pointer: false });
         }
-        self.registers[variable] = value;
+        self.registers[variable] = TypedU64 {value, is_pointer};
     }
 
     fn set_pointer(&mut self, address: usize) {
@@ -32,8 +32,14 @@ impl EvaluatorState {
         }
     }
 
-    fn current_stack_element_is_pointer(&self) -> bool {
-        self.pointers.contains(&self.stack.len())
+    fn pop_stack(&mut self) -> Option<TypedU64> {
+        let is_pointer = if let Some(i) = self.pointers.iter().position(|p| p == &self.stack.len()) {
+            self.pointers.remove(i);
+            true
+        } else {
+            false
+        };
+        self.stack.pop().map(|value| TypedU64 {value, is_pointer})
     }
 }
 
@@ -53,10 +59,14 @@ pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> Resu
         state.pc += 1;
     }
     if state.stack.len() == 1 {
-        (state.stack.pop().unwrap() as i64).into()
+        (state.pop_stack().unwrap().value as i64).into()
     } else {
         for (variable, &value) in state.registers.iter().enumerate() {
-            println!("{:00}: {}", variable, value as i64)
+            if value.is_pointer {
+                println!("{:00}: #{}", variable, value.value)
+            } else {
+                println!("{:00}: {}", variable, value.value as i64)
+            }
         }
         Value::Integer(-1)
     }
@@ -95,27 +105,29 @@ fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction)
 }
 
 fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
-    if state.current_stack_element_is_pointer() {
-        let address = state.stack.pop().unwrap();
+    let address = state.pop_stack().unwrap();
+    if address.is_pointer {
+        let address = address.value;
         let difference = state.stack.len() as u64 - address;
         if difference == state.stack[address as usize] {
             while state.stack.len() != address as usize {
-                assert!(state.stack.pop().is_some());
+                assert!(state.pop_stack().is_some());
             }
         }
-    } else {
-        assert!(state.stack.pop().is_some())
     }
 }
 
 fn evaluate_load_register(state: &mut EvaluatorState, instruction: Instruction) {
     let value = state.registers[instruction.arg as usize];
-    state.stack.push(value);
+    state.stack.push(value.value);
+    if value.is_pointer {
+        state.set_pointer(state.stack.len());
+    }
 }
 
 fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruction) {
-    let value = state.stack.pop().unwrap();
-    state.set_variable(instruction.arg, value);
+    let TypedU64 { value, is_pointer } = state.pop_stack().unwrap();
+    state.set_variable(instruction.arg, value, is_pointer);
 }
 
 fn evaluate_array_literal(state: &mut EvaluatorState, instruction: Instruction) {
@@ -127,87 +139,88 @@ fn evaluate_array_literal(state: &mut EvaluatorState, instruction: Instruction) 
 }
 
 fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
-    let index = state.stack.pop().unwrap();
-    let array = state.stack.pop().unwrap();
-    assert!(state.current_stack_element_is_pointer());
+    let index = state.pop_stack().unwrap().value;
+    let array = state.pop_stack().unwrap();
+    assert!(array.is_pointer, "array = {:#?}, pointers = {:#?}, stack = {:#?}", array, state.pointers, state.stack);
+    let array = array.value;
     let value = state.stack[array as usize + 1 + index as usize];
     state.stack.push(value);
 }
 
 fn evaluate_bitwise_twos_complement(state: &mut EvaluatorState, _: Instruction) {
-    let value = state.stack.pop().unwrap() as i64;
+    let value = state.pop_stack().unwrap().value as i64;
     state.stack.push((-value) as u64);
 }
 
 fn evaluate_bitwise_xor(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push(lhs ^ rhs);
 }
 
 fn evaluate_bitwise_nxor(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push(!(lhs ^ rhs));
 }
 
 fn evaluate_addition(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push(lhs.wrapping_add(rhs));
 }
 
 fn evaluate_subtraction(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push(lhs.wrapping_sub(rhs));
 }
 
 fn evaluate_multiplication(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push(lhs.wrapping_mul(rhs));
 }
 
 fn evaluate_division(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push(lhs.wrapping_div(rhs));
 }
 
 fn evaluate_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs == rhs) as _);
 }
 
 fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs != rhs) as _);
 }
 
 fn evaluate_less_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs < rhs) as _);
 }
 
 fn evaluate_greater_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs > rhs) as _);
 }
 
 fn evaluate_less_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs <= rhs) as _);
 }
 
 fn evaluate_greater_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap();
-    let lhs = state.stack.pop().unwrap();
+    let rhs = state.pop_stack().unwrap().value;
+    let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs >= rhs) as _);
 }
 
@@ -216,13 +229,13 @@ fn evaluate_jmp_relative(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_jmp_if_false(state: &mut EvaluatorState, instruction: Instruction) {
-    let condition = state.stack.pop().unwrap();
+    let condition = state.pop_stack().unwrap().value;
     if condition == 0 {
         state.pc = ((state.pc as i64) + (instruction.arg as i64)) as usize;
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TypedU64 {
     value: u64,
     is_pointer: bool,
@@ -233,10 +246,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     let argument_count = (instruction.arg >> 8) as usize;
     let mut arguments = Vec::with_capacity(argument_count);
     for _ in 0..argument_count {
-        arguments.push(TypedU64 {
-            is_pointer: state.current_stack_element_is_pointer(),
-            value: state.stack.pop().unwrap(),
-        });
+        arguments.push(state.pop_stack().unwrap());
     }
     match sys_call_kind {
         SystemCallKind::Print => sys_calls::print(arguments[0], &state.stack),
