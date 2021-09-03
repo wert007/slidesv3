@@ -1,4 +1,4 @@
-use num_enum::TryFromPrimitive;
+mod sys_calls;
 
 use crate::{
     binder::typing::SystemCallKind,
@@ -6,6 +6,7 @@ use crate::{
     value::Value,
     DebugFlags,
 };
+use num_enum::TryFromPrimitive;
 
 type ResultType = Value;
 
@@ -97,7 +98,9 @@ fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
         let address = state.stack.pop().unwrap();
         let difference = state.stack.len() as u64 - address;
         if difference == state.stack[address as usize] {
-            while state.stack.len() != address as usize { assert!(state.stack.pop().is_some()); }
+            while state.stack.len() != address as usize {
+                assert!(state.stack.pop().is_some());
+            }
         }
     } else {
         assert!(state.stack.pop().is_some())
@@ -117,7 +120,7 @@ fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruct
 fn evaluate_array_literal(state: &mut EvaluatorState, instruction: Instruction) {
     let array_length_in_bytes = instruction.arg;
     let array_length = array_length_in_bytes / 4;
-    let array_address = state.stack.len() as u64 - array_length;
+    let array_address = state.stack.len() as u64 - array_length - 1;
     state.stack.push(array_address);
     state.set_pointer(state.stack.len());
 }
@@ -210,14 +213,23 @@ fn evaluate_jmp_if_false(state: &mut EvaluatorState, instruction: Instruction) {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct TypedU64 {
+    value: u64,
+    is_pointer: bool,
+}
+
 fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     let sys_call_kind = SystemCallKind::try_from_primitive((instruction.arg & 0xFF) as u8).unwrap();
     let argument_count = (instruction.arg >> 8) as usize;
     let mut arguments = Vec::with_capacity(argument_count);
     for _ in 0..argument_count {
-        arguments.push(state.stack.pop().unwrap());
+        arguments.push(TypedU64 {
+            is_pointer: state.current_stack_element_is_pointer(),
+            value: state.stack.pop().unwrap(),
+        });
     }
     match sys_call_kind {
-        SystemCallKind::Print => println!("PRINT {}", arguments[0]),
+        SystemCallKind::Print => sys_calls::print(arguments[0], &state.stack),
     }
 }
