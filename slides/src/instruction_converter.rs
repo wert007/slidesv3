@@ -87,6 +87,7 @@ fn convert_literal(literal: LiteralNodeKind, _: &mut DiagnosticBag) -> Vec<Instr
 fn convert_array_literal(array_literal: BoundArrayLiteralNodeKind, diagnostic_bag: &mut DiagnosticBag) -> Vec<Instruction> {
     let mut result = vec![];
     let count_in_bytes = array_literal.children.len() * 4;
+    result.push(Instruction::load_immediate(count_in_bytes as u64));
     for child in array_literal.children {
         result.append(&mut convert_node(child, diagnostic_bag));
     }
