@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use assert_matches::assert_matches;
 
-use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
 use self::{
     bound_nodes::BoundNode,
@@ -135,6 +135,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::FunctionCall(function_call) => {
             bind_function_call(node.span, function_call, binder)
         }
+        SyntaxNodeKind::ArrayIndex(array_index) => {
+            bind_array_index(node.span, array_index, binder)
+        }
         SyntaxNodeKind::BlockStatement(block_statement) => {
             bind_block_statement(node.span, block_statement, binder)
         }
@@ -169,7 +172,7 @@ fn bind_array_literal<'a, 'b>(
 ) -> BoundNode<'a> {
     let first_element = array_literal.children.remove(0);
     let first_element = bind_node(first_element, binder);
-    let type_ = first_element.type_.clone();
+    let type_ = Type::array(first_element.type_.clone());
     let mut children = vec![first_element];
     for child in array_literal.children {
         let child_span = child.span;
@@ -294,7 +297,7 @@ fn bind_unary_operator<'a, 'b>(
     };
     match operand.type_ {
         Type::Integer => Some((result, Type::Integer)),
-        Type::Error | Type::Void | Type::Any | Type::SystemCall(_) | Type::Boolean => {
+        Type::Error | Type::Void | Type::Any | Type::SystemCall(_) | Type::Boolean | Type::Array(_) => {
             binder.diagnostic_bag.report_no_unary_operator(
                 span,
                 operator_token.lexeme,
@@ -343,6 +346,29 @@ fn bind_function_call<'a, 'b>(
         return BoundNode::system_call(span, system_call, arguments, function_type.return_type);
     }
     BoundNode::function_call(span, base, arguments, function_type.return_type)
+}
+
+
+fn bind_array_index<'a, 'b>(
+    span: TextSpan,
+    array_index: ArrayIndexNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let index_span = array_index.index.span;
+    let index = bind_node(*array_index.index, binder);
+    if !index.type_.can_be_converted_to(&Type::Integer) {
+        binder.diagnostic_bag.report_cannot_convert(index_span, &index.type_, &Type::Integer);
+    }
+    let base_span = array_index.base.span;
+    let base = bind_node(*array_index.base, binder);
+    let type_ = match base.type_.clone() {
+        Type::Array(base_type) => *base_type,
+        error => {
+            binder.diagnostic_bag.report_cannot_convert(base_span, &base.type_, &Type::array(error));
+            Type::Error
+        }
+    };
+    BoundNode::array_index(span, base, index, type_)
 }
 
 fn bind_arguments_for_function<'a, 'b>(

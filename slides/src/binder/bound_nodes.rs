@@ -117,6 +117,23 @@ impl<'a> BoundNode<'a> {
         }
     }
 
+    pub fn array_index(
+        span: TextSpan,
+        base: BoundNode<'a>,
+        index: BoundNode<'a>,
+        type_: Type,
+    ) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::ArrayIndex(BoundArrayIndexNodeKind {
+                base: Box::new(base),
+                index: Box::new(index),
+            }),
+            type_,
+            constant_value: None,
+        }
+    }
+
     pub fn system_call(
         span: TextSpan,
         base: SystemCallKind,
@@ -215,6 +232,7 @@ pub enum BoundNodeKind<'a> {
     BinaryExpression(BoundBinaryNodeKind<'a>),
     FunctionCall(BoundFunctionCallNodeKind<'a>),
     SystemCall(BoundSystemCallNodeKind<'a>),
+    ArrayIndex(BoundArrayIndexNodeKind<'a>),
 
     // Statements
     BlockStatement(BoundBlockStatementNodeKind<'a>),
@@ -258,6 +276,12 @@ pub struct BoundFunctionCallNodeKind<'a> {
 pub struct BoundSystemCallNodeKind<'a> {
     pub base: SystemCallKind,
     pub arguments: Vec<BoundNode<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundArrayIndexNodeKind<'a> {
+    pub base: Box<BoundNode<'a>>,
+    pub index: Box<BoundNode<'a>>,
 }
 
 #[derive(Debug, Clone)]

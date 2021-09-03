@@ -9,9 +9,14 @@ pub enum Type {
     Integer,
     Boolean,
     SystemCall(SystemCallKind),
+    Array(Box<Type>),
 }
 
 impl Type {
+    pub fn array(base_type: Type) -> Self {
+        Self::Array(Box::new(base_type))
+    }
+
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         self == other || other == &Type::Any
     }
@@ -44,6 +49,7 @@ impl std::fmt::Display for Type {
             Type::Integer => write!(f, "int"),
             Type::Boolean => write!(f, "bool"),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
+            Type::Array(base) => write!(f, "{}[]", base),
         }
     }
 }
