@@ -143,6 +143,25 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn array_index(
+        base: SyntaxNode<'a>,
+        lbracket: SyntaxToken<'a>,
+        index: SyntaxNode<'a>,
+        rbracket: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(base.span(), rbracket.span());
+        Self {
+            kind: SyntaxNodeKind::ArrayIndex(ArrayIndexNodeKind {
+                base: Box::new(base),
+                lbracket,
+                index: Box::new(index),
+                rbracket,
+            }),
+            span,
+            is_inserted: false,
+        }
+    }
+
     pub fn if_statement(
         if_keyword: SyntaxToken<'a>,
         condition: SyntaxNode<'a>,
@@ -262,6 +281,7 @@ pub enum SyntaxNodeKind<'a> {
     Unary(UnaryNodeKind<'a>),
     Parenthesized(ParenthesizedNodeKind<'a>),
     FunctionCall(FunctionCallNodeKind<'a>),
+    ArrayIndex(ArrayIndexNodeKind<'a>),
 
     // Statements
     BlockStatement(BlockStatementNodeKind<'a>),
@@ -334,6 +354,16 @@ impl FunctionCallNodeKind<'_> {
         )
     }
 }
+
+
+#[derive(Debug)]
+pub struct ArrayIndexNodeKind<'a> {
+    pub base: Box<SyntaxNode<'a>>,
+    pub lbracket: SyntaxToken<'a>,
+    pub index: Box<SyntaxNode<'a>>,
+    pub rbracket: SyntaxToken<'a>,
+}
+
 
 #[derive(Debug)]
 pub struct BlockStatementNodeKind<'a> {

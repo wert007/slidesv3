@@ -188,31 +188,43 @@ fn parse_function_call<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let base = parse_primary(tokens, diagnostic_bag);
-    if matches!(peek_token(tokens).kind, SyntaxTokenKind::LParen) {
-        let open_parenthesis_token = next_token(tokens);
-        let mut arguments = vec![];
-        let mut comma_tokens = vec![];
-        while !matches!(
-            peek_token(tokens).kind,
-            // Currently there are no statements allowed as arguments to a
-            // function. This may change..
-            SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi | SyntaxTokenKind::Semicolon
-        ) {
-            arguments.push(parse_expression(tokens, diagnostic_bag));
-            if !matches!(peek_token(tokens).kind, SyntaxTokenKind::RParen) {
-                comma_tokens.push(match_token!(tokens, diagnostic_bag, Comma));
+    match peek_token(tokens).kind {
+        SyntaxTokenKind::LParen => {
+            let open_parenthesis_token = next_token(tokens);
+            let mut arguments = vec![];
+            let mut comma_tokens = vec![];
+            while !matches!(
+                peek_token(tokens).kind,
+                // Currently there are no statements allowed as arguments to a
+                // function. This may change..
+                SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi | SyntaxTokenKind::Semicolon
+            ) {
+                arguments.push(parse_expression(tokens, diagnostic_bag));
+                if !matches!(peek_token(tokens).kind, SyntaxTokenKind::RParen) {
+                    comma_tokens.push(match_token!(tokens, diagnostic_bag, Comma));
+                }
             }
-        }
-        let close_parenthesis_token = match_token!(tokens, diagnostic_bag, RParen);
-        SyntaxNode::function_call(
-            base,
-            open_parenthesis_token,
-            arguments,
-            comma_tokens,
-            close_parenthesis_token,
-        )
-    } else {
-        base
+            let close_parenthesis_token = match_token!(tokens, diagnostic_bag, RParen);
+            SyntaxNode::function_call(
+                base,
+                open_parenthesis_token,
+                arguments,
+                comma_tokens,
+                close_parenthesis_token,
+            )
+        },
+        SyntaxTokenKind::LBracket => {
+            let lbracket = next_token(tokens);
+            let index = parse_expression(tokens, diagnostic_bag);
+            let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
+            SyntaxNode::array_index(
+                base,
+                lbracket,
+                index,
+                rbracket,
+            )
+        },
+        _ => base
     }
 }
 
