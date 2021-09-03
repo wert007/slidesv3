@@ -172,7 +172,7 @@ fn bind_array_literal<'a, 'b>(
 ) -> BoundNode<'a> {
     let first_element = array_literal.children.remove(0);
     let first_element = bind_node(first_element, binder);
-    let type_ = Type::array(first_element.type_.clone());
+    let type_ = first_element.type_.clone();
     let mut children = vec![first_element];
     for child in array_literal.children {
         let child_span = child.span;
@@ -184,7 +184,7 @@ fn bind_array_literal<'a, 'b>(
             children.push(BoundNode::error(child_span));
         }
     }
-    BoundNode::array_literal(span, children, type_)
+    BoundNode::array_literal(span, children, Type::array(type_))
 }
 
 fn bind_variable<'a, 'b>(
