@@ -13,6 +13,7 @@ struct EvaluatorState {
     stack: Vec<u64>,
     registers: Vec<u64>,
     pc: usize,
+    pointers: Vec<usize>,
 }
 
 impl EvaluatorState {
@@ -23,6 +24,12 @@ impl EvaluatorState {
         }
         self.registers[variable] = value;
     }
+
+    fn set_pointer(&mut self, address: usize) {
+        if !self.pointers.contains(&address) {
+            self.pointers.push(address);
+        }
+    }
 }
 
 pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> ResultType {
@@ -30,6 +37,7 @@ pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> Resu
         stack: vec![],
         registers: vec![],
         pc: 0,
+        pointers: vec![],
     };
     while state.pc < instructions.len() {
         let pc = state.pc;
