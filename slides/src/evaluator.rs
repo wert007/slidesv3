@@ -30,6 +30,10 @@ impl EvaluatorState {
             self.pointers.push(address);
         }
     }
+
+    fn current_stack_element_is_pointer(&self) -> bool {
+        self.pointers.contains(&self.stack.len())
+    }
 }
 
 pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> ResultType {
@@ -49,13 +53,11 @@ pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> Resu
     }
     if state.stack.len() == 1 {
         (state.stack.pop().unwrap() as i64).into()
-    } else if state.stack.is_empty() {
+    } else {
         for (variable, &value) in state.registers.iter().enumerate() {
             println!("{:00}: {}", variable, value as i64)
         }
         Value::Integer(-1)
-    } else {
-        panic!();
     }
 }
 
@@ -91,7 +93,15 @@ fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction)
 }
 
 fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
-    assert!(state.stack.pop().is_some())
+    if state.current_stack_element_is_pointer() {
+        let address = state.stack.pop().unwrap();
+        let difference = state.stack.len() as u64 - address;
+        if difference == state.stack[address as usize] {
+            while state.stack.len() != address as usize { assert!(state.stack.pop().is_some()); }
+        }
+    } else {
+        assert!(state.stack.pop().is_some())
+    }
 }
 
 fn evaluate_load_register(state: &mut EvaluatorState, instruction: Instruction) {
