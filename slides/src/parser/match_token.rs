@@ -39,6 +39,32 @@ macro_rules! match_token {
             SyntaxToken::operator(current.span().start(), ")")
         }
     };
+    ($tokens:expr, $diagnostic_bag:expr, LBracket) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::LBracket) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::LBracket,
+            );
+            SyntaxToken::operator(current.span().start(), "[")
+        }
+    };
+    ($tokens:expr, $diagnostic_bag:expr, RBracket) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::RBracket) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::RBracket,
+            );
+            SyntaxToken::operator(current.span().start(), "]")
+        }
+    };
     ($tokens:expr, $diagnostic_bag:expr, LBrace) => {
         if matches!(peek_token($tokens).kind, SyntaxTokenKind::LBrace) {
             next_token($tokens)

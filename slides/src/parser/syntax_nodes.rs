@@ -66,6 +66,25 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn array_literal(
+        lbracket: SyntaxToken<'a>,
+        children: Vec<SyntaxNode<'a>>,
+        comma_tokens: Vec<SyntaxToken<'a>>,
+        rbracket: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(lbracket.span(), rbracket.span());
+        Self {
+            span,
+            kind: SyntaxNodeKind::ArrayLiteral(ArrayLiteralNodeKind {
+                lbracket,
+                children,
+                comma_tokens,
+                rbracket,
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn variable(token: SyntaxToken<'a>) -> Self {
         Self {
             span: token.span(),
@@ -237,6 +256,7 @@ impl<'a> SyntaxNode<'a> {
 pub enum SyntaxNodeKind<'a> {
     //Expressions
     Literal(LiteralNodeKind<'a>),
+    ArrayLiteral(ArrayLiteralNodeKind<'a>),
     Variable(VariableNodeKind<'a>),
     Binary(BinaryNodeKind<'a>),
     Unary(UnaryNodeKind<'a>),
@@ -262,6 +282,14 @@ impl SyntaxNodeKind<'_> {
 pub struct LiteralNodeKind<'a> {
     pub token: SyntaxToken<'a>,
     pub value: Value,
+}
+
+#[derive(Debug)]
+pub struct ArrayLiteralNodeKind<'a> {
+    pub lbracket: SyntaxToken<'a>,
+    pub children: Vec<SyntaxNode<'a>>,
+    pub comma_tokens: Vec<SyntaxToken<'a>>,
+    pub rbracket: SyntaxToken<'a>,
 }
 
 #[derive(Debug)]
