@@ -46,6 +46,15 @@ impl<'a> BoundNode<'a> {
         }
     }
 
+    pub fn array_literal(span: TextSpan, children: Vec<BoundNode<'a>>, type_: Type) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
+            type_,
+            constant_value: None,
+        }
+    }
+
     pub fn variable(span: TextSpan, variable_index: u64, type_: Type) -> Self {
         Self {
             span,
@@ -200,6 +209,7 @@ pub enum BoundNodeKind<'a> {
     // Expressions
     ErrorExpression,
     LiteralExpression(LiteralNodeKind<'a>),
+    ArrayLiteralExpression(BoundArrayLiteralNodeKind<'a>),
     VariableExpression(BoundVariableNodeKind),
     UnaryExpression(BoundUnaryNodeKind<'a>),
     BinaryExpression(BoundBinaryNodeKind<'a>),
@@ -213,6 +223,11 @@ pub enum BoundNodeKind<'a> {
     WhileStatement(BoundWhileStatementNodeKind<'a>),
     Assignment(BoundAssignmentNodeKind<'a>),
     ExpressionStatement(BoundExpressionStatementNodeKind<'a>),
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundArrayLiteralNodeKind<'a> {
+    pub children: Vec<BoundNode<'a>>,
 }
 
 #[derive(Debug, Clone)]

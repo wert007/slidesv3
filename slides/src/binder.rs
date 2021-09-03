@@ -8,23 +8,7 @@ use std::collections::HashMap;
 
 use assert_matches::assert_matches;
 
-use crate::{
-    binder::{operators::BoundUnaryOperator, typing::Type},
-    diagnostics::DiagnosticBag,
-    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    parser::{
-        self,
-        syntax_nodes::{
-            AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind,
-            ExpressionStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind,
-            LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind,
-            VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
-        },
-    },
-    text::{SourceText, TextSpan},
-    value::Value,
-    DebugFlags,
-};
+use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
 use self::{
     bound_nodes::BoundNode,
@@ -141,6 +125,7 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
     match node.kind {
         SyntaxNodeKind::Literal(literal) => bind_literal(node.span, literal, binder),
+        SyntaxNodeKind::ArrayLiteral(array_literal) => bind_array_literal(node.span, array_literal, binder),
         SyntaxNodeKind::Variable(variable) => bind_variable(node.span, variable, binder),
         SyntaxNodeKind::Binary(binary) => bind_binary(node.span, binary, binder),
         SyntaxNodeKind::Unary(unary) => bind_unary(node.span, unary, binder),
@@ -175,6 +160,28 @@ fn bind_literal<'a>(
     _: &mut BindingState,
 ) -> BoundNode<'a> {
     BoundNode::literal(span, literal)
+}
+
+fn bind_array_literal<'a, 'b>(
+    span: TextSpan,
+    mut array_literal: ArrayLiteralNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let first_element = array_literal.children.remove(0);
+    let first_element = bind_node(first_element, binder);
+    let type_ = first_element.type_.clone();
+    let mut children = vec![first_element];
+    for child in array_literal.children {
+        let child_span = child.span;
+        let child = bind_node(child, binder);
+        if child.type_.can_be_converted_to(&type_) {
+            children.push(child);
+        } else {
+            binder.diagnostic_bag.report_cannot_convert(child_span, &child.type_, &type_);
+            children.push(BoundNode::error(child_span));
+        }
+    }
+    BoundNode::array_literal(span, children, type_)
 }
 
 fn bind_variable<'a, 'b>(
