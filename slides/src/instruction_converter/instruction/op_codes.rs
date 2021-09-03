@@ -8,6 +8,7 @@ pub enum OpCode {
     LoadRegister = 3,
     StoreInRegister = 4,
     ArrayLength = 5,
+    ArrayIndex = 6,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,

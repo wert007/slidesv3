@@ -19,13 +19,6 @@ impl Instruction {
         }
     }
 
-    pub const fn array_length(count_in_bytes: usize) -> Self {
-        Self {
-            op_code: OpCode::ArrayLength,
-            arg: count_in_bytes as u64,
-        }
-    }
-
     pub const fn pop() -> Self {
         Self {
             op_code: OpCode::Pop,
@@ -44,6 +37,20 @@ impl Instruction {
         Self {
             op_code: OpCode::StoreInRegister,
             arg: register,
+        }
+    }
+
+    pub const fn array_length(count_in_bytes: usize) -> Self {
+        Self {
+            op_code: OpCode::ArrayLength,
+            arg: count_in_bytes as u64,
+        }
+    }
+
+    pub const fn array_index() -> Self {
+        Self {
+            op_code: OpCode::ArrayIndex,
+            arg: 0,
         }
     }
 

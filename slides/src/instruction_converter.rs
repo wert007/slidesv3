@@ -2,7 +2,7 @@ pub mod instruction;
 #[cfg(test)]
 mod tests;
 
-use crate::{binder::{self, bound_nodes::{BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFunctionCallNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::Type}, debug::DebugFlags, diagnostics::DiagnosticBag, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
+use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFunctionCallNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::Type}, debug::DebugFlags, diagnostics::DiagnosticBag, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
 
 use self::instruction::Instruction;
 
@@ -37,7 +37,10 @@ fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Inst
             convert_function_call(function_call, diagnostic_bag)
         }
         BoundNodeKind::SystemCall(system_call) => convert_system_call(system_call, diagnostic_bag),
-
+        BoundNodeKind::ArrayIndex(array_index) => {
+            convert_array_index(array_index, diagnostic_bag)
+        }
+        
         BoundNodeKind::BlockStatement(block_statement) => {
             convert_block_statement(block_statement, diagnostic_bag)
         }
@@ -156,6 +159,16 @@ fn convert_system_call(
         result.append(&mut convert_node(argument, diagnostic_bag));
     }
     result.push(Instruction::system_call(system_call.base, argument_count));
+    result
+}
+
+fn convert_array_index(
+    array_index: BoundArrayIndexNodeKind,
+    diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<Instruction> {
+    let mut result = convert_node(*array_index.base, diagnostic_bag);
+    result.append(&mut convert_node(*array_index.index, diagnostic_bag));
+    result.push(Instruction::array_index());
     result
 }
 
