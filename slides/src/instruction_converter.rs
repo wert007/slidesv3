@@ -2,24 +2,7 @@ pub mod instruction;
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    binder::{
-        self,
-        bound_nodes::{
-            BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind,
-            BoundExpressionStatementNodeKind, BoundFunctionCallNodeKind, BoundIfStatementNodeKind,
-            BoundNode, BoundNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
-            BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind,
-        },
-        operators::{BoundBinaryOperator, BoundUnaryOperator},
-        typing::Type,
-    },
-    debug::DebugFlags,
-    diagnostics::DiagnosticBag,
-    parser::syntax_nodes::LiteralNodeKind,
-    text::SourceText,
-    value::Value,
-};
+use crate::{binder::{self, bound_nodes::{BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFunctionCallNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::Type}, debug::DebugFlags, diagnostics::DiagnosticBag, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
 
 use self::instruction::Instruction;
 
@@ -46,6 +29,7 @@ fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Inst
     match node.kind {
         BoundNodeKind::ErrorExpression => unreachable!(),
         BoundNodeKind::LiteralExpression(literal) => convert_literal(literal, diagnostic_bag),
+        BoundNodeKind::ArrayLiteralExpression(array_literal) => convert_array_literal(array_literal, diagnostic_bag),
         BoundNodeKind::VariableExpression(variable) => convert_variable(variable, diagnostic_bag),
         BoundNodeKind::UnaryExpression(unary) => convert_unary(unary, diagnostic_bag),
         BoundNodeKind::BinaryExpression(binary) => convert_binary(binary, diagnostic_bag),
@@ -98,6 +82,16 @@ fn convert_literal(literal: LiteralNodeKind, _: &mut DiagnosticBag) -> Vec<Instr
         Value::SystemCall(kind) => kind as u64,
     };
     vec![Instruction::load_immediate(value)]
+}
+
+fn convert_array_literal(array_literal: BoundArrayLiteralNodeKind, diagnostic_bag: &mut DiagnosticBag) -> Vec<Instruction> {
+    let mut result = vec![];
+    let count_in_bytes = array_literal.children.len() * 4;
+    for child in array_literal.children {
+        result.append(&mut convert_node(child, diagnostic_bag));
+    }
+    result.push(Instruction::array_length(count_in_bytes));
+    result
 }
 
 fn convert_variable(variable: BoundVariableNodeKind, _: &mut DiagnosticBag) -> Vec<Instruction> {

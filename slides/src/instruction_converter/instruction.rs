@@ -19,6 +19,13 @@ impl Instruction {
         }
     }
 
+    pub const fn array_length(count_in_bytes: usize) -> Self {
+        Self {
+            op_code: OpCode::ArrayLength,
+            arg: count_in_bytes as u64,
+        }
+    }
+
     pub const fn pop() -> Self {
         Self {
             op_code: OpCode::Pop,
