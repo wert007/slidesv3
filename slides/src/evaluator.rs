@@ -111,17 +111,27 @@ fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction)
     state.stack.push(instruction.arg);
 }
 
-fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
+fn pop_array(state: &mut EvaluatorState) -> (TypedU64, Vec<TypedU64>) {
     let address = state.pop_stack().unwrap();
+    let mut popped = vec![];
     if address.is_pointer {
         let address = address.value;
+        let length = state.stack[address as usize] / 4;
         let difference = state.stack.len() as u64 - address;
-        if difference == state.stack[address as usize] {
-            while state.stack.len() != address as usize {
-                assert!(state.pop_stack().is_some());
+        if difference == 1 {
+            for _ in 0..length + 1 {
+                match state.pop_stack() {
+                    Some(value) => popped.push(value),
+                    None => unreachable!(),
+                }
             }
         }
     }
+    (address, popped)
+}
+
+fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
+    pop_array(state);
 }
 
 fn evaluate_load_register(state: &mut EvaluatorState, instruction: Instruction) {
@@ -240,51 +250,113 @@ fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
 }
 
 fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.pop_stack().unwrap();
-    let lhs = state.pop_stack().unwrap();
-    assert!(lhs.is_pointer, "{:#?}, stack = {:#?}, pointers = {:#?}", lhs, state.stack, state.pointers);
-    assert!(rhs.is_pointer, "{:#?}, stack = {:#?}, pointers = {:#?}", rhs, state.stack, state.pointers);
+    // Pop lhs and rhs and eventual array to get the correct other side (lhs)
+    let (rhs, rhs_values) = pop_array(state);
+    let (lhs, lhs_values) = pop_array(state);
+
+    // Remember how long the stack is supposed to be after comparison
+    let expected_stack_length = state.stack.len();
+
+    // Reconstruct stack so that the pointers work
+    for v in lhs_values.into_iter().rev() {
+        state.stack.push(v.value);
+        assert!(!v.is_pointer);
+    }
+    state.stack.push(lhs.value);
+    for v in rhs_values.into_iter().rev() {
+        state.stack.push(v.value);
+        assert!(!v.is_pointer);
+    }
+    state.stack.push(rhs.value);
+
+    assert!(
+        lhs.is_pointer,
+        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        lhs, state.stack, state.pointers
+    );
+    assert!(
+        rhs.is_pointer,
+        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        rhs, state.stack, state.pointers
+    );
     let lhs_address = lhs.value;
-    let rhs_address = rhs.value;
     let lhs_length = state.stack[lhs_address as usize] / 4;
+    let rhs_address = rhs.value;
     let rhs_length = state.stack[rhs_address as usize] / 4;
-    if lhs_length != rhs_length {
-        state.stack.push(0);
-    } else {
+    // If two arrays are not equal in length, we don't compare their elements.
+    // But when we compare their elements we expect a true result and only
+    // change it if its false.
+    let mut result = if lhs_length == rhs_length { 1 } else { 0 };
+    if lhs_address != rhs_address && lhs_length == rhs_length {
         for i in 0..lhs_length {
-            let lhs = state.stack[lhs_address as usize + 1 + i as usize];
-            let rhs = state.stack[rhs_address as usize + 1 + i as usize];
+            let lhs = state.stack[lhs_address as usize - 1 - i as usize];
+            let rhs = state.stack[rhs_address as usize - 1 - i as usize];
             if lhs != rhs {
-                state.stack.push(0);
-                return;
+                result = 0;
+                break;
             }
         }
-        state.stack.push(1);
     }
+    // Clear stack after the comparison.
+    while state.stack.len() > expected_stack_length {
+        assert!(state.pop_stack().is_some());
+    }
+    state.stack.push(result);
 }
 
 fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.pop_stack().unwrap();
-    let lhs = state.pop_stack().unwrap();
-    assert!(lhs.is_pointer, "{:#?}", lhs);
-    assert!(rhs.is_pointer, "{:#?}", rhs);
+    // Pop lhs and rhs and eventual array to get the correct other side (lhs)
+    let (rhs, rhs_values) = pop_array(state);
+    let (lhs, lhs_values) = pop_array(state);
+
+    // Remember how long the stack is supposed to be after comparison
+    let expected_stack_length = state.stack.len();
+
+    // Reconstruct stack so that the pointers work
+    for v in lhs_values.into_iter().rev() {
+        state.stack.push(v.value);
+        assert!(!v.is_pointer);
+    }
+    state.stack.push(lhs.value);
+    for v in rhs_values.into_iter().rev() {
+        state.stack.push(v.value);
+        assert!(!v.is_pointer);
+    }
+    state.stack.push(rhs.value);
+
+    assert!(
+        lhs.is_pointer,
+        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        lhs, state.stack, state.pointers
+    );
+    assert!(
+        rhs.is_pointer,
+        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        rhs, state.stack, state.pointers
+    );
     let lhs_address = lhs.value;
-    let rhs_address = rhs.value;
     let lhs_length = state.stack[lhs_address as usize] / 4;
+    let rhs_address = rhs.value;
     let rhs_length = state.stack[rhs_address as usize] / 4;
-    if lhs_length != rhs_length {
-        state.stack.push(1);
-    } else {
+    // If two arrays are not equal in length, we don't compare their elements.
+    // But when we compare their elements we expect a false result and only
+    // change it if its true.
+    let mut result = if lhs_length == rhs_length { 0 } else { 1 };
+    if lhs_address != rhs_address && lhs_length == rhs_length {
         for i in 0..lhs_length {
-            let lhs = state.stack[lhs_address as usize + 1 + i as usize];
-            let rhs = state.stack[rhs_address as usize + 1 + i as usize];
+            let lhs = state.stack[lhs_address as usize - 1 - i as usize];
+            let rhs = state.stack[rhs_address as usize - 1 - i as usize];
             if lhs != rhs {
-                state.stack.push(1);
-                return;
+                result = 1;
+                break;
             }
         }
-        state.stack.push(0);
     }
+    // Clear stack after the comparison.
+    while state.stack.len() > expected_stack_length {
+        assert!(state.pop_stack().is_some());
+    }
+    state.stack.push(result);
 }
 
 fn evaluate_less_than(state: &mut EvaluatorState, _: Instruction) {
