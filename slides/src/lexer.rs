@@ -71,7 +71,10 @@ pub fn lex<'a>(
                     state = State::MultiLineComment(start);
                 }
                 (State::MaybeComment(start), _) => {
-                    result.push_back(SyntaxToken::operator(start.char_index, &text[start.byte_index..][..1]));
+                    result.push_back(SyntaxToken::operator(
+                        start.char_index,
+                        &text[start.byte_index..][..1],
+                    ));
                     state = State::Default;
                     continue 'start;
                 }
@@ -82,7 +85,7 @@ pub fn lex<'a>(
                 (State::MultiLineComment(start), '*') => {
                     state = State::MaybeCloseMultiLineComment(start);
                 }
-                (State::MultiLineComment(start), '/')  => {
+                (State::MultiLineComment(start), '/') => {
                     state = State::MaybeComment(start);
                 }
                 (State::MaybeCloseMultiLineComment(start), '/') => {
@@ -169,16 +172,16 @@ pub fn lex<'a>(
                 result.push_back(SyntaxToken::operator(start.char_index, lexeme));
             }
         }
-        State::MaybeComment(start) => {
-            result.push_back(SyntaxToken::operator(start.char_index, &text[start.byte_index..]))
-        },
+        State::MaybeComment(start) => result.push_back(SyntaxToken::operator(
+            start.char_index,
+            &text[start.byte_index..],
+        )),
         State::SingleLineComment(_start) => {
             // Here you would emit a token.
-        },
-        State::MaybeCloseMultiLineComment(start) |
-        State::MultiLineComment(start) => {
+        }
+        State::MaybeCloseMultiLineComment(start) | State::MultiLineComment(start) => {
             diagnostic_bag.report_unterminated_comment(start.char_index, &text[start.byte_index..])
-        },
+        }
     }
     result.push_back(SyntaxToken::eoi(text.len()));
     if debug_flags.print_tokens() {

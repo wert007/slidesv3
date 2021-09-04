@@ -6,9 +6,24 @@ pub mod typing;
 
 use std::collections::HashMap;
 
-use assert_matches::assert_matches;
-
-use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+use crate::{
+    binder::{operators::BoundUnaryOperator, typing::Type},
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    parser::{
+        self,
+        syntax_nodes::{
+            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
+            BlockStatementNodeKind, ExpressionStatementNodeKind, FunctionCallNodeKind,
+            IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode,
+            SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind,
+            WhileStatementNodeKind,
+        },
+    },
+    text::{SourceText, TextSpan},
+    value::Value,
+    DebugFlags,
+};
 
 use self::{
     bound_nodes::BoundNode,
@@ -125,7 +140,9 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
     match node.kind {
         SyntaxNodeKind::Literal(literal) => bind_literal(node.span, literal, binder),
-        SyntaxNodeKind::ArrayLiteral(array_literal) => bind_array_literal(node.span, array_literal, binder),
+        SyntaxNodeKind::ArrayLiteral(array_literal) => {
+            bind_array_literal(node.span, array_literal, binder)
+        }
         SyntaxNodeKind::Variable(variable) => bind_variable(node.span, variable, binder),
         SyntaxNodeKind::Binary(binary) => bind_binary(node.span, binary, binder),
         SyntaxNodeKind::Unary(unary) => bind_unary(node.span, unary, binder),
@@ -135,9 +152,7 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::FunctionCall(function_call) => {
             bind_function_call(node.span, function_call, binder)
         }
-        SyntaxNodeKind::ArrayIndex(array_index) => {
-            bind_array_index(node.span, array_index, binder)
-        }
+        SyntaxNodeKind::ArrayIndex(array_index) => bind_array_index(node.span, array_index, binder),
         SyntaxNodeKind::BlockStatement(block_statement) => {
             bind_block_statement(node.span, block_statement, binder)
         }
@@ -180,7 +195,9 @@ fn bind_array_literal<'a, 'b>(
         if child.type_.can_be_converted_to(&type_) {
             children.push(child);
         } else {
-            binder.diagnostic_bag.report_cannot_convert(child_span, &child.type_, &type_);
+            binder
+                .diagnostic_bag
+                .report_cannot_convert(child_span, &child.type_, &type_);
             children.push(BoundNode::error(child_span));
         }
     }
@@ -297,7 +314,12 @@ fn bind_unary_operator<'a, 'b>(
     };
     match operand.type_ {
         Type::Integer => Some((result, Type::Integer)),
-        Type::Error | Type::Void | Type::Any | Type::SystemCall(_) | Type::Boolean | Type::Array(_) => {
+        Type::Error
+        | Type::Void
+        | Type::Any
+        | Type::SystemCall(_)
+        | Type::Boolean
+        | Type::Array(_) => {
             binder.diagnostic_bag.report_no_unary_operator(
                 span,
                 operator_token.lexeme,
@@ -348,7 +370,6 @@ fn bind_function_call<'a, 'b>(
     BoundNode::function_call(span, base, arguments, function_type.return_type)
 }
 
-
 fn bind_array_index<'a, 'b>(
     span: TextSpan,
     array_index: ArrayIndexNodeKind<'a>,
@@ -357,14 +378,20 @@ fn bind_array_index<'a, 'b>(
     let index_span = array_index.index.span;
     let index = bind_node(*array_index.index, binder);
     if !index.type_.can_be_converted_to(&Type::Integer) {
-        binder.diagnostic_bag.report_cannot_convert(index_span, &index.type_, &Type::Integer);
+        binder
+            .diagnostic_bag
+            .report_cannot_convert(index_span, &index.type_, &Type::Integer);
     }
     let base_span = array_index.base.span;
     let base = bind_node(*array_index.base, binder);
     let type_ = match base.type_.clone() {
         Type::Array(base_type) => *base_type,
         error => {
-            binder.diagnostic_bag.report_cannot_convert(base_span, &base.type_, &Type::array(error));
+            binder.diagnostic_bag.report_cannot_convert(
+                base_span,
+                &base.type_,
+                &Type::array(error),
+            );
             Type::Error
         }
     };
@@ -467,13 +494,11 @@ fn bind_assignment<'a, 'b>(
     let lhs_span = assignment.lhs.span();
     let lhs = match assignment.lhs.kind {
         SyntaxNodeKind::Variable(variable) => {
-            let variable = bind_variable(lhs_span, variable, binder);
-            variable
-        },
+            bind_variable(lhs_span, variable, binder)
+        }
         SyntaxNodeKind::ArrayIndex(array_index) => {
-            let array_index = bind_array_index(lhs_span, array_index, binder);
-            array_index
-        },
+            bind_array_index(lhs_span, array_index, binder)
+        }
         error => unreachable!("Unknown left hand side in assignment: {:#?}", error),
     };
     let expression = bind_node(*assignment.expression, binder);

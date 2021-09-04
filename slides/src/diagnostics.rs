@@ -152,11 +152,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span)
     }
 
-    pub fn report_unterminated_comment(
-        &mut self,
-        start: usize,
-        text: &str,
-    ) {
+    pub fn report_unterminated_comment(&mut self, start: usize, text: &str) {
         let span = TextSpan::new(start, text.len());
         let message = "Unterminated comment found here.".into();
         self.report(message, span);

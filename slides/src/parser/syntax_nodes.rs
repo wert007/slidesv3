@@ -355,7 +355,6 @@ impl FunctionCallNodeKind<'_> {
     }
 }
 
-
 #[derive(Debug)]
 pub struct ArrayIndexNodeKind<'a> {
     pub base: Box<SyntaxNode<'a>>,
@@ -363,7 +362,6 @@ pub struct ArrayIndexNodeKind<'a> {
     pub index: Box<SyntaxNode<'a>>,
     pub rbracket: SyntaxToken<'a>,
 }
-
 
 #[derive(Debug)]
 pub struct BlockStatementNodeKind<'a> {

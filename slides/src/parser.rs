@@ -5,10 +5,15 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
+use crate::{
+    diagnostics::DiagnosticBag,
+    lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    }, text::{SourceText, TextSpan}};
+    },
+    text::{SourceText, TextSpan},
+    DebugFlags,
+};
 
 use self::syntax_nodes::SyntaxNode;
 use crate::match_token;
@@ -212,19 +217,14 @@ fn parse_function_call<'a>(
                 comma_tokens,
                 close_parenthesis_token,
             )
-        },
+        }
         SyntaxTokenKind::LBracket => {
             let lbracket = next_token(tokens);
             let index = parse_expression(tokens, diagnostic_bag);
             let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
-            SyntaxNode::array_index(
-                base,
-                lbracket,
-                index,
-                rbracket,
-            )
-        },
-        _ => base
+            SyntaxNode::array_index(base, lbracket, index, rbracket)
+        }
+        _ => base,
     }
 }
 
@@ -240,9 +240,7 @@ fn parse_primary<'a>(
             let rparen = match_token!(tokens, diagnostic_bag, RParen);
             SyntaxNode::parenthesized(lparen, expression, rparen)
         }
-        SyntaxTokenKind::LBracket => {
-            parse_array_literal(tokens, diagnostic_bag)
-        }
+        SyntaxTokenKind::LBracket => parse_array_literal(tokens, diagnostic_bag),
         SyntaxTokenKind::NumberLiteral(_) => parse_number_literal(tokens, diagnostic_bag),
         SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => {
             parse_boolean_literal(tokens, diagnostic_bag)
@@ -267,7 +265,10 @@ fn parse_array_literal<'a>(
     let lbracket = match_token!(tokens, diagnostic_bag, LBracket);
     let mut children = vec![];
     let mut comma_tokens = vec![];
-    while !matches!(peek_token(tokens).kind, SyntaxTokenKind::RBracket | SyntaxTokenKind::Eoi) {
+    while !matches!(
+        peek_token(tokens).kind,
+        SyntaxTokenKind::RBracket | SyntaxTokenKind::Eoi
+    ) {
         let expression = parse_expression(tokens, diagnostic_bag);
         children.push(expression);
         if !matches!(peek_token(tokens).kind, SyntaxTokenKind::RBracket) {
@@ -278,10 +279,12 @@ fn parse_array_literal<'a>(
     let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
     if children.is_empty() {
         let span = TextSpan::bounds(lbracket.span(), rbracket.span());
-        diagnostic_bag.report_not_supported(span, "Empty Array literals (`[]`) are not supported currently.");
+        diagnostic_bag.report_not_supported(
+            span,
+            "Empty Array literals (`[]`) are not supported currently.",
+        );
     }
     SyntaxNode::array_literal(lbracket, children, comma_tokens, rbracket)
-
 }
 
 fn parse_number_literal<'a>(
