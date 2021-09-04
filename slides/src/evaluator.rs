@@ -1,11 +1,6 @@
 mod sys_calls;
 
-use crate::{
-    binder::typing::SystemCallKind,
-    instruction_converter::instruction::{op_codes::OpCode, Instruction},
-    value::Value,
-    DebugFlags,
-};
+use crate::{DebugFlags, binder::typing::{SystemCallKind, Type}, instruction_converter::instruction::{op_codes::OpCode, Instruction}, value::Value};
 use num_enum::TryFromPrimitive;
 
 type ResultType = Value;
@@ -86,6 +81,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ArrayLength => evaluate_array_literal(state, instruction),
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
+        OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
         OpCode::BitwiseNxor => evaluate_bitwise_nxor(state, instruction),
@@ -404,10 +400,12 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     let sys_call_kind = SystemCallKind::try_from_primitive((instruction.arg & 0xFF) as u8).unwrap();
     let argument_count = (instruction.arg >> 8) as usize;
     let mut arguments = Vec::with_capacity(argument_count);
+    let mut types = Vec::with_capacity(argument_count);
     for _ in 0..argument_count {
         arguments.push(state.pop_stack().unwrap());
+        types.push(Type::from_type_identifier(state.pop_stack().unwrap().value).unwrap());
     }
     match sys_call_kind {
-        SystemCallKind::Print => sys_calls::print(arguments[0], &state.stack),
+        SystemCallKind::Print => sys_calls::print(types.remove(0), arguments[0], &state.stack),
     }
 }

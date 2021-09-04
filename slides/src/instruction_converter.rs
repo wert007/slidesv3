@@ -235,6 +235,7 @@ fn convert_system_call(
     let mut result = vec![];
     let argument_count = system_call.arguments.len();
     for argument in system_call.arguments {
+        result.push(Instruction::type_identifier(argument.type_.type_identifier()));
         result.append(&mut convert_node(argument, diagnostic_bag));
     }
     result.push(Instruction::system_call(system_call.base, argument_count));
