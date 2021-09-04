@@ -144,6 +144,12 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
     let array = state.pop_stack().unwrap();
     assert!(array.is_pointer, "array = {:#?}, pointers = {:#?}, stack = {:#?}", array, state.pointers, state.stack);
     let array = array.value;
+    let array_length = state.stack[array as usize] / 4;
+    if (index as i64) < 0 || index > array_length{
+        println!("RuntimeError: Index {} is out of Bounds ({}) for this array!", index as i64, array_length);
+        state.stack.push(0);
+        return;
+    }
     let value = state.stack[array as usize + 1 + index as usize];
     state.stack.push(value);
 }
@@ -154,6 +160,11 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
     assert!(array.is_pointer, "array = {:#?}, pointers = {:#?}, stack = {:#?}", array, state.pointers, state.stack);
     let array = array.value;
     let value = state.pop_stack().unwrap().value;
+    let array_length = state.stack[array as usize] / 4;
+    if (index as i64) < 0 || index > array_length{
+        println!("RuntimeError: Index {} is out of Bounds ({}) for this array!", index as i64, array_length);
+        return;
+    }
     state.stack[array as usize + 1 + index as usize] = value;
 }
 
