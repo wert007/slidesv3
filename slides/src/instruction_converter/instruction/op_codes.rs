@@ -9,6 +9,7 @@ pub enum OpCode {
     StoreInRegister = 4,
     ArrayLength = 5,
     ArrayIndex = 6,
+    StoreInMemory = 7,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,

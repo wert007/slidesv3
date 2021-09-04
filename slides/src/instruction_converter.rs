@@ -68,6 +68,9 @@ fn convert_node_for_assignment(
         BoundNodeKind::VariableExpression(variable) => {
             convert_variable_for_assignment(variable, diagnostic_bag)
         }
+        BoundNodeKind::ArrayIndex(array_index) => {
+            convert_array_index_for_assignment(array_index, diagnostic_bag)
+        }
         _ => unreachable!(),
     }
 }
@@ -107,6 +110,16 @@ fn convert_variable_for_assignment(
     _: &mut DiagnosticBag,
 ) -> Vec<Instruction> {
     vec![Instruction::store_in_register(variable.variable_index)]
+}
+
+fn convert_array_index_for_assignment(
+    array_index: BoundArrayIndexNodeKind,
+    diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<Instruction> {
+    let mut result = convert_node(*array_index.base, diagnostic_bag);
+    result.append(&mut convert_node(*array_index.index, diagnostic_bag));
+    result.push(Instruction::store_in_memory());
+    result
 }
 
 fn convert_unary(

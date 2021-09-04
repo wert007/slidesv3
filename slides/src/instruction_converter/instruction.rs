@@ -54,6 +54,13 @@ impl Instruction {
         }
     }
 
+    pub const fn store_in_memory() -> Self {
+        Self {
+            op_code: OpCode::StoreInMemory,
+            arg: 0,
+        }
+    }
+
     pub const fn twos_complement() -> Self {
         Self {
             op_code: OpCode::BitwiseTwosComplement,
