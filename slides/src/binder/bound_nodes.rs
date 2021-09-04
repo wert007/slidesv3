@@ -23,6 +23,7 @@ pub struct BoundNode<'a> {
     pub span: TextSpan,
     pub kind: BoundNodeKind<'a>,
     pub type_: Type,
+    pub byte_width: u64,
     constant_value: Option<BoundConstant>,
 }
 
@@ -32,6 +33,7 @@ impl<'a> BoundNode<'a> {
             span,
             kind: BoundNodeKind::ErrorExpression,
             type_: Type::Error,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -39,19 +41,28 @@ impl<'a> BoundNode<'a> {
     pub fn literal(span: TextSpan, literal: LiteralNodeKind<'a>) -> Self {
         let value = literal.value.clone();
         let type_ = value.infer_type();
+        let byte_width = match &value {
+            Value::Integer(_) |
+            Value::Boolean(_) |
+            Value::SystemCall(_) => 4,
+            Value::String(value) => 4 + value.len(),
+        } as _;
         Self {
             span,
             kind: BoundNodeKind::LiteralExpression(literal),
             type_,
+            byte_width,
             constant_value: Some(value.into()),
         }
     }
 
     pub fn array_literal(span: TextSpan, children: Vec<BoundNode<'a>>, type_: Type) -> Self {
+        let byte_width = 8 + children.iter().map(|b|b.byte_width).sum::<u64>();
         Self {
             span,
             kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
             type_,
+            byte_width,
             constant_value: None,
         }
     }
@@ -61,6 +72,7 @@ impl<'a> BoundNode<'a> {
             span,
             kind: BoundNodeKind::VariableExpression(BoundVariableNodeKind { variable_index }),
             type_,
+            byte_width: 4,
             constant_value: None,
         }
     }
@@ -72,6 +84,7 @@ impl<'a> BoundNode<'a> {
         rhs: BoundNode<'a>,
         type_: Type,
     ) -> Self {
+        let byte_width = lhs.byte_width + rhs.byte_width;
         Self {
             span,
             kind: BoundNodeKind::BinaryExpression(BoundBinaryNodeKind {
@@ -80,6 +93,7 @@ impl<'a> BoundNode<'a> {
                 rhs: Box::new(rhs),
             }),
             type_,
+            byte_width,
             constant_value: None,
         }
     }
@@ -90,6 +104,7 @@ impl<'a> BoundNode<'a> {
         operand: BoundNode<'a>,
         type_: Type,
     ) -> Self {
+        let byte_width = operand.byte_width;
         Self {
             span,
             kind: BoundNodeKind::UnaryExpression(BoundUnaryNodeKind {
@@ -97,25 +112,28 @@ impl<'a> BoundNode<'a> {
                 operand: Box::new(operand),
             }),
             type_,
+            byte_width,
             constant_value: None,
         }
     }
 
     pub fn function_call(
-        span: TextSpan,
-        base: BoundNode<'a>,
-        arguments: Vec<BoundNode<'a>>,
-        type_: Type,
+        _span: TextSpan,
+        _base: BoundNode<'a>,
+        _arguments: Vec<BoundNode<'a>>,
+        _type_: Type,
     ) -> Self {
-        Self {
-            span,
-            kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
-                base: Box::new(base),
-                arguments,
-            }),
-            type_,
-            constant_value: None,
-        }
+        todo!("Byte Width wrongly set!");
+        // Self {
+        //     span,
+        //     kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
+        //         base: Box::new(base),
+        //         arguments,
+        //     }),
+        //     type_,
+        //     byte_width: 0,
+        //     constant_value: None,
+        // }
     }
 
     pub fn array_index(
@@ -124,6 +142,7 @@ impl<'a> BoundNode<'a> {
         index: BoundNode<'a>,
         type_: Type,
     ) -> Self {
+        let byte_width = index.byte_width + base.byte_width;
         Self {
             span,
             kind: BoundNodeKind::ArrayIndex(BoundArrayIndexNodeKind {
@@ -131,6 +150,7 @@ impl<'a> BoundNode<'a> {
                 index: Box::new(index),
             }),
             type_,
+            byte_width,
             constant_value: None,
         }
     }
@@ -141,10 +161,12 @@ impl<'a> BoundNode<'a> {
         arguments: Vec<BoundNode<'a>>,
         type_: Type,
     ) -> Self {
+        let byte_width = 4 * (arguments.len() as u64 + 1) + arguments.iter().map(|b| b.byte_width).sum::<u64>();
         Self {
             span,
             kind: BoundNodeKind::SystemCall(BoundSystemCallNodeKind { base, arguments }),
             type_,
+            byte_width,
             constant_value: None,
         }
     }
@@ -157,6 +179,7 @@ impl<'a> BoundNode<'a> {
                 body: Box::new(body),
             }),
             type_: Type::Void,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -173,6 +196,7 @@ impl<'a> BoundNode<'a> {
                 initializer: Box::new(initializer),
             }),
             type_: Type::Void,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -185,6 +209,7 @@ impl<'a> BoundNode<'a> {
                 body: Box::new(body),
             }),
             type_: Type::Void,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -197,6 +222,7 @@ impl<'a> BoundNode<'a> {
                 expression: Box::new(expression),
             }),
             type_: Type::Void,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -206,6 +232,7 @@ impl<'a> BoundNode<'a> {
             span,
             kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind { statements }),
             type_: Type::Void,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -217,6 +244,7 @@ impl<'a> BoundNode<'a> {
                 expression: Box::new(expression),
             }),
             type_: Type::Void,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -231,7 +259,7 @@ pub enum BoundNodeKind<'a> {
     VariableExpression(BoundVariableNodeKind),
     UnaryExpression(BoundUnaryNodeKind<'a>),
     BinaryExpression(BoundBinaryNodeKind<'a>),
-    FunctionCall(BoundFunctionCallNodeKind<'a>),
+    _FunctionCall(BoundFunctionCallNodeKind<'a>),
     SystemCall(BoundSystemCallNodeKind<'a>),
     ArrayIndex(BoundArrayIndexNodeKind<'a>),
 
