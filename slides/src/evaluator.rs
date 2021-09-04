@@ -81,6 +81,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
         OpCode::ArrayLength => evaluate_array_literal(state, instruction),
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
+        OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
         OpCode::BitwiseNxor => evaluate_bitwise_nxor(state, instruction),
@@ -145,6 +146,15 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
     let array = array.value;
     let value = state.stack[array as usize + 1 + index as usize];
     state.stack.push(value);
+}
+
+fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
+    let index = state.pop_stack().unwrap().value;
+    let array = state.pop_stack().unwrap();
+    assert!(array.is_pointer, "array = {:#?}, pointers = {:#?}, stack = {:#?}", array, state.pointers, state.stack);
+    let array = array.value;
+    let value = state.pop_stack().unwrap().value;
+    state.stack[array as usize + 1 + index as usize] = value;
 }
 
 fn evaluate_bitwise_twos_complement(state: &mut EvaluatorState, _: Instruction) {
