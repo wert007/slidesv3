@@ -61,21 +61,27 @@ fn print_array(base_type: Type, argument: TypedU64, stack: &[u64]) {
             }
         },
         Type::Array(base_type) => {
-            dbg!(stack);
             let count = array_length_in_bytes / 4;
-            let mut address = stack[argument.value as usize];
-            for _ in (argument.value - count..argument.value).rev() {
+            let mut address = stack[argument.value as usize - 1] + 1;
+            let end = argument.value - count;
+            while address > end {
+                address -= 1;
+                // println!("adress = {}, value = {}", address, stack[address as usize]);
                 let argument = TypedU64 {
                     value: address,
                     is_pointer: true,
                 }; // FIXME
                 print_array(*base_type.clone(), argument, stack);
                 print!(", ");
-                address -= stack[address as usize] / 4;
+                if address > stack[address as usize]/ 4 + 1 {
+                    // println!("array_len = {}", stack[address as usize]);
+                    address -= stack[address as usize]/ 4 + 1;
+                } else {
+                    address = end;
+                }
             }
         },
         Type::String => {
-            dbg!(&stack);
             let count = array_length_in_bytes / 4;
             for i in (argument.value - count..argument.value).rev() {
                 let argument = TypedU64 { value: stack[i as usize], is_pointer: true, }; //FIXME
