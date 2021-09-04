@@ -14,9 +14,13 @@
     print(b_1);
     // print(b == a);
     print(b == b2);
-    // print(b == [true, false]);
+    print(b == [true, false]);
 
-    // let c = [1, 2, 3, 4,];
+    let c = [1, 2, 3, 4,];
+    print([4, 3, 2, 1] == [1, 2, 3, 4]);
+    print([1, 2, 3, 4] == c);
+    let c2 = c;
+    print(c == c2);
     // let check = c[3] == c.length();
     // print(check);
 
