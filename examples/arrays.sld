@@ -9,10 +9,12 @@
     print(a_1 == 2);
 
     let b = [true, false, ];
+    let b2 = [true, false, ];
     let b_1 = b[1];
     print(b_1);
     // print(b == a);
-    print(b == [true, false]);
+    print(b == b2);
+    // print(b == [true, false]);
 
     // let c = [1, 2, 3, 4,];
     // let check = c[3] == c.length();

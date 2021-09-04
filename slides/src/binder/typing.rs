@@ -28,6 +28,10 @@ impl Type {
             None
         }
     }
+
+    pub fn is_array(&self) -> bool {
+        matches!(self, Self::Array(_))
+    }
 }
 
 impl From<Value> for Type {
