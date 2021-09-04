@@ -57,7 +57,7 @@ impl<'a> SyntaxToken<'a> {
         start: usize,
         lexeme: &'a str,
     ) -> Self {
-        let value = lexeme[1..lexeme.len() - 2].to_owned();
+        let value = lexeme[1..lexeme.len() - 1].to_owned();
         Self {
             start,
             lexeme,

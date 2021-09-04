@@ -135,7 +135,7 @@ pub fn lex<'a>(
                             let span = TextSpan::new(start.char_index, char_index - start.char_index);
                             diagnostic_bag.report_unterminated_string(span, string_state.enclosing_char);
                         }
-                        result.push_back(SyntaxToken::string_literal(start.char_index, &text[start.byte_index..byte_index]));
+                        result.push_back(SyntaxToken::string_literal(start.char_index, &text[start.byte_index..byte_index + 1]));
                     }
                 }
                 (State::Identifier(start), c) => {
