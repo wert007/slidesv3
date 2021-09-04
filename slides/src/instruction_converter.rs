@@ -93,7 +93,10 @@ fn convert_node_for_assignment(
     }
 }
 
-fn convert_literal(literal: LiteralNodeKind, _: &mut DiagnosticBag) -> Vec<Instruction> {
+fn convert_literal(
+    literal: LiteralNodeKind,
+    diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<Instruction> {
     let value = match literal.value {
         Value::Integer(value) => value as u64,
         Value::Boolean(value) => {
@@ -104,9 +107,37 @@ fn convert_literal(literal: LiteralNodeKind, _: &mut DiagnosticBag) -> Vec<Instr
             }
         }
         Value::SystemCall(kind) => kind as u64,
-        Value::String(_value) => todo!(),
+        Value::String(value) => return convert_string_literal(value, diagnostic_bag),
     };
     vec![Instruction::load_immediate(value)]
+}
+
+fn convert_string_literal(value: String, _: &mut DiagnosticBag) -> Vec<Instruction> {
+    let mut result = vec![];
+    let count_in_bytes = value.len() as u64;
+    let byte_groups = value.as_bytes().chunks_exact(4);
+    let remainder = byte_groups.remainder();
+    let word = [
+        *remainder.get(0).unwrap_or(&0),
+        *remainder.get(1).unwrap_or(&0),
+        *remainder.get(2).unwrap_or(&0),
+        *remainder.get(3).unwrap_or(&0),
+    ];
+    let word = (word[0] as u64)
+        + ((word[1] as u64) << 8)
+        + ((word[2] as u64) << 16)
+        + ((word[3] as u64) << 24);
+    result.push(Instruction::load_immediate(word));
+    for word in byte_groups.rev() {
+        let word = (word[0] as u64)
+            + ((word[1] as u64) << 8)
+            + ((word[2] as u64) << 16)
+            + ((word[3] as u64) << 24);
+        result.push(Instruction::load_immediate(word));
+    }
+    result.push(Instruction::load_immediate(count_in_bytes as u64));
+    result.push(Instruction::array_length(count_in_bytes as usize));
+    result
 }
 
 fn convert_array_literal(
