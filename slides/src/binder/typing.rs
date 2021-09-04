@@ -10,6 +10,7 @@ pub enum Type {
     Boolean,
     SystemCall(SystemCallKind),
     Array(Box<Type>),
+    String,
 }
 
 impl Type {
@@ -54,6 +55,7 @@ impl std::fmt::Display for Type {
             Type::Boolean => write!(f, "bool"),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
             Type::Array(base) => write!(f, "{}[]", base),
+            Type::String => write!(f, "string"),
         }
     }
 }

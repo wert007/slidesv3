@@ -319,6 +319,7 @@ fn bind_unary_operator<'a, 'b>(
         | Type::Any
         | Type::SystemCall(_)
         | Type::Boolean
+        | Type::String
         | Type::Array(_) => {
             binder.diagnostic_bag.report_no_unary_operator(
                 span,

@@ -104,6 +104,7 @@ fn convert_literal(literal: LiteralNodeKind, _: &mut DiagnosticBag) -> Vec<Instr
             }
         }
         Value::SystemCall(kind) => kind as u64,
+        Value::String(_value) => todo!(),
     };
     vec![Instruction::load_immediate(value)]
 }

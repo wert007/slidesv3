@@ -1,10 +1,11 @@
-use crate::binder::typing::SystemCallKind;
+use crate::binder::typing::{SystemCallKind, Type};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Integer(i64),
     Boolean(bool),
     SystemCall(SystemCallKind),
+    String(String),
 }
 
 #[allow(dead_code)]
@@ -38,12 +39,19 @@ impl From<bool> for Value {
     }
 }
 
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Integer(value) => write!(f, "{}", value),
             Value::Boolean(value) => write!(f, "{}", value),
             Value::SystemCall(value) => write!(f, "system call {}", value),
+            Value::String(value) => write!(f, "'{:?}'", value),
         }
     }
 }
