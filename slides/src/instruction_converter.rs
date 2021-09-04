@@ -159,20 +159,33 @@ fn convert_binary(
     binary: BoundBinaryNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
 ) -> Vec<Instruction> {
-    let mut result = convert_node(*binary.lhs, diagnostic_bag);
-    result.append(&mut convert_node(*binary.rhs, diagnostic_bag));
-    result.push(match binary.operator_token {
+    let operator_instruction = match binary.operator_token {
         BoundBinaryOperator::ArithmeticAddition => Instruction::addition(),
         BoundBinaryOperator::ArithmeticSubtraction => Instruction::subtraction(),
         BoundBinaryOperator::ArithmeticMultiplication => Instruction::multiplication(),
         BoundBinaryOperator::ArithmeticDivision => Instruction::division(),
-        BoundBinaryOperator::Equals => Instruction::equals(),
-        BoundBinaryOperator::NotEquals => Instruction::not_equals(),
+        BoundBinaryOperator::Equals => {
+            if binary.lhs.type_.is_array() && binary.rhs.type_.is_array() {
+                Instruction::array_equals()
+            } else {
+                Instruction::equals()
+            }
+        }
+        BoundBinaryOperator::NotEquals => {
+            if binary.lhs.type_.is_array() && binary.rhs.type_.is_array() {
+                Instruction::array_not_equals()
+            } else {
+                Instruction::not_equals()
+            }
+        }
         BoundBinaryOperator::LessThan => Instruction::less_than(),
         BoundBinaryOperator::GreaterThan => Instruction::greater_than(),
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(),
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
-    });
+    };
+    let mut result = convert_node(*binary.lhs, diagnostic_bag);
+    result.append(&mut convert_node(*binary.rhs, diagnostic_bag));
+    result.push(operator_instruction);
     result
 }
 

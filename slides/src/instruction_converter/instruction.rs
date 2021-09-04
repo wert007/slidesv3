@@ -124,6 +124,21 @@ impl Instruction {
         }
     }
 
+
+    pub const fn array_equals() -> Self {
+        Self {
+            op_code: OpCode::ArrayEquals,
+            arg: 0,
+        }
+    }
+
+    pub const fn array_not_equals() -> Self {
+        Self {
+            op_code: OpCode::ArrayNotEquals,
+            arg: 0,
+        }
+    }
+
     pub const fn less_than() -> Self {
         Self {
             op_code: OpCode::LessThan,

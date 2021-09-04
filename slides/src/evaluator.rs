@@ -95,6 +95,8 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::Division => evaluate_division(state, instruction),
         OpCode::Equals => evaluate_equals(state, instruction),
         OpCode::NotEquals => evaluate_not_equals(state, instruction),
+        OpCode::ArrayEquals => evaluate_array_equals(state, instruction),
+        OpCode::ArrayNotEquals => evaluate_array_not_equals(state, instruction),
         OpCode::LessThan => evaluate_less_than(state, instruction),
         OpCode::GreaterThan => evaluate_greater_than(state, instruction),
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
@@ -237,6 +239,54 @@ fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
     let rhs = state.pop_stack().unwrap().value;
     let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs != rhs) as _);
+}
+
+fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
+    let rhs = state.pop_stack().unwrap();
+    let lhs = state.pop_stack().unwrap();
+    assert!(lhs.is_pointer, "{:#?}, stack = {:#?}, pointers = {:#?}", lhs, state.stack, state.pointers);
+    assert!(rhs.is_pointer, "{:#?}, stack = {:#?}, pointers = {:#?}", rhs, state.stack, state.pointers);
+    let lhs_address = lhs.value;
+    let rhs_address = rhs.value;
+    let lhs_length = state.stack[lhs_address as usize] / 4;
+    let rhs_length = state.stack[rhs_address as usize] / 4;
+    if lhs_length != rhs_length {
+        state.stack.push(0);
+    } else {
+        for i in 0..lhs_length {
+            let lhs = state.stack[lhs_address as usize + 1 + i as usize];
+            let rhs = state.stack[rhs_address as usize + 1 + i as usize];
+            if lhs != rhs {
+                state.stack.push(0);
+                return;
+            }
+        }
+        state.stack.push(1);
+    }
+}
+
+fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
+    let rhs = state.pop_stack().unwrap();
+    let lhs = state.pop_stack().unwrap();
+    assert!(lhs.is_pointer, "{:#?}", lhs);
+    assert!(rhs.is_pointer, "{:#?}", rhs);
+    let lhs_address = lhs.value;
+    let rhs_address = rhs.value;
+    let lhs_length = state.stack[lhs_address as usize] / 4;
+    let rhs_length = state.stack[rhs_address as usize] / 4;
+    if lhs_length != rhs_length {
+        state.stack.push(1);
+    } else {
+        for i in 0..lhs_length {
+            let lhs = state.stack[lhs_address as usize + 1 + i as usize];
+            let rhs = state.stack[rhs_address as usize + 1 + i as usize];
+            if lhs != rhs {
+                state.stack.push(1);
+                return;
+            }
+        }
+        state.stack.push(0);
+    }
 }
 
 fn evaluate_less_than(state: &mut EvaluatorState, _: Instruction) {
