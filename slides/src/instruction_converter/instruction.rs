@@ -61,6 +61,13 @@ impl Instruction {
         }
     }
 
+    pub const fn type_identifier(type_identifier: u64) -> Self {
+        Self {
+            op_code: OpCode::TypeIdentifier,
+            arg: type_identifier,
+        }
+    }
+
     pub const fn twos_complement() -> Self {
         Self {
             op_code: OpCode::BitwiseTwosComplement,
