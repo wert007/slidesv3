@@ -114,10 +114,10 @@ fn convert_array_literal(
 ) -> Vec<Instruction> {
     let mut result = vec![];
     let count_in_bytes = array_literal.children.len() * 4;
-    result.push(Instruction::load_immediate(count_in_bytes as u64));
-    for child in array_literal.children {
+    for child in array_literal.children.into_iter().rev() {
         result.append(&mut convert_node(child, diagnostic_bag));
     }
+    result.push(Instruction::load_immediate(count_in_bytes as u64));
     result.push(Instruction::array_length(count_in_bytes));
     result
 }

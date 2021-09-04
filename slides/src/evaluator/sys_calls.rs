@@ -6,8 +6,8 @@ pub fn print(argument: TypedU64, stack: &[u64]) {
         dbg!(stack);
         let count = stack[argument.value as usize] / 4;
         print!("[ ");
-        for i in argument.value..argument.value + count {
-            print!("{}, ", stack[i as usize + 1]);
+        for i in (argument.value - count..argument.value).rev() {
+            print!("{}, ", stack[i as usize]);
         }
         println!("]")
     } else {

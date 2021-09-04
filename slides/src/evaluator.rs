@@ -137,10 +137,8 @@ fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruct
     state.set_variable(instruction.arg, value, is_pointer);
 }
 
-fn evaluate_array_literal(state: &mut EvaluatorState, instruction: Instruction) {
-    let array_length_in_bytes = instruction.arg;
-    let array_length = array_length_in_bytes / 4;
-    let array_address = state.stack.len() as u64 - array_length - 1;
+fn evaluate_array_literal(state: &mut EvaluatorState, _: Instruction) {
+    let array_address = state.stack.len() as u64 - 1;
     state.stack.push(array_address);
     state.set_pointer(state.stack.len());
 }
@@ -163,7 +161,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
         state.stack.push(0);
         return;
     }
-    let value = state.stack[array as usize + 1 + index as usize];
+    let value = state.stack[array as usize - 1 - index as usize];
     state.stack.push(value);
 }
 
@@ -185,7 +183,7 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
         );
         return;
     }
-    state.stack[array as usize + 1 + index as usize] = value;
+    state.stack[array as usize - 1 - index as usize] = value;
 }
 
 fn evaluate_bitwise_twos_complement(state: &mut EvaluatorState, _: Instruction) {
