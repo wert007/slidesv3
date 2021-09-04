@@ -3,8 +3,9 @@
     print(a[0]);
     print(a[1]);
     print(a[2]);
-    print(a);
     let a_1 = a[1];
+    a[1] = 5;
+    print(a);
     print(a_1 == 2);
 
     let b = [true, false, ];
