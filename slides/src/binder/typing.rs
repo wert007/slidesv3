@@ -33,9 +33,30 @@ impl Type {
         matches!(self, Self::Array(_))
     }
 
-    pub fn from_u64(value: u64) -> Option<Self> {
+    pub fn type_identifier(&self) -> u64 {
+        match self {
+            Type::Array(base_type) => {
+                let mut array_count = 0u8;
+                let mut base_type = base_type;
+                while let &Type::Array(child) = &base_type.deref() {
+                    base_type = &child;
+                    array_count += 1;
+                }
+                let base_type : u64 = base_type.type_identifier();
+                (base_type << 8) + (array_count << 1) as u64 + 1
+            }
+            Type::Error => 0,
+            Type::Any => 2,
+            Type::Void => 4,
+            Type::Integer => 6,
+            Type::Boolean => 8,
+            Type::String => 10,
+            Type::SystemCall(kind) => ((*kind as u8) as u64) << 4 + 16,
+        }
+    }
+
+    pub fn from_type_identifier(value: u64) -> Option<Self> {
         match value {
-            1 => todo!(),
             0 => Some(Self::Error),
             2 => Some(Self::Any),
             4 => Some(Self::Void),
@@ -44,7 +65,7 @@ impl Type {
             10 => Some(Self::String),
             _ => {
                 if value & 1 == 1 {
-                    let base_type = Self::from_u64(value >> 8)?;
+                    let base_type = Self::from_type_identifier(value >> 8)?;
                     let mut result = Type::array(base_type);
                     let array_count = (value >> 1) & 0xFF;
                     for _ in 0..array_count {
@@ -73,30 +94,6 @@ impl std::fmt::Display for Type {
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
             Type::Array(base) => write!(f, "{}[]", base),
             Type::String => write!(f, "string"),
-        }
-    }
-}
-
-impl Into<u64> for Type {
-    fn into(self) -> u64 {
-        match self {
-            Type::Array(base_type) => {
-                let mut array_count = 0u8;
-                let mut base_type = *base_type;
-                while let Type::Array(child) = base_type {
-                    base_type = *child;
-                    array_count += 1;
-                }
-                let base_type : u64 = base_type.into();
-                (base_type << 8) + (array_count << 1) as u64 + 1
-            } 
-            Type::Error => 0,
-            Type::Any => 2,
-            Type::Void => 4,
-            Type::Integer => 6,
-            Type::Boolean => 8,
-            Type::String => 10,
-            Type::SystemCall(kind) => ((kind as u8) as u64) << 4 + 16,
         }
     }
 }
