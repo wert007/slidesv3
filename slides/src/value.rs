@@ -25,6 +25,15 @@ impl Value {
             None
         }
     }
+
+    pub fn infer_type(&self) -> Type {
+        match self {
+            Value::Integer(_) => Type::Integer,
+            Value::Boolean(_) => Type::Boolean,
+            Value::SystemCall(kind) => Type::SystemCall(*kind),
+            Value::String(_) => Type::String,
+        }
+    }
 }
 
 impl From<i64> for Value {

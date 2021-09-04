@@ -37,11 +37,12 @@ impl<'a> BoundNode<'a> {
     }
 
     pub fn literal(span: TextSpan, literal: LiteralNodeKind<'a>) -> Self {
-        let value = literal.value;
+        let value = literal.value.clone();
+        let type_ = value.infer_type();
         Self {
             span,
             kind: BoundNodeKind::LiteralExpression(literal),
-            type_: value.into(),
+            type_,
             constant_value: Some(value.into()),
         }
     }

@@ -1,4 +1,3 @@
-use crate::value::Value;
 use num_enum::TryFromPrimitive;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -32,16 +31,6 @@ impl Type {
 
     pub fn is_array(&self) -> bool {
         matches!(self, Self::Array(_))
-    }
-}
-
-impl From<Value> for Type {
-    fn from(value: Value) -> Self {
-        match value {
-            Value::Integer(_) => Type::Integer,
-            Value::Boolean(_) => Type::Boolean,
-            Value::SystemCall(kind) => Type::SystemCall(kind),
-        }
     }
 }
 
