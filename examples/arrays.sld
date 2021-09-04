@@ -32,6 +32,12 @@
     // print(e);
     // print(e == [7, 3, 3, 3, 3, 3, 1])
 
+    let f = [ [ 1 ], [ 2, 3 ], [ 4, 5, 6, ], ];
+    print(f);
+
+    // let g = ['Red', 'Blue', 'Yellow', 'Green'];
+    // print(g);
+
     // let list = new List<int>();
     // list.add(1);
     // list.add([1, 2, 3]);
