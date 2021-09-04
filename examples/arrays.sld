@@ -11,10 +11,20 @@
     let b = [true, false, ];
     let b_1 = b[1];
     print(b_1);
+    // print(b == a);
+    print(b == [true, false]);
 
     // let c = [1, 2, 3, 4,];
     // let check = c[3] == c.length();
     // print(check);
+
+    // let d = [5;999] // Array with 999 elements, each being 5
+    // print(d.length());
+    // print(d[998]);
+
+    // let e = [7, 3;5, 1] // [7, 3, 3, 3, 3, 3, 1]
+    // print(e);
+    // print(e == [7, 3, 3, 3, 3, 3, 1])
 
     // let list = new List<int>();
     // list.add(1);
