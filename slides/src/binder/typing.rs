@@ -32,6 +32,34 @@ impl Type {
     pub fn is_array(&self) -> bool {
         matches!(self, Self::Array(_))
     }
+
+    pub fn from_u64(value: u64) -> Option<Self> {
+        match value {
+            1 => todo!(),
+            0 => Some(Self::Error),
+            2 => Some(Self::Any),
+            4 => Some(Self::Void),
+            6 => Some(Self::Integer),
+            8 => Some(Self::Boolean),
+            10 => Some(Self::String),
+            _ => {
+                if value & 1 == 1 {
+                    let base_type = Self::from_u64(value >> 8)?;
+                    let mut result = Type::array(base_type);
+                    let array_count = (value >> 1) & 0xFF;
+                    for _ in 0..array_count {
+                        result = Type::array(result);
+                    }
+                    Some(result)
+                } else if value & 0x31 == 16 {
+                    let kind = SystemCallKind::try_from_primitive(((value >> 5) & 0xFF) as u8).ok()?;
+                    Some(Self::SystemCall(kind))
+                } else {
+                    None
+                }
+            },
+        }
+    }
 }
 
 impl std::fmt::Display for Type {
@@ -45,6 +73,30 @@ impl std::fmt::Display for Type {
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
             Type::Array(base) => write!(f, "{}[]", base),
             Type::String => write!(f, "string"),
+        }
+    }
+}
+
+impl Into<u64> for Type {
+    fn into(self) -> u64 {
+        match self {
+            Type::Array(base_type) => {
+                let mut array_count = 0u8;
+                let mut base_type = *base_type;
+                while let Type::Array(child) = base_type {
+                    base_type = *child;
+                    array_count += 1;
+                }
+                let base_type : u64 = base_type.into();
+                (base_type << 8) + (array_count << 1) as u64 + 1
+            } 
+            Type::Error => 0,
+            Type::Any => 2,
+            Type::Void => 4,
+            Type::Integer => 6,
+            Type::Boolean => 8,
+            Type::String => 10,
+            Type::SystemCall(kind) => ((kind as u8) as u64) << 4 + 16,
         }
     }
 }
