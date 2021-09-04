@@ -174,6 +174,10 @@ impl SyntaxTokenKind {
         SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 0 })
     }
 
+    pub fn default_string_literal() -> Self {
+        SyntaxTokenKind::StringLiteral(StringLiteralKind { value: String::default() })
+    }
+
     pub fn keyword(identifier: &str) -> Option<Self> {
         match identifier {
             "false" => Some(Self::FalseKeyword),

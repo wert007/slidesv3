@@ -1,5 +1,3 @@
-use assert_matches::assert_matches;
-
 use crate::{
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
     text::TextSpan,
@@ -38,9 +36,11 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn literal(token: SyntaxToken<'a>) -> Self {
-        let value =
-            assert_matches!(&token.kind, SyntaxTokenKind::NumberLiteral(n) => n).value as i64;
-        let value = value.into();
+        let value = match &token.kind {
+            SyntaxTokenKind::NumberLiteral(n) => (n.value as i64).into(),
+            SyntaxTokenKind::StringLiteral(s) => s.value.clone().into(),
+            error => unreachable!("Unexpected Literal SyntaxToken {:#?}!", error),
+        };
         Self {
             span: token.span(),
             kind: SyntaxNodeKind::Literal(LiteralNodeKind { token, value }),

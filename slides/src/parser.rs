@@ -242,6 +242,7 @@ fn parse_primary<'a>(
         }
         SyntaxTokenKind::LBracket => parse_array_literal(tokens, diagnostic_bag),
         SyntaxTokenKind::NumberLiteral(_) => parse_number_literal(tokens, diagnostic_bag),
+        SyntaxTokenKind::StringLiteral(_) => parse_string_literal(tokens, diagnostic_bag),
         SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => {
             parse_boolean_literal(tokens, diagnostic_bag)
         }
@@ -292,6 +293,13 @@ fn parse_number_literal<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     SyntaxNode::literal(match_token!(tokens, diagnostic_bag, NumberLiteral))
+}
+
+fn parse_string_literal<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    SyntaxNode::literal(match_token!(tokens, diagnostic_bag, StringLiteral))
 }
 
 fn parse_boolean_literal<'a>(

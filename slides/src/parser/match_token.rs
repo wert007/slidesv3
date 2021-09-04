@@ -13,6 +13,19 @@ macro_rules! match_token {
             SyntaxToken::number_literal_no_diagnostics(current.span().start(), "0")
         }
     };
+    ($tokens:expr, $diagnostic_bag:expr, StringLiteral) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::StringLiteral(_)) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::default_string_literal(),
+            );
+            SyntaxToken::string_literal(current.span().start(), "''")
+        }
+    };
     ($tokens:expr, $diagnostic_bag:expr, Eoi) => {
         if matches!(peek_token($tokens).kind, SyntaxTokenKind::Eoi) {
             next_token($tokens)
