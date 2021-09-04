@@ -1,3 +1,8 @@
+#[cfg(test)]
+mod tests;
+
+use std::ops::Deref;
+
 use num_enum::TryFromPrimitive;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
