@@ -464,17 +464,25 @@ fn bind_assignment<'a, 'b>(
     assignment: AssignmentNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    let variable_span = assignment.lhs.span();
-    let variable =
-        assert_matches!(assignment.lhs.kind, SyntaxNodeKind::Variable(variable) => variable);
-    let variable = bind_variable(variable_span, variable, binder);
+    let lhs_span = assignment.lhs.span();
+    let lhs = match assignment.lhs.kind {
+        SyntaxNodeKind::Variable(variable) => {
+            let variable = bind_variable(lhs_span, variable, binder);
+            variable
+        },
+        SyntaxNodeKind::ArrayIndex(array_index) => {
+            let array_index = bind_array_index(lhs_span, array_index, binder);
+            array_index
+        },
+        error => unreachable!("Unknown left hand side in assignment: {:#?}", error),
+    };
     let expression = bind_node(*assignment.expression, binder);
-    if !expression.type_.can_be_converted_to(&variable.type_) {
+    if !expression.type_.can_be_converted_to(&lhs.type_) {
         binder
             .diagnostic_bag
-            .report_cannot_convert(span, &expression.type_, &variable.type_);
+            .report_cannot_convert(span, &expression.type_, &lhs.type_);
     }
-    BoundNode::assignment(span, variable, expression)
+    BoundNode::assignment(span, lhs, expression)
 }
 
 fn bind_block_statement<'a, 'b>(
