@@ -9,9 +9,9 @@
     print(concat);
 
 // TODO: Implement string length!
-    let len = h.length();
-    print(len);
+    // let len = h.length();
+    // print(len);
 
 // TODO: String concatination with any type
-    print('Len was ' + len);
+    // print('Len was ' + len);
 }
