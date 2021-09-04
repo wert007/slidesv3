@@ -53,6 +53,18 @@ impl<'a> SyntaxToken<'a> {
         }
     }
 
+    pub fn string_literal(
+        start: usize,
+        lexeme: &'a str,
+    ) -> Self {
+        let value = lexeme[1..lexeme.len() - 2].to_owned();
+        Self {
+            start,
+            lexeme,
+            kind: SyntaxTokenKind::StringLiteral(StringLiteralKind { value }),
+        }
+    }
+
     pub fn keyword(start: usize, lexeme: &'a str) -> Self {
         let kind = SyntaxTokenKind::keyword(lexeme).expect(lexeme);
         Self {
@@ -96,6 +108,7 @@ impl<'a> SyntaxToken<'a> {
 pub enum SyntaxTokenKind {
     Eoi,
     NumberLiteral(NumberLiteralKind),
+    StringLiteral(StringLiteralKind),
     LParen,
     RParen,
     LBracket,
@@ -206,6 +219,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SyntaxTokenKind::NumberLiteral(v) => write!(f, "{:?}", v),
+            SyntaxTokenKind::StringLiteral(v) => write!(f, "{:?}", v),
             SyntaxTokenKind::Eoi => write!(f, "End-of-Input-Token"),
             SyntaxTokenKind::Semicolon => write!(f, "SemicolonToken"),
             SyntaxTokenKind::Comma => write!(f, "CommaToken"),
@@ -245,5 +259,17 @@ pub struct NumberLiteralKind {
 impl std::fmt::Debug for NumberLiteralKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NumberLiteralKind({})", self.value)
+    }
+}
+
+#[derive(Clone)]
+pub struct StringLiteralKind {
+    pub value: String,
+}
+
+
+impl std::fmt::Debug for StringLiteralKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StringLiteralKind({:#?})", self.value)
     }
 }

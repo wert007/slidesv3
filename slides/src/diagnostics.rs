@@ -157,4 +157,9 @@ impl<'a> DiagnosticBag<'a> {
         let message = "Unterminated comment found here.".into();
         self.report(message, span);
     }
+
+    pub fn report_unterminated_string(&mut self, span: TextSpan, expected_char: char) {
+        let message = format!("Unterminated string found here. Expected `{}`.", expected_char);
+        self.report(message, span);
+    }
 }

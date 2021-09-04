@@ -4,9 +4,7 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{
-    diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::SourceText, DebugFlags,
-};
+use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::{SourceText, TextSpan}};
 
 use self::syntax_token::SyntaxTokenKind;
 
@@ -14,6 +12,7 @@ use self::syntax_token::SyntaxTokenKind;
 enum State {
     Default,
     DecimalNumber(TextIndex),
+    String(TextIndex, StringState),
     Identifier(TextIndex),
     MultiCharOperator(TextIndex),
     MaybeComment(TextIndex),
@@ -28,6 +27,19 @@ struct TextIndex {
     char_index: usize,
 }
 
+#[derive(Clone, Copy)]
+struct StringState {
+    enclosing_char: char,
+}
+
+impl StringState {
+    pub fn single_quote() -> Self {
+        Self {
+            enclosing_char: '\'',
+        }
+    }
+}
+
 pub fn lex<'a>(
     content: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
@@ -36,12 +48,14 @@ pub fn lex<'a>(
     let mut result = VecDeque::new();
     let mut state = State::Default;
     let mut nested_comments_depth = 0;
+    let mut char_len = 0;
     let text = content.text;
     for (char_index, (byte_index, character)) in text.char_indices().enumerate() {
         let index = TextIndex {
             byte_index,
             char_index,
         };
+        char_len = char_index;
         'start: loop {
             match (state, character) {
                 (State::Default, '/') => {
@@ -49,6 +63,9 @@ pub fn lex<'a>(
                 }
                 (State::Default, d) if d.is_digit(10) => {
                     state = State::DecimalNumber(index);
+                }
+                (State::Default, '\'') => {
+                    state = State::String(index, StringState::single_quote());
                 }
                 (State::Default, c) if c.is_alphabetic() || c == '_' => {
                     state = State::Identifier(index);
@@ -111,6 +128,16 @@ pub fn lex<'a>(
                         continue 'start;
                     }
                 }
+                (State::String(start, string_state), c) => {
+                    if c == '\n' || c == string_state.enclosing_char {
+                        state = State::Default;
+                        if c == '\n' {
+                            let span = TextSpan::new(start.char_index, char_index - start.char_index);
+                            diagnostic_bag.report_unterminated_string(span, string_state.enclosing_char);
+                        }
+                        result.push_back(SyntaxToken::string_literal(start.char_index, &text[start.byte_index..byte_index]));
+                    }
+                }
                 (State::Identifier(start), c) => {
                     if !c.is_alphanumeric() && c != '_' {
                         state = State::Default;
@@ -154,6 +181,11 @@ pub fn lex<'a>(
                 &text[start.byte_index..],
                 diagnostic_bag,
             ));
+        }
+        State::String(start, string_state) => {
+            let span = TextSpan::new(start.char_index, char_len - start.char_index);
+            diagnostic_bag.report_unterminated_string(span, string_state.enclosing_char);
+            result.push_back(SyntaxToken::string_literal(start.char_index, &text[start.byte_index..]));
         }
         State::Identifier(start) => {
             let lexeme = &text[start.byte_index..];
