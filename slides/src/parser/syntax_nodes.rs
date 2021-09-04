@@ -294,7 +294,7 @@ pub enum SyntaxNodeKind<'a> {
 
 impl SyntaxNodeKind<'_> {
     pub fn is_assignable(&self) -> bool {
-        matches!(self, Self::Variable(_))
+        matches!(self, Self::Variable(_) | Self::ArrayIndex(_))
     }
 }
 
