@@ -2,6 +2,9 @@
     let h = 'Hello World!';
     print(h);
 
+    let array_test = ['Hello', 'World', '!'];
+    print(array_test);
+
 // TODO: Implement string concatination
     // let a = 'Hewwo';
     // let b = ' Meowrld! o//';
