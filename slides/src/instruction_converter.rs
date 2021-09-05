@@ -147,7 +147,7 @@ fn convert_array_literal(
     diagnostic_bag: &mut DiagnosticBag,
 ) -> Vec<Instruction> {
     let mut result = vec![];
-    let count_in_bytes = array_literal.children.iter().map(|c|c.byte_width).sum::<u64>();
+    let count_in_bytes = array_literal.children.iter().map(|c|(c.byte_width + 3) / 4).sum::<u64>() * 4;
     for child in array_literal.children.into_iter().rev() {
         result.append(&mut convert_node(child, diagnostic_bag));
     }
