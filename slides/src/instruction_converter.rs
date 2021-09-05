@@ -117,17 +117,19 @@ fn convert_string_literal(value: String, _: &mut DiagnosticBag) -> Vec<Instructi
     let count_in_bytes = value.len() as u64;
     let byte_groups = value.as_bytes().chunks_exact(4);
     let remainder = byte_groups.remainder();
-    let word = [
-        *remainder.get(0).unwrap_or(&0),
-        *remainder.get(1).unwrap_or(&0),
-        *remainder.get(2).unwrap_or(&0),
-        *remainder.get(3).unwrap_or(&0),
-    ];
-    let word = (word[0] as u64)
-        + ((word[1] as u64) << 8)
-        + ((word[2] as u64) << 16)
-        + ((word[3] as u64) << 24);
-    result.push(Instruction::load_immediate(word));
+    if !remainder.is_empty() {
+        let word = [
+            *remainder.get(0).unwrap_or(&0),
+            *remainder.get(1).unwrap_or(&0),
+            *remainder.get(2).unwrap_or(&0),
+            *remainder.get(3).unwrap_or(&0),
+        ];
+        let word = (word[0] as u64)
+            + ((word[1] as u64) << 8)
+            + ((word[2] as u64) << 16)
+            + ((word[3] as u64) << 24);
+        result.push(Instruction::load_immediate(word));
+    }
     for word in byte_groups.rev() {
         let word = (word[0] as u64)
             + ((word[1] as u64) << 8)
