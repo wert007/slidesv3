@@ -45,7 +45,7 @@ impl<'a> BoundNode<'a> {
             Value::Integer(_) |
             Value::Boolean(_) |
             Value::SystemCall(_) => 4,
-            Value::String(value) => 4 + value.len(),
+            Value::String(value) => 8 + value.len(),
         } as _;
         Self {
             span,
@@ -57,7 +57,9 @@ impl<'a> BoundNode<'a> {
     }
 
     pub fn array_literal(span: TextSpan, children: Vec<BoundNode<'a>>, type_: Type) -> Self {
-        let byte_width = 8 + children.iter().map(|b|b.byte_width).sum::<u64>();
+        let byte_width = 8 + children.iter().map(|b|{
+            (b.byte_width + 3) / 4
+        }).sum::<u64>() * 4;
         Self {
             span,
             kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
