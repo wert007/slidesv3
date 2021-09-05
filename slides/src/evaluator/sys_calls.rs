@@ -34,19 +34,20 @@ fn print_array(base_type: Type, argument: TypedU64, stack: &[u64]) {
     print!("[ ");
     assert!(argument.is_pointer);
     let array_length_in_bytes = stack[argument.value as usize];
+    let array_length_in_words = (array_length_in_bytes + 3) / 4;
+    let array_start = argument.value;
+    let array_end = array_start - array_length_in_words;
     match base_type {
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
         Type::Integer => {
-            let count = array_length_in_bytes / 4;
-            for i in (argument.value - count..argument.value).rev() {
+            for i in (array_end..array_start).rev() {
                 print!("{}, ", stack[i as usize] as i64);
             }
         },
         Type::Boolean => {
-            let count = array_length_in_bytes / 4;
-            for i in (argument.value - count..argument.value).rev() {
+            for i in (array_end..array_start).rev() {
                 if stack[i as usize] == 0 {
                     print!("false, ");
                 } else {
@@ -55,38 +56,50 @@ fn print_array(base_type: Type, argument: TypedU64, stack: &[u64]) {
             }
         },
         Type::SystemCall(kind) => {
-            let count = array_length_in_bytes / 4;
-            for _ in (argument.value - count..argument.value).rev() {
+            for _ in (array_end..array_start).rev() {
                 print!("system call {}, ", kind);
             }
         },
         Type::Array(base_type) => {
-            let count = array_length_in_bytes / 4;
-            let mut address = stack[argument.value as usize - 1] + 1;
-            let end = argument.value - count;
-            while address > end {
+            // After the length is the address to the array (- 1). The address
+            // points to the length of another array. But print_array expects
+            // the address right before that, so the address is decreased by
+            // one.
+            let mut address = stack[array_start as usize - 1] + 1;
+            while address > array_end {
                 address -= 1;
-                // println!("adress = {}, value = {}", address, stack[address as usize]);
                 let argument = TypedU64 {
                     value: address,
                     is_pointer: true,
                 }; // FIXME
                 print_array(*base_type.clone(), argument, stack);
                 print!(", ");
-                if address > stack[address as usize]/ 4 + 1 {
-                    // println!("array_len = {}", stack[address as usize]);
-                    address -= stack[address as usize]/ 4 + 1;
+
+                if address > (stack[address as usize] + 3) / 4 + 1 {
+                    address -= (stack[address as usize] + 3) / 4 + 1;
                 } else {
-                    address = end;
+                    address = array_end;
                 }
             }
         },
         Type::String => {
-            let count = array_length_in_bytes / 4;
-            for i in (argument.value - count..argument.value).rev() {
-                let argument = TypedU64 { value: stack[i as usize], is_pointer: true, }; //FIXME
+            // After the length is the address to the array (- 1). The address
+            // points to the length of another array. But print_array expects
+            // the address right before that, so the address is decreased by
+            // one.
+            let mut address = stack[array_start as usize - 1] + 1;
+            while address > array_end {
+                address -= 1;
+
+                let argument = TypedU64 { value: address, is_pointer: true, }; //FIXME
                 print_string(argument, stack);
                 print!(", ");
+
+                if address > (stack[address as usize] + 3) / 4 + 1 {
+                    address -= (stack[address as usize] + 3) / 4 + 1;
+                } else {
+                    address = array_end;
+                }
             }
         },
     }
@@ -95,9 +108,13 @@ fn print_array(base_type: Type, argument: TypedU64, stack: &[u64]) {
 
 fn print_string(argument: TypedU64, stack: &[u64]) {
     let string_length_in_bytes = stack[argument.value as usize];
+    let string_length_in_words = (string_length_in_bytes + 3) / 4;
+    let string_start = argument.value; // Includes the length of the string
+    let string_end = string_start - string_length_in_words;
     let mut string_buffer : Vec<u8> = Vec::with_capacity(string_length_in_bytes as usize);
-    let count = (string_length_in_bytes + 3) / 4;
-    for i in (argument.value - count..argument.value).rev() {
+
+    // The exclusive end of the range excludes the length of the string.
+    for i in (string_end..string_start).rev() {
         let word = stack[i as usize];
         string_buffer.push((word & 0xFF) as u8);
         string_buffer.push((word >> 8 & 0xFF) as u8);
