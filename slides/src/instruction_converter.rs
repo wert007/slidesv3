@@ -147,9 +147,42 @@ fn convert_array_literal(
     diagnostic_bag: &mut DiagnosticBag,
 ) -> Vec<Instruction> {
     let mut result = vec![];
-    let count_in_bytes = array_literal.children.iter().map(|c|(c.byte_width + 3) / 4).sum::<u64>() * 4;
-    for child in array_literal.children.into_iter().rev() {
-        result.append(&mut convert_node(child, diagnostic_bag));
+    let element_count = array_literal.children.len();
+    let count_in_bytes = element_count * 4;
+    match &array_literal.children[0].type_ {
+        Type::Error |
+        Type::Void => unreachable!(),
+        Type::Any => todo!(),
+        Type::Integer |
+        Type::Boolean |
+        Type::SystemCall(_) => {
+            for child in array_literal.children.into_iter().rev() {
+                result.append(&mut convert_node(child, diagnostic_bag));
+            }
+        },
+        Type::Array(_) |
+        Type::String => {
+            let mut word_widths = Vec::with_capacity(element_count);
+            for child in array_literal.children.into_iter().rev() {
+                let word_width = (child.byte_width + 3) / 4;
+                // Remove the pointer to the array, string itself. The outer
+                // array provides their own pointer.
+                word_widths.push(word_width - 1);
+                let mut child = convert_node(child, diagnostic_bag);
+                // Remove the pointer to the array, string itself. The outer
+                // array provides their own pointer.
+                assert!(child.pop().is_some());
+                result.append(&mut child);
+            }
+            word_widths.reverse();
+            let mut offset : u64 = word_widths.iter().sum();
+            for i in 0..element_count {
+                // Reverse i
+                offset -= word_widths[element_count - i - 1];
+                let stack_pointer_offset = offset + i as u64 + 1;
+                result.push(Instruction::create_stack_pointer(stack_pointer_offset));
+            }
+        },
     }
     result.push(Instruction::load_immediate(count_in_bytes as u64));
     result.push(Instruction::create_stack_pointer(1));

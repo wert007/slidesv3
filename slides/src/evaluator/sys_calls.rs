@@ -61,45 +61,19 @@ fn print_array(base_type: Type, argument: TypedU64, stack: &[u64]) {
             }
         },
         Type::Array(base_type) => {
-            // After the length is the address to the array (- 1). The address
-            // points to the length of another array. But print_array expects
-            // the address right before that, so the address is decreased by
-            // one.
-            let mut address = stack[array_start as usize - 1] + 1;
-            while address > array_end {
-                address -= 1;
-                let argument = TypedU64 {
-                    value: address,
-                    is_pointer: true,
-                }; // FIXME
+            for pointer_index in (array_end..array_start).rev() {
+                let pointer = stack[pointer_index as usize];
+                let argument= TypedU64 { value: pointer, is_pointer: true };
                 print_array(*base_type.clone(), argument, stack);
                 print!(", ");
-
-                if address > (stack[address as usize] + 3) / 4 + 1 {
-                    address -= (stack[address as usize] + 3) / 4 + 1;
-                } else {
-                    address = array_end;
-                }
             }
         },
         Type::String => {
-            // After the length is the address to the array (- 1). The address
-            // points to the length of another array. But print_array expects
-            // the address right before that, so the address is decreased by
-            // one.
-            let mut address = stack[array_start as usize - 1] + 1;
-            while address > array_end {
-                address -= 1;
-
-                let argument = TypedU64 { value: address, is_pointer: true, }; //FIXME
+            for pointer_index in (array_end..array_start).rev() {
+                let pointer = stack[pointer_index as usize];
+                let argument= TypedU64 { value: pointer, is_pointer: true };
                 print_string(argument, stack);
                 print!(", ");
-
-                if address > (stack[address as usize] + 3) / 4 + 1 {
-                    address -= (stack[address as usize] + 3) / 4 + 1;
-                } else {
-                    address = array_end;
-                }
             }
         },
     }
