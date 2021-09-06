@@ -6,20 +6,27 @@
     let a_1 = a[1];
     a[1] = 5;
     print(a);
+    print('a_1 == 2?');
     print(a_1 == 2);
 
     let b = [true, false, ];
     let b2 = [true, false, ];
     let b_1 = b[1];
+    print('b_1?');
     print(b_1);
     // print(b == a);
+    print('b == b2?');
     print(b == b2);
+    print('b == [true, false]?');
     print(b == [true, false]);
 
     let c = [1, 2, 3, 4,];
+    print('[4, 3, 2, 1] == [1, 2, 3, 4]?');
     print([4, 3, 2, 1] == [1, 2, 3, 4]);
+    print('[1, 2, 3, 4] == c?');
     print([1, 2, 3, 4] == c);
     let c2 = c;
+    print('c == c2?');
     print(c == c2);
     // let check = c[3] == c.length();
     // print(check);
@@ -33,6 +40,10 @@
     // print(e == [7, 3, 3, 3, 3, 3, 1])
 
     let f = [ [ 1 ], [ 2, 3 ], [ 4, 5, 6, ], ];
+    print(f[2]);
+    print(f[2][2]);
+    f[2][2] = 999;
+    f[1] = [ 42, 1337, 876 ];
     print(f);
 
     let g = ['Red', 'Blue', 'Yellow', 'Green'];

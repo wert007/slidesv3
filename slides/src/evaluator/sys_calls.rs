@@ -31,12 +31,12 @@ pub fn print(type_: Type, argument: TypedU64, stack: &[u64]) {
 }
 
 fn print_array(base_type: Type, argument: TypedU64, stack: &[u64]) {
-    print!("[ ");
-    assert!(argument.is_pointer);
+    assert!(argument.is_pointer, "argument = {:#?}", argument);
     let array_length_in_bytes = stack[argument.value as usize];
     let array_length_in_words = (array_length_in_bytes + 3) / 4;
     let array_start = argument.value;
     let array_end = array_start - array_length_in_words;
+    print!("[ ");
     match base_type {
         Type::Error => todo!(),
         Type::Void => todo!(),
