@@ -155,7 +155,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
     let array = state.pop_stack().unwrap();
     assert!(
         array.is_pointer,
-        "array = {:#?}, pointers = {:#?}, stack = {:#?}",
+        "array = {:#?}, pointers = {:?}, stack = {:?}",
         array, state.pointers, state.stack
     );
     let array = array.value;
@@ -177,7 +177,7 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
     let array = state.pop_stack().unwrap();
     assert!(
         array.is_pointer,
-        "array = {:#?}, pointers = {:#?}, stack = {:#?}",
+        "array = {:#?}, pointers = {:?}, stack = {:?}",
         array, state.pointers, state.stack
     );
     let array = array.value;
@@ -268,12 +268,12 @@ fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
 
     assert!(
         lhs.is_pointer,
-        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        "{:#?}, stack = {:?}, pointers = {:?}",
         lhs, state.stack, state.pointers
     );
     assert!(
         rhs.is_pointer,
-        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        "{:#?}, stack = {:?}, pointers = {:?}",
         rhs, state.stack, state.pointers
     );
     let lhs_address = lhs.value;
@@ -323,12 +323,12 @@ fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
 
     assert!(
         lhs.is_pointer,
-        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        "{:#?}, stack = {:?}, pointers = {:?}",
         lhs, state.stack, state.pointers
     );
     assert!(
         rhs.is_pointer,
-        "{:#?}, stack = {:#?}, pointers = {:#?}",
+        "{:#?}, stack = {:?}, pointers = {:?}",
         rhs, state.stack, state.pointers
     );
     let lhs_address = lhs.value;
