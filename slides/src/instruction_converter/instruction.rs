@@ -40,10 +40,10 @@ impl Instruction {
         }
     }
 
-    pub const fn array_length(count_in_bytes: usize) -> Self {
+    pub const fn create_stack_pointer(offset: u64) -> Self {
         Self {
-            op_code: OpCode::ArrayLength,
-            arg: count_in_bytes as u64,
+            op_code: OpCode::CreateStackPointer,
+            arg: offset,
         }
     }
 

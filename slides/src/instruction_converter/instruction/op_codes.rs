@@ -7,7 +7,7 @@ pub enum OpCode {
     Pop = 2,
     LoadRegister = 3,
     StoreInRegister = 4,
-    ArrayLength = 5,
+    CreateStackPointer = 5,
     ArrayIndex = 6,
     StoreInMemory = 7,
     TypeIdentifier = 8,

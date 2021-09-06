@@ -138,7 +138,7 @@ fn convert_string_literal(value: String, _: &mut DiagnosticBag) -> Vec<Instructi
         result.push(Instruction::load_immediate(word));
     }
     result.push(Instruction::load_immediate(count_in_bytes as u64));
-    result.push(Instruction::array_length(count_in_bytes as usize));
+    result.push(Instruction::create_stack_pointer(1));
     result
 }
 
@@ -151,8 +151,8 @@ fn convert_array_literal(
     for child in array_literal.children.into_iter().rev() {
         result.append(&mut convert_node(child, diagnostic_bag));
     }
-    result.push(Instruction::load_immediate(count_in_bytes));
-    result.push(Instruction::array_length(count_in_bytes as usize));
+    result.push(Instruction::load_immediate(count_in_bytes as u64));
+    result.push(Instruction::create_stack_pointer(1));
     result
 }
 

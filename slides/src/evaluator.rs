@@ -78,7 +78,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::Pop => evaluate_pop(state, instruction),
         OpCode::LoadRegister => evaluate_load_register(state, instruction),
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
-        OpCode::ArrayLength => evaluate_array_literal(state, instruction),
+        OpCode::CreateStackPointer => evaluate_create_stack_pointer(state, instruction),
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
@@ -143,10 +143,11 @@ fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruct
     state.set_variable(instruction.arg, value, is_pointer);
 }
 
-fn evaluate_array_literal(state: &mut EvaluatorState, _: Instruction) {
-    let array_address = state.stack.len() as u64 - 1;
-    state.stack.push(array_address);
-    state.set_pointer(state.stack.len());
+fn evaluate_create_stack_pointer(state: &mut EvaluatorState, instruction: Instruction) {
+    let stack_pointer = state.stack.len() as u64 - instruction.arg;
+    state.stack.push(stack_pointer);
+    state.set_pointer(state.stack.len() - 1);
+
 }
 
 fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
