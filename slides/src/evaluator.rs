@@ -403,8 +403,8 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     let mut arguments = Vec::with_capacity(argument_count);
     let mut types = Vec::with_capacity(argument_count);
     for _ in 0..argument_count {
-        arguments.push(state.pop_stack().unwrap());
         types.push(Type::from_type_identifier(state.pop_stack().unwrap().value).unwrap());
+        arguments.push(state.pop_stack().unwrap());
     }
     match sys_call_kind {
         SystemCallKind::Print => sys_calls::print(types.remove(0), arguments[0], &state.stack),
