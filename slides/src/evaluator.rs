@@ -30,8 +30,12 @@ impl EvaluatorState {
         }
     }
 
+    fn is_pointer(&mut self, address: usize) -> bool {
+        self.pointers.contains(&address)
+    }
+
     fn pop_stack(&mut self) -> Option<TypedU64> {
-        let is_pointer = if let Some(i) = self.pointers.iter().position(|p| p == &self.stack.len())
+        let is_pointer = if let Some(i) = self.pointers.iter().position(|&p| p == self.stack.len() - 1)
         {
             self.pointers.remove(i);
             true
@@ -132,10 +136,10 @@ fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
 
 fn evaluate_load_register(state: &mut EvaluatorState, instruction: Instruction) {
     let value = state.registers[instruction.arg as usize];
-    state.stack.push(value.value);
     if value.is_pointer {
         state.set_pointer(state.stack.len());
     }
+    state.stack.push(value.value);
 }
 
 fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruction) {
@@ -168,7 +172,11 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
         state.stack.push(0);
         return;
     }
-    let value = state.stack[array as usize - 1 - index as usize];
+    let index = array as usize - 1 - index as usize;
+    let value = state.stack[index];
+    if state.is_pointer(index) {
+        state.set_pointer(state.stack.len());
+    }
     state.stack.push(value);
 }
 
