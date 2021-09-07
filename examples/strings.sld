@@ -8,11 +8,15 @@
     print(array_test);
 
 // TODO: Implement string concatination
-    // let a = 'Hewwo';
-    // let b = ' Meowrld! o//';
-    // let concat = a + b;
-    // print(concat);
+    let a = 'Hewwo';
+    let b = ' Meowrld! o//';
+    let concat = a + b;
+    print(concat);
 
+    // let concat2 = a + ' :3';
+    // print(concat2);
+
+    // print('uWu' + b);
 // TODO: Implement string length!
     // let len = h.length();
     // print(len);
