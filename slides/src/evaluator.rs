@@ -1,12 +1,23 @@
+mod allocator;
 mod sys_calls;
 
-use crate::{DebugFlags, binder::typing::{SystemCallKind, Type}, instruction_converter::instruction::{op_codes::OpCode, Instruction}, value::Value};
+use crate::{
+    binder::typing::{SystemCallKind, Type},
+    instruction_converter::instruction::{op_codes::OpCode, Instruction},
+    value::Value,
+    DebugFlags,
+};
 use num_enum::TryFromPrimitive;
+
+use self::allocator::Allocator;
 
 type ResultType = Value;
 
-struct EvaluatorState {
+const HEAP_POINTER: u64 = 0x80_00_00_00_00_00_00_00;
+
+pub struct EvaluatorState {
     stack: Vec<u64>,
+    heap: Allocator,
     registers: Vec<TypedU64>,
     pc: usize,
     pointers: Vec<usize>,
@@ -35,7 +46,10 @@ impl EvaluatorState {
     }
 
     fn pop_stack(&mut self) -> Option<TypedU64> {
-        let is_pointer = if let Some(i) = self.pointers.iter().position(|&p| p == self.stack.len() - 1)
+        let is_pointer = if let Some(i) = self
+            .pointers
+            .iter()
+            .position(|&p| p == self.stack.len() - 1)
         {
             self.pointers.remove(i);
             true
@@ -49,6 +63,7 @@ impl EvaluatorState {
 pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> ResultType {
     let mut state = EvaluatorState {
         stack: vec![],
+        heap: Allocator::new(128),
         registers: vec![],
         pc: 0,
         pointers: vec![],
@@ -114,9 +129,9 @@ fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction)
 fn pop_array(state: &mut EvaluatorState) -> (TypedU64, Vec<TypedU64>) {
     let address = state.pop_stack().unwrap();
     let mut popped = vec![];
-    if address.is_pointer {
+    if address.is_pointer && !is_heap_pointer(address.value) {
         let address = address.value;
-        let length = state.stack[address as usize] / 4;
+        let length = (state.stack[address as usize] + 3) / 4;
         let difference = state.stack.len() as u64 - address;
         if difference == 1 {
             for _ in 0..length + 1 {
@@ -128,6 +143,10 @@ fn pop_array(state: &mut EvaluatorState) -> (TypedU64, Vec<TypedU64>) {
         }
     }
     (address, popped)
+}
+
+fn is_heap_pointer(address: u64) -> bool {
+    address & HEAP_POINTER > 0
 }
 
 fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
@@ -151,7 +170,6 @@ fn evaluate_create_stack_pointer(state: &mut EvaluatorState, instruction: Instru
     let stack_pointer = state.stack.len() as u64 - instruction.arg;
     state.stack.push(stack_pointer);
     state.set_pointer(state.stack.len() - 1);
-
 }
 
 fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
@@ -163,7 +181,12 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
         array, state.pointers, state.stack
     );
     let array = array.value;
-    let array_length = state.stack[array as usize] / 4;
+
+    let array_length = if is_heap_pointer(array) {
+        state.heap.read_word(array as _)
+    } else {
+        state.stack[array as usize]
+    } / 4;
     if (index as i64) < 0 || index > array_length {
         println!(
             "RuntimeError: Index {} is out of Bounds ({}) for this array!",
@@ -173,7 +196,11 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
         return;
     }
     let index = array as usize - 1 - index as usize;
-    let value = state.stack[index];
+    let value = if is_heap_pointer(array) {
+        state.heap.read_word(index)
+    } else {
+        state.stack[index]
+    };
     if state.is_pointer(index) {
         state.set_pointer(state.stack.len());
     }
@@ -190,7 +217,11 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
     );
     let array = array.value;
     let value = state.pop_stack().unwrap().value;
-    let array_length = state.stack[array as usize] / 4;
+    let array_length = if is_heap_pointer(array) {
+        state.heap.read_word(array as _)
+    } else {
+        state.stack[array as usize]
+    } / 4;
     if (index as i64) < 0 || index > array_length {
         println!(
             "RuntimeError: Index {} is out of Bounds ({}) for this array!",
@@ -198,7 +229,12 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
         );
         return;
     }
-    state.stack[array as usize - 1 - index as usize] = value;
+    let index = array as usize - 1 - index as usize;
+    if is_heap_pointer(array) {
+        state.heap.write_word(index, value);
+    } else {
+        state.stack[index] = value;
+    }
 }
 
 fn evaluate_bitwise_twos_complement(state: &mut EvaluatorState, _: Instruction) {
@@ -254,7 +290,7 @@ fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
     state.stack.push((lhs != rhs) as _);
 }
 
-fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
+fn array_equals(state: &mut EvaluatorState) -> bool {
     // Pop lhs and rhs and eventual array to get the correct other side (lhs)
     let (rhs, rhs_values) = pop_array(state);
     let (lhs, lhs_values) = pop_array(state);
@@ -285,19 +321,41 @@ fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
         rhs, state.stack, state.pointers
     );
     let lhs_address = lhs.value;
-    let lhs_length = state.stack[lhs_address as usize] / 4;
+    let lhs_length = if is_heap_pointer(lhs_address) {
+        state.heap.read_word(lhs_address as _)
+    } else {
+        state.stack[lhs_address as usize]
+    } / 4;
     let rhs_address = rhs.value;
-    let rhs_length = state.stack[rhs_address as usize] / 4;
+    let rhs_length = if is_heap_pointer(rhs_address) {
+        state.heap.read_word(rhs_address as _)
+    } else {
+        state.stack[rhs_address as usize]
+    } / 4;
     // If two arrays are not equal in length, we don't compare their elements.
     // But when we compare their elements we expect a true result and only
     // change it if its false.
-    let mut result = if lhs_length == rhs_length { 1 } else { 0 };
+    let mut result = if lhs_length == rhs_length {
+        true
+    } else {
+        false
+    };
     if lhs_address != rhs_address && lhs_length == rhs_length {
         for i in 0..lhs_length {
-            let lhs = state.stack[lhs_address as usize - 1 - i as usize];
-            let rhs = state.stack[rhs_address as usize - 1 - i as usize];
+            let lhs_index = lhs_address as usize - 1 - i as usize;
+            let rhs_index = rhs_address as usize - 1 - i as usize;
+            let lhs = if is_heap_pointer(lhs_address) {
+                state.heap.read_word(lhs_index)
+            } else {
+                state.stack[lhs_index]
+            };
+            let rhs = if is_heap_pointer(rhs_address) {
+                state.heap.read_word(rhs_index)
+            } else {
+                state.stack[rhs_index]
+            };
             if lhs != rhs {
-                result = 0;
+                result = false;
                 break;
             }
         }
@@ -306,62 +364,17 @@ fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
     while state.stack.len() > expected_stack_length {
         assert!(state.pop_stack().is_some());
     }
-    state.stack.push(result);
+    result
+}
+
+fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
+    let result = array_equals(state);
+    state.stack.push(result as _);
 }
 
 fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
-    // Pop lhs and rhs and eventual array to get the correct other side (lhs)
-    let (rhs, rhs_values) = pop_array(state);
-    let (lhs, lhs_values) = pop_array(state);
-
-    // Remember how long the stack is supposed to be after comparison
-    let expected_stack_length = state.stack.len();
-
-    // Reconstruct stack so that the pointers work
-    for v in lhs_values.into_iter().rev() {
-        state.stack.push(v.value);
-        assert!(!v.is_pointer);
-    }
-    state.stack.push(lhs.value);
-    for v in rhs_values.into_iter().rev() {
-        state.stack.push(v.value);
-        assert!(!v.is_pointer);
-    }
-    state.stack.push(rhs.value);
-
-    assert!(
-        lhs.is_pointer,
-        "{:#?}, stack = {:?}, pointers = {:?}",
-        lhs, state.stack, state.pointers
-    );
-    assert!(
-        rhs.is_pointer,
-        "{:#?}, stack = {:?}, pointers = {:?}",
-        rhs, state.stack, state.pointers
-    );
-    let lhs_address = lhs.value;
-    let lhs_length = state.stack[lhs_address as usize] / 4;
-    let rhs_address = rhs.value;
-    let rhs_length = state.stack[rhs_address as usize] / 4;
-    // If two arrays are not equal in length, we don't compare their elements.
-    // But when we compare their elements we expect a false result and only
-    // change it if its true.
-    let mut result = if lhs_length == rhs_length { 0 } else { 1 };
-    if lhs_address != rhs_address && lhs_length == rhs_length {
-        for i in 0..lhs_length {
-            let lhs = state.stack[lhs_address as usize - 1 - i as usize];
-            let rhs = state.stack[rhs_address as usize - 1 - i as usize];
-            if lhs != rhs {
-                result = 1;
-                break;
-            }
-        }
-    }
-    // Clear stack after the comparison.
-    while state.stack.len() > expected_stack_length {
-        assert!(state.pop_stack().is_some());
-    }
-    state.stack.push(result);
+    let result = !array_equals(state);
+    state.stack.push(result as _);
 }
 
 fn evaluate_less_than(state: &mut EvaluatorState, _: Instruction) {
@@ -386,6 +399,94 @@ fn evaluate_greater_than_equals(state: &mut EvaluatorState, _: Instruction) {
     let rhs = state.pop_stack().unwrap().value;
     let lhs = state.pop_stack().unwrap().value;
     state.stack.push((lhs >= rhs) as _);
+}
+
+fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
+    let (rhs, rhs_values) = pop_array(state);
+    assert!(rhs.is_pointer, "{:#?}", rhs);
+    let (lhs, lhs_values) = pop_array(state);
+    assert!(lhs.is_pointer, "lhs = {:#?}, rhs = {:#?}, rhs_values = {:x?}, stack = {:x?}", lhs, rhs, rhs_values, state.stack);
+
+    // Remember how long the stack is supposed to be after comparison
+    let expected_stack_length = state.stack.len();
+
+    // Reconstruct stack so that the pointers work
+    for v in lhs_values.into_iter().rev() {
+        state.stack.push(v.value);
+        assert!(!v.is_pointer);
+    }
+    state.stack.push(lhs.value);
+    for v in rhs_values.into_iter().rev() {
+        state.stack.push(v.value);
+        assert!(!v.is_pointer);
+    }
+    state.stack.push(rhs.value);
+
+    let lhs_length = if is_heap_pointer(lhs.value) {
+        state.heap.read_word(lhs.value as usize)
+    } else {
+        state.stack[lhs.value as usize]
+    };
+    let rhs_length = if is_heap_pointer(rhs.value) {
+        state.heap.read_word(rhs.value as usize)
+    } else {
+        state.stack[rhs.value as usize]
+    };
+    let result_length = lhs_length + rhs_length;
+    let mut pointer = state.heap.allocate(result_length);
+    if pointer == 0 {
+        println!("RuntimeError: No memory left for string with length {}.", result_length);
+        pointer = HEAP_POINTER;
+    }
+    else {   
+        let mut writing_pointer = pointer;
+        state.heap.write_word(writing_pointer as _, result_length);
+        writing_pointer += 4;
+        for i in 0..lhs_length {
+            let lhs_address = lhs.value;
+            let lhs_byte = if is_heap_pointer(lhs_address + i) {
+                state.heap.read_byte(lhs_address as usize + i as usize)
+            } else {
+                let word = state.stack[lhs_address as usize - 1 - (i / 4) as usize];
+                let bytes = [
+                    (word & 0xFF) as u8,
+                    ((word >> 8) & 0xFF) as u8,
+                    ((word >> 16) & 0xFF) as u8,
+                    ((word >> 24) & 0xFF) as u8,
+                ];
+                // println!("string_concat::bytes = {:x?}", bytes);
+                bytes[(i % 4) as usize]
+            };
+            state.heap.write_byte(writing_pointer as _, lhs_byte);
+            writing_pointer += 1;
+        }
+        for i in 0..rhs_length {
+            let rhs_address = rhs.value;
+            let rhs_byte = if is_heap_pointer(rhs_address + i) {
+                state.heap.read_byte(rhs_address as usize + i as usize)
+            } else {
+                let word = state.stack[rhs_address as usize - 1 - (i / 4) as usize];
+                let bytes = [
+                    (word & 0xFF) as u8,
+                    ((word >> 8) & 0xFF) as u8,
+                    ((word >> 16) & 0xFF) as u8,
+                    ((word >> 24) & 0xFF) as u8,
+                ];
+                // println!("string_concat::bytes = {:x?}", bytes);
+                bytes[(i % 4) as usize]
+            };
+            state.heap.write_byte(writing_pointer as _, rhs_byte);
+            writing_pointer += 1;
+        }
+    }
+
+    // Clear stack after the comparison.
+    while state.stack.len() > expected_stack_length {
+        assert!(state.pop_stack().is_some());
+    }
+
+    state.set_pointer(state.stack.len());
+    state.stack.push(pointer);
 }
 
 fn evaluate_jmp_relative(state: &mut EvaluatorState, instruction: Instruction) {
