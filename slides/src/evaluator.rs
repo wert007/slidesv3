@@ -434,9 +434,9 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
         state.stack[rhs.value as usize]
     };
     let result_length = lhs_length + rhs_length;
-    let mut pointer = state.heap.allocate(result_length);
+    let mut pointer = state.heap.allocate(result_length + 4);
     if pointer == 0 {
-        println!("RuntimeError: No memory left for string with length {}.", result_length);
+        println!("RuntimeError: No memory left for string with length {} + 4.", result_length);
         pointer = HEAP_POINTER;
     }
     else {   
@@ -455,7 +455,6 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
                     ((word >> 16) & 0xFF) as u8,
                     ((word >> 24) & 0xFF) as u8,
                 ];
-                // println!("string_concat::bytes = {:x?}", bytes);
                 bytes[(i % 4) as usize]
             };
             state.heap.write_byte(writing_pointer as _, lhs_byte);
@@ -473,7 +472,6 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
                     ((word >> 16) & 0xFF) as u8,
                     ((word >> 24) & 0xFF) as u8,
                 ];
-                // println!("string_concat::bytes = {:x?}", bytes);
                 bytes[(i % 4) as usize]
             };
             state.heap.write_byte(writing_pointer as _, rhs_byte);

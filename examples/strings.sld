@@ -24,8 +24,8 @@
     let e = 'ha' + 'ha';
     print(e);
 
-    // let f = [a, b, c, d, e];
-    // print(f);
+    let f = [a, b, c, d, e];
+    print(f);
 
     // let g = [ 'maybe' + 'this', 'works' + 'maybe??', 'literal', 'heap' + 'allocated'];
     // print(g);

@@ -16,6 +16,23 @@ impl Allocator {
         }
     }
 
+    #[cfg(debug_assertions)]
+    fn find_bucket_from_address(&self, address: usize) -> &Bucket {
+        for bucket in &self.buckets {
+            if let BucketEntry::Bucket(bucket) = bucket {
+                if bucket.address * 4 <= address && (bucket.address + bucket.size) * 4 > address {
+                    return bucket;
+                }
+            }
+        }
+        panic!(
+            "Address 0x{:x} could not be assigned to a bucket! All Buckets ({}):\n\n{:#?}",
+            address,
+            self.buckets.len(),
+            &self.buckets
+        );
+    }
+
     fn free_buckets(&mut self) -> Vec<&mut Bucket> {
         let mut result: Vec<_> = self
             .buckets
@@ -25,7 +42,7 @@ impl Allocator {
                 _ => None,
             })
             .collect();
-        result.sort_by_key(|b| b.size);
+        result.sort_by_key(|b| usize::MAX - b.size);
         result
     }
 
@@ -42,15 +59,15 @@ impl Allocator {
             let size = (size + 3) / 4;
             let expected_size = size.next_power_of_two() as usize;
             let expected_size = expected_size.max(4);
-            while self.buckets[bucket_index].size() > expected_size {
-                let old_buddy_index = self.buckets[bucket_index]
-                .buddy_index().clone(); 
+
+            while self.buckets[bucket_index].size() / 2 >= expected_size {
+                let old_buddy_index = self.buckets[bucket_index].buddy_index().clone();
                 let new_index = self.buckets.len();
                 let (tmp_bucket, parent) = Bucket::split(
                     self.buckets[bucket_index].as_bucket_mut().unwrap(),
                     new_index,
                 );
-                
+
                 if let Some(old_buddy) = old_buddy_index {
                     self.buckets[old_buddy].set_buddy_index(Some(parent.index));
                 }
@@ -70,6 +87,8 @@ impl Allocator {
 
     pub fn read_byte(&self, address: usize) -> u8 {
         let address = clear_address(address);
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address).is_used);
         let word_address = address & !3;
         let word = self.read_word_aligned(word_address / 4);
         let word = match address % 4 {
@@ -84,6 +103,8 @@ impl Allocator {
 
     pub fn read_word(&self, address: usize) -> u64 {
         let address = clear_address(address);
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address).is_used);
         if address % 4 == 0 {
             self.read_word_aligned(address / 4)
         } else {
@@ -93,13 +114,15 @@ impl Allocator {
 
     pub fn read_word_aligned(&self, address: usize) -> u64 {
         let address = clear_address(address);
-        // println!("address = 0x{:x}", address);
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address * 4).is_used);
         self.data[address]
     }
 
     pub fn write_byte(&mut self, address: usize, value: u8) {
-        // println!("write_byte::value : u8 = 0x{:x}", value);
         let address = clear_address(address);
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address).is_used);
         let word_address = address & !3;
         let old_value = self.read_word_aligned(word_address / 4);
         let value = value as u64;
@@ -123,6 +146,9 @@ impl Allocator {
 
     pub fn write_word(&mut self, address: usize, value: u64) {
         let address = clear_address(address);
+
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address).is_used);
         if address % 4 == 0 {
             self.write_word_aligned(address / 4, value)
         } else {
@@ -131,7 +157,13 @@ impl Allocator {
     }
 
     fn write_word_aligned(&mut self, address: usize, value: u64) {
-        // println!("data[0x{:x}] = 0x{:x}", address, value);
+        #[cfg(debug_assertions)]
+        assert!(
+            self.find_bucket_from_address(address * 4).is_used,
+            "bucket = {:#?}, address = 0x{:x}",
+            self.find_bucket_from_address(address),
+            address
+        );
         self.data[address] = value;
     }
 }
@@ -220,10 +252,6 @@ impl Bucket {
 
     pub fn buddy(buddy: &Self, index: usize, parent_index: usize) -> Self {
         let address = buddy.address + buddy.size / 2;
-        // println!(
-        //     "creating buddy at index {} with buddy {}",
-        //     index, buddy.index
-        // );
         Self {
             index,
             buddy_index: Some(buddy.index),
@@ -235,11 +263,7 @@ impl Bucket {
         }
     }
 
-    pub fn split(
-        buddy: &mut Self,
-        new_index: usize,
-    ) -> (Bucket, BucketParent) {
-        // println!("splitting now, new_index = {}", new_index);
+    pub fn split(buddy: &mut Self, new_index: usize) -> (Bucket, BucketParent) {
         let result = Self::buddy(buddy, new_index, new_index + 1);
         let parent = BucketParent {
             index: new_index + 1,
@@ -250,18 +274,11 @@ impl Bucket {
             depth: buddy.depth,
             child_indices: [result.index, buddy.index],
         };
-        // println!(
-        //     "creating parent at index {} with buddy {:?}",
-        //     parent.index, parent.buddy_index
-        // );
+
         buddy.buddy_index = Some(result.index);
         buddy.parent_index = Some(parent.index);
         buddy.size /= 2;
         buddy.depth += 1;
-        // println!(
-        //     "assigning buddy for index {} with buddy {}",
-        //     buddy.index, result.index
-        // );
 
         (result, parent)
     }
