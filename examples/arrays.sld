@@ -49,6 +49,9 @@
     let g = ['Red', 'Blue', 'Yellow', 'Green'];
     print(g);
 
+    let h = [a, c, f[0], f[1], f[2], [843, 43], [321, 32]];
+    print(h);
+
     // let list = new List<int>();
     // list.add(1);
     // list.add([1, 2, 3]);
