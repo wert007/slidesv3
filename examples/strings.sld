@@ -7,16 +7,28 @@
     let array_test = ['Hello', 'World', '!'];
     print(array_test);
 
-// TODO: Implement string concatination
     let a = 'Hewwo';
     let b = ' Meowrld! o//';
-    let concat = a + b;
-    print(concat);
+    let c = a + b;
+    print(c);
 
-    // let concat2 = a + ' :3';
-    // print(concat2);
+    let d = a + ' :3';
+    print(d);
 
-    // print('uWu' + b);
+    print(c);
+
+    print('uWu' + b);
+
+    print('lol' + 'lal');
+
+    let e = 'ha' + 'ha';
+    print(e);
+
+    // let f = [a, b, c, d, e];
+    // print(f);
+
+    // let g = [ 'maybe' + 'this', 'works' + 'maybe??', 'literal', 'heap' + 'allocated'];
+    // print(g);
 // TODO: Implement string length!
     // let len = h.length();
     // print(len);
