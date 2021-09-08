@@ -27,6 +27,7 @@ pub enum OpCode {
     GreaterThan = 37,
     LessThanEquals = 38,
     GreaterThanEquals = 39,
+    StringConcat = 40,
     //Jumps
     JmpRelative = 58,
     JmpIfFalse = 59,

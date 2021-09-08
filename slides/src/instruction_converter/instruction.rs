@@ -174,6 +174,13 @@ impl Instruction {
         }
     }
 
+    pub const fn string_concat() -> Self {
+        Self {
+            op_code: OpCode::StringConcat,
+            arg: 0,
+        }
+    }
+
     pub const fn jump_relative(relative_address: i64) -> Self {
         Self {
             op_code: OpCode::JmpRelative,

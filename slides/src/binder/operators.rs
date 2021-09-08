@@ -16,4 +16,5 @@ pub enum BoundBinaryOperator {
     GreaterThan,
     LessThanEquals,
     GreaterThanEquals,
+    StringConcat,
 }

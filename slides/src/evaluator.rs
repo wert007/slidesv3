@@ -116,6 +116,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::GreaterThan => evaluate_greater_than(state, instruction),
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
+        OpCode::StringConcat => evaluate_string_concat(state, instruction),
         OpCode::JmpRelative => evaluate_jmp_relative(state, instruction),
         OpCode::JmpIfFalse => evaluate_jmp_if_false(state, instruction),
         OpCode::SysCall => evaluate_sys_call(state, instruction),

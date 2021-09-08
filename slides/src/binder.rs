@@ -275,6 +275,11 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::GreaterThanEquals,
             Type::Integer,
         ) => Some((result, Type::Boolean)),
+        (
+            Type::String,
+            BoundBinaryOperator::ArithmeticAddition,
+            Type::String
+        ) => Some((BoundBinaryOperator::StringConcat, Type::String)),
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
             binder.diagnostic_bag.report_no_binary_operator(

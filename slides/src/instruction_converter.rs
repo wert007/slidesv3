@@ -249,6 +249,7 @@ fn convert_binary(
         BoundBinaryOperator::GreaterThan => Instruction::greater_than(),
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(),
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
+        BoundBinaryOperator::StringConcat => Instruction::string_concat(),
     };
     let mut result = convert_node(*binary.lhs, diagnostic_bag);
     result.append(&mut convert_node(*binary.rhs, diagnostic_bag));
