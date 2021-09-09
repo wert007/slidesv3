@@ -344,6 +344,11 @@ fn bind_binary_operator<'a, 'b>(
         (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => {
             Some((BoundBinaryOperator::StringConcat, Type::String))
         }
+        (Type::String, BoundBinaryOperator::ArithmeticAddition, _) |
+        (_, BoundBinaryOperator::ArithmeticAddition, Type::String)
+         => {
+            Some((BoundBinaryOperator::StringConcat, Type::String))
+        }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
             binder.diagnostic_bag.report_no_binary_operator(
