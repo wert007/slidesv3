@@ -6,6 +6,7 @@ pub struct DebugFlags {
     pub print_current_instruction: bool,
     pub print_variable_table: bool,
     pub print_tokens: bool,
+    pub print_heap_as_string: bool,
 }
 
 impl Default for DebugFlags {
@@ -15,6 +16,7 @@ impl Default for DebugFlags {
             print_variable_table: false,
             print_current_instruction: false,
             print_tokens: false,
+            print_heap_as_string: false,
         }
     }
 }

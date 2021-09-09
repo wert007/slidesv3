@@ -1,18 +1,22 @@
+use crate::DebugFlags;
+
 use super::HEAP_POINTER;
 
 pub struct Allocator {
     pub data: Vec<u64>,
     buckets: Vec<BucketEntry>,
+    debug_heap_as_string: bool,
 }
 
 impl Allocator {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, debug_flags: DebugFlags) -> Self {
         assert_eq!(size % 4, 0);
         let size = size / 4;
         assert!(size.is_power_of_two());
         Self {
             data: vec![0; size],
             buckets: vec![BucketEntry::root(size)],
+            debug_heap_as_string: debug_flags.print_heap_as_string,
         }
     }
 
@@ -82,6 +86,9 @@ impl Allocator {
             result_bucket.address as u64 * 4
         };
         let result = result | HEAP_POINTER;
+        if self.debug_heap_as_string {
+            print_heap_as_string(&self.data);
+        }
         result
     }
 
@@ -165,7 +172,20 @@ impl Allocator {
             address
         );
         self.data[address] = value;
+
+        if self.debug_heap_as_string {
+            print_heap_as_string(&self.data);
+        }
     }
+}
+
+pub fn print_heap_as_string(heap: &[u64]) {
+    let mut string_buffer = Vec::with_capacity(heap.len() * 8);
+    for &word in heap {
+        string_buffer.extend_from_slice(&word.to_ne_bytes());
+    }
+    println!("heap = {:x?}", heap);
+    println!("= '{}'", String::from_utf8_lossy(&string_buffer));
 }
 
 fn clear_address(address: usize) -> usize {

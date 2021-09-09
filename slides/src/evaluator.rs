@@ -63,7 +63,7 @@ impl EvaluatorState {
 pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> ResultType {
     let mut state = EvaluatorState {
         stack: vec![],
-        heap: Allocator::new(128),
+        heap: Allocator::new(512, debug_flags),
         registers: vec![],
         pc: 0,
         pointers: vec![],
