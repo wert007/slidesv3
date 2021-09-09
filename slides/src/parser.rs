@@ -251,6 +251,11 @@ fn parse_function_call<'a>(
                 let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
                 base = SyntaxNode::array_index(base, lbracket, index, rbracket);
             }
+            SyntaxTokenKind::Period => {
+                let period = next_token(tokens);
+                let identifier = match_token!(tokens, diagnostic_bag, Identifier);
+                base = SyntaxNode::field_access(base, period, identifier);
+            }
             _ => break,
         }
     }

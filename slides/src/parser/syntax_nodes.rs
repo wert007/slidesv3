@@ -162,6 +162,23 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn field_access(
+        base: SyntaxNode<'a>,
+        period: SyntaxToken<'a>,
+        field: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(base.span(), field.span());
+        Self {
+            kind: SyntaxNodeKind::FieldAccess(FieldAccessNodeKind {
+                base: Box::new(base),
+                period,
+                field,
+            }),
+            span,
+            is_inserted: false,
+        }
+    }
+
     pub fn for_statement(
         for_keyword: SyntaxToken<'a>,
         optional_index_variable: Option<SyntaxToken<'a>>,
@@ -305,6 +322,7 @@ pub enum SyntaxNodeKind<'a> {
     Parenthesized(ParenthesizedNodeKind<'a>),
     FunctionCall(FunctionCallNodeKind<'a>),
     ArrayIndex(ArrayIndexNodeKind<'a>),
+    FieldAccess(FieldAccessNodeKind<'a>),
 
     // Statements
     BlockStatement(BlockStatementNodeKind<'a>),
@@ -387,7 +405,14 @@ pub struct ArrayIndexNodeKind<'a> {
     pub rbracket: SyntaxToken<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct FieldAccessNodeKind<'a> {
+    pub base: Box<SyntaxNode<'a>>,
+    pub period: SyntaxToken<'a>,
+    pub field: SyntaxToken<'a>,
+}
+
+#[derive(Debug, Clone)]
 pub struct BlockStatementNodeKind<'a> {
     pub lbrace: SyntaxToken<'a>,
     pub statements: Vec<SyntaxNode<'a>>,
