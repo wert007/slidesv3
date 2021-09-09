@@ -1,15 +1,26 @@
 {
-    let a = [1, 2, 3, 4];
-
+    let a = ['Hello', 'World', 'how are you', '?'];
     for i in a {
         print(i);
     }
+    for i in a {
+        print(i);
+    }
+    for j in [0, 1] {
+        for i in a {
+            print(i);
+        }
+    }
 
     // {
-    //     let $index = 0;
-    //     while $index < a.length() {
-    //         let i = a[$index];
-    //         print(i);
+    //     let i$index = 0;
+    //     let i$collection = a;
+    //     while i$index < i$collection.length() {
+    //         let i = i$collection[i$index];
+    //         {
+    //             print(i);
+    //         }
+    //         i$index += 1;
     //     }
     // }
 
