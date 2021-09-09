@@ -153,3 +153,39 @@ fn print_string(argument: TypedU64, state: &mut EvaluatorState) {
     }
     print!("'{}'", String::from_utf8_lossy(&string_buffer));
 }
+
+pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
+    let mut is_heap_array;
+    let mut array_start = argument.value;
+    let mut pointer = if is_heap_pointer(array_start) {
+        is_heap_array = true;
+        state.heap.read_word(array_start as _)
+    } else {
+        is_heap_array = false;
+        state.stack[array_start as usize]
+    };
+
+    while state.is_pointer(array_start as _) && !is_heap_array {
+        array_start = pointer;
+        pointer = if is_heap_pointer(pointer) {
+            is_heap_array = true;
+            state.heap.read_word(pointer as _)
+        } else {
+            is_heap_array = false;
+            state.stack[pointer as usize]
+        };
+    }
+
+    let array_length = match type_ {
+        Type::Error => todo!(),
+        Type::Void => todo!(),
+        Type::Any => todo!(),
+        Type::Integer |
+        Type::Boolean |
+        Type::SystemCall(_) |
+        Type::Array(_) => pointer / 4,
+        Type::String => pointer,
+    };
+
+    state.stack.push(array_length);
+}
