@@ -86,7 +86,7 @@ impl<'a> BoundNode<'a> {
         rhs: BoundNode<'a>,
         type_: Type,
     ) -> Self {
-        let byte_width = lhs.byte_width + rhs.byte_width;
+        let byte_width = 4;
         Self {
             span,
             kind: BoundNodeKind::BinaryExpression(BoundBinaryNodeKind {
