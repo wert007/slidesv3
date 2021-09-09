@@ -28,8 +28,9 @@
     let c2 = c;
     print('c == c2?');
     print(c == c2);
-    // let check = c[3] == c.length();
-    // print(check);
+    let check = c[3] == c.length();
+    print('c[3] == c.length()?');
+    print(check);
 
     // let d = [5;999] // Array with 999 elements, each being 5
     // print(d.length());
