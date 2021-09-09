@@ -1,4 +1,4 @@
-use crate::{binder::typing::{FunctionType, Type}, lexer::syntax_token::SyntaxTokenKind, text::{SourceText, TextLocation, TextSpan}};
+use crate::{binder::typing::Type, lexer::syntax_token::SyntaxTokenKind, text::{SourceText, TextLocation, TextSpan}};
 
 #[derive(Debug)]
 pub struct Diagnostic<'a> {
@@ -171,16 +171,6 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_no_field_named_on_type(&mut self, span: TextSpan, field_name: &str, type_: &Type) {
         let message = format!("There are no fields named '{}' on type {}.", field_name, type_);
-        self.report(message, span);
-    }
-
-    pub fn report_expected_no_this(&mut self, span: TextSpan, _function_type: &FunctionType) {
-        let message = "Expected no this parameter for function.".into();
-        self.report(message, span);
-    }
-
-    pub fn report_expected_this_parameter(&mut self, span: TextSpan, _function_type: &FunctionType) {
-        let message = "Expected this parameter for function.".into();
         self.report(message, span);
     }
 }
