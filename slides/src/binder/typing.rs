@@ -38,6 +38,14 @@ impl Type {
         matches!(self, Self::Array(_))
     }
 
+    pub fn array_base_type(&self) -> Option<&Type> {
+        if let Self::Array(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     pub fn type_identifier(&self) -> u64 {
         match self {
             Type::Array(base_type) => {

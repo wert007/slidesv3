@@ -9,15 +9,15 @@ use std::collections::HashMap;
 use crate::{
     binder::{operators::BoundUnaryOperator, typing::Type},
     diagnostics::DiagnosticBag,
-    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind},
     parser::{
         self,
         syntax_nodes::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
-            BlockStatementNodeKind, ExpressionStatementNodeKind, FunctionCallNodeKind,
-            IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode,
-            SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind,
-            WhileStatementNodeKind,
+            BlockStatementNodeKind, ExpressionStatementNodeKind, ForStatementNodeKind,
+            FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind,
+            SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind,
+            VariableNodeKind, WhileStatementNodeKind,
         },
     },
     text::{SourceText, TextSpan},
@@ -204,6 +204,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::BlockStatement(block_statement) => {
             bind_block_statement(node.span, block_statement, binder)
         }
+        SyntaxNodeKind::ForStatement(for_statement) => {
+            bind_for_statement(node.span, for_statement, binder)
+        }
         SyntaxNodeKind::IfStatement(if_statement) => {
             bind_if_statement(node.span, if_statement, binder)
         }
@@ -323,11 +326,9 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::GreaterThanEquals,
             Type::Integer,
         ) => Some((result, Type::Boolean)),
-        (
-            Type::String,
-            BoundBinaryOperator::ArithmeticAddition,
-            Type::String
-        ) => Some((BoundBinaryOperator::StringConcat, Type::String)),
+        (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => {
+            Some((BoundBinaryOperator::StringConcat, Type::String))
+        }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
             binder.diagnostic_bag.report_no_binary_operator(
@@ -477,6 +478,134 @@ fn bind_arguments_for_function<'a, 'b>(
     result
 }
 
+fn bind_for_statement<'a, 'b>(
+    span: TextSpan,
+    for_statement: ForStatementNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let variable_count = binder.variable_table.len();
+    let collection = bind_node(*for_statement.collection, binder);
+    if !matches!(collection.type_, Type::Array(_)) {
+        binder.diagnostic_bag.report_cannot_convert(
+            collection.span,
+            &collection.type_,
+            &Type::array(collection.type_.clone()),
+        );
+        return BoundNode::error(span);
+    }
+    let variable_type = collection.type_.array_base_type().unwrap();
+    let variable = binder.register_variable(for_statement.variable.lexeme, variable_type.clone());
+    if variable.is_none() {
+        binder.diagnostic_bag.report_cannot_declare_variable(
+            for_statement.variable.span(),
+            for_statement.variable.lexeme,
+        );
+        return BoundNode::error(span);
+    }
+    let variable = variable.unwrap();
+    let index_variable = binder
+        .register_generated_variable(
+            format!("{}$index", for_statement.variable.lexeme),
+            Type::Integer,
+        )
+        .unwrap();
+    let collection_variable = binder
+        .register_generated_variable(
+            format!("{}$collection", for_statement.variable.lexeme),
+            collection.type_.clone(),
+        )
+        .unwrap();
+    let body = bind_node(*for_statement.body, binder);
+    let while_condition = BoundNode::binary(
+        span,
+        BoundNode::variable(span, index_variable, Type::Integer),
+        BoundBinaryOperator::LessThan,
+        BoundNode::system_call(
+            span,
+            SystemCallKind::ArrayLength,
+            vec![BoundNode::variable(
+                span,
+                collection_variable,
+                collection.type_.clone(),
+            )],
+            Type::Integer,
+        ),
+        Type::Boolean,
+    );
+    let while_body = BoundNode::block_statement(
+        span,
+        vec![
+            // variable = $collection[$index];
+            BoundNode::assignment(
+                span,
+                BoundNode::variable(span, variable, variable_type.clone()),
+                BoundNode::array_index(
+                    span,
+                    BoundNode::variable(span, collection_variable, collection.type_.clone()),
+                    BoundNode::variable(span, index_variable, Type::Integer),
+                    collection.type_.array_base_type().unwrap().clone(),
+                ),
+            ),
+            // {
+            body,
+            // }
+            // $index = $index + 1;
+            BoundNode::assignment(
+                span,
+                BoundNode::variable(span, index_variable, Type::Integer),
+                BoundNode::binary(
+                    span,
+                    BoundNode::variable(span, index_variable, Type::Integer),
+                    BoundBinaryOperator::ArithmeticAddition,
+                    BoundNode::literal(
+                        span,
+                        LiteralNodeKind {
+                            value: 1.into(),
+                            token: SyntaxToken {
+                                kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind {
+                                    value: 1,
+                                }),
+                                lexeme: "1",
+                                start: 0,
+                            },
+                        },
+                    ),
+                    Type::Integer,
+                ),
+            ),
+        ],
+    );
+    let result = BoundNode::block_statement(
+        span,
+        vec![
+            BoundNode::variable_declaration(
+                span,
+                index_variable,
+                BoundNode::literal(
+                    span,
+                    LiteralNodeKind {
+                        value: 0.into(),
+                        token: SyntaxToken {
+                            kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 0 }),
+                            lexeme: "0",
+                            start: 0,
+                        },
+                    },
+                ),
+            ), // let $index = 0;
+            BoundNode::variable_declaration(span, collection_variable, collection), // let $collection = collection;
+            BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
+        ],
+    );
+
+    if binder.print_variable_table {
+        print_variable_table(&binder.variable_table);
+    }
+    binder.delete_variables_until(variable_count);
+
+    result
+}
+
 fn bind_if_statement<'a, 'b>(
     span: TextSpan,
     if_statement: IfStatementNodeKind<'a>,
@@ -547,12 +676,8 @@ fn bind_assignment<'a, 'b>(
 ) -> BoundNode<'a> {
     let lhs_span = assignment.lhs.span();
     let lhs = match assignment.lhs.kind {
-        SyntaxNodeKind::Variable(variable) => {
-            bind_variable(lhs_span, variable, binder)
-        }
-        SyntaxNodeKind::ArrayIndex(array_index) => {
-            bind_array_index(lhs_span, array_index, binder)
-        }
+        SyntaxNodeKind::Variable(variable) => bind_variable(lhs_span, variable, binder),
+        SyntaxNodeKind::ArrayIndex(array_index) => bind_array_index(lhs_span, array_index, binder),
         error => unreachable!("Unknown left hand side in assignment: {:#?}", error),
     };
     let expression = bind_node(*assignment.expression, binder);
