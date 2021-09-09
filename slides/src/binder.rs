@@ -236,6 +236,16 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
     }
 }
 
+fn bind_node_for_assignment<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
+    match node.kind {
+        SyntaxNodeKind::Variable(variable) => bind_variable_for_assignment(node.span, variable, binder),
+        SyntaxNodeKind::Parenthesized(parenthesized) => bind_node_for_assignment(*parenthesized.expression, binder),
+        SyntaxNodeKind::FunctionCall(_) => todo!(),
+        SyntaxNodeKind::ArrayIndex(array_index) => bind_array_index_for_assignment(node.span, array_index, binder),
+        _ => unreachable!("Unexpected left hand side of assignment {:#?}", node),
+    }
+}
+
 fn bind_literal<'a>(
     span: TextSpan,
     literal: LiteralNodeKind<'a>,
@@ -282,6 +292,18 @@ fn bind_variable<'a, 'b>(
             BoundNode::error(span)
         }
     }
+}
+
+fn bind_variable_for_assignment<'a, 'b>(
+    span: TextSpan,
+    variable: VariableNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let variable_is_read_only = binder.look_up_variable_by_name(variable.token.lexeme).map(|ve| ve.is_read_only);
+    if variable_is_read_only == Some(true) {
+        binder.diagnostic_bag.report_variable_is_read_only(variable.token.span());
+    }
+    bind_variable(span, variable, binder)
 }
 
 fn bind_binary<'a, 'b>(
@@ -465,6 +487,35 @@ fn bind_array_index<'a, 'b>(
     };
     BoundNode::array_index(span, base, index, type_)
 }
+
+fn bind_array_index_for_assignment<'a, 'b>(
+    span: TextSpan,
+    array_index: ArrayIndexNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let index_span = array_index.index.span;
+    let index = bind_node(*array_index.index, binder);
+    if !index.type_.can_be_converted_to(&Type::Integer) {
+        binder
+            .diagnostic_bag
+            .report_cannot_convert(index_span, &index.type_, &Type::Integer);
+    }
+    let base_span = array_index.base.span;
+    let base = bind_node_for_assignment(*array_index.base, binder);
+    let type_ = match base.type_.clone() {
+        Type::Array(base_type) => *base_type,
+        error => {
+            binder.diagnostic_bag.report_cannot_convert(
+                base_span,
+                &base.type_,
+                &Type::array(error),
+            );
+            Type::Error
+        }
+    };
+    BoundNode::array_index(span, base, index, type_)
+}
+
 
 fn bind_arguments_for_function<'a, 'b>(
     span: TextSpan,
@@ -700,12 +751,7 @@ fn bind_assignment<'a, 'b>(
     assignment: AssignmentNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    let lhs_span = assignment.lhs.span();
-    let lhs = match assignment.lhs.kind {
-        SyntaxNodeKind::Variable(variable) => bind_variable(lhs_span, variable, binder),
-        SyntaxNodeKind::ArrayIndex(array_index) => bind_array_index(lhs_span, array_index, binder),
-        error => unreachable!("Unknown left hand side in assignment: {:#?}", error),
-    };
+    let lhs = bind_node_for_assignment(*assignment.lhs, binder);
     let expression = bind_node(*assignment.expression, binder);
     if !expression.type_.can_be_converted_to(&lhs.type_) {
         binder
