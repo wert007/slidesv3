@@ -39,7 +39,27 @@
 
 
     // TODO: Ranges
-    // for i in 0..12 {
+    // for i in 3..12 {
     //     print(i * i);
+    // }
+
+    // TODO: Ranges with step size
+    // for i in (3..12).step_by(5) {
+    //     print(i * i);
+    // }
+
+    // {
+    //     let i = 3;
+    //     let i$increase = 12 >= 3;
+    //     while i < 12 {
+    //         {
+    //             print(i * i);
+    //         }
+    //         if i$increase {
+    //             i = i + 1;
+    //         } else {
+    //             i = i - 1;
+    //         }
+    //     }
     // }
 }
