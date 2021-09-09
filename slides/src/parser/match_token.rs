@@ -143,6 +143,19 @@ macro_rules! match_token {
             SyntaxToken::operator(current.span().start(), ",")
         }
     };
+    ($tokens:expr, $diagnostic_bag:expr, ForKeyword) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::ForKeyword) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::ForKeyword,
+            );
+            SyntaxToken::keyword(current.span().start(), "for")
+        }
+    };
     ($tokens:expr, $diagnostic_bag:expr, IfKeyword) => {
         if matches!(peek_token($tokens).kind, SyntaxTokenKind::IfKeyword) {
             next_token($tokens)
@@ -154,6 +167,19 @@ macro_rules! match_token {
                 &SyntaxTokenKind::IfKeyword,
             );
             SyntaxToken::keyword(current.span().start(), "if")
+        }
+    };
+    ($tokens:expr, $diagnostic_bag:expr, InKeyword) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::InKeyword) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::InKeyword,
+            );
+            SyntaxToken::keyword(current.span().start(), "in")
         }
     };
     ($tokens:expr, $diagnostic_bag:expr, LetKeyword) => {

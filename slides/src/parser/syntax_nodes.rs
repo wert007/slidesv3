@@ -162,6 +162,27 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn for_statement(
+        for_keyword: SyntaxToken<'a>,
+        variable: SyntaxToken<'a>,
+        in_keyword: SyntaxToken<'a>,
+        collection: SyntaxNode<'a>,
+        body: SyntaxNode<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(for_keyword.span(), body.span());
+        Self {
+            kind: SyntaxNodeKind::ForStatement(ForStatementNodeKind {
+                for_keyword,
+                variable,
+                in_keyword,
+                collection: Box::new(collection),
+                body: Box::new(body),
+            }),
+            span,
+            is_inserted: false,
+        }
+    }
+
     pub fn if_statement(
         if_keyword: SyntaxToken<'a>,
         condition: SyntaxNode<'a>,
@@ -285,6 +306,7 @@ pub enum SyntaxNodeKind<'a> {
 
     // Statements
     BlockStatement(BlockStatementNodeKind<'a>),
+    ForStatement(ForStatementNodeKind<'a>),
     IfStatement(IfStatementNodeKind<'a>),
     VariableDeclaration(VariableDeclarationNodeKind<'a>),
     WhileStatement(WhileStatementNodeKind<'a>),
@@ -368,6 +390,15 @@ pub struct BlockStatementNodeKind<'a> {
     pub lbrace: SyntaxToken<'a>,
     pub statements: Vec<SyntaxNode<'a>>,
     pub rbrace: SyntaxToken<'a>,
+}
+
+#[derive(Debug)]
+pub struct ForStatementNodeKind<'a> {
+    pub for_keyword: SyntaxToken<'a>,
+    pub variable: SyntaxToken<'a>,
+    pub in_keyword: SyntaxToken<'a>,
+    pub collection: Box<SyntaxNode<'a>>,
+    pub body: Box<SyntaxNode<'a>>,
 }
 
 #[derive(Debug)]

@@ -134,7 +134,9 @@ pub enum SyntaxTokenKind {
 
     // Keywords
     FalseKeyword,
+    ForKeyword,
     IfKeyword,
+    InKeyword,
     LetKeyword,
     TrueKeyword,
     WhileKeyword,
@@ -181,7 +183,9 @@ impl SyntaxTokenKind {
     pub fn keyword(identifier: &str) -> Option<Self> {
         match identifier {
             "false" => Some(Self::FalseKeyword),
+            "for" => Some(Self::ForKeyword),
             "if" => Some(Self::IfKeyword),
+            "in" => Some(Self::InKeyword),
             "let" => Some(Self::LetKeyword),
             "true" => Some(Self::TrueKeyword),
             "while" => Some(Self::WhileKeyword),
@@ -247,7 +251,9 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::EqualsEquals => write!(f, "Equals-Equals-Token"),
             SyntaxTokenKind::Identifier => write!(f, "Identifier"),
             SyntaxTokenKind::FalseKeyword => write!(f, "false"),
+            SyntaxTokenKind::ForKeyword => write!(f, "for"),
             SyntaxTokenKind::IfKeyword => write!(f, "if"),
+            SyntaxTokenKind::InKeyword => write!(f, "in"),
             SyntaxTokenKind::LetKeyword => write!(f, "let"),
             SyntaxTokenKind::TrueKeyword => write!(f, "true"),
             SyntaxTokenKind::WhileKeyword => write!(f, "while"),

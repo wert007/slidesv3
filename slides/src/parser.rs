@@ -38,6 +38,7 @@ fn parse_statement<'a>(
 ) -> SyntaxNode<'a> {
     match &peek_token(tokens).kind {
         SyntaxTokenKind::LBrace => parse_block_statement(tokens, diagnostic_bag),
+        SyntaxTokenKind::ForKeyword => parse_for_statement(tokens, diagnostic_bag),
         SyntaxTokenKind::IfKeyword => parse_if_statement(tokens, diagnostic_bag),
         SyntaxTokenKind::LetKeyword => parse_variable_declaration(tokens, diagnostic_bag),
         SyntaxTokenKind::WhileKeyword => parse_while_statement(tokens, diagnostic_bag),
@@ -73,10 +74,27 @@ fn parse_block_statement<'a>(
         peek_token(tokens).kind,
         SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi
     ) {
+        let old_tokens_len = tokens.len();
         statements.push(parse_statement(tokens, diagnostic_bag));
+        if tokens.len() == old_tokens_len {
+            next_token(tokens);
+        }
     }
     let close_brace_token = match_token!(tokens, diagnostic_bag, RBrace);
     SyntaxNode::block_statement(open_brace_token, statements, close_brace_token)
+}
+
+fn parse_for_statement<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let for_keyword = match_token!(tokens, diagnostic_bag, ForKeyword);
+    let variable = match_token!(tokens, diagnostic_bag, Identifier);
+    let in_keyword = match_token!(tokens, diagnostic_bag, InKeyword);
+    let collection = parse_expression(tokens, diagnostic_bag);
+    let body = parse_block_statement(tokens, diagnostic_bag);
+
+    SyntaxNode::for_statement(for_keyword, variable, in_keyword, collection, body)
 }
 
 fn parse_if_statement<'a>(
@@ -183,7 +201,7 @@ fn parse_binary_with_parent_precedence<'a>(
             diagnostic_bag.report_cannot_assign_to(lhs.span);
         }
         let rhs = parse_binary_with_parent_precedence(tokens, diagnostic_bag, precedence);
-        lhs = SyntaxNode::binary(lhs, operator_token, rhs)
+        lhs = SyntaxNode::binary(lhs, operator_token, rhs);
     }
     lhs
 }
