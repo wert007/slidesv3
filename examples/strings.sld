@@ -30,12 +30,9 @@
     let g = [ 'maybe' + 'this', 'works' + 'maybe??', 'literal', 'heap' + 'allocated'];
     print(g);
     let len = h.length();
-    print(len);
+    print('Len was ' + len);
 
 // TODO: This has the wrong result
-    let len_fn = 'This is interesting'.length;
-    print(len_fn());
-
-// TODO: String concatination with any type
-    // print('Len was ' + len);
+    // let len_fn = 'This is interesting'.length;
+    // print(len_fn());
 }
