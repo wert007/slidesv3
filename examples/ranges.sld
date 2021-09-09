@@ -12,6 +12,12 @@
         }
     }
 
+    // let z = [ [1], [2], [3], ];
+    // for i, it in z {
+    //     it[0] = i;
+    // }
+    // print(z);
+
     // {
     //     let i$index = 0;
     //     let i$collection = a;
