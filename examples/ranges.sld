@@ -24,12 +24,12 @@
     //     }
     // }
 
-    // TODO: optional enumeration variable
-    // let b = [false, false, false, false, ];
-    // for i, it in a {
-    //     b[i] = i - it == 0;
-    // }
-    // print(b);
+    let a2 = [1, 2, 3, 4];
+    let b = [false, false, false, false, ];
+    for i, it in a2 {
+        b[i] = it - i == 1;
+    }
+    print(b);
 
 
     // TODO: Ranges

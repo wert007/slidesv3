@@ -503,12 +503,22 @@ fn bind_for_statement<'a, 'b>(
         return BoundNode::error(span);
     }
     let variable = variable.unwrap();
-    let index_variable = binder
-        .register_generated_variable(
-            format!("{}$index", for_statement.variable.lexeme),
-            Type::Integer,
-        )
-        .unwrap();
+    let index_variable = match for_statement.optional_index_variable {
+        Some(index_variable) => binder.register_variable(index_variable.lexeme, Type::Integer),
+        None => binder
+           .register_generated_variable(
+               format!("{}$index", for_statement.variable.lexeme),
+               Type::Integer,
+           ),
+    };
+    if index_variable.is_none() {
+        binder.diagnostic_bag.report_cannot_declare_variable(
+            for_statement.variable.span(),
+            for_statement.variable.lexeme,
+        );
+        return BoundNode::error(span);
+    }
+    let index_variable = index_variable.unwrap();
     let collection_variable = binder
         .register_generated_variable(
             format!("{}$collection", for_statement.variable.lexeme),

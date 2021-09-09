@@ -164,6 +164,7 @@ impl<'a> SyntaxNode<'a> {
 
     pub fn for_statement(
         for_keyword: SyntaxToken<'a>,
+        optional_index_variable: Option<SyntaxToken<'a>>,
         variable: SyntaxToken<'a>,
         in_keyword: SyntaxToken<'a>,
         collection: SyntaxNode<'a>,
@@ -173,6 +174,7 @@ impl<'a> SyntaxNode<'a> {
         Self {
             kind: SyntaxNodeKind::ForStatement(ForStatementNodeKind {
                 for_keyword,
+                optional_index_variable,
                 variable,
                 in_keyword,
                 collection: Box::new(collection),
@@ -395,6 +397,7 @@ pub struct BlockStatementNodeKind<'a> {
 #[derive(Debug)]
 pub struct ForStatementNodeKind<'a> {
     pub for_keyword: SyntaxToken<'a>,
+    pub optional_index_variable: Option<SyntaxToken<'a>>,
     pub variable: SyntaxToken<'a>,
     pub in_keyword: SyntaxToken<'a>,
     pub collection: Box<SyntaxNode<'a>>,

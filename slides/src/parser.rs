@@ -89,12 +89,20 @@ fn parse_for_statement<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let for_keyword = match_token!(tokens, diagnostic_bag, ForKeyword);
-    let variable = match_token!(tokens, diagnostic_bag, Identifier);
+    let mut variable = match_token!(tokens, diagnostic_bag, Identifier);
+    let optional_index_variable = if matches!(peek_token(tokens).kind, SyntaxTokenKind::Comma) {
+        next_token(tokens);
+        let it = variable;
+        variable = match_token!(tokens, diagnostic_bag, Identifier);
+        Some(it)
+    } else {
+        None
+    };
     let in_keyword = match_token!(tokens, diagnostic_bag, InKeyword);
     let collection = parse_expression(tokens, diagnostic_bag);
     let body = parse_block_statement(tokens, diagnostic_bag);
 
-    SyntaxNode::for_statement(for_keyword, variable, in_keyword, collection, body)
+    SyntaxNode::for_statement(for_keyword, optional_index_variable, variable, in_keyword, collection, body)
 }
 
 fn parse_if_statement<'a>(
