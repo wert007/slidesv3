@@ -1,4 +1,5 @@
 mod binder;
+#[allow(dead_code)]
 mod debug;
 mod diagnostics;
 mod evaluator;
