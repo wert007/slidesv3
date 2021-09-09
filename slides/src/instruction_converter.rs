@@ -58,7 +58,7 @@ fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Inst
         }
         BoundNodeKind::SystemCall(system_call) => convert_system_call(system_call, diagnostic_bag),
         BoundNodeKind::ArrayIndex(array_index) => convert_array_index(array_index, diagnostic_bag),
-
+        BoundNodeKind::FieldAccess(field_access) => convert_field_access(field_access, diagnostic_bag),
         BoundNodeKind::BlockStatement(block_statement) => {
             convert_block_statement(block_statement, diagnostic_bag)
         }
@@ -312,6 +312,13 @@ fn convert_array_index(
     result.append(&mut convert_node(*array_index.index, diagnostic_bag));
     result.push(Instruction::array_index());
     result
+}
+
+fn convert_field_access(
+    field_access: BoundFieldAccessNodeKind,
+    diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<Instruction> {
+    convert_node(*field_access.base, diagnostic_bag)
 }
 
 fn convert_if_statement(

@@ -68,6 +68,7 @@ fn print_bound_node_as_code_with_indent(node: &BoundNode, printer: DebugPrinter)
         BoundNodeKind::_FunctionCall(function_call) => print_bound_node_function_call_as_code(function_call, printer),
         BoundNodeKind::SystemCall(system_call) => print_bound_node_system_call_as_code(system_call, printer),
         BoundNodeKind::ArrayIndex(array_index) => print_bound_node_array_index_as_code(array_index, printer),
+        BoundNodeKind::FieldAccess(field_access) => print_bound_node_field_access_as_code(field_access, printer),
         BoundNodeKind::BlockStatement(block_statement) => print_bound_node_block_statement_as_code(block_statement, printer),
         BoundNodeKind::IfStatement(if_statement) => print_bound_node_if_statement_as_code(if_statement, printer),
         BoundNodeKind::VariableDeclaration(variable_declaration) => print_bound_node_variable_declaration_as_code(variable_declaration, printer),
@@ -133,6 +134,11 @@ fn print_bound_node_array_index_as_code(array_index: &BoundArrayIndexNodeKind, p
     print!("[");
     print_bound_node_as_code_with_indent(&array_index.index, printer);
     print!("]");
+}
+
+fn print_bound_node_field_access_as_code(field_access: &BoundFieldAccessNodeKind, printer: DebugPrinter) {
+    print_bound_node_as_code_with_indent(&field_access.base, printer);
+    print!(".length");
 }
 
 fn print_bound_node_block_statement_as_code(block_statement: &BoundBlockStatementNodeKind, mut printer: DebugPrinter) {

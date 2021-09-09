@@ -157,6 +157,23 @@ impl<'a> BoundNode<'a> {
         }
     }
 
+    pub fn field_access(
+        span: TextSpan,
+        base: BoundNode<'a>,
+        type_: Type,
+    ) -> Self {
+        let byte_width = base.byte_width;
+        Self {
+            span,
+            kind: BoundNodeKind::FieldAccess(BoundFieldAccessNodeKind {
+                base: Box::new(base),
+            }),
+            type_,
+            byte_width,
+            constant_value: None,
+        }
+    }
+
     pub fn system_call(
         span: TextSpan,
         base: SystemCallKind,
@@ -264,6 +281,7 @@ pub enum BoundNodeKind<'a> {
     _FunctionCall(BoundFunctionCallNodeKind<'a>),
     SystemCall(BoundSystemCallNodeKind<'a>),
     ArrayIndex(BoundArrayIndexNodeKind<'a>),
+    FieldAccess(BoundFieldAccessNodeKind<'a>),
 
     // Statements
     BlockStatement(BoundBlockStatementNodeKind<'a>),
@@ -313,6 +331,11 @@ pub struct BoundSystemCallNodeKind<'a> {
 pub struct BoundArrayIndexNodeKind<'a> {
     pub base: Box<BoundNode<'a>>,
     pub index: Box<BoundNode<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundFieldAccessNodeKind<'a> {
+    pub base: Box<BoundNode<'a>>,
 }
 
 #[derive(Debug, Clone)]

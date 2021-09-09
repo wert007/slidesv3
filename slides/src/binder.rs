@@ -214,6 +214,7 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
             bind_function_call(node.span, function_call, binder)
         }
         SyntaxNodeKind::ArrayIndex(array_index) => bind_array_index(node.span, array_index, binder),
+        SyntaxNodeKind::FieldAccess(field_access) => bind_field_access(node.span, field_access, binder),
         SyntaxNodeKind::BlockStatement(block_statement) => {
             bind_block_statement(node.span, block_statement, binder)
         }
@@ -514,6 +515,35 @@ fn bind_array_index_for_assignment<'a, 'b>(
         }
     };
     BoundNode::array_index(span, base, index, type_)
+}
+
+fn bind_field_access<'a, 'b>(
+    span: TextSpan,
+    field_access: FieldAccessNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let base_span = field_access.base.span();
+    let base = bind_node(*field_access.base, binder);
+    match &base.type_ {
+        Type::Error => todo!(),
+        Type::Any => todo!(),
+        Type::Void |
+        Type::Integer |
+        Type::Boolean |
+        Type::SystemCall(_) => {
+            binder.diagnostic_bag.report_no_fields_on_type(base_span, &base.type_);
+            BoundNode::error(span)
+        },
+        Type::Array(_) |
+        Type::String => {
+            if field_access.field.lexeme == "length" {
+                BoundNode::field_access(span, base, Type::SystemCall(SystemCallKind::ArrayLength))
+            } else {
+                binder.diagnostic_bag.report_no_field_named_on_type(span, field_access.field.lexeme, &base.type_);
+                BoundNode::error(span)
+            }
+        },
+    }
 }
 
 
