@@ -115,6 +115,7 @@ impl std::fmt::Display for Type {
 #[repr(u8)]
 pub enum SystemCallKind {
     Print,
+    ToString,
     ArrayLength,
 }
 
@@ -125,7 +126,8 @@ impl std::fmt::Display for SystemCallKind {
             "{}",
             match self {
                 SystemCallKind::Print => "print",
-                SystemCallKind::ArrayLength => "array length",
+                SystemCallKind::ToString => "to$string",
+                SystemCallKind::ArrayLength => "array$length",
             }
         )
     }

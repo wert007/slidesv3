@@ -520,5 +520,6 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     match sys_call_kind {
         SystemCallKind::Print => sys_calls::print(types.remove(0), arguments[0], state),
         SystemCallKind::ArrayLength => sys_calls::array_length(types.remove(0), arguments[0], state),
+        SystemCallKind::ToString => sys_calls::to_string(types.remove(0), arguments[0], state),
     }
 }

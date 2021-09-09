@@ -2,35 +2,52 @@ use crate::{binder::typing::Type, evaluator::is_heap_pointer};
 
 use super::{EvaluatorState, TypedU64};
 
+
 pub fn print(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
-    print!("PRINT ");
+    println!("{}", to_string_native(type_, argument, state));
+}
+
+pub fn to_string(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
+    let string = to_string_native(type_, argument, state);
+    let string_length = string.len() as u64;
+    let mut pointer = state.heap.allocate(4 + string_length);
+    let result = pointer;
+    state.heap.write_word(pointer as _, string_length);
+    pointer += 4;
+    for &byte in string.as_bytes() {
+        state.heap.write_byte(pointer as _, byte);
+        pointer += 1;
+    }
+    state.set_pointer(state.stack.len());
+    state.stack.push(result);
+}
+
+fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState) -> String {
     match type_ {
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
         Type::Integer => {
-            println!("{}", argument.value as i64)
+            format!("{}", argument.value as i64)
         }
         Type::Boolean => {
             if argument.value == 0 {
-                println!("false");
+                "false".into()
             } else {
-                println!("true");
+                "true".into()
             }
         }
-        Type::SystemCall(kind) => println!("system call {}", kind),
+        Type::SystemCall(kind) => format!("system call {}", kind),
         Type::Array(base_type) => {
-            print_array(*base_type, argument, state);
-            println!();
+            array_to_string_native(*base_type, argument, state)
         }
         Type::String => {
-            print_string(argument, state);
-            println!();
+            string_to_string_native(argument, state)
         }
     }
 }
 
-fn print_array(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) {
+fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) -> String {
     assert!(argument.is_pointer, "argument = {:#?}", argument);
     let array_length_in_bytes = if is_heap_pointer(argument.value) {
         state.heap.read_word(argument.value as _)
@@ -40,7 +57,7 @@ fn print_array(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) 
     let array_length_in_words = (array_length_in_bytes + 3) / 4;
     let array_start = argument.value;
     let array_end = array_start - array_length_in_words;
-    print!("[ ");
+    let mut result : String = "[ ".into();
     match base_type {
         Type::Error => todo!(),
         Type::Void => todo!(),
@@ -52,7 +69,7 @@ fn print_array(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) 
                 } else {
                     state.stack[i as usize]
                 };
-                print!("{}, ", value as i64);
+                result.push_str(&format!("{}, ", value as i64));
             }
         }
         Type::Boolean => {
@@ -63,15 +80,15 @@ fn print_array(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) 
                     state.stack[i as usize]
                 };
                 if value == 0 {
-                    print!("false, ");
+                    result.push_str("false, ");
                 } else {
-                    print!("true, ");
+                    result.push_str("true, ");
                 }
             }
         }
         Type::SystemCall(kind) => {
             for _ in (array_end..array_start).rev() {
-                print!("system call {}, ", kind);
+                result.push_str(&format!("system call {}, ", kind));
             }
         }
         Type::Array(base_type) => {
@@ -85,8 +102,8 @@ fn print_array(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) 
                     value: pointer,
                     is_pointer: true,
                 };
-                print_array(*base_type.clone(), argument, state);
-                print!(", ");
+                result.push_str(&array_to_string_native(*base_type.clone(), argument, state));
+                result.push_str(", ");
             }
         }
         Type::String => {
@@ -100,15 +117,17 @@ fn print_array(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) 
                     value: pointer,
                     is_pointer: true,
                 };
-                print_string(argument, state);
-                print!(", ");
+                result.push('\'');
+                result.push_str(&string_to_string_native(argument, state));
+                result.push_str("', ");
             }
         }
     }
-    print!("]");
+    result.push_str("]");
+    result
 }
 
-fn print_string(argument: TypedU64, state: &mut EvaluatorState) {
+fn string_to_string_native(argument: TypedU64, state: &mut EvaluatorState) -> String {
     let mut is_heap_string;
     let mut string_start = argument.value;
     let mut pointer = if is_heap_pointer(string_start) {
@@ -151,7 +170,7 @@ fn print_string(argument: TypedU64, state: &mut EvaluatorState) {
         string_buffer.push((word >> 16 & 0xFF) as u8);
         string_buffer.push((word >> 24 & 0xFF) as u8);
     }
-    print!("'{}'", String::from_utf8_lossy(&string_buffer));
+    String::from_utf8_lossy(&string_buffer).into_owned()
 }
 
 pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
