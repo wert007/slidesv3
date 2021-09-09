@@ -445,8 +445,8 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
         writing_pointer += 4;
         for i in 0..lhs_length {
             let lhs_address = lhs.value;
-            let lhs_byte = if is_heap_pointer(lhs_address + i) {
-                state.heap.read_byte(lhs_address as usize + i as usize)
+            let lhs_byte = if is_heap_pointer(lhs_address + i + 4) {
+                state.heap.read_byte(lhs_address as usize + i as usize + 4)
             } else {
                 let word = state.stack[lhs_address as usize - 1 - (i / 4) as usize];
                 let bytes = [
@@ -462,8 +462,8 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
         }
         for i in 0..rhs_length {
             let rhs_address = rhs.value;
-            let rhs_byte = if is_heap_pointer(rhs_address + i) {
-                state.heap.read_byte(rhs_address as usize + i as usize)
+            let rhs_byte = if is_heap_pointer(rhs_address + i + 4) {
+                state.heap.read_byte(rhs_address as usize + i as usize + 4)
             } else {
                 let word = state.stack[rhs_address as usize - 1 - (i / 4) as usize];
                 let bytes = [
