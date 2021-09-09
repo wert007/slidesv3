@@ -4,7 +4,7 @@ use crate::{
     value::Value,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SyntaxNode<'a> {
     pub kind: SyntaxNodeKind<'a>,
     pub span: TextSpan,
@@ -311,7 +311,7 @@ impl<'a> SyntaxNode<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SyntaxNodeKind<'a> {
     //Expressions
     Literal(LiteralNodeKind<'a>),
@@ -346,7 +346,7 @@ pub struct LiteralNodeKind<'a> {
     pub value: Value,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArrayLiteralNodeKind<'a> {
     pub lbracket: SyntaxToken<'a>,
     pub children: Vec<SyntaxNode<'a>>,
@@ -354,32 +354,32 @@ pub struct ArrayLiteralNodeKind<'a> {
     pub rbracket: SyntaxToken<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VariableNodeKind<'a> {
     pub token: SyntaxToken<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryNodeKind<'a> {
     pub lhs: Box<SyntaxNode<'a>>,
     pub operator_token: SyntaxToken<'a>,
     pub rhs: Box<SyntaxNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnaryNodeKind<'a> {
     pub operator_token: SyntaxToken<'a>,
     pub operand: Box<SyntaxNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ParenthesizedNodeKind<'a> {
     pub lparen: SyntaxToken<'a>,
     pub expression: Box<SyntaxNode<'a>>,
     pub rparen: SyntaxToken<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionCallNodeKind<'a> {
     pub base: Box<SyntaxNode<'a>>,
     pub open_parenthesis_token: SyntaxToken<'a>,
@@ -397,7 +397,7 @@ impl FunctionCallNodeKind<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArrayIndexNodeKind<'a> {
     pub base: Box<SyntaxNode<'a>>,
     pub lbracket: SyntaxToken<'a>,
@@ -419,7 +419,7 @@ pub struct BlockStatementNodeKind<'a> {
     pub rbrace: SyntaxToken<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ForStatementNodeKind<'a> {
     pub for_keyword: SyntaxToken<'a>,
     pub optional_index_variable: Option<SyntaxToken<'a>>,
@@ -429,14 +429,14 @@ pub struct ForStatementNodeKind<'a> {
     pub body: Box<SyntaxNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfStatementNodeKind<'a> {
     pub if_keyword: SyntaxToken<'a>,
     pub condition: Box<SyntaxNode<'a>>,
     pub body: Box<SyntaxNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VariableDeclarationNodeKind<'a> {
     pub let_keyword: SyntaxToken<'a>,
     pub identifier: SyntaxToken<'a>,
@@ -445,21 +445,21 @@ pub struct VariableDeclarationNodeKind<'a> {
     pub semicolon_token: SyntaxToken<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WhileStatementNodeKind<'a> {
     pub while_keyword: SyntaxToken<'a>,
     pub condition: Box<SyntaxNode<'a>>,
     pub body: Box<SyntaxNode<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssignmentNodeKind<'a> {
     pub lhs: Box<SyntaxNode<'a>>,
     pub expression: Box<SyntaxNode<'a>>,
     pub semicolon_token: SyntaxToken<'a>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExpressionStatementNodeKind<'a> {
     pub expression: Box<SyntaxNode<'a>>,
     pub semicolon_token: SyntaxToken<'a>,
