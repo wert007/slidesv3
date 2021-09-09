@@ -42,7 +42,7 @@ impl EvaluatorState {
     }
 
     fn is_pointer(&mut self, address: usize) -> bool {
-        self.pointers.contains(&address)
+        is_heap_pointer(address as _) || self.pointers.contains(&address)
     }
 
     fn pop_stack(&mut self) -> Option<TypedU64> {

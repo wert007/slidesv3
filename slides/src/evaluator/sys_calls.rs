@@ -109,14 +109,28 @@ fn print_array(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) 
 }
 
 fn print_string(argument: TypedU64, state: &mut EvaluatorState) {
-    let is_heap_string = is_heap_pointer(argument.value);
-    let string_length_in_bytes = if is_heap_string {
-        state.heap.read_word(argument.value as _)
+    let mut is_heap_string;
+    let mut string_start = argument.value;
+    let mut pointer = if is_heap_pointer(string_start) {
+        is_heap_string = true;
+        state.heap.read_word(string_start as _)
     } else {
-        state.stack[argument.value as usize]
+        is_heap_string = false;
+        state.stack[string_start as usize]
     };
+
+    while state.is_pointer(string_start as _) && !is_heap_string {
+        string_start = pointer;
+        pointer = if is_heap_pointer(pointer) {
+            is_heap_string = true;
+            state.heap.read_word(pointer as _)
+        } else {
+            is_heap_string = false;
+            state.stack[pointer as usize]
+        };
+    }
+    let string_length_in_bytes = pointer;
     let string_length_in_words = (string_length_in_bytes + 3) / 4;
-    let string_start = argument.value; // Includes the length of the string
     let string_end = string_start - string_length_in_words;
     let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as usize);
 
