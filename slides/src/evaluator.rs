@@ -512,7 +512,9 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     let mut types = Vec::with_capacity(argument_count);
 
     for _ in 0..argument_count {
-        types.push(Type::from_type_identifier(state.pop_stack().unwrap().value).unwrap());
+        let type_ = state.pop_stack().unwrap().value;
+        let type_ = Type::from_type_identifier(type_).unwrap_or_else(|| panic!("Invalid type identifier = {} | 0x{:x}", type_, type_));
+        types.push(type_);
         arguments.push(state.pop_stack().unwrap());
     }
     match sys_call_kind {

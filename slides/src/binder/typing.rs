@@ -64,7 +64,7 @@ impl Type {
             Type::Integer => 6,
             Type::Boolean => 8,
             Type::String => 10,
-            Type::SystemCall(kind) => ((*kind as u8) as u64) << 4 + 16,
+            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 16,
         }
     }
 
@@ -85,7 +85,7 @@ impl Type {
                         result = Type::array(result);
                     }
                     Some(result)
-                } else if value & 0x31 == 16 {
+                } else if value & 31 == 16 {
                     let kind = SystemCallKind::try_from_primitive(((value >> 5) & 0xFF) as u8).ok()?;
                     Some(Self::SystemCall(kind))
                 } else {
