@@ -21,14 +21,14 @@
 
     print('lol' + 'lal');
 
-    let e = 'ha' + 'ha';
+    let e = 'ha' + 'he';
     print(e);
 
     let f = [a, b, c, d, e];
     print(f);
 
-    // let g = [ 'maybe' + 'this', 'works' + 'maybe??', 'literal', 'heap' + 'allocated'];
-    // print(g);
+    let g = [ 'maybe' + 'this', 'works' + 'maybe??', 'literal', 'heap' + 'allocated'];
+    print(g);
 // TODO: Implement string length!
     // let len = h.length();
     // print(len);
