@@ -139,6 +139,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_variable_is_read_only(&mut self, span: TextSpan) {
+        let message = "Variable cannot be assigned to, it is a read only variable.".into();
+        self.report(message, span);
+    }
+
     pub fn report_unexpected_argument_count(
         &mut self,
         span: TextSpan,

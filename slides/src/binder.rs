@@ -57,9 +57,16 @@ impl AsRef<str> for SmartString<'_> {
     }
 }
 
+struct VariableEntry {
+    id: u64,
+    type_: Type,
+    is_read_only: bool,
+}
+
 struct BoundVariableName<'a> {
     pub identifier: SmartString<'a>,
     pub type_: Type,
+    pub is_read_only: bool,
 }
 
 struct BindingState<'a, 'b> {
@@ -69,7 +76,7 @@ struct BindingState<'a, 'b> {
 }
 
 impl<'a> BindingState<'a, '_> {
-    fn register_variable(&mut self, name: &'a str, type_: Type) -> Option<u64> {
+    fn register_variable(&mut self, name: &'a str, type_: Type, is_read_only: bool) -> Option<u64> {
         let index = self.variable_table.len() as u64;
         let variable_already_registered = self
             .variable_table
@@ -83,13 +90,14 @@ impl<'a> BindingState<'a, '_> {
                 BoundVariableName {
                     identifier: name.into(),
                     type_,
+                    is_read_only,
                 },
             );
             Some(index)
         }
     }
 
-    fn register_generated_variable(&mut self, name: String, type_: Type) -> Option<u64> {
+    fn register_generated_variable(&mut self, name: String, type_: Type, is_read_only: bool) -> Option<u64> {
         let index = self.variable_table.len() as u64;
         let variable_already_registered = self
             .variable_table
@@ -103,6 +111,7 @@ impl<'a> BindingState<'a, '_> {
                 BoundVariableName {
                     identifier: name.into(),
                     type_,
+                    is_read_only
                 },
             );
             Some(index)
@@ -119,11 +128,15 @@ impl<'a> BindingState<'a, '_> {
         }
     }
 
-    fn look_up_variable_by_name(&self, name: &str) -> Option<(u64, Type)> {
+    fn look_up_variable_by_name(&self, name: &str) -> Option<VariableEntry> {
         self.variable_table
             .iter()
             .find(|(_, v)| v.identifier.as_ref() == name)
-            .map(|(&i, v)| (i, v.type_.clone()))
+            .map(|(&i, v)| VariableEntry {
+                id: i,
+                type_: v.type_.clone(),
+                is_read_only: v.is_read_only
+            })
     }
 }
 
@@ -164,7 +177,7 @@ pub fn bind<'a>(
 fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {
     let span = TextSpan::new(0, 0);
     let variable_index = binder
-        .register_variable("print", Type::SystemCall(SystemCallKind::Print))
+        .register_variable("print", Type::SystemCall(SystemCallKind::Print), true)
         .unwrap();
     let token = SyntaxToken {
         kind: SyntaxTokenKind::Eoi,
@@ -261,7 +274,7 @@ fn bind_variable<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     match binder.look_up_variable_by_name(variable.token.lexeme) {
-        Some((index, type_)) => BoundNode::variable(span, index, type_),
+        Some(VariableEntry { id, type_, ..}) => BoundNode::variable(span, id, type_),
         None => {
             binder
                 .diagnostic_bag
@@ -494,7 +507,7 @@ fn bind_for_statement<'a, 'b>(
         return BoundNode::error(span);
     }
     let variable_type = collection.type_.array_base_type().unwrap();
-    let variable = binder.register_variable(for_statement.variable.lexeme, variable_type.clone());
+    let variable = binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
     if variable.is_none() {
         binder.diagnostic_bag.report_cannot_declare_variable(
             for_statement.variable.span(),
@@ -504,11 +517,12 @@ fn bind_for_statement<'a, 'b>(
     }
     let variable = variable.unwrap();
     let index_variable = match for_statement.optional_index_variable {
-        Some(index_variable) => binder.register_variable(index_variable.lexeme, Type::Integer),
+        Some(index_variable) => binder.register_variable(index_variable.lexeme, Type::Integer, true),
         None => binder
            .register_generated_variable(
                format!("{}$index", for_statement.variable.lexeme),
                Type::Integer,
+               true,
            ),
     };
     if index_variable.is_none() {
@@ -523,6 +537,7 @@ fn bind_for_statement<'a, 'b>(
         .register_generated_variable(
             format!("{}$collection", for_statement.variable.lexeme),
             collection.type_.clone(),
+            true,
         )
         .unwrap();
     let body = bind_node(*for_statement.body, binder);
@@ -647,6 +662,7 @@ fn bind_variable_declaration<'a, 'b>(
     let variable_index = binder.register_variable(
         variable_declaration.identifier.lexeme,
         initializer.type_.clone(),
+        false,
     );
     if let Some(variable_index) = variable_index {
         BoundNode::variable_declaration(span, variable_index, initializer)
