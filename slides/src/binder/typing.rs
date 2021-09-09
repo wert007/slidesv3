@@ -133,6 +133,7 @@ impl std::fmt::Display for SystemCallKind {
 
 pub struct FunctionType {
     pub parameter_types: Vec<Type>,
+    pub this_type: Option<Type>,
     pub return_type: Type,
     pub system_call_kind: Option<SystemCallKind>,
 }

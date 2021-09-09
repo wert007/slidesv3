@@ -2,25 +2,7 @@ pub mod instruction;
 #[cfg(test)]
 mod tests;
 
-use crate::{
-    binder::{
-        self,
-        bound_nodes::{
-            BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
-            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind,
-            BoundFunctionCallNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind,
-            BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind,
-            BoundVariableNodeKind, BoundWhileStatementNodeKind,
-        },
-        operators::{BoundBinaryOperator, BoundUnaryOperator},
-        typing::Type,
-    },
-    debug::DebugFlags,
-    diagnostics::DiagnosticBag,
-    parser::syntax_nodes::LiteralNodeKind,
-    text::SourceText,
-    value::Value,
-};
+use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::Type}, debug::DebugFlags, diagnostics::DiagnosticBag, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
 
 use self::instruction::Instruction;
 

@@ -6,30 +6,9 @@ pub mod typing;
 
 use std::collections::HashMap;
 
-use crate::{
-    binder::{operators::BoundUnaryOperator, typing::Type},
-    diagnostics::DiagnosticBag,
-    lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind},
-    parser::{
-        self,
-        syntax_nodes::{
-            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
-            BlockStatementNodeKind, ExpressionStatementNodeKind, ForStatementNodeKind,
-            FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind,
-            SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind,
-            VariableNodeKind, WhileStatementNodeKind,
-        },
-    },
-    text::{SourceText, TextSpan},
-    value::Value,
-    DebugFlags,
-};
+use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
-use self::{
-    bound_nodes::BoundNode,
-    operators::BoundBinaryOperator,
-    typing::{FunctionType, SystemCallKind},
-};
+use self::{bound_nodes::{BoundNode, BoundNodeKind}, operators::BoundBinaryOperator, typing::{FunctionType, SystemCallKind}};
 
 enum SmartString<'a> {
     Heap(String),
@@ -433,11 +412,19 @@ fn function_type(type_: &Type) -> FunctionType {
     match type_ {
         Type::SystemCall(SystemCallKind::Print) => FunctionType {
             parameter_types: vec![Type::Any],
+            this_type: None,
             return_type: Type::Void,
             system_call_kind: type_.as_system_call(),
         },
-
-        _ => unimplemented!(),
+        Type::SystemCall(SystemCallKind::ArrayLength) => FunctionType {
+            parameter_types: vec![],
+            // Actually Array or String, but there is no way to call this system
+            // call directly, so that this is already checked somewhere.
+            this_type: Some(Type::Any),
+            return_type: Type::Integer,
+            system_call_kind: type_.as_system_call(),
+        },
+        _ => unimplemented!("Not implemented for {}", type_),
     }
 }
 
@@ -447,18 +434,47 @@ fn bind_function_call<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let argument_span = function_call.argument_span();
-    let base = bind_node(*function_call.base, binder);
-    let function_type = function_type(&base.type_);
-    let arguments = bind_arguments_for_function(
+    let function = bind_node(*function_call.base, binder);
+    let this = match &function.kind {
+        BoundNodeKind::FieldAccess(field_access) => {
+            Some(*field_access.base.clone())
+        },
+        _ => None,
+    };
+    let function_type = function_type(&function.type_);
+    // match (&this, &function_type.this_type) {
+    //     (Some(this), Some(type_)) => {
+    //         if !this.type_.can_be_converted_to(type_) {
+    //             binder.diagnostic_bag.report_cannot_convert(this.span, &this.type_, type_);
+    //             return BoundNode::error(span);
+    //         }
+    //     }
+    //     (None, None) => {},
+    //     (Some(this), None) => {
+    //         binder.diagnostic_bag.report_expected_no_this(this.span, &function_type);
+    //         return BoundNode::error(span)
+    //     }
+    //     (None, Some(_)) => {
+    //         binder.diagnostic_bag.report_expected_this_parameter(function.span, &function_type);
+    //         return BoundNode::error(span)
+    //     }
+    // }
+    let mut arguments = bind_arguments_for_function(
         argument_span,
         function_call.arguments,
         &function_type,
         binder,
     );
-    if let Type::SystemCall(system_call) = base.type_ {
+    if function_type.this_type.is_some() {
+        arguments.insert(0, this.unwrap_or_else(|| {
+            function.clone() // Wrong Type, wrong idea!
+        }
+        ));
+    }
+    if let Type::SystemCall(system_call) = function.type_ {
         return BoundNode::system_call(span, system_call, arguments, function_type.return_type);
     }
-    BoundNode::function_call(span, base, arguments, function_type.return_type)
+    BoundNode::function_call(span, function, arguments, function_type.return_type)
 }
 
 fn bind_array_index<'a, 'b>(
