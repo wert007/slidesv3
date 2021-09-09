@@ -150,57 +150,64 @@ fn convert_array_literal(
     let element_count = array_literal.children.len();
     let count_in_bytes = element_count * 4;
     match &array_literal.children[0].type_ {
-        Type::Error |
-        Type::Void => unreachable!(),
+        Type::Error | Type::Void => unreachable!(),
         Type::Any => todo!(),
-        Type::Integer |
-        Type::Boolean |
-        Type::SystemCall(_) => {
+        Type::Integer | Type::Boolean | Type::SystemCall(_) => {
             for child in array_literal.children.into_iter().rev() {
                 result.append(&mut convert_node(child, diagnostic_bag));
             }
-        },
-        Type::Array(_) |
-        Type::String => {
+        }
+        Type::Array(_) | Type::String => {
             let mut word_widths = Vec::with_capacity(element_count);
             let mut pointers = vec![];
             for child in array_literal.children.into_iter().rev() {
+                let is_literal = matches!(
+                    &child.kind,
+                    BoundNodeKind::ArrayLiteralExpression(_) | BoundNodeKind::LiteralExpression(_)
+                );
                 match &child.kind {
-                    BoundNodeKind::ArrayIndex(_) |
-                    BoundNodeKind::VariableExpression(_) => {
+                    BoundNodeKind::ArrayIndex(_) | BoundNodeKind::VariableExpression(_) => {
                         word_widths.push(0);
                         pointers.push(Some(convert_node(child, diagnostic_bag)));
-                    },
+                    }
                     _ => {
                         let word_width = (child.byte_width + 3) / 4;
-                        // Remove the pointer to the array, string itself. The outer
-                        // array provides their own pointer.
-                        word_widths.push(word_width - 1);
                         let mut child = convert_node(child, diagnostic_bag);
-                        // Remove the pointer to the array, string itself. The outer
-                        // array provides their own pointer.
-                        assert!(child.pop().is_some());
+
+                        // Array Literals and String literals create an extra
+                        // stack pointer, which is going to be replicated later
+                        // in the array itself anyway. Because of the type check
+                        // above it is ensured, that LiteralExpression is a
+                        // string literal.
+                        if is_literal {
+                            // Remove the pointer to the array, string itself.
+                            // The outer array provides their own pointer.
+                            word_widths.push(word_width - 1);
+                            assert!(child.pop().is_some());
+                        } else {
+                            word_widths.push(word_width);
+                        }
                         result.append(&mut child);
                         pointers.push(None);
                     }
                 }
             }
             word_widths.reverse();
-            let mut offset : u64 = word_widths.iter().sum();
+            let mut offset: u64 = word_widths.iter().sum();
             for i in 0..element_count {
                 match &mut pointers[i] {
                     Some(instructions) => {
                         result.append(instructions);
-                    },
+                    }
                     None => {
-                        // Reverse i
-                        offset -= word_widths[element_count - i - 1];
+                        // Create a stack pointer to the literal on the stack
+                        offset -= word_widths[element_count - i - 1]; // Reverse i
                         let stack_pointer_offset = offset + i as u64 + 1;
                         result.push(Instruction::create_stack_pointer(stack_pointer_offset));
                     }
                 }
             }
-        },
+        }
     }
     result.push(Instruction::load_immediate(count_in_bytes as u64));
     result.push(Instruction::create_stack_pointer(1));
