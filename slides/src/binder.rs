@@ -31,8 +31,34 @@ use self::{
     typing::{FunctionType, SystemCallKind},
 };
 
+enum SmartString<'a> {
+    Heap(String),
+    Reference(&'a str),
+}
+
+impl From<String> for SmartString<'_> {
+    fn from(value: String) -> Self {
+        Self::Heap(value)
+    }
+}
+
+impl<'a> From<&'a str> for SmartString<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Reference(value)
+    }
+}
+
+impl AsRef<str> for SmartString<'_> {
+    fn as_ref(&self) -> &str {
+        match self {
+            SmartString::Heap(str) => &str,
+            SmartString::Reference(str) => str,
+        }
+    }
+}
+
 struct BoundVariableName<'a> {
-    pub identifier: &'a str,
+    pub identifier: SmartString<'a>,
     pub type_: Type,
 }
 
@@ -48,14 +74,34 @@ impl<'a> BindingState<'a, '_> {
         let variable_already_registered = self
             .variable_table
             .values()
-            .any(|variable| variable.identifier == name);
+            .any(|variable| variable.identifier.as_ref() == name);
         if variable_already_registered {
             None
         } else {
             self.variable_table.insert(
                 index,
                 BoundVariableName {
-                    identifier: name,
+                    identifier: name.into(),
+                    type_,
+                },
+            );
+            Some(index)
+        }
+    }
+
+    fn register_generated_variable(&mut self, name: String, type_: Type) -> Option<u64> {
+        let index = self.variable_table.len() as u64;
+        let variable_already_registered = self
+            .variable_table
+            .values()
+            .any(|variable| variable.identifier.as_ref() == name);
+        if variable_already_registered {
+            None
+        } else {
+            self.variable_table.insert(
+                index,
+                BoundVariableName {
+                    identifier: name.into(),
                     type_,
                 },
             );
@@ -76,7 +122,7 @@ impl<'a> BindingState<'a, '_> {
     fn look_up_variable_by_name(&self, name: &str) -> Option<(u64, Type)> {
         self.variable_table
             .iter()
-            .find(|(_, v)| v.identifier == name)
+            .find(|(_, v)| v.identifier.as_ref() == name)
             .map(|(&i, v)| (i, v.type_.clone()))
     }
 }
@@ -87,7 +133,9 @@ fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
     for (index, variable) in variable_table {
         println!(
             "  {:00}: {} : {}",
-            index, variable.identifier, variable.type_
+            index,
+            variable.identifier.as_ref(),
+            variable.type_
         );
     }
     println!();
