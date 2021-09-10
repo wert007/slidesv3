@@ -1,3 +1,5 @@
+use num_enum::TryFromPrimitive;
+
 use crate::binder::typing::SystemCallKind;
 
 use self::op_codes::OpCode;
@@ -206,10 +208,25 @@ impl Instruction {
 
 impl std::fmt::Debug for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{:?} arg: {} ({})",
-            self.op_code, self.arg, self.arg as i64
-        )
+        match self.op_code {
+            OpCode::SysCall => {
+                // let arg = (argument_count << 8) as u64 | call_kind as u64;
+                let kind = (self.arg & 0xFF) as u8;
+                let kind = SystemCallKind::try_from_primitive(kind).map_err(|_| kind);
+                let kind = match kind {
+                    Ok(v) => v.to_string(),
+                    Err(v) =>v.to_string(),
+                };
+                let arg_count = self.arg >> 8;
+                write!(f, "{:?} arg: sys call {}, arg_count {}", self.op_code, kind, arg_count)
+            }
+            _ => {
+                write!(
+                    f,
+                    "{:?} arg: {} ({})",
+                    self.op_code, self.arg, self.arg as i64
+                )
+            }
+        }
     }
 }
