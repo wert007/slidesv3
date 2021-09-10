@@ -258,17 +258,18 @@ fn convert_binary(
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
         BoundBinaryOperator::StringConcat => Instruction::string_concat(),
     };
+    let mut result = vec![];
     let lhs_is_string = matches!(binary.lhs.type_, Type::String);
     let lhs_type_identifier = binary.lhs.type_.type_identifier();
-    let mut result = convert_node(*binary.lhs, diagnostic_bag);
-    if !lhs_is_string {
+    result.append(&mut convert_node(*binary.lhs, diagnostic_bag));
+    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !lhs_is_string {
         result.push(Instruction::type_identifier(lhs_type_identifier));
         result.push(Instruction::system_call(SystemCallKind::ToString, 1));
     }
     let rhs_is_string = matches!(binary.rhs.type_, Type::String);
     let rhs_type_identifier = binary.rhs.type_.type_identifier();
     result.append(&mut convert_node(*binary.rhs, diagnostic_bag));
-    if !rhs_is_string {
+    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !rhs_is_string {
         result.push(Instruction::type_identifier(rhs_type_identifier));
         result.push(Instruction::system_call(SystemCallKind::ToString, 1));
     }
