@@ -130,7 +130,7 @@ fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction)
 fn pop_array(state: &mut EvaluatorState) -> (TypedU64, Vec<TypedU64>) {
     let address = state.pop_stack().unwrap();
     let mut popped = vec![];
-    if address.is_pointer && !is_heap_pointer(address.value) {
+    if address.is_pointer && address.value < state.stack.len() as u64 {
         let address = address.value;
         let length = (state.stack[address as usize] + 3) / 4;
         let difference = state.stack.len() as u64 - address;
