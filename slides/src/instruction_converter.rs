@@ -239,14 +239,14 @@ fn convert_binary(
         BoundBinaryOperator::ArithmeticMultiplication => Instruction::multiplication(),
         BoundBinaryOperator::ArithmeticDivision => Instruction::division(),
         BoundBinaryOperator::Equals => {
-            if binary.lhs.type_.is_array() && binary.rhs.type_.is_array() {
+            if matches!(binary.lhs.type_, Type::Array(_) | Type::String) && matches!(binary.rhs.type_, Type::Array(_) | Type::String) {
                 Instruction::array_equals()
             } else {
                 Instruction::equals()
             }
         }
         BoundBinaryOperator::NotEquals => {
-            if binary.lhs.type_.is_array() && binary.rhs.type_.is_array() {
+            if matches!(binary.lhs.type_, Type::Array(_) | Type::String) && matches!(binary.rhs.type_, Type::Array(_) | Type::String) {
                 Instruction::array_not_equals()
             } else {
                 Instruction::not_equals()

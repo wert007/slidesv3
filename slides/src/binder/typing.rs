@@ -34,10 +34,6 @@ impl Type {
         }
     }
 
-    pub fn is_array(&self) -> bool {
-        matches!(self, Self::Array(_))
-    }
-
     pub fn array_base_type(&self) -> Option<&Type> {
         if let Self::Array(v) = self {
             Some(v)
