@@ -4,6 +4,8 @@
     let h = 'Hello World!';
     print(h);
 
+    print(h + ' != "Hello World!"? ' + (h != 'Hello World!'));
+
     let array_test = ['Hello', 'World', '!'];
     print(array_test);
 
