@@ -6,7 +6,7 @@ pub mod typing;
 
 use std::collections::HashMap;
 
-use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
 use self::{bound_nodes::{BoundNode, BoundNodeKind}, operators::BoundBinaryOperator, typing::{FunctionType, SystemCallKind}};
 
@@ -149,7 +149,8 @@ pub fn bind<'a>(
     };
     let mut statements = default_statements(&mut binder);
     let span = node.span();
-    statements.push(bind_node(node, &mut binder));
+
+    statements.push(bind_top_level_statements(node, &mut binder));
     BoundNode::block_statement(span, statements)
 }
 
@@ -175,6 +176,42 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
         ),
     );
     vec![print_statement]
+}
+
+fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a>{
+    let mut syntax_nodes = vec![];
+    match node.kind {
+        SyntaxNodeKind::CompilationUnit(compilation_unit) => {
+            for statement in compilation_unit.statements {
+                syntax_nodes.push(bind_top_level_statement(statement, binder));
+            }
+        },
+        SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
+            syntax_nodes.push(bind_function_declaration(function_declaration, binder));
+        }
+        _ => binder.diagnostic_bag.report_invalid_top_level_statement(node.span(), node.kind),
+    }
+    let mut statements = vec![];
+    for node in syntax_nodes {
+        statements.push(bind_node(node, binder));
+    }
+    BoundNode::block_statement(node.span, statements)
+}
+
+fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> SyntaxNode<'a> {
+    match node.kind {
+        SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
+            bind_function_declaration(function_declaration, binder)
+        }
+        _ => {
+            binder.diagnostic_bag.report_invalid_top_level_statement(node.span(), node.kind);
+            SyntaxNode::error(node.span.start())
+        }
+    }
+}
+
+fn bind_function_declaration<'a, 'b>(function_declaration: FunctionDeclarationNodeKind<'a>, binder: &mut BindingState<'a, 'b>) -> SyntaxNode<'a> {
+    *function_declaration.body
 }
 
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
@@ -213,6 +250,7 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::ExpressionStatement(expression_statement) => {
             bind_expression_statement(node.span, expression_statement, binder)
         }
+        _ => unreachable!(),
     }
 }
 

@@ -91,6 +91,14 @@ impl<'a> SyntaxToken<'a> {
         }
     }
 
+    pub fn bracket_pair(lbracket: SyntaxToken, rbracket: SyntaxToken) -> Self {
+        Self {
+            kind: SyntaxTokenKind::BracketPair,
+            lexeme: "[]", // TODO: use actual lexeme
+            start: lbracket.start
+        }
+    }
+
     pub fn eoi(start: usize) -> Self {
         Self {
             kind: SyntaxTokenKind::Eoi,
@@ -113,6 +121,7 @@ pub enum SyntaxTokenKind {
     RParen,
     LBracket,
     RBracket,
+    BracketPair,
     LBrace,
     RBrace,
     Semicolon,
@@ -136,6 +145,7 @@ pub enum SyntaxTokenKind {
     // Keywords
     FalseKeyword,
     ForKeyword,
+    FuncKeyword,
     IfKeyword,
     InKeyword,
     LetKeyword,
@@ -185,6 +195,7 @@ impl SyntaxTokenKind {
         match identifier {
             "false" => Some(Self::FalseKeyword),
             "for" => Some(Self::ForKeyword),
+            "func" => Some(Self::FuncKeyword),
             "if" => Some(Self::IfKeyword),
             "in" => Some(Self::InKeyword),
             "let" => Some(Self::LetKeyword),
@@ -238,6 +249,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::RParen => write!(f, "Close-Parenthesis-Token"),
             SyntaxTokenKind::LBracket => write!(f, "Open-Bracket-Token"),
             SyntaxTokenKind::RBracket => write!(f, "Close-Bracket-Token"),
+            SyntaxTokenKind::BracketPair => write!(f, "Bracket-Pair-Token"),
             SyntaxTokenKind::LBrace => write!(f, "Open-Brace-Token"),
             SyntaxTokenKind::RBrace => write!(f, "Close-Brace-Token"),
             SyntaxTokenKind::Plus => write!(f, "PlusToken"),
@@ -255,6 +267,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::Identifier => write!(f, "Identifier"),
             SyntaxTokenKind::FalseKeyword => write!(f, "false"),
             SyntaxTokenKind::ForKeyword => write!(f, "for"),
+            SyntaxTokenKind::FuncKeyword => write!(f, "func"),
             SyntaxTokenKind::IfKeyword => write!(f, "if"),
             SyntaxTokenKind::InKeyword => write!(f, "in"),
             SyntaxTokenKind::LetKeyword => write!(f, "let"),

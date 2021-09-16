@@ -5,17 +5,12 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{
-    diagnostics::DiagnosticBag,
-    lexer::{
+use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    },
-    text::{SourceText, TextSpan},
-    DebugFlags,
-};
+    }, parser::syntax_nodes::FunctionTypeNode, text::{SourceText, TextSpan}};
 
-use self::syntax_nodes::SyntaxNode;
+use self::syntax_nodes::{ParameterNode, SyntaxNode, TypeNode};
 use crate::match_token;
 
 pub fn parse<'a>(
@@ -27,9 +22,94 @@ pub fn parse<'a>(
     if diagnostic_bag.has_errors() {
         return SyntaxNode::error(0);
     }
-    let result = parse_statement(&mut tokens, diagnostic_bag);
-    match_token!(&mut tokens, diagnostic_bag, Eoi);
+    let result = parse_compilation_unit(&mut tokens, diagnostic_bag);
     result
+}
+
+fn parse_compilation_unit<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let mut statements = vec![];
+    while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::Eoi) {
+        statements.push(parse_top_level_statement(tokens, diagnostic_bag));
+    }
+    let eoi = match_token!(tokens, diagnostic_bag, Eoi);
+    SyntaxNode::compilation_unit(statements, eoi)
+}
+
+fn parse_top_level_statement<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    match &peek_token(tokens).kind {
+        SyntaxTokenKind::FuncKeyword => parse_function_statement(tokens, diagnostic_bag),
+        _ => {
+            let token = next_token(tokens);
+            let span = token.span();
+            let actual_token_kind = &token.kind;
+            diagnostic_bag.report_unexpected_token_kind(span, actual_token_kind, &SyntaxTokenKind::FuncKeyword);
+            SyntaxNode::error(span.start())
+        }
+    }
+}
+
+fn parse_function_statement<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let func_keyword = match_token!(tokens, diagnostic_bag, FuncKeyword);
+    let identifier = match_token!(tokens, diagnostic_bag, Identifier);
+    let function_type = parse_function_type(tokens, diagnostic_bag);
+    let body = parse_block_statement(tokens, diagnostic_bag);
+
+    SyntaxNode::function_declaration(func_keyword, identifier, function_type, body)
+}
+
+fn parse_function_type<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> FunctionTypeNode<'a> {
+    let lparen = match_token!(tokens, diagnostic_bag, LParen);
+    let mut parameters = vec![];
+    let mut commas = vec![];
+    while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RParen) {
+        let parameter = parse_parameter(tokens, diagnostic_bag);
+        parameters.push(parameter);
+        if !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RParen) {
+            let comma = match_token!(tokens, diagnostic_bag, Comma);
+            commas.push(comma);
+        }
+    }
+    let rparen = match_token!(tokens, diagnostic_bag, RParen);
+    // TODO: Parse return type.
+
+    FunctionTypeNode::new(lparen, parameters, commas, rparen)
+}
+
+fn parse_parameter<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> ParameterNode<'a> {
+    let identifier = match_token!(tokens, diagnostic_bag, Identifier);
+    let colon_token = next_token(tokens);
+    let type_ = parse_type(tokens, diagnostic_bag);
+    ParameterNode::new(identifier, colon_token, type_)
+}
+
+fn parse_type<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> TypeNode<'a> {
+    let identifier = match_token!(tokens, diagnostic_bag, Identifier);
+    let mut brackets = vec![];
+    while matches!(&peek_token(tokens).kind, SyntaxTokenKind::LBracket) {
+        let lbracket = next_token(tokens);
+        let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
+        brackets.push(SyntaxToken::bracket_pair(lbracket, rbracket));
+    }
+
+    TypeNode::new(identifier, brackets)
 }
 
 fn parse_statement<'a>(

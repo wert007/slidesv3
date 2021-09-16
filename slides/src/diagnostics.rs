@@ -1,4 +1,4 @@
-use crate::{binder::typing::Type, lexer::syntax_token::SyntaxTokenKind, text::{SourceText, TextLocation, TextSpan}};
+use crate::{binder::typing::Type, lexer::syntax_token::SyntaxTokenKind, parser::syntax_nodes::SyntaxNodeKind, text::{SourceText, TextLocation, TextSpan}};
 
 #[derive(Debug)]
 pub struct Diagnostic<'a> {
@@ -171,6 +171,11 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_no_field_named_on_type(&mut self, span: TextSpan, field_name: &str, type_: &Type) {
         let message = format!("There are no fields named '{}' on type {}.", field_name, type_);
+        self.report(message, span);
+    }
+
+    pub fn report_invalid_top_level_statement(&mut self, span: TextSpan, kind: SyntaxNodeKind) {
+        let message = format!("{:?} is no valid top level statement. Use functions instead.", kind);
         self.report(message, span);
     }
 }
