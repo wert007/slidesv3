@@ -35,6 +35,24 @@ impl<'a> SyntaxNode<'a> {
         result
     }
 
+    pub fn function_declaration(
+        func_keyword: SyntaxToken<'a>,
+        identifier: SyntaxToken<'a>,
+        function_type: FunctionTypeNode<'a>,
+        body: SyntaxNode<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(func_keyword.span(), body.span());
+        Self {
+            span,
+            kind: SyntaxNodeKind::FunctionDeclaration(FunctionDeclarationNodeKind {
+                identifier,
+                function_type,
+                body: Box::new(body),
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn literal(token: SyntaxToken<'a>) -> Self {
         let value = match &token.kind {
             SyntaxTokenKind::NumberLiteral(n) => (n.value as i64).into(),
@@ -306,6 +324,18 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn compilation_unit(statements: Vec<SyntaxNode<'a>>, eoi: SyntaxToken<'a>) -> Self {
+        let span = TextSpan::bounds(statements.first().unwrap().span(), statements.last().unwrap().span());
+        Self {
+            kind: SyntaxNodeKind::CompilationUnit(CompilationUnitNodeKind {
+                statements,
+                eoi,
+            }),
+            span,
+            is_inserted: false,
+        }
+    }
+
     pub fn span(&self) -> TextSpan {
         self.span
     }
@@ -313,6 +343,10 @@ impl<'a> SyntaxNode<'a> {
 
 #[derive(Debug, Clone)]
 pub enum SyntaxNodeKind<'a> {
+    // Top Level Statements
+    CompilationUnit(CompilationUnitNodeKind<'a>),
+    FunctionDeclaration(FunctionDeclarationNodeKind<'a>),
+
     //Expressions
     Literal(LiteralNodeKind<'a>),
     ArrayLiteral(ArrayLiteralNodeKind<'a>),
@@ -339,6 +373,72 @@ impl SyntaxNodeKind<'_> {
         matches!(self, Self::Variable(_) | Self::ArrayIndex(_))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct CompilationUnitNodeKind<'a> {
+    pub statements: Vec<SyntaxNode<'a>>,
+    pub eoi: SyntaxToken<'a>,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct FunctionDeclarationNodeKind<'a> {
+    pub identifier: SyntaxToken<'a>,
+    pub function_type: FunctionTypeNode<'a>,
+    pub body: Box<SyntaxNode<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionTypeNode<'a> {
+    pub lparen: SyntaxToken<'a>,
+    pub parameters: Vec<ParameterNode<'a>>,
+    pub comma_tokens: Vec<SyntaxToken<'a>>,
+    pub rparen: SyntaxToken<'a>,
+}
+
+impl<'a> FunctionTypeNode<'a> {
+    pub fn new(lparen: SyntaxToken<'a>, parameters: Vec<ParameterNode<'a>>, comma_tokens: Vec<SyntaxToken<'a>>, rparen: SyntaxToken<'a>) -> Self {
+        Self {
+            lparen,
+            parameters,
+            comma_tokens,
+            rparen,
+        }
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct ParameterNode<'a> {
+    pub identifier: SyntaxToken<'a>,
+    pub colon_token: SyntaxToken<'a>,
+    pub type_: TypeNode<'a>
+}
+
+impl<'a> ParameterNode<'a> {
+    pub fn new(identifier: SyntaxToken<'a>, colon_token: SyntaxToken<'a>, type_: TypeNode<'a>) -> Self {
+        Self {
+            identifier,
+            colon_token,
+            type_,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TypeNode<'a> {
+    pub identifier: SyntaxToken<'a>,
+    pub brackets: Vec<SyntaxToken<'a>>,
+}
+
+impl<'a> TypeNode<'a> {
+    pub fn new(identifier: SyntaxToken<'a>, brackets: Vec<SyntaxToken<'a>>) -> Self {
+        Self {
+            identifier,
+            brackets,
+        }
+    }
+}    
 
 #[derive(Debug, Clone)]
 pub struct LiteralNodeKind<'a> {
