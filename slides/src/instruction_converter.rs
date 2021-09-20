@@ -49,6 +49,7 @@ pub fn convert<'a>(
 fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
     match node.kind {
         BoundNodeKind::ErrorExpression => unreachable!(),
+        BoundNodeKind::FunctionDeclaration(function_declaration) => convert_function_declaration(function_declaration, diagnostic_bag),
         BoundNodeKind::LiteralExpression(literal) => convert_literal(literal, diagnostic_bag),
         BoundNodeKind::ArrayLiteralExpression(array_literal) => {
             convert_array_literal(array_literal, diagnostic_bag)
@@ -78,7 +79,21 @@ fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Inst
         BoundNodeKind::ExpressionStatement(expression_statement) => {
             convert_expression_statement(expression_statement, diagnostic_bag)
         }
+        BoundNodeKind::ReturnStatement(return_statement) => {
+            convert_return_statement(return_statement, diagnostic_bag)
+        }
+        BoundNodeKind::LabelAddress(label_address) => convert_label_address(label_address),
     }
+}
+
+fn convert_function_declaration(function_declaration: BoundFunctionDeclarationNodeKind, diagnostic_bag: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
+    let mut result = vec![];
+    result.push(Instruction::label(function_declaration.index).into());
+    for parameter in function_declaration.parameters {
+        result.push(Instruction::store_in_register(parameter).into());
+    }
+    result.append(&mut convert_node(*function_declaration.body, diagnostic_bag));
+    result
 }
 
 fn convert_node_for_assignment(
@@ -408,11 +423,32 @@ fn convert_block_statement(
 fn convert_expression_statement(
     expression_statement: BoundExpressionStatementNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let pushes_on_stack = !matches!(expression_statement.expression.type_, Type::Void);
     let mut result = convert_node(*expression_statement.expression, diagnostic_bag);
     if pushes_on_stack {
-        result.push(Instruction::pop());
+        result.push(Instruction::pop().into());
     }
     result
+}
+
+fn convert_return_statement(
+    return_statement: BoundReturnStatementNodeKind,
+    diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<InstructionOrLabel> {
+    let mut pushes_on_stack = false;
+    let mut result = if let Some(expression) = return_statement.expression {
+        pushes_on_stack = true;
+        convert_node(*expression, diagnostic_bag)
+    } else {
+        vec![]
+    };
+    result.push(Instruction::return_from_function(pushes_on_stack).into());
+    result
+}
+
+fn convert_label_address(
+    label_address: usize,
+) -> Vec<InstructionOrLabel> {
+    vec![Label(label_address).into()]
 }
