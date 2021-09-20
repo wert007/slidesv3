@@ -140,22 +140,21 @@ impl<'a> BoundNode<'a> {
     }
 
     pub fn function_call(
-        _span: TextSpan,
-        _base: BoundNode<'a>,
-        _arguments: Vec<BoundNode<'a>>,
-        _type_: Type,
+        span: TextSpan,
+        base: BoundNode<'a>,
+        arguments: Vec<BoundNode<'a>>,
+        type_: Type,
     ) -> Self {
-        todo!("Byte Width wrongly set!");
-        // Self {
-        //     span,
-        //     kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
-        //         base: Box::new(base),
-        //         arguments,
-        //     }),
-        //     type_,
-        //     byte_width: 0,
-        //     constant_value: None,
-        // }
+        Self {
+            span,
+            kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
+                base: Box::new(base),
+                arguments,
+            }),
+            type_,
+            byte_width: 4,
+            constant_value: None,
+        }
     }
 
     pub fn array_index(
@@ -298,7 +297,7 @@ pub enum BoundNodeKind<'a> {
     VariableExpression(BoundVariableNodeKind),
     UnaryExpression(BoundUnaryNodeKind<'a>),
     BinaryExpression(BoundBinaryNodeKind<'a>),
-    _FunctionCall(BoundFunctionCallNodeKind<'a>),
+    FunctionCall(BoundFunctionCallNodeKind<'a>),
     SystemCall(BoundSystemCallNodeKind<'a>),
     ArrayIndex(BoundArrayIndexNodeKind<'a>),
     FieldAccess(BoundFieldAccessNodeKind<'a>),

@@ -67,7 +67,7 @@ fn print_bound_node_as_code_with_indent(node: &BoundNode, printer: DebugPrinter)
         BoundNodeKind::VariableExpression(variable_expression) => print_bound_node_variable_expression_as_code(variable_expression, printer),
         BoundNodeKind::UnaryExpression(unary_expression) => print_bound_node_unary_expression_as_code(unary_expression, printer),
         BoundNodeKind::BinaryExpression(binary_expression) => print_bound_node_binary_expression_as_code(binary_expression, printer),
-        BoundNodeKind::_FunctionCall(function_call) => print_bound_node_function_call_as_code(function_call, printer),
+        BoundNodeKind::FunctionCall(function_call) => print_bound_node_function_call_as_code(function_call, printer),
         BoundNodeKind::SystemCall(system_call) => print_bound_node_system_call_as_code(system_call, printer),
         BoundNodeKind::ArrayIndex(array_index) => print_bound_node_array_index_as_code(array_index, printer),
         BoundNodeKind::FieldAccess(field_access) => print_bound_node_field_access_as_code(field_access, printer),
