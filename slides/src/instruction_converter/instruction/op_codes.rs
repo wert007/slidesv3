@@ -1,16 +1,18 @@
 #[repr(u8)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum OpCode {
     NoOp = 0,
     LoadImmediate = 1,
-    Pop = 2,
-    LoadRegister = 3,
-    StoreInRegister = 4,
-    CreateStackPointer = 5,
-    ArrayIndex = 6,
-    StoreInMemory = 7,
-    TypeIdentifier = 8,
+    LoadPointer = 2,
+    Pop = 3,
+    LoadRegister = 4,
+    StoreInRegister = 5,
+    CreateStackPointer = 6,
+    ArrayIndex = 7,
+    StoreInMemory = 8,
+    TypeIdentifier = 9,
+    Label = 10,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,
@@ -32,4 +34,6 @@ pub enum OpCode {
     JmpRelative = 58,
     JmpIfFalse = 59,
     SysCall = 60,
+    FunctionCall = 61,
+    Return = 62,
 }

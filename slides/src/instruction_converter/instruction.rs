@@ -21,6 +21,13 @@ impl Instruction {
         }
     }
 
+    pub const fn load_pointer(pointer: u64) -> Self {
+        Self {
+            op_code: OpCode::LoadPointer,
+            arg: pointer,
+        }
+    }
+
     pub const fn pop() -> Self {
         Self {
             op_code: OpCode::Pop,
@@ -202,6 +209,27 @@ impl Instruction {
         Self {
             op_code: OpCode::SysCall,
             arg,
+        }
+    }
+
+    pub const fn function_call(argument_count: usize) -> Self {
+        Self {
+            op_code: OpCode::FunctionCall,
+            arg: argument_count as _,
+        }
+    }
+
+    pub const fn label(index: usize) -> Self {
+        Self {
+            op_code: OpCode::Label,
+            arg: index as _,
+        }
+    }
+
+    pub const fn return_from_function(returns_value: bool) -> Self {
+        Self {
+            op_code: OpCode::Return,
+            arg: returns_value as _,
         }
     }
 }
