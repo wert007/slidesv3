@@ -2,9 +2,30 @@ pub mod instruction;
 #[cfg(test)]
 mod tests;
 
-use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
+use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
 
 use self::instruction::Instruction;
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Label(usize);
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum InstructionOrLabel {
+    Instruction(Instruction),
+    Label(Label),
+}
+
+impl From<Instruction> for InstructionOrLabel {
+    fn from(it: Instruction) -> Self {
+        Self::Instruction(it)
+    }
+}
+
+impl From<Label> for InstructionOrLabel {
+    fn from(it: Label) -> Self {
+        Self::Label(it)
+    }
+}
 
 pub fn convert<'a>(
     source_text: &'a SourceText<'a>,
@@ -25,7 +46,7 @@ pub fn convert<'a>(
     result
 }
 
-fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Instruction> {
+fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
     match node.kind {
         BoundNodeKind::ErrorExpression => unreachable!(),
         BoundNodeKind::LiteralExpression(literal) => convert_literal(literal, diagnostic_bag),
@@ -63,7 +84,7 @@ fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Inst
 fn convert_node_for_assignment(
     node: BoundNode,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     match node.kind {
         BoundNodeKind::VariableExpression(variable) => {
             convert_variable_for_assignment(variable, diagnostic_bag)
@@ -78,7 +99,7 @@ fn convert_node_for_assignment(
 fn convert_literal(
     literal: LiteralNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let value = match literal.value {
         Value::Integer(value) => value as u64,
         Value::Boolean(value) => {
@@ -91,10 +112,10 @@ fn convert_literal(
         Value::SystemCall(kind) => kind as u64,
         Value::String(value) => return convert_string_literal(value, diagnostic_bag),
     };
-    vec![Instruction::load_immediate(value)]
+    vec![Instruction::load_immediate(value).into()]
 }
 
-fn convert_string_literal(value: String, _: &mut DiagnosticBag) -> Vec<Instruction> {
+fn convert_string_literal(value: String, _: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     let count_in_bytes = value.len() as u64;
     let byte_groups = value.as_bytes().chunks_exact(4);
@@ -121,13 +142,13 @@ fn convert_string_literal(value: String, _: &mut DiagnosticBag) -> Vec<Instructi
     }
     result.push(Instruction::load_immediate(count_in_bytes as u64));
     result.push(Instruction::create_stack_pointer(1));
-    result
+    result.into_iter().map(|i|i.into()).collect()
 }
 
 fn convert_array_literal(
     array_literal: BoundArrayLiteralNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     let element_count = array_literal.children.len();
     let count_in_bytes = element_count * 4;
@@ -186,45 +207,45 @@ fn convert_array_literal(
                         // Create a stack pointer to the literal on the stack
                         offset -= word_widths[element_count - i - 1]; // Reverse i
                         let stack_pointer_offset = offset + i as u64 + 1;
-                        result.push(Instruction::create_stack_pointer(stack_pointer_offset));
+                        result.push(Instruction::create_stack_pointer(stack_pointer_offset).into());
                     }
                 }
             }
         }
     }
-    result.push(Instruction::load_immediate(count_in_bytes as u64));
-    result.push(Instruction::create_stack_pointer(1));
+    result.push(Instruction::load_immediate(count_in_bytes as u64).into());
+    result.push(Instruction::create_stack_pointer(1).into());
     result
 }
 
-fn convert_variable(variable: BoundVariableNodeKind, _: &mut DiagnosticBag) -> Vec<Instruction> {
-    vec![Instruction::load_register(variable.variable_index)]
+fn convert_variable(variable: BoundVariableNodeKind, _: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
+    vec![Instruction::load_register(variable.variable_index).into()]
 }
 
 fn convert_variable_for_assignment(
     variable: BoundVariableNodeKind,
     _: &mut DiagnosticBag,
-) -> Vec<Instruction> {
-    vec![Instruction::store_in_register(variable.variable_index)]
+) -> Vec<InstructionOrLabel> {
+    vec![Instruction::store_in_register(variable.variable_index).into()]
 }
 
 fn convert_array_index_for_assignment(
     array_index: BoundArrayIndexNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*array_index.base, diagnostic_bag);
     result.append(&mut convert_node(*array_index.index, diagnostic_bag));
-    result.push(Instruction::store_in_memory());
+    result.push(Instruction::store_in_memory().into());
     result
 }
 
 fn convert_unary(
     unary: BoundUnaryNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*unary.operand, diagnostic_bag);
     match unary.operator_token {
-        BoundUnaryOperator::ArithmeticNegate => result.push(Instruction::twos_complement()),
+        BoundUnaryOperator::ArithmeticNegate => result.push(Instruction::twos_complement().into()),
         BoundUnaryOperator::ArithmeticIdentity => {}
     }
     result
@@ -233,7 +254,7 @@ fn convert_unary(
 fn convert_binary(
     binary: BoundBinaryNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let operator_instruction = match binary.operator_token {
         BoundBinaryOperator::ArithmeticAddition => Instruction::addition(),
         BoundBinaryOperator::ArithmeticSubtraction => Instruction::subtraction(),
@@ -264,67 +285,74 @@ fn convert_binary(
     let lhs_type_identifier = binary.lhs.type_.type_identifier();
     result.append(&mut convert_node(*binary.lhs, diagnostic_bag));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !lhs_is_string {
-        result.push(Instruction::type_identifier(lhs_type_identifier));
-        result.push(Instruction::system_call(SystemCallKind::ToString, 1));
+        result.push(Instruction::type_identifier(lhs_type_identifier).into());
+        result.push(Instruction::system_call(SystemCallKind::ToString, 1).into());
     }
     let rhs_is_string = matches!(binary.rhs.type_, Type::String);
     let rhs_type_identifier = binary.rhs.type_.type_identifier();
     result.append(&mut convert_node(*binary.rhs, diagnostic_bag));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !rhs_is_string {
-        result.push(Instruction::type_identifier(rhs_type_identifier));
-        result.push(Instruction::system_call(SystemCallKind::ToString, 1));
+        result.push(Instruction::type_identifier(rhs_type_identifier).into());
+        result.push(Instruction::system_call(SystemCallKind::ToString, 1).into());
     }
-    result.push(operator_instruction);
+    result.push(operator_instruction.into());
     result
 }
 
 fn convert_function_call(
-    _function_call: BoundFunctionCallNodeKind,
-    _diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
-    todo!()
+    function_call: BoundFunctionCallNodeKind,
+    diagnostic_bag: &mut DiagnosticBag,
+) -> Vec<InstructionOrLabel> {
+    let mut result = vec![];
+    let argument_count = function_call.arguments.len();
+    for argument in function_call.arguments {
+        result.append(&mut convert_node(argument, diagnostic_bag));
+    }
+    result.append(&mut convert_node(*function_call.base, diagnostic_bag));
+    result.push(Instruction::function_call(argument_count).into());
+    result
 }
 
 fn convert_system_call(
     system_call: BoundSystemCallNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     let argument_count = system_call.arguments.len();
     for argument in system_call.arguments {
         let type_identifier = argument.type_.type_identifier();
         result.append(&mut convert_node(argument, diagnostic_bag));
-        result.push(Instruction::type_identifier(type_identifier));
+        result.push(Instruction::type_identifier(type_identifier).into());
     }
-    result.push(Instruction::system_call(system_call.base, argument_count));
+    result.push(Instruction::system_call(system_call.base, argument_count).into());
     result
 }
 
 fn convert_array_index(
     array_index: BoundArrayIndexNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*array_index.base, diagnostic_bag);
     result.append(&mut convert_node(*array_index.index, diagnostic_bag));
-    result.push(Instruction::array_index());
+    result.push(Instruction::array_index().into());
     result
 }
 
 fn convert_field_access(
     field_access: BoundFieldAccessNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     convert_node(*field_access.base, diagnostic_bag)
 }
 
 fn convert_if_statement(
     if_statement: BoundIfStatementNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*if_statement.condition, diagnostic_bag);
     let mut body = convert_node(*if_statement.body, diagnostic_bag);
     let jmp = Instruction::jump_if_false(body.len() as i64);
-    result.push(jmp);
+    result.push(jmp.into());
     result.append(&mut body);
     result
 }
@@ -332,32 +360,32 @@ fn convert_if_statement(
 fn convert_variable_declaration(
     variable_declaration: BoundVariableDeclarationNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*variable_declaration.initializer, diagnostic_bag);
     result.push(Instruction::store_in_register(
         variable_declaration.variable_index,
-    ));
+    ).into());
     result
 }
 
 fn convert_while_statement(
     while_statement: BoundWhileStatementNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*while_statement.condition, diagnostic_bag);
     let mut body = convert_node(*while_statement.body, diagnostic_bag);
     let jmp = Instruction::jump_if_false(body.len() as i64 + 1);
-    result.push(jmp);
+    result.push(jmp.into());
     result.append(&mut body);
     let jmp = Instruction::jump_relative(-(result.len() as i64 + 1));
-    result.push(jmp);
+    result.push(jmp.into());
     result
 }
 
 fn convert_assignment(
     assignment: BoundAssignmentNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*assignment.expression, diagnostic_bag);
     result.append(&mut convert_node_for_assignment(
         *assignment.variable,
@@ -369,7 +397,7 @@ fn convert_assignment(
 fn convert_block_statement(
     block_statement: BoundBlockStatementNodeKind,
     diagnostic_bag: &mut DiagnosticBag,
-) -> Vec<Instruction> {
+) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     for node in block_statement.statements {
         result.append(&mut convert_node(node, diagnostic_bag));
