@@ -92,8 +92,10 @@ pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> Resu
 
 fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
     match instruction.op_code {
+        OpCode::Label => unreachable!(),
         OpCode::NoOp => {}
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),
+        OpCode::LoadPointer => evaluate_load_pointer(state, instruction),
         OpCode::Pop => evaluate_pop(state, instruction),
         OpCode::LoadRegister => evaluate_load_register(state, instruction),
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
@@ -120,10 +122,17 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::JmpRelative => evaluate_jmp_relative(state, instruction),
         OpCode::JmpIfFalse => evaluate_jmp_if_false(state, instruction),
         OpCode::SysCall => evaluate_sys_call(state, instruction),
+        OpCode::FunctionCall => evaluate_function_call(state, instruction),
+        OpCode::Return => evaluate_return(state, instruction),
     }
 }
 
 fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction) {
+    state.stack.push(instruction.arg);
+}
+
+fn evaluate_load_pointer(state: &mut EvaluatorState, instruction: Instruction) {
+    state.set_pointer(state.stack.len());
     state.stack.push(instruction.arg);
 }
 
@@ -521,5 +530,48 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::Print => sys_calls::print(types.remove(0), arguments[0], state),
         SystemCallKind::ArrayLength => sys_calls::array_length(types.remove(0), arguments[0], state),
         SystemCallKind::ToString => sys_calls::to_string(types.remove(0), arguments[0], state),
+    }
+}
+
+fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) {
+    let base = state.pop_stack().unwrap();
+    assert!(base.is_pointer);
+    let return_address = state.pc + 1;
+    let mut argument_values = vec![];
+    for _ in 0..instruction.arg {
+        let mut argument = pop_array(state);
+        argument_values.push(argument.0);
+        argument_values.append(&mut argument.1);
+    }
+    state.stack.push(return_address as _);
+    for v in argument_values.into_iter().rev() {
+        if v.is_pointer {
+            state.set_pointer(state.stack.len());
+        }
+        state.stack.push(v.value);
+    }
+    state.pc = base.value as _;
+}
+
+fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
+    let has_return_value = instruction.arg != 0;
+    if has_return_value {
+        todo!()
+        // let result = pop_array(state);
+        // let return_address = state.stack.pop().unwrap();
+        // state.pc = return_address as _;
+        // for v in result.1 {
+        //     if v.is_pointer {
+        //         state.set_pointer(state.stack.len());
+        //     }
+        //     state.stack.push(v.value);
+        // }
+        // if result.0.is_pointer {
+        //     state.set_pointer(state.stack.len());
+        // }
+        // state.stack.push(result.0.value);
+    } else {
+        let return_address = state.stack.pop().unwrap();
+        state.pc = return_address as _;
     }
 }
