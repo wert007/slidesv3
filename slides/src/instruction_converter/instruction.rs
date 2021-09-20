@@ -14,6 +14,13 @@ pub struct Instruction {
 
 #[allow(dead_code)]
 impl Instruction {
+    pub const fn noop() -> Instruction {
+        Self {
+            op_code: OpCode::NoOp,
+            arg: 0,
+        }
+    }
+
     pub const fn load_immediate(immediate: u64) -> Self {
         Self {
             op_code: OpCode::LoadImmediate,
