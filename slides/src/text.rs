@@ -140,6 +140,13 @@ pub struct TextSpan {
 
 #[allow(dead_code)]
 impl TextSpan {
+    pub fn zero() -> Self {
+        Self {
+            start: 0,
+            length: 0,
+        }
+    }
+
     pub fn bounds(start: Self, end: Self) -> Self {
         Self {
             start: start.start,

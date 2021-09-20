@@ -438,6 +438,10 @@ impl<'a> TypeNode<'a> {
             brackets,
         }
     }
+
+    pub fn span(&self) -> TextSpan {
+        TextSpan::bounds(self.identifier.span(), self.brackets.last().unwrap_or(&self.identifier).span())
+    }
 }    
 
 #[derive(Debug, Clone)]
