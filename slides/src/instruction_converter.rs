@@ -2,6 +2,8 @@ pub mod instruction;
 #[cfg(test)]
 mod tests;
 
+mod label_replacer;
+
 use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
 
 use self::instruction::Instruction;
@@ -37,7 +39,7 @@ pub fn convert<'a>(
         return vec![];
     }
 
-    let result = convert_node(bound_node, diagnostic_bag);
+    let result = label_replacer::replace_labels(convert_node(bound_node, diagnostic_bag));
     if debug_flags.print_instructions() {
         for (i, instruction) in result.iter().enumerate() {
             println!("  {:000}: {:?}", i, instruction);
