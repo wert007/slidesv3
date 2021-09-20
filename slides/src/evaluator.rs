@@ -1,4 +1,5 @@
 mod allocator;
+mod stack;
 mod sys_calls;
 
 use crate::{
