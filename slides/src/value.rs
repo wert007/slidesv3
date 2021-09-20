@@ -60,7 +60,7 @@ impl std::fmt::Display for Value {
             Value::Integer(value) => write!(f, "{}", value),
             Value::Boolean(value) => write!(f, "{}", value),
             Value::SystemCall(value) => write!(f, "system call {}", value),
-            Value::String(value) => write!(f, "'{:?}'", value),
+            Value::String(value) => write!(f, "'{}'", value),
         }
     }
 }

@@ -91,7 +91,7 @@ impl<'a> SyntaxToken<'a> {
         }
     }
 
-    pub fn bracket_pair(lbracket: SyntaxToken, rbracket: SyntaxToken) -> Self {
+    pub fn bracket_pair(lbracket: SyntaxToken, _rbracket: SyntaxToken) -> Self {
         Self {
             kind: SyntaxTokenKind::BracketPair,
             lexeme: "[]", // TODO: use actual lexeme
