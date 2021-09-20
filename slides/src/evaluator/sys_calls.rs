@@ -38,6 +38,7 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
             }
         }
         Type::SystemCall(kind) => format!("system call {}", kind),
+        Type::Function(kind) => format!("fn {}", kind),
         Type::Array(base_type) => {
             array_to_string_native(*base_type, argument, state)
         }
@@ -89,6 +90,11 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
         Type::SystemCall(kind) => {
             for _ in (array_end..array_start).rev() {
                 result.push_str(&format!("system call {}, ", kind));
+            }
+        }
+        Type::Function(kind) => {
+            for _ in (array_end..array_start).rev() {
+                result.push_str(&format!("fn {}, ", kind));
             }
         }
         Type::Array(base_type) => {
@@ -199,6 +205,7 @@ pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
+        Type::Function(_) => todo!(),
         Type::Integer |
         Type::Boolean |
         Type::SystemCall(_) |
