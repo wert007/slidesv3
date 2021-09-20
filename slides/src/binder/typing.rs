@@ -15,11 +15,22 @@ pub enum Type {
     SystemCall(SystemCallKind),
     Array(Box<Type>),
     String,
+    Function(Box<FunctionType>),
 }
 
 impl Type {
     pub fn array(base_type: Type) -> Self {
         Self::Array(Box::new(base_type))
+    }
+
+    pub fn function(parameter_types: Vec<Type>) -> Type {
+        let function_type = FunctionType {
+            parameter_types,
+            this_type: None,
+            return_type: Self::Void,
+            system_call_kind: None,
+        };
+        Self::Function(Box::new(function_type))
     }
 
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
@@ -61,6 +72,7 @@ impl Type {
             Type::Boolean => 8,
             Type::String => 10,
             Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 16,
+            Type::Function(_) => unimplemented!(),
         }
     }
 
@@ -103,6 +115,9 @@ impl std::fmt::Display for Type {
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
             Type::Array(base) => write!(f, "{}[]", base),
             Type::String => write!(f, "string"),
+            Type::Function(function_type) => {
+                write!(f, "fn {}", function_type)
+            }
         }
     }
 }
@@ -129,9 +144,39 @@ impl std::fmt::Display for SystemCallKind {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct FunctionType {
     pub parameter_types: Vec<Type>,
     pub this_type: Option<Type>,
     pub return_type: Type,
     pub system_call_kind: Option<SystemCallKind>,
+}
+
+impl std::fmt::Display for FunctionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+        let mut is_first = true;
+        for parameter in &self.parameter_types {
+            if !is_first {
+                write!(f, ", ")?;
+            }
+            is_first = false;
+            write!(f, "{}", parameter)?;
+        }
+        write!(f, ")")?;
+        if self.return_type != Type::Void {
+            write!(f, " -> {}", self.return_type)?;
+        }
+        Ok(())
+    }
+}
+impl FunctionType {
+    pub fn error() -> Self {
+        Self {
+            parameter_types: vec![],
+            this_type: None,
+            return_type: Type::Void,
+            system_call_kind: None,
+        }
+    }
 }
