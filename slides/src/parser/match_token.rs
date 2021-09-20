@@ -143,6 +143,19 @@ macro_rules! match_token {
             SyntaxToken::operator(current.span().start(), ";")
         }
     };
+    ($tokens:expr, $diagnostic_bag:expr, Colon) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::Colon) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::Colon,
+            );
+            SyntaxToken::operator(current.span().start(), ":")
+        }
+    };
     ($tokens:expr, $diagnostic_bag:expr, Comma) => {
         if matches!(peek_token($tokens).kind, SyntaxTokenKind::Comma) {
             next_token($tokens)

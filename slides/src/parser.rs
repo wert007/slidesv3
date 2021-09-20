@@ -92,7 +92,7 @@ fn parse_parameter<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> ParameterNode<'a> {
     let identifier = match_token!(tokens, diagnostic_bag, Identifier);
-    let colon_token = next_token(tokens);
+    let colon_token = match_token!(tokens, diagnostic_bag, Colon);
     let type_ = parse_type(tokens, diagnostic_bag);
     ParameterNode::new(identifier, colon_token, type_)
 }
@@ -104,7 +104,7 @@ fn parse_type<'a>(
     let identifier = match_token!(tokens, diagnostic_bag, Identifier);
     let mut brackets = vec![];
     while matches!(&peek_token(tokens).kind, SyntaxTokenKind::LBracket) {
-        let lbracket = next_token(tokens);
+        let lbracket = match_token!(tokens, diagnostic_bag, LBracket);
         let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
         brackets.push(SyntaxToken::bracket_pair(lbracket, rbracket));
     }
