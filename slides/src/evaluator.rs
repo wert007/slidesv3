@@ -415,7 +415,11 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
     let (rhs, rhs_values) = pop_array(state);
     assert!(rhs.is_pointer, "{:#?}", rhs);
     let (lhs, lhs_values) = pop_array(state);
-    assert!(lhs.is_pointer, "lhs = {:#?}, rhs = {:#?}, rhs_values = {:x?}, stack = {:x?}", lhs, rhs, rhs_values, state.stack);
+    assert!(
+        lhs.is_pointer,
+        "lhs = {:#?}, rhs = {:#?}, rhs_values = {:x?}, stack = {:x?}",
+        lhs, rhs, rhs_values, state.stack
+    );
 
     // Remember how long the stack is supposed to be after comparison
     let expected_stack_length = state.stack.len();
@@ -445,10 +449,12 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
     let result_length = lhs_length + rhs_length;
     let mut pointer = state.heap.allocate(result_length + 4);
     if pointer == 0 {
-        println!("RuntimeError: No memory left for string with length {} + 4.", result_length);
+        println!(
+            "RuntimeError: No memory left for string with length {} + 4.",
+            result_length
+        );
         pointer = HEAP_POINTER;
-    }
-    else {   
+    } else {
         let mut writing_pointer = pointer;
         state.heap.write_word(writing_pointer as _, result_length);
         writing_pointer += 4;
@@ -522,13 +528,16 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
 
     for _ in 0..argument_count {
         let type_ = state.pop_stack().unwrap().value;
-        let type_ = Type::from_type_identifier(type_).unwrap_or_else(|| panic!("Invalid type identifier = {} | 0x{:x}", type_, type_));
+        let type_ = Type::from_type_identifier(type_)
+            .unwrap_or_else(|| panic!("Invalid type identifier = {} | 0x{:x}", type_, type_));
         types.push(type_);
         arguments.push(state.pop_stack().unwrap());
     }
     match sys_call_kind {
         SystemCallKind::Print => sys_calls::print(types.remove(0), arguments[0], state),
-        SystemCallKind::ArrayLength => sys_calls::array_length(types.remove(0), arguments[0], state),
+        SystemCallKind::ArrayLength => {
+            sys_calls::array_length(types.remove(0), arguments[0], state)
+        }
         SystemCallKind::ToString => sys_calls::to_string(types.remove(0), arguments[0], state),
     }
 }
