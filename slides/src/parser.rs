@@ -32,7 +32,11 @@ fn parse_compilation_unit<'a>(
 ) -> SyntaxNode<'a> {
     let mut statements = vec![];
     while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::Eoi) {
+        let token_count = tokens.len();
         statements.push(parse_top_level_statement(tokens, diagnostic_bag));
+        if token_count == tokens.len() {
+            next_token(tokens);
+        }
     }
     let eoi = match_token!(tokens, diagnostic_bag, Eoi);
     SyntaxNode::compilation_unit(statements, eoi)
@@ -74,11 +78,15 @@ fn parse_function_type<'a>(
     let mut parameters = vec![];
     let mut commas = vec![];
     while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RParen) {
+        let token_count = tokens.len();
         let parameter = parse_parameter(tokens, diagnostic_bag);
         parameters.push(parameter);
         if !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RParen) {
             let comma = match_token!(tokens, diagnostic_bag, Comma);
             commas.push(comma);
+        }
+        if token_count == tokens.len() {
+            next_token(tokens);
         }
     }
     let rparen = match_token!(tokens, diagnostic_bag, RParen);
@@ -104,8 +112,12 @@ fn parse_type<'a>(
     let identifier = match_token!(tokens, diagnostic_bag, Identifier);
     let mut brackets = vec![];
     while matches!(&peek_token(tokens).kind, SyntaxTokenKind::LBracket) {
+        let token_count = tokens.len();
         let lbracket = match_token!(tokens, diagnostic_bag, LBracket);
         let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
+        if token_count == tokens.len() {
+            next_token(tokens);
+        }
         brackets.push(SyntaxToken::bracket_pair(lbracket, rbracket));
     }
 
@@ -154,9 +166,9 @@ fn parse_block_statement<'a>(
         peek_token(tokens).kind,
         SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi
     ) {
-        let old_tokens_len = tokens.len();
+        let token_count = tokens.len();
         statements.push(parse_statement(tokens, diagnostic_bag));
-        if tokens.len() == old_tokens_len {
+        if token_count == tokens.len() {
             next_token(tokens);
         }
     }
@@ -311,9 +323,13 @@ fn parse_function_call<'a>(
                     // function. This may change..
                     SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi | SyntaxTokenKind::Semicolon
                 ) {
+                    let token_count = tokens.len();
                     arguments.push(parse_expression(tokens, diagnostic_bag));
                     if !matches!(peek_token(tokens).kind, SyntaxTokenKind::RParen) {
                         comma_tokens.push(match_token!(tokens, diagnostic_bag, Comma));
+                    }
+                    if token_count == tokens.len() {
+                        next_token(tokens);
                     }
                 }
                 let close_parenthesis_token = match_token!(tokens, diagnostic_bag, RParen);
@@ -384,11 +400,15 @@ fn parse_array_literal<'a>(
         peek_token(tokens).kind,
         SyntaxTokenKind::RBracket | SyntaxTokenKind::Eoi
     ) {
+        let token_count = tokens.len();
         let expression = parse_expression(tokens, diagnostic_bag);
         children.push(expression);
         if !matches!(peek_token(tokens).kind, SyntaxTokenKind::RBracket) {
             let comma_token = match_token!(tokens, diagnostic_bag, Comma);
             comma_tokens.push(comma_token);
+        }
+        if token_count == tokens.len() {
+            next_token(tokens);
         }
     }
     let rbracket = match_token!(tokens, diagnostic_bag, RBracket);
