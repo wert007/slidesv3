@@ -140,7 +140,7 @@ pub fn bind<'a>(
 ) -> BoundNode<'a> {
     let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
-        return BoundNode::error(TextSpan::new(0, 0));
+        return BoundNode::error(TextSpan::zero());
     }
     let mut binder = BindingState {
         diagnostic_bag,
@@ -155,25 +155,14 @@ pub fn bind<'a>(
 }
 
 fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {
-    let span = TextSpan::new(0, 0);
+    let span = TextSpan::zero();
     let variable_index = binder
         .register_variable("print", Type::SystemCall(SystemCallKind::Print), true)
         .unwrap();
-    let token = SyntaxToken {
-        kind: SyntaxTokenKind::Eoi,
-        lexeme: "",
-        start: 0,
-    };
     let print_statement = BoundNode::variable_declaration(
         span,
         variable_index,
-        BoundNode::literal(
-            span,
-            LiteralNodeKind {
-                token,
-                value: Value::SystemCall(SystemCallKind::Print),
-            },
-        ),
+        BoundNode::literal_from_value(Value::SystemCall(SystemCallKind::Print)),
     );
     vec![print_statement]
 }
@@ -462,7 +451,7 @@ fn function_type(type_: &Type) -> FunctionType {
         Type::SystemCall(SystemCallKind::ArrayLength) => FunctionType {
             parameter_types: vec![],
             // Actually Array or String, but there is no way to call this system
-            // call directly, so that this is already checked somewhere.
+            // call directly, so that it is already checked somewhere else.
             this_type: Some(Type::Any),
             return_type: Type::Integer,
             system_call_kind: type_.as_system_call(),

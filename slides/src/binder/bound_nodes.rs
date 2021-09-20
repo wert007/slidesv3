@@ -38,6 +38,26 @@ impl<'a> BoundNode<'a> {
         }
     }
 
+    pub fn literal_from_value(value: Value) -> Self {
+        let type_ = value.infer_type();
+        let byte_width = match &value {
+            Value::Integer(_) |
+            Value::Boolean(_) |
+            Value::SystemCall(_) => 4,
+            Value::String(value) => 8 + value.len(),
+        } as _;
+        Self {
+            span: TextSpan::zero(),
+            kind: BoundNodeKind::LiteralExpression(LiteralNodeKind {
+                token: crate::lexer::syntax_token::SyntaxToken { kind: crate::lexer::syntax_token::SyntaxTokenKind::Eoi, lexeme: "", start: 0 },
+                value: value.clone(),
+            }),
+            type_,
+            byte_width,
+            constant_value: Some(value.into()),
+        }
+    }
+
     pub fn literal(span: TextSpan, literal: LiteralNodeKind<'a>) -> Self {
         let value = literal.value.clone();
         let type_ = value.infer_type();
