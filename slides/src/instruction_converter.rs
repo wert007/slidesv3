@@ -35,7 +35,7 @@ fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<Inst
         BoundNodeKind::VariableExpression(variable) => convert_variable(variable, diagnostic_bag),
         BoundNodeKind::UnaryExpression(unary) => convert_unary(unary, diagnostic_bag),
         BoundNodeKind::BinaryExpression(binary) => convert_binary(binary, diagnostic_bag),
-        BoundNodeKind::_FunctionCall(function_call) => {
+        BoundNodeKind::FunctionCall(function_call) => {
             convert_function_call(function_call, diagnostic_bag)
         }
         BoundNodeKind::SystemCall(system_call) => convert_system_call(system_call, diagnostic_bag),
@@ -134,6 +134,7 @@ fn convert_array_literal(
     match &array_literal.children[0].type_ {
         Type::Error | Type::Void => unreachable!(),
         Type::Any => todo!(),
+        Type::Function(_) => todo!(),
         Type::Integer | Type::Boolean | Type::SystemCall(_) => {
             for child in array_literal.children.into_iter().rev() {
                 result.append(&mut convert_node(child, diagnostic_bag));
