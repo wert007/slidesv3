@@ -51,6 +51,7 @@ struct BoundVariableName<'a> {
 struct BindingState<'a, 'b> {
     diagnostic_bag: &'b mut DiagnosticBag<'a>,
     variable_table: HashMap<u64, BoundVariableName<'a>>,
+    functions: Vec<FunctionDeclarationBody<'a>>,
     print_variable_table: bool,
 }
 
@@ -145,6 +146,7 @@ pub fn bind<'a>(
     let mut binder = BindingState {
         diagnostic_bag,
         variable_table: HashMap::new(),
+        functions: vec![],
         print_variable_table: debug_flags.print_variable_table(),
     };
     let mut statements = default_statements(&mut binder);
@@ -202,6 +204,16 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
 fn bind_function_declaration<'a, 'b>(function_declaration: FunctionDeclarationNodeKind<'a>, binder: &mut BindingState<'a, 'b>) -> SyntaxNode<'a> {
     *function_declaration.body
 }
+
+#[derive(Clone, Debug)]
+struct FunctionDeclarationBody<'a> {
+    body: SyntaxNode<'a>,
+    parameters: Vec<(&'a str, Type)>,
+    is_main: bool,
+    function_id: u64,
+    function_type: Type,
+}
+
 
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
     match node.kind {
