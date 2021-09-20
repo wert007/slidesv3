@@ -178,4 +178,9 @@ impl<'a> DiagnosticBag<'a> {
         let message = format!("{:?} is no valid top level statement. Use functions instead.", kind);
         self.report(message, span);
     }
+
+    pub fn report_unknown_type(&mut self, span: TextSpan, type_name: &str) {
+        let message = format!("Unknown type {} found.", type_name);
+        self.report(message, span);
+    }
 }

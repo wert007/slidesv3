@@ -6,9 +6,31 @@ pub mod typing;
 
 use std::collections::HashMap;
 
-use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, SyntaxNode, SyntaxNodeKind, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+use crate::{
+    binder::{operators::BoundUnaryOperator, typing::Type},
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind},
+    parser::{
+        self,
+        syntax_nodes::{
+            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
+            BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
+            ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
+            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind,
+            SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind,
+            VariableNodeKind, WhileStatementNodeKind,
+        },
+    },
+    text::{SourceText, TextSpan},
+    value::Value,
+    DebugFlags,
+};
 
-use self::{bound_nodes::{BoundNode, BoundNodeKind}, operators::BoundBinaryOperator, typing::{FunctionType, SystemCallKind}};
+use self::{
+    bound_nodes::{BoundNode, BoundNodeKind},
+    operators::BoundBinaryOperator,
+    typing::{FunctionType, SystemCallKind},
+};
 
 enum SmartString<'a> {
     Heap(String),
@@ -149,11 +171,38 @@ pub fn bind<'a>(
         functions: vec![],
         print_variable_table: debug_flags.print_variable_table(),
     };
-    let mut statements = default_statements(&mut binder);
     let span = node.span();
+    let mut statements = default_statements(&mut binder);
+    bind_top_level_statements(node, &mut binder);
+    statements.push(call_main(&mut binder));
 
-    statements.push(bind_top_level_statements(node, &mut binder));
-    BoundNode::block_statement(span, statements)
+    let variable_count = binder.variable_table.len();
+    for (index, node) in binder.functions.clone().into_iter().enumerate() {
+        let mut parameters = Vec::with_capacity(node.parameters.len());
+        for (variable_name, variable_type) in node.parameters {
+            if let Some(it) = binder.register_variable(variable_name, variable_type, false) {
+                parameters.push(it);
+            } else {
+                // binder.diagnostic_bag.report_cannot_declare_variable(span, variable_name)
+                panic!("Could not declare a parameter! This sounds like an error in the binder!");
+            }
+        }
+
+        let body = bind_node(node.body, &mut binder);
+        let body = BoundNode::block_statement(body.span, vec![body, BoundNode::return_statement(TextSpan::zero(), None)]);
+
+        statements.insert(0, BoundNode::assignment(
+            TextSpan::zero(),
+            BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
+            BoundNode::label_address(index),
+        ));
+        statements.push(BoundNode::function_declaration(index, node.is_main, body, parameters));
+        binder.delete_variables_until(variable_count);
+    }
+
+    let result = BoundNode::block_statement(span, statements);
+    crate::debug::print_bound_node_as_code(&result);
+    result
 }
 
 fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {
@@ -169,24 +218,34 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
     vec![print_statement]
 }
 
-fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a>{
-    let mut syntax_nodes = vec![];
+fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
+    let span = TextSpan::zero();
+    let base = binder
+        .look_up_variable_by_name("main")
+        .expect("No main function found..");
+    let base = BoundNode::variable(span, base.id, base.type_);
+    let call_main = BoundNode::function_call(span, base, vec![], Type::Void);
+    let call_main = BoundNode::expression_statement(span, call_main);
+    call_main
+}
+
+fn bind_top_level_statements<'a, 'b>(
+    node: SyntaxNode<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) {
     match node.kind {
         SyntaxNodeKind::CompilationUnit(compilation_unit) => {
             for statement in compilation_unit.statements {
-                syntax_nodes.push(bind_top_level_statement(statement, binder));
+                bind_top_level_statement(statement, binder);
             }
         },
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
-            syntax_nodes.push(bind_function_declaration(function_declaration, binder));
+            bind_function_declaration(function_declaration, binder)
         }
-        _ => binder.diagnostic_bag.report_invalid_top_level_statement(node.span(), node.kind),
+        _ => binder
+            .diagnostic_bag
+            .report_invalid_top_level_statement(node.span(), node.kind),
     }
-    let mut statements = vec![];
-    for node in syntax_nodes {
-        statements.push(bind_node(node, binder));
-    }
-    BoundNode::block_statement(node.span, statements)
 }
 
 fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> SyntaxNode<'a> {
@@ -195,14 +254,11 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
             bind_function_declaration(function_declaration, binder)
         }
         _ => {
-            binder.diagnostic_bag.report_invalid_top_level_statement(node.span(), node.kind);
-            SyntaxNode::error(node.span.start())
+            binder
+                .diagnostic_bag
+                .report_invalid_top_level_statement(node.span(), node.kind);
         }
     }
-}
-
-fn bind_function_declaration<'a, 'b>(function_declaration: FunctionDeclarationNodeKind<'a>, binder: &mut BindingState<'a, 'b>) -> SyntaxNode<'a> {
-    *function_declaration.body
 }
 
 #[derive(Clone, Debug)]
@@ -214,6 +270,71 @@ struct FunctionDeclarationBody<'a> {
     function_type: Type,
 }
 
+fn bind_function_declaration<'a, 'b>(
+    function_declaration: FunctionDeclarationNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) {
+    let (function_type, variables) = bind_function_type(function_declaration.function_type, binder);
+    let is_main = function_declaration.identifier.lexeme == "main";
+    let function_id = if let Some(it) =
+        binder.register_variable(function_declaration.identifier.lexeme, function_type.clone(), false)
+    {
+        it
+    } else {
+        binder.diagnostic_bag.report_cannot_declare_variable(
+            function_declaration.identifier.span(),
+            function_declaration.identifier.lexeme,
+        );
+        0
+    };
+    binder.functions.push(FunctionDeclarationBody {
+        body: *function_declaration.body,
+        parameters: variables,
+        is_main,
+        function_id,
+        function_type,
+    });
+}
+
+fn bind_function_type<'a>(
+    function_type: FunctionTypeNode<'a>,
+    binder: &mut BindingState,
+) -> (Type, Vec<(&'a str, Type)>) {
+    let variable_count = binder.variable_table.len();
+    let mut parameter_types = Vec::with_capacity(function_type.parameters.len());
+    let mut parameter_names = Vec::with_capacity(function_type.parameters.len());
+    for parameter in function_type.parameters {
+        let parameter_name = parameter.identifier.lexeme;
+        let parameter_type = bind_type(parameter.type_, binder);
+        parameter_types.push(parameter_type.clone());
+        parameter_names.push(parameter_name);
+        binder.register_generated_variable(parameter_name.into(), parameter_type, false);
+    }
+    binder.delete_variables_until(variable_count);
+    let variables: Vec<(&'a str, Type)> = parameter_names
+        .into_iter()
+        .zip(parameter_types.iter().map(|t| t.clone()))
+        .collect();
+    (Type::function(parameter_types), variables)
+}
+
+fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
+    let mut result = match type_.identifier.lexeme {
+        "int" => Type::Integer,
+        "string" => Type::String,
+        "bool" => Type::Boolean,
+        type_name => {
+            binder
+                .diagnostic_bag
+                .report_unknown_type(type_.span(), type_name);
+            return Type::Error;
+        }
+    };
+    for _ in &type_.brackets {
+        result = Type::array(result);
+    }
+    result
+}
 
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
     match node.kind {
@@ -431,6 +552,7 @@ fn bind_unary_operator<'a, 'b>(
         | Type::Void
         | Type::Any
         | Type::SystemCall(_)
+        | Type::Function(_)
         | Type::Boolean
         | Type::String
         | Type::Array(_) => {
@@ -468,6 +590,8 @@ fn function_type(type_: &Type) -> FunctionType {
             return_type: Type::Integer,
             system_call_kind: type_.as_system_call(),
         },
+        Type::Function(result) => *result.clone(),
+        Type::Error => FunctionType::error(),
         _ => unimplemented!("Not implemented for {}", type_),
     }
 }
@@ -587,25 +711,26 @@ fn bind_field_access<'a, 'b>(
     match &base.type_ {
         Type::Error => todo!(),
         Type::Any => todo!(),
-        Type::Void |
-        Type::Integer |
-        Type::Boolean |
-        Type::SystemCall(_) => {
-            binder.diagnostic_bag.report_no_fields_on_type(base_span, &base.type_);
+        Type::Void | Type::Integer | Type::Boolean | Type::Function(_) | Type::SystemCall(_) => {
+            binder
+                .diagnostic_bag
+                .report_no_fields_on_type(base_span, &base.type_);
             BoundNode::error(span)
-        },
-        Type::Array(_) |
-        Type::String => {
+        }
+        Type::Array(_) | Type::String => {
             if field_access.field.lexeme == "length" {
                 BoundNode::field_access(span, base, Type::SystemCall(SystemCallKind::ArrayLength))
             } else {
-                binder.diagnostic_bag.report_no_field_named_on_type(span, field_access.field.lexeme, &base.type_);
+                binder.diagnostic_bag.report_no_field_named_on_type(
+                    span,
+                    field_access.field.lexeme,
+                    &base.type_,
+                );
                 BoundNode::error(span)
             }
-        },
+        }
     }
 }
-
 
 fn bind_arguments_for_function<'a, 'b>(
     span: TextSpan,
