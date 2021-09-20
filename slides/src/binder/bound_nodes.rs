@@ -286,12 +286,53 @@ impl<'a> BoundNode<'a> {
             constant_value: None,
         }
     }
+
+    pub fn function_declaration(index: usize, is_main: bool, body: BoundNode<'a>, parameters: Vec<u64>) -> Self {
+        Self {
+            span: body.span,
+            kind: BoundNodeKind::FunctionDeclaration(BoundFunctionDeclarationNodeKind {
+                index,
+                is_main,
+                body: Box::new(body),
+                parameters,
+            }),
+            type_: Type::Void,
+            byte_width: 0,
+            constant_value: None,
+        }
+    }
+
+    pub fn label_address(index: usize) -> Self {
+        Self {
+            span: TextSpan::zero(),
+            kind: BoundNodeKind::LabelAddress(index),
+            type_: Type::Integer, // FIXME: Type::Pointer
+            byte_width: 4,
+            constant_value: None,
+        }
+    }
+
+
+    pub fn return_statement(span: TextSpan, expression: Option<BoundNode<'a>>) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::ReturnStatement(BoundReturnStatementNodeKind {
+                expression: expression.map(|n| Box::new(n)),
+            }),
+            type_: Type::Void,
+            byte_width: 0,
+            constant_value: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum BoundNodeKind<'a> {
+    // Top Level Statements
+    FunctionDeclaration(BoundFunctionDeclarationNodeKind<'a>),
     // Expressions
     ErrorExpression,
+    LabelAddress(usize),
     LiteralExpression(LiteralNodeKind<'a>),
     ArrayLiteralExpression(BoundArrayLiteralNodeKind<'a>),
     VariableExpression(BoundVariableNodeKind),
@@ -309,6 +350,15 @@ pub enum BoundNodeKind<'a> {
     WhileStatement(BoundWhileStatementNodeKind<'a>),
     Assignment(BoundAssignmentNodeKind<'a>),
     ExpressionStatement(BoundExpressionStatementNodeKind<'a>),
+    ReturnStatement(BoundReturnStatementNodeKind<'a>),
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundFunctionDeclarationNodeKind<'a> {
+    pub index: usize,
+    pub is_main: bool,
+    pub body: Box<BoundNode<'a>>,
+    pub parameters: Vec<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -389,4 +439,9 @@ pub struct BoundBlockStatementNodeKind<'a> {
 #[derive(Debug, Clone)]
 pub struct BoundExpressionStatementNodeKind<'a> {
     pub expression: Box<BoundNode<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundReturnStatementNodeKind<'a> {
+    pub expression: Option<Box<BoundNode<'a>>>,
 }

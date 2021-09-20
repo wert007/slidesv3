@@ -62,6 +62,8 @@ pub fn print_bound_node_as_code(node: &BoundNode) {
 fn print_bound_node_as_code_with_indent(node: &BoundNode, printer: DebugPrinter) {
     match &node.kind {
         BoundNodeKind::ErrorExpression => print_bound_node_error_expression_as_code(printer),
+        BoundNodeKind::LabelAddress(label_address) => print_bound_node_label_address_as_code(label_address, printer),
+        BoundNodeKind::FunctionDeclaration(function_declaration) => print_bound_node_function_declaration_as_code(function_declaration, printer),
         BoundNodeKind::LiteralExpression(literal_expression) => print_bound_node_literal_expression_as_code(literal_expression, printer),
         BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => print_bound_node_array_literal_expression_as_code(array_literal_expression, printer),
         BoundNodeKind::VariableExpression(variable_expression) => print_bound_node_variable_expression_as_code(variable_expression, printer),
@@ -77,11 +79,25 @@ fn print_bound_node_as_code_with_indent(node: &BoundNode, printer: DebugPrinter)
         BoundNodeKind::WhileStatement(while_statement) => print_bound_node_while_statement_as_code(while_statement, printer),
         BoundNodeKind::Assignment(assignment) => print_bound_node_assignment_as_code(assignment, printer),
         BoundNodeKind::ExpressionStatement(expression_statement) => print_bound_node_expression_statement_as_code(expression_statement, printer),
+        BoundNodeKind::ReturnStatement(return_statement) => print_bound_node_return_statement_as_code(return_statement, printer),
     }
+}
+
+fn print_bound_node_function_declaration_as_code(function_declaration: &BoundFunctionDeclarationNodeKind, printer: DebugPrinter) {
+    if function_declaration.is_main {
+        print!("fn main() ");
+    } else {
+        print!("fn f{}(...) -> ... ", function_declaration.index);
+    }
+    print_bound_node_as_code_with_indent(&function_declaration.body, printer);
 }
 
 fn print_bound_node_error_expression_as_code(_: DebugPrinter) {
     print!("#error");
+}
+
+fn print_bound_node_label_address_as_code(label_address: &usize, _: DebugPrinter) {
+    print!("l#{}", label_address);
 }
 
 fn print_bound_node_literal_expression_as_code(literal_expression: &LiteralNodeKind, _: DebugPrinter) {
@@ -184,5 +200,14 @@ fn print_bound_node_assignment_as_code(assignment: &BoundAssignmentNodeKind, pri
 
 fn print_bound_node_expression_statement_as_code(expression_statement: &BoundExpressionStatementNodeKind, printer: DebugPrinter) {
     print_bound_node_as_code_with_indent(&expression_statement.expression, printer);
+    println!(";");
+}
+
+fn print_bound_node_return_statement_as_code(return_statement: &BoundReturnStatementNodeKind, printer: DebugPrinter) {
+    print!("return");
+    if let Some(expression) = &return_statement.expression {
+        print!(" ");
+        print_bound_node_as_code_with_indent(&expression, printer);
+    }
     println!(";");
 }
