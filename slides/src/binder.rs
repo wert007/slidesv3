@@ -99,7 +99,12 @@ impl<'a> BindingState<'a, '_> {
         }
     }
 
-    fn register_generated_variable(&mut self, name: String, type_: Type, is_read_only: bool) -> Option<u64> {
+    fn register_generated_variable(
+        &mut self,
+        name: String,
+        type_: Type,
+        is_read_only: bool,
+    ) -> Option<u64> {
         let index = self.variable_table.len() as u64;
         let variable_already_registered = self
             .variable_table
@@ -113,7 +118,7 @@ impl<'a> BindingState<'a, '_> {
                 BoundVariableName {
                     identifier: name.into(),
                     type_,
-                    is_read_only
+                    is_read_only,
                 },
             );
             Some(index)
@@ -137,7 +142,7 @@ impl<'a> BindingState<'a, '_> {
             .map(|(&i, v)| VariableEntry {
                 id: i,
                 type_: v.type_.clone(),
-                is_read_only: v.is_read_only
+                is_read_only: v.is_read_only,
             })
     }
 }
@@ -238,7 +243,7 @@ fn bind_top_level_statements<'a, 'b>(
             for statement in compilation_unit.statements {
                 bind_top_level_statement(statement, binder);
             }
-        },
+        }
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(function_declaration, binder)
         }
@@ -248,7 +253,10 @@ fn bind_top_level_statements<'a, 'b>(
     }
 }
 
-fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> SyntaxNode<'a> {
+fn bind_top_level_statement<'a, 'b>(
+    node: SyntaxNode<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) {
     match node.kind {
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(function_declaration, binder)
@@ -352,7 +360,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
             bind_function_call(node.span, function_call, binder)
         }
         SyntaxNodeKind::ArrayIndex(array_index) => bind_array_index(node.span, array_index, binder),
-        SyntaxNodeKind::FieldAccess(field_access) => bind_field_access(node.span, field_access, binder),
+        SyntaxNodeKind::FieldAccess(field_access) => {
+            bind_field_access(node.span, field_access, binder)
+        }
         SyntaxNodeKind::BlockStatement(block_statement) => {
             bind_block_statement(node.span, block_statement, binder)
         }
@@ -376,12 +386,21 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
     }
 }
 
-fn bind_node_for_assignment<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
+fn bind_node_for_assignment<'a, 'b>(
+    node: SyntaxNode<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
     match node.kind {
-        SyntaxNodeKind::Variable(variable) => bind_variable_for_assignment(node.span, variable, binder),
-        SyntaxNodeKind::Parenthesized(parenthesized) => bind_node_for_assignment(*parenthesized.expression, binder),
+        SyntaxNodeKind::Variable(variable) => {
+            bind_variable_for_assignment(node.span, variable, binder)
+        }
+        SyntaxNodeKind::Parenthesized(parenthesized) => {
+            bind_node_for_assignment(*parenthesized.expression, binder)
+        }
         SyntaxNodeKind::FunctionCall(_) => todo!(),
-        SyntaxNodeKind::ArrayIndex(array_index) => bind_array_index_for_assignment(node.span, array_index, binder),
+        SyntaxNodeKind::ArrayIndex(array_index) => {
+            bind_array_index_for_assignment(node.span, array_index, binder)
+        }
         _ => unreachable!("Unexpected left hand side of assignment {:#?}", node),
     }
 }
@@ -424,7 +443,7 @@ fn bind_variable<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     match binder.look_up_variable_by_name(variable.token.lexeme) {
-        Some(VariableEntry { id, type_, ..}) => BoundNode::variable(span, id, type_),
+        Some(VariableEntry { id, type_, .. }) => BoundNode::variable(span, id, type_),
         None => {
             binder
                 .diagnostic_bag
@@ -439,9 +458,13 @@ fn bind_variable_for_assignment<'a, 'b>(
     variable: VariableNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    let variable_is_read_only = binder.look_up_variable_by_name(variable.token.lexeme).map(|ve| ve.is_read_only);
+    let variable_is_read_only = binder
+        .look_up_variable_by_name(variable.token.lexeme)
+        .map(|ve| ve.is_read_only);
     if variable_is_read_only == Some(true) {
-        binder.diagnostic_bag.report_variable_is_read_only(variable.token.span());
+        binder
+            .diagnostic_bag
+            .report_variable_is_read_only(variable.token.span());
     }
     bind_variable(span, variable, binder)
 }
@@ -504,9 +527,8 @@ fn bind_binary_operator<'a, 'b>(
         (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => {
             Some((BoundBinaryOperator::StringConcat, Type::String))
         }
-        (Type::String, BoundBinaryOperator::ArithmeticAddition, _) |
-        (_, BoundBinaryOperator::ArithmeticAddition, Type::String)
-         => {
+        (Type::String, BoundBinaryOperator::ArithmeticAddition, _)
+        | (_, BoundBinaryOperator::ArithmeticAddition, Type::String) => {
             Some((BoundBinaryOperator::StringConcat, Type::String))
         }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
@@ -604,9 +626,7 @@ fn bind_function_call<'a, 'b>(
     let argument_span = function_call.argument_span();
     let function = bind_node(*function_call.base, binder);
     let this = match &function.kind {
-        BoundNodeKind::FieldAccess(field_access) => {
-            Some(*field_access.base.clone())
-        },
+        BoundNodeKind::FieldAccess(field_access) => Some(*field_access.base.clone()),
         _ => None,
     };
     let function_type = function_type(&function.type_);
@@ -634,10 +654,12 @@ fn bind_function_call<'a, 'b>(
         binder,
     );
     if function_type.this_type.is_some() {
-        arguments.insert(0, this.unwrap_or_else(|| {
-            function.clone() // Wrong Type, wrong idea!
-        }
-        ));
+        arguments.insert(
+            0,
+            this.unwrap_or_else(|| {
+                function.clone() // Wrong Type, wrong idea!
+            }),
+        );
     }
     if let Type::SystemCall(system_call) = function.type_ {
         return BoundNode::system_call(span, system_call, arguments, function_type.return_type);
@@ -773,7 +795,8 @@ fn bind_for_statement<'a, 'b>(
         return BoundNode::error(span);
     }
     let variable_type = collection.type_.array_base_type().unwrap();
-    let variable = binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
+    let variable =
+        binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
     if variable.is_none() {
         binder.diagnostic_bag.report_cannot_declare_variable(
             for_statement.variable.span(),
@@ -783,13 +806,14 @@ fn bind_for_statement<'a, 'b>(
     }
     let variable = variable.unwrap();
     let index_variable = match for_statement.optional_index_variable {
-        Some(index_variable) => binder.register_variable(index_variable.lexeme, Type::Integer, true),
-        None => binder
-           .register_generated_variable(
-               format!("{}$index", for_statement.variable.lexeme),
-               Type::Integer,
-               true,
-           ),
+        Some(index_variable) => {
+            binder.register_variable(index_variable.lexeme, Type::Integer, true)
+        }
+        None => binder.register_generated_variable(
+            format!("{}$index", for_statement.variable.lexeme),
+            Type::Integer,
+            true,
+        ),
     };
     if index_variable.is_none() {
         binder.diagnostic_bag.report_cannot_declare_variable(

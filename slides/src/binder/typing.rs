@@ -62,7 +62,7 @@ impl Type {
                     base_type = &child;
                     array_count += 1;
                 }
-                let base_type : u64 = base_type.type_identifier();
+                let base_type: u64 = base_type.type_identifier();
                 (base_type << 8) + (array_count << 1) as u64 + 1
             }
             Type::Error => 0,
@@ -94,12 +94,13 @@ impl Type {
                     }
                     Some(result)
                 } else if value & 31 == 16 {
-                    let kind = SystemCallKind::try_from_primitive(((value >> 5) & 0xFF) as u8).ok()?;
+                    let kind =
+                        SystemCallKind::try_from_primitive(((value >> 5) & 0xFF) as u8).ok()?;
                     Some(Self::SystemCall(kind))
                 } else {
                     None
                 }
-            },
+            }
         }
     }
 }
