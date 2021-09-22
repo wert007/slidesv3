@@ -206,7 +206,9 @@ pub fn bind<'a>(
     }
 
     let result = BoundNode::block_statement(span, statements);
-    crate::debug::print_bound_node_as_code(&result);
+    if debug_flags.print_bound_program {
+        crate::debug::print_bound_node_as_code(&result);
+    }
     result
 }
 
