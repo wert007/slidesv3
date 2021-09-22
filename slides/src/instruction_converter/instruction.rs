@@ -77,6 +77,13 @@ impl Instruction {
         }
     }
 
+    pub const fn write_to_stack(address: u64) -> Self {
+        Self {
+            op_code: OpCode::WriteToStack,
+            arg: address,
+        }
+    }
+
     pub const fn type_identifier(type_identifier: u64) -> Self {
         Self {
             op_code: OpCode::TypeIdentifier,

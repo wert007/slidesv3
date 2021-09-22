@@ -86,6 +86,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::CreateStackPointer => evaluate_create_stack_pointer(state, instruction),
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
+        OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
@@ -212,6 +213,15 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
         state.heap.write_word(index, value);
     } else {
         state.stack.write_word(index, value);
+    }
+}
+
+fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
+    let address = instruction.arg as _;
+    let value = state.stack.pop();
+    state.stack.write_word(address, value.value);
+    if value.is_pointer {
+        state.stack.set_pointer(address);
     }
 }
 
