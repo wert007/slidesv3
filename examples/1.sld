@@ -1,4 +1,4 @@
-{
+func main() {
     let a = 500;
     let b = a * 3 - 3121;
 

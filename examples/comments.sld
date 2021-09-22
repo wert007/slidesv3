@@ -4,7 +4,7 @@ is
 a
 multiline
 comment */
-{
+func main() {
     // let i = 99;
     print(-42);
     print(/* false == */ false // we can do this, since we use semicolons)

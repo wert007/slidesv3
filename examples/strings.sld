@@ -1,4 +1,4 @@
-{
+func main() {
     print('Im a literal!');
 
     let h = 'Hello World!';

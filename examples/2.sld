@@ -1,4 +1,4 @@
-{
+func main() {
     let a = print;
     a(false);
     print(true);

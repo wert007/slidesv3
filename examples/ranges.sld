@@ -1,4 +1,4 @@
-{
+func main() {
     let a = ['Hello', 'World', 'how are you', '?'];
     for i in a {
         print(i);
