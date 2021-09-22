@@ -92,6 +92,7 @@ fn bind_helper_expression(input: &str, callback: impl FnOnce(BoundNode) -> ()) -
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
+    let result = result.program;
     let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
     let result = result[1].to_owned();
     let result = assert_matches!(result.kind, BoundNodeKind::ExpressionStatement(expression_statement) => *expression_statement.expression);
@@ -102,6 +103,7 @@ fn bind_helper(input: &str, callback: impl FnOnce(BoundNode) -> ()) -> () {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
+    let result = result.program;
     let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
     let result = result[1].to_owned();
     assert!(!diagnostic_bag.has_errors());
@@ -144,11 +146,12 @@ fn failed_binding() {
 fn bind_helper_errors(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnostic>) -> ()) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let node = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
-    let node = assert_matches!(node.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
-    let node = node[1].to_owned();
+    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
+    let result = result.program;
+    let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
+    let result = result[1].to_owned();
     assert!(diagnostic_bag.has_errors());
-    callback(node, diagnostic_bag.diagnostics)
+    callback(result, diagnostic_bag.diagnostics)
 }
 
 fn bind_helper_errors_expression(
@@ -157,10 +160,11 @@ fn bind_helper_errors_expression(
 ) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let node = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
-    let node = assert_matches!(node.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
-    let node = node[1].to_owned();
-    let node = assert_matches!(node.kind, BoundNodeKind::ExpressionStatement(expression_statement) => *expression_statement.expression);
+    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
+    let result = result.program;
+    let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
+    let result = result[1].to_owned();
+    let result = assert_matches!(result.kind, BoundNodeKind::ExpressionStatement(expression_statement) => *expression_statement.expression);
     assert!(diagnostic_bag.has_errors());
-    callback(node, diagnostic_bag.diagnostics)
+    callback(result, diagnostic_bag.diagnostics)
 }

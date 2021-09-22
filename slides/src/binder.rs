@@ -161,14 +161,28 @@ fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
     println!();
 }
 
+pub struct BoundProgram<'a> {
+    pub program: BoundNode<'a>,
+    pub fixed_variable_count: usize,
+}
+
+impl BoundProgram<'_> {
+    pub fn error() -> Self {
+        Self {
+            program: BoundNode::error(TextSpan::zero()),
+            fixed_variable_count: 0,
+        }
+    }
+}
+
 pub fn bind<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
-) -> BoundNode<'a> {
+) -> BoundProgram<'a> {
     let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
-        return BoundNode::error(TextSpan::zero());
+        return BoundProgram::error();
     }
     let mut binder = BindingState {
         diagnostic_bag,
@@ -181,7 +195,7 @@ pub fn bind<'a>(
     bind_top_level_statements(node, &mut binder);
     statements.push(call_main(&mut binder));
 
-    let variable_count = binder.variable_table.len();
+    let fixed_variable_count = binder.variable_table.len();
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
         let mut parameters = Vec::with_capacity(node.parameters.len());
         for (variable_name, variable_type) in node.parameters {
@@ -202,14 +216,17 @@ pub fn bind<'a>(
             BoundNode::label_address(index),
         ));
         statements.push(BoundNode::function_declaration(index, node.is_main, body, parameters));
-        binder.delete_variables_until(variable_count);
+        binder.delete_variables_until(fixed_variable_count);
     }
 
-    let result = BoundNode::block_statement(span, statements);
+    let program = BoundNode::block_statement(span, statements);
     if debug_flags.print_bound_program {
-        crate::debug::print_bound_node_as_code(&result);
+        crate::debug::print_bound_node_as_code(&program);
     }
-    result
+    BoundProgram {
+        program,
+        fixed_variable_count,
+    }
 }
 
 fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {

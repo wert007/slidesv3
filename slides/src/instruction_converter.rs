@@ -58,12 +58,12 @@ pub fn convert<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> Program {
-    let bound_node = binder::bind(source_text, diagnostic_bag, debug_flags);
+    let bound_program = binder::bind(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return Program::error();
     }
     let mut stack = Stack::new(debug_flags);
-    let instructions = convert_node(bound_node, &mut stack);
+    let bound_node = bound_program.program;
     let instructions = label_replacer::replace_labels(instructions);
     if debug_flags.print_instructions() {
         for (i, instruction) in instructions.iter().enumerate() {
