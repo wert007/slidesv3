@@ -29,6 +29,7 @@ pub struct EvaluatorState {
     heap: Allocator,
     registers: Vec<TypedU64>,
     pc: usize,
+    is_main_call: bool,
 }
 
 impl EvaluatorState {
@@ -54,6 +55,7 @@ pub fn evaluate(program: Program, debug_flags: DebugFlags) -> ResultType {
         heap: Allocator::new(1024, debug_flags),
         registers: vec![],
         pc: 0,
+        is_main_call: true,
     };
     let instructions = program.instructions;
     while state.pc < instructions.len() {
@@ -490,7 +492,12 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
 fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) {
     let base = state.stack.pop();
     assert!(base.is_pointer);
-    let return_address = state.pc + 1;
+    let return_address = if state.is_main_call {
+        state.is_main_call = false;
+        usize::MAX - 1
+    } else {
+        state.pc
+    };
     let mut argument_values = vec![];
     for _ in 0..instruction.arg {
         argument_values.push(state.stack.pop());
