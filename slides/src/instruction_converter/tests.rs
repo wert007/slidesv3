@@ -191,5 +191,5 @@ fn converter_helper(input: &str, callback: impl FnOnce(&[Instruction]) -> ()) {
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = convert(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
-    callback(&result[2..])
+    callback(&result.instructions[2..])
 }

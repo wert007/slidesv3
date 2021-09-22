@@ -7,6 +7,7 @@ mod label_replacer;
 use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundIfStatementNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, BoundWhileStatementNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::{WORD_SIZE_IN_BYTES, bytes_to_word}, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
 
 use self::instruction::Instruction;
+use super::evaluator::stack::Stack;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Label(usize);
@@ -29,85 +30,112 @@ impl From<Label> for InstructionOrLabel {
     }
 }
 
+pub struct Program {
+    pub stack: Stack,
+    pub instructions: Vec<Instruction>,
+}
+
+impl Program {
+    pub fn error() -> Self {
+        Self {
+            stack: Stack::new(DebugFlags::default()),
+            instructions: vec![],
+        }
+    }
+}
+
+fn allocate(stack: &mut Stack, size_in_bytes: u64) -> usize {
+    let size_in_words = bytes_to_word(size_in_bytes);
+    let pointer = stack.len() * WORD_SIZE_IN_BYTES as usize;
+    for _ in 0..size_in_words {
+        stack.push(0);
+    }
+    pointer
+}
+
 pub fn convert<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
-) -> Vec<Instruction> {
+) -> Program {
     let bound_node = binder::bind(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
-        return vec![];
+        return Program::error();
     }
-
-    let result = label_replacer::replace_labels(convert_node(bound_node, diagnostic_bag));
+    let mut stack = Stack::new(debug_flags);
+    let instructions = convert_node(bound_node, &mut stack);
+    let instructions = label_replacer::replace_labels(instructions);
     if debug_flags.print_instructions() {
-        for (i, instruction) in result.iter().enumerate() {
+        for (i, instruction) in instructions.iter().enumerate() {
             println!("  {:000}: {:?}", i, instruction);
         }
     }
-    result
+    Program {
+        instructions,
+        stack,
+    }
 }
 
-fn convert_node(node: BoundNode, diagnostic_bag: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
+fn convert_node(node: BoundNode, stack: &mut Stack) -> Vec<InstructionOrLabel> {
     match node.kind {
         BoundNodeKind::ErrorExpression => unreachable!(),
-        BoundNodeKind::FunctionDeclaration(function_declaration) => convert_function_declaration(function_declaration, diagnostic_bag),
-        BoundNodeKind::LiteralExpression(literal) => convert_literal(literal, diagnostic_bag),
+        BoundNodeKind::FunctionDeclaration(function_declaration) => convert_function_declaration(function_declaration, stack),
+        BoundNodeKind::LiteralExpression(literal) => convert_literal(literal, stack),
         BoundNodeKind::ArrayLiteralExpression(array_literal) => {
-            convert_array_literal(array_literal, diagnostic_bag)
+            convert_array_literal(array_literal, stack)
         }
-        BoundNodeKind::VariableExpression(variable) => convert_variable(variable, diagnostic_bag),
-        BoundNodeKind::UnaryExpression(unary) => convert_unary(unary, diagnostic_bag),
-        BoundNodeKind::BinaryExpression(binary) => convert_binary(binary, diagnostic_bag),
+        BoundNodeKind::VariableExpression(variable) => convert_variable(variable),
+        BoundNodeKind::UnaryExpression(unary) => convert_unary(unary, stack),
+        BoundNodeKind::BinaryExpression(binary) => convert_binary(binary, stack),
         BoundNodeKind::FunctionCall(function_call) => {
-            convert_function_call(function_call, diagnostic_bag)
+            convert_function_call(function_call, stack)
         }
-        BoundNodeKind::SystemCall(system_call) => convert_system_call(system_call, diagnostic_bag),
-        BoundNodeKind::ArrayIndex(array_index) => convert_array_index(array_index, diagnostic_bag),
-        BoundNodeKind::FieldAccess(field_access) => convert_field_access(field_access, diagnostic_bag),
+        BoundNodeKind::SystemCall(system_call) => convert_system_call(system_call, stack),
+        BoundNodeKind::ArrayIndex(array_index) => convert_array_index(array_index, stack),
+        BoundNodeKind::FieldAccess(field_access) => convert_field_access(field_access, stack),
         BoundNodeKind::BlockStatement(block_statement) => {
-            convert_block_statement(block_statement, diagnostic_bag)
+            convert_block_statement(block_statement, stack)
         }
         BoundNodeKind::IfStatement(if_statement) => {
-            convert_if_statement(if_statement, diagnostic_bag)
+            convert_if_statement(if_statement, stack)
         }
         BoundNodeKind::VariableDeclaration(variable_declaration) => {
-            convert_variable_declaration(variable_declaration, diagnostic_bag)
+            convert_variable_declaration(variable_declaration, stack)
         }
         BoundNodeKind::WhileStatement(while_statement) => {
-            convert_while_statement(while_statement, diagnostic_bag)
+            convert_while_statement(while_statement, stack)
         }
-        BoundNodeKind::Assignment(assignment) => convert_assignment(assignment, diagnostic_bag),
+        BoundNodeKind::Assignment(assignment) => convert_assignment(assignment, stack),
         BoundNodeKind::ExpressionStatement(expression_statement) => {
-            convert_expression_statement(expression_statement, diagnostic_bag)
+            convert_expression_statement(expression_statement, stack)
         }
         BoundNodeKind::ReturnStatement(return_statement) => {
-            convert_return_statement(return_statement, diagnostic_bag)
+            convert_return_statement(return_statement, stack)
         }
         BoundNodeKind::LabelAddress(label_address) => convert_label_address(label_address),
     }
 }
 
-fn convert_function_declaration(function_declaration: BoundFunctionDeclarationNodeKind, diagnostic_bag: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
+fn convert_function_declaration(function_declaration: BoundFunctionDeclarationNodeKind, stack: &mut Stack) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     result.push(Instruction::label(function_declaration.index).into());
     for parameter in function_declaration.parameters {
         result.push(Instruction::store_in_register(parameter).into());
     }
-    result.append(&mut convert_node(*function_declaration.body, diagnostic_bag));
+    result.append(&mut convert_node(*function_declaration.body, stack));
     result
 }
 
 fn convert_node_for_assignment(
     node: BoundNode,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     match node.kind {
         BoundNodeKind::VariableExpression(variable) => {
-            convert_variable_for_assignment(variable, diagnostic_bag)
+            convert_variable_for_assignment(variable)
         }
         BoundNodeKind::ArrayIndex(array_index) => {
-            convert_array_index_for_assignment(array_index, diagnostic_bag)
+            convert_array_index_for_assignment(array_index, stack)
         }
         _ => unreachable!(),
     }
@@ -115,7 +143,7 @@ fn convert_node_for_assignment(
 
 fn convert_literal(
     literal: LiteralNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let value = match literal.value {
         Value::Integer(value) => value as u64,
@@ -127,140 +155,95 @@ fn convert_literal(
             }
         }
         Value::SystemCall(kind) => kind as u64,
-        Value::String(value) => return convert_string_literal(value, diagnostic_bag),
+        Value::String(value) => return convert_string_literal(value, stack),
     };
     vec![Instruction::load_immediate(value).into()]
 }
 
-fn convert_string_literal(value: String, _: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
-    let mut result = vec![];
-    let count_in_bytes = value.len() as u64;
-    let byte_groups = value.as_bytes().chunks_exact(4);
+fn convert_string_literal(value: String, stack: &mut Stack) -> Vec<InstructionOrLabel> {
+    let length_in_bytes = value.len() as u64;
+    let mut address = allocate(stack, length_in_bytes + WORD_SIZE_IN_BYTES);
+    let pointer = address as _;
+    stack.write_word(address, length_in_bytes);
+    address += WORD_SIZE_IN_BYTES as usize;
+    let byte_groups = value.as_bytes().chunks_exact(WORD_SIZE_IN_BYTES as _);
     let remainder = byte_groups.remainder();
+    for word in byte_groups {
+        let word = [word[0], word[1], word[2], word[3], word[4], word[5], word[6], word[7], ];
+        let word = u64::from_be_bytes(word);
+        stack.write_word(address, word);
+        address += WORD_SIZE_IN_BYTES as usize;
+    }
     if !remainder.is_empty() {
         let word = [
             *remainder.get(0).unwrap_or(&0),
             *remainder.get(1).unwrap_or(&0),
             *remainder.get(2).unwrap_or(&0),
             *remainder.get(3).unwrap_or(&0),
+            *remainder.get(4).unwrap_or(&0),
+            *remainder.get(5).unwrap_or(&0),
+            *remainder.get(6).unwrap_or(&0),
+            *remainder.get(7).unwrap_or(&0),
         ];
-        let word = (word[0] as u64)
-            + ((word[1] as u64) << 8)
-            + ((word[2] as u64) << 16)
-            + ((word[3] as u64) << 24);
-        result.push(Instruction::load_immediate(word));
+        let word = u64::from_be_bytes(word);
+        stack.write_word(address, word);
     }
-    for word in byte_groups.rev() {
-        let word = (word[0] as u64)
-            + ((word[1] as u64) << 8)
-            + ((word[2] as u64) << 16)
-            + ((word[3] as u64) << 24);
-        result.push(Instruction::load_immediate(word));
-    }
-    result.push(Instruction::load_immediate(count_in_bytes as u64));
-    result.push(Instruction::create_stack_pointer(1));
-    result.into_iter().map(|i|i.into()).collect()
+    vec![Instruction::load_pointer(pointer).into()]
 }
 
 fn convert_array_literal(
     array_literal: BoundArrayLiteralNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     let element_count = array_literal.children.len();
-    let count_in_bytes = element_count * 4;
+    let length_in_bytes = element_count as u64 * WORD_SIZE_IN_BYTES;
+    let mut address = allocate(stack, length_in_bytes + WORD_SIZE_IN_BYTES) as u64;
+    let pointer = address;
+    stack.write_word(address as _, length_in_bytes as _);
+    address += WORD_SIZE_IN_BYTES;
     match &array_literal.children[0].type_ {
         Type::Error | Type::Void => unreachable!(),
         Type::Any => todo!(),
         Type::Function(_) => todo!(),
+        Type::Array(_) | Type::String |
         Type::Integer | Type::Boolean | Type::SystemCall(_) => {
-            for child in array_literal.children.into_iter().rev() {
-                result.append(&mut convert_node(child, diagnostic_bag));
-            }
-        }
-        Type::Array(_) | Type::String => {
-            let mut word_widths = Vec::with_capacity(element_count);
-            let mut pointers = vec![];
-            for child in array_literal.children.into_iter().rev() {
-                let is_literal = matches!(
-                    &child.kind,
-                    BoundNodeKind::ArrayLiteralExpression(_) | BoundNodeKind::LiteralExpression(_)
-                );
-                match &child.kind {
-                    BoundNodeKind::ArrayIndex(_) | BoundNodeKind::VariableExpression(_) => {
-                        word_widths.push(0);
-                        pointers.push(Some(convert_node(child, diagnostic_bag)));
-                    }
-                    _ => {
-                        let word_width = (child.byte_width + 3) / 4;
-                        let mut child = convert_node(child, diagnostic_bag);
-
-                        // Array Literals and String literals create an extra
-                        // stack pointer, which is going to be replicated later
-                        // in the array itself anyway. Because of the type check
-                        // above it is ensured, that LiteralExpression is a
-                        // string literal.
-                        if is_literal {
-                            // Remove the pointer to the array, string itself.
-                            // The outer array provides their own pointer.
-                            word_widths.push(word_width - 1);
-                            assert!(child.pop().is_some());
-                        } else {
-                            word_widths.push(word_width);
-                        }
-                        result.append(&mut child);
-                        pointers.push(None);
-                    }
-                }
-            }
-            word_widths.reverse();
-            let mut offset: u64 = word_widths.iter().sum();
-            for i in 0..element_count {
-                match &mut pointers[i] {
-                    Some(instructions) => {
-                        result.append(instructions);
-                    }
-                    None => {
-                        // Create a stack pointer to the literal on the stack
-                        offset -= word_widths[element_count - i - 1]; // Reverse i
-                        let stack_pointer_offset = offset + i as u64 + 1;
-                        result.push(Instruction::create_stack_pointer(stack_pointer_offset).into());
-                    }
-                }
+            for child in array_literal.children.into_iter() {
+                result.append(&mut convert_node(child, stack));
+                result.push(Instruction::write_to_stack(address as _).into());
+                address += WORD_SIZE_IN_BYTES;
             }
         }
     }
-    result.push(Instruction::load_immediate(count_in_bytes as u64).into());
-    result.push(Instruction::create_stack_pointer(1).into());
+    result.push(Instruction::load_pointer(pointer).into());
     result
 }
 
-fn convert_variable(variable: BoundVariableNodeKind, _: &mut DiagnosticBag) -> Vec<InstructionOrLabel> {
+fn convert_variable(variable: BoundVariableNodeKind) -> Vec<InstructionOrLabel> {
     vec![Instruction::load_register(variable.variable_index).into()]
 }
 
 fn convert_variable_for_assignment(
     variable: BoundVariableNodeKind,
-    _: &mut DiagnosticBag,
 ) -> Vec<InstructionOrLabel> {
     vec![Instruction::store_in_register(variable.variable_index).into()]
 }
 
 fn convert_array_index_for_assignment(
     array_index: BoundArrayIndexNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*array_index.base, diagnostic_bag);
-    result.append(&mut convert_node(*array_index.index, diagnostic_bag));
+    let mut result = convert_node(*array_index.base, stack);
+    result.append(&mut convert_node(*array_index.index, stack));
     result.push(Instruction::store_in_memory().into());
     result
 }
 
 fn convert_unary(
     unary: BoundUnaryNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*unary.operand, diagnostic_bag);
+    let mut result = convert_node(*unary.operand, stack);
     match unary.operator_token {
         BoundUnaryOperator::ArithmeticNegate => result.push(Instruction::twos_complement().into()),
         BoundUnaryOperator::ArithmeticIdentity => {}
@@ -270,7 +253,7 @@ fn convert_unary(
 
 fn convert_binary(
     binary: BoundBinaryNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let operator_instruction = match binary.operator_token {
         BoundBinaryOperator::ArithmeticAddition => Instruction::addition(),
@@ -300,14 +283,14 @@ fn convert_binary(
     let mut result = vec![];
     let lhs_is_string = matches!(binary.lhs.type_, Type::String);
     let lhs_type_identifier = binary.lhs.type_.type_identifier();
-    result.append(&mut convert_node(*binary.lhs, diagnostic_bag));
+    result.append(&mut convert_node(*binary.lhs, stack));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !lhs_is_string {
         result.push(Instruction::type_identifier(lhs_type_identifier).into());
         result.push(Instruction::system_call(SystemCallKind::ToString, 1).into());
     }
     let rhs_is_string = matches!(binary.rhs.type_, Type::String);
     let rhs_type_identifier = binary.rhs.type_.type_identifier();
-    result.append(&mut convert_node(*binary.rhs, diagnostic_bag));
+    result.append(&mut convert_node(*binary.rhs, stack));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !rhs_is_string {
         result.push(Instruction::type_identifier(rhs_type_identifier).into());
         result.push(Instruction::system_call(SystemCallKind::ToString, 1).into());
@@ -318,27 +301,27 @@ fn convert_binary(
 
 fn convert_function_call(
     function_call: BoundFunctionCallNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     let argument_count = function_call.arguments.len();
     for argument in function_call.arguments {
-        result.append(&mut convert_node(argument, diagnostic_bag));
+        result.append(&mut convert_node(argument, stack));
     }
-    result.append(&mut convert_node(*function_call.base, diagnostic_bag));
+    result.append(&mut convert_node(*function_call.base, stack));
     result.push(Instruction::function_call(argument_count).into());
     result
 }
 
 fn convert_system_call(
     system_call: BoundSystemCallNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     let argument_count = system_call.arguments.len();
     for argument in system_call.arguments {
         let type_identifier = argument.type_.type_identifier();
-        result.append(&mut convert_node(argument, diagnostic_bag));
+        result.append(&mut convert_node(argument, stack));
         result.push(Instruction::type_identifier(type_identifier).into());
     }
     result.push(Instruction::system_call(system_call.base, argument_count).into());
@@ -347,27 +330,27 @@ fn convert_system_call(
 
 fn convert_array_index(
     array_index: BoundArrayIndexNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*array_index.base, diagnostic_bag);
-    result.append(&mut convert_node(*array_index.index, diagnostic_bag));
+    let mut result = convert_node(*array_index.base, stack);
+    result.append(&mut convert_node(*array_index.index, stack));
     result.push(Instruction::array_index().into());
     result
 }
 
 fn convert_field_access(
     field_access: BoundFieldAccessNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    convert_node(*field_access.base, diagnostic_bag)
+    convert_node(*field_access.base, stack)
 }
 
 fn convert_if_statement(
     if_statement: BoundIfStatementNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*if_statement.condition, diagnostic_bag);
-    let mut body = convert_node(*if_statement.body, diagnostic_bag);
+    let mut result = convert_node(*if_statement.condition, stack);
+    let mut body = convert_node(*if_statement.body, stack);
     let jmp = Instruction::jump_if_false(body.len() as i64);
     result.push(jmp.into());
     result.append(&mut body);
@@ -376,9 +359,9 @@ fn convert_if_statement(
 
 fn convert_variable_declaration(
     variable_declaration: BoundVariableDeclarationNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*variable_declaration.initializer, diagnostic_bag);
+    let mut result = convert_node(*variable_declaration.initializer, stack);
     result.push(Instruction::store_in_register(
         variable_declaration.variable_index,
     ).into());
@@ -387,10 +370,10 @@ fn convert_variable_declaration(
 
 fn convert_while_statement(
     while_statement: BoundWhileStatementNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*while_statement.condition, diagnostic_bag);
-    let mut body = convert_node(*while_statement.body, diagnostic_bag);
+    let mut result = convert_node(*while_statement.condition, stack);
+    let mut body = convert_node(*while_statement.body, stack);
     let jmp = Instruction::jump_if_false(body.len() as i64 + 1);
     result.push(jmp.into());
     result.append(&mut body);
@@ -401,33 +384,33 @@ fn convert_while_statement(
 
 fn convert_assignment(
     assignment: BoundAssignmentNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*assignment.expression, diagnostic_bag);
+    let mut result = convert_node(*assignment.expression, stack);
     result.append(&mut convert_node_for_assignment(
         *assignment.variable,
-        diagnostic_bag,
+        stack,
     ));
     result
 }
 
 fn convert_block_statement(
     block_statement: BoundBlockStatementNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let mut result = vec![];
     for node in block_statement.statements {
-        result.append(&mut convert_node(node, diagnostic_bag));
+        result.append(&mut convert_node(node, stack));
     }
     result
 }
 
 fn convert_expression_statement(
     expression_statement: BoundExpressionStatementNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let pushes_on_stack = !matches!(expression_statement.expression.type_, Type::Void);
-    let mut result = convert_node(*expression_statement.expression, diagnostic_bag);
+    let mut result = convert_node(*expression_statement.expression, stack);
     if pushes_on_stack {
         result.push(Instruction::pop().into());
     }
@@ -436,12 +419,12 @@ fn convert_expression_statement(
 
 fn convert_return_statement(
     return_statement: BoundReturnStatementNodeKind,
-    diagnostic_bag: &mut DiagnosticBag,
+    stack: &mut Stack,
 ) -> Vec<InstructionOrLabel> {
     let mut pushes_on_stack = false;
     let mut result = if let Some(expression) = return_statement.expression {
         pushes_on_stack = true;
-        convert_node(*expression, diagnostic_bag)
+        convert_node(*expression, stack)
     } else {
         vec![]
     };

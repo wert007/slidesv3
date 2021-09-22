@@ -4,7 +4,10 @@ mod sys_calls;
 
 use crate::{
     binder::typing::{SystemCallKind, Type},
-    instruction_converter::instruction::{op_codes::OpCode, Instruction},
+    instruction_converter::{
+        instruction::{op_codes::OpCode, Instruction},
+        Program,
+    },
     value::Value,
     DebugFlags,
 };
@@ -45,13 +48,14 @@ impl EvaluatorState {
     }
 }
 
-pub fn evaluate(instructions: Vec<Instruction>, debug_flags: DebugFlags) -> ResultType {
+pub fn evaluate(program: Program, debug_flags: DebugFlags) -> ResultType {
     let mut state = EvaluatorState {
-        stack: Stack::new(debug_flags),
+        stack: program.stack,
         heap: Allocator::new(1024, debug_flags),
         registers: vec![],
         pc: 0,
     };
+    let instructions = program.instructions;
     while state.pc < instructions.len() {
         let pc = state.pc;
         if debug_flags.print_current_instruction() {
