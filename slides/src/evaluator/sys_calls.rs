@@ -40,16 +40,16 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         }
         Type::SystemCall(kind) => format!("system call {}", kind),
         Type::Function(kind) => format!("fn {}", kind),
-        Type::Array(base_type) => {
-            array_to_string_native(*base_type, argument, state)
-        }
-        Type::String => {
-            string_to_string_native(argument, state)
-        }
+        Type::Array(base_type) => array_to_string_native(*base_type, argument, state),
+        Type::String => string_to_string_native(argument, state),
     }
 }
 
-fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut EvaluatorState) -> String {
+fn array_to_string_native(
+    base_type: Type,
+    argument: TypedU64,
+    state: &mut EvaluatorState,
+) -> String {
     assert!(argument.is_pointer, "argument = {:#?}", argument);
     let array_length_in_bytes = if is_heap_pointer(argument.value) {
         state.heap.read_word(argument.value as _)
