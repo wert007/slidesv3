@@ -18,8 +18,7 @@ pub fn to_string(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
         state.heap.write_byte(pointer as _, byte);
         pointer += 1;
     }
-    state.set_pointer(state.stack.len());
-    state.stack.push(result);
+    state.stack.push_pointer(result);
 }
 
 fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState) -> String {
@@ -53,12 +52,12 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
     let array_length_in_bytes = if is_heap_pointer(argument.value) {
         state.heap.read_word(argument.value as _)
     } else {
-        state.stack[argument.value as usize]
+        state.stack.read_word(argument.value as usize)
     };
-    let array_length_in_words = (array_length_in_bytes + 3) / 4;
-    let array_start = argument.value;
-    let array_end = array_start - array_length_in_words;
-    let mut result : String = "[ ".into();
+    let array_length_in_words = bytes_to_word(array_length_in_bytes);
+    let array_start = argument.value + WORD_SIZE_IN_BYTES;
+    let array_end = array_start + array_length_in_words * WORD_SIZE_IN_BYTES;
+    let mut result: String = "[ ".into();
     match base_type {
         Type::Error => todo!(),
         Type::Void => todo!(),
@@ -68,7 +67,7 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
                 let value = if is_heap_pointer(i) {
                     state.heap.read_word(i as _)
                 } else {
-                    state.stack[i as usize]
+                    state.stack.read_word(i as _)
                 };
                 result.push_str(&format!("{}, ", value as i64));
             }
@@ -78,7 +77,7 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
                 let value = if is_heap_pointer(i) {
                     state.heap.read_word(i as _)
                 } else {
-                    state.stack[i as usize]
+                    state.stack.read_word(i as _)
                 };
                 if value == 0 {
                     result.push_str("false, ");
@@ -102,7 +101,7 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
                 let pointer = if is_heap_pointer(pointer_index) {
                     state.heap.read_word(pointer_index as _)
                 } else {
-                    state.stack[pointer_index as usize]
+                    state.stack.read_word(pointer_index as _)
                 };
                 let argument = TypedU64 {
                     value: pointer,
@@ -117,7 +116,7 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
                 let pointer = if is_heap_pointer(pointer_index) {
                     state.heap.read_word(pointer_index as _)
                 } else {
-                    state.stack[pointer_index as usize]
+                    state.stack.read_word(pointer_index as _)
                 };
                 let argument = TypedU64 {
                     value: pointer,
@@ -141,7 +140,7 @@ fn string_to_string_native(argument: TypedU64, state: &mut EvaluatorState) -> St
         state.heap.read_word(string_start as _)
     } else {
         is_heap_string = false;
-        state.stack[string_start as usize]
+        state.stack.read_word(string_start as _)
     };
 
     while state.is_pointer(string_start as _) && !is_heap_string {
@@ -151,7 +150,7 @@ fn string_to_string_native(argument: TypedU64, state: &mut EvaluatorState) -> St
             state.heap.read_word(pointer as _)
         } else {
             is_heap_string = false;
-            state.stack[pointer as usize]
+            state.stack.read_word(pointer as _)
         };
     }
     let string_length_in_bytes = pointer;
@@ -159,17 +158,15 @@ fn string_to_string_native(argument: TypedU64, state: &mut EvaluatorState) -> St
     let string_end = string_start - string_length_in_words;
     let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as usize);
 
-    let range = if is_heap_string {
-        (string_start + 4..string_start + 4 + string_length_in_words * 4).step_by(4)
-    } else {
-        (string_end..string_start).step_by(1)
-    };
+    let range = (string_start + WORD_SIZE_IN_BYTES
+        ..string_start + WORD_SIZE_IN_BYTES + string_length_in_words * WORD_SIZE_IN_BYTES)
+        .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {
         let word = if is_heap_string {
             state.heap.read_word(i as usize)
         } else {
-            state.stack[(string_end + string_start - i - 1) as usize]
+            state.stack.read_word(i as _)
         };
         string_buffer.push((word & 0xFF) as u8);
         string_buffer.push((word >> 8 & 0xFF) as u8);
@@ -187,7 +184,7 @@ pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         state.heap.read_word(array_start as _)
     } else {
         is_heap_array = false;
-        state.stack[array_start as usize]
+        state.stack.read_word(array_start as usize)
     };
 
     while state.is_pointer(array_start as _) && !is_heap_array {
@@ -197,7 +194,7 @@ pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
             state.heap.read_word(pointer as _)
         } else {
             is_heap_array = false;
-            state.stack[pointer as usize]
+            state.stack.read_word(pointer as usize)
         };
     }
 
