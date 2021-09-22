@@ -35,12 +35,6 @@ pub struct EvaluatorState {
 impl EvaluatorState {
     fn set_variable(&mut self, variable: u64, value: u64, is_pointer: bool) {
         let variable = variable as usize;
-        while self.registers.len() <= variable {
-            self.registers.push(TypedU64 {
-                value: 0,
-                is_pointer: false,
-            });
-        }
         self.registers[variable] = TypedU64 { value, is_pointer };
     }
 
@@ -53,7 +47,7 @@ pub fn evaluate(program: Program, debug_flags: DebugFlags) -> ResultType {
     let mut state = EvaluatorState {
         stack: program.stack,
         heap: Allocator::new(1024, debug_flags),
-        registers: vec![],
+        registers: vec![TypedU64::default(); program.max_used_variables],
         pc: 0,
         is_main_call: true,
     };
@@ -481,7 +475,7 @@ fn evaluate_jmp_if_false(state: &mut EvaluatorState, instruction: Instruction) {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct TypedU64 {
     value: u64,
     is_pointer: bool,

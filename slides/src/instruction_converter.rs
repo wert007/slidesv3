@@ -38,6 +38,7 @@ struct InstructionConverter {
 pub struct Program {
     pub stack: Stack,
     pub instructions: Vec<Instruction>,
+    pub max_used_variables: usize,
 }
 
 impl Program {
@@ -45,6 +46,7 @@ impl Program {
         Self {
             stack: Stack::new(DebugFlags::default()),
             instructions: vec![],
+            max_used_variables: 0,
         }
     }
 }
@@ -82,6 +84,7 @@ pub fn convert<'a>(
     Program {
         instructions,
         stack: converter.stack,
+        max_used_variables: bound_program.max_used_variables,
     }
 }
 

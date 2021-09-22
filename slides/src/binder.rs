@@ -75,11 +75,13 @@ struct BindingState<'a, 'b> {
     variable_table: HashMap<u64, BoundVariableName<'a>>,
     functions: Vec<FunctionDeclarationBody<'a>>,
     print_variable_table: bool,
+    max_used_variables: usize,
 }
 
 impl<'a> BindingState<'a, '_> {
     fn register_variable(&mut self, name: &'a str, type_: Type, is_read_only: bool) -> Option<u64> {
         let index = self.variable_table.len() as u64;
+        self.max_used_variables = self.max_used_variables.max(index as usize + 1);
         let variable_already_registered = self
             .variable_table
             .values()
@@ -106,6 +108,7 @@ impl<'a> BindingState<'a, '_> {
         is_read_only: bool,
     ) -> Option<u64> {
         let index = self.variable_table.len() as u64;
+        self.max_used_variables = self.max_used_variables.max(index as _);
         let variable_already_registered = self
             .variable_table
             .values()
@@ -164,6 +167,7 @@ fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
 pub struct BoundProgram<'a> {
     pub program: BoundNode<'a>,
     pub fixed_variable_count: usize,
+    pub max_used_variables: usize,
 }
 
 impl BoundProgram<'_> {
@@ -171,6 +175,7 @@ impl BoundProgram<'_> {
         Self {
             program: BoundNode::error(TextSpan::zero()),
             fixed_variable_count: 0,
+            max_used_variables: 0,
         }
     }
 }
@@ -189,6 +194,7 @@ pub fn bind<'a>(
         variable_table: HashMap::new(),
         functions: vec![],
         print_variable_table: debug_flags.print_variable_table(),
+        max_used_variables: 0,
     };
     let span = node.span();
     let mut statements = default_statements(&mut binder);
@@ -226,6 +232,7 @@ pub fn bind<'a>(
     BoundProgram {
         program,
         fixed_variable_count,
+        max_used_variables: binder.max_used_variables,
     }
 }
 
