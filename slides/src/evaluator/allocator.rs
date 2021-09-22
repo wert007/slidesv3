@@ -37,12 +37,12 @@ impl Allocator {
         );
     }
 
-    fn free_buckets(&mut self) -> Vec<&mut Bucket> {
+    fn free_buckets(&mut self, min_size: usize) -> Vec<&mut Bucket> {
         let mut result: Vec<_> = self
             .buckets
             .iter_mut()
             .filter_map(|b| match b {
-                BucketEntry::Bucket(b) if !b.is_used => Some(b),
+                BucketEntry::Bucket(b) if !b.is_used && b.size_in_words >= min_size => Some(b),
                 _ => None,
             })
             .collect();
@@ -55,7 +55,7 @@ impl Allocator {
             let size_in_words = bytes_to_word(size_in_bytes);
             let expected_size = size_in_words.next_power_of_two() as usize;
             let mut bucket_index = {
-                let mut free_buckets = self.free_buckets();
+                let mut free_buckets = self.free_buckets(expected_size);
                 if free_buckets.is_empty() {
                     // eprintln!("No Memory left!!!!");
                     return 0;
