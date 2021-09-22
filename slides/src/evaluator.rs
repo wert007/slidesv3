@@ -93,6 +93,8 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
+        OpCode::ReadRegistersFromStack => evaluate_read_registers_from_stack(state, instruction),
+        OpCode::WriteRegistersToStack => evaluate_write_registers_to_stack(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
@@ -228,6 +230,24 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
     state.stack.write_word(address, value.value);
     if value.is_pointer {
         state.stack.set_pointer(address);
+    }
+}
+
+fn evaluate_read_registers_from_stack(state: &mut EvaluatorState, instruction: Instruction) {
+    let start_index = instruction.arg as usize;
+    for register in state.registers.iter_mut().skip(start_index).rev() {
+        *register = state.stack.pop();
+    }
+}
+
+fn evaluate_write_registers_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
+    let start_index = instruction.arg as usize;
+    for register in state.registers.iter().skip(start_index) {
+        if register.is_pointer {
+            state.stack.push_pointer(register.value);
+        } else {
+            state.stack.push(register.value);
+        }
     }
 }
 
