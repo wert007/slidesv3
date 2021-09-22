@@ -383,17 +383,17 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
         state.stack.read_word(rhs.value as usize)
     };
     let result_length = lhs_length + rhs_length;
-    let mut pointer = state.heap.allocate(result_length + 4);
+    let mut pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
         println!(
-            "RuntimeError: No memory left for string with length {} + 4.",
-            result_length
+            "RuntimeError: No memory left for string with length {} + {}.",
+            result_length, WORD_SIZE_IN_BYTES,
         );
         pointer = HEAP_POINTER;
     } else {
         let mut writing_pointer = pointer;
         state.heap.write_word(writing_pointer as _, result_length);
-        writing_pointer += 4;
+        writing_pointer += WORD_SIZE_IN_BYTES;
         for i in 0..lhs_length {
             let lhs_address = lhs.value;
             let address = lhs_address + i + WORD_SIZE_IN_BYTES;

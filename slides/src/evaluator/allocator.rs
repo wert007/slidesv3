@@ -1,4 +1,4 @@
-use crate::DebugFlags;
+use crate::{DebugFlags, evaluator::{WORD_SIZE_IN_BYTES, bytes_to_word}};
 
 use super::HEAP_POINTER;
 
@@ -9,13 +9,13 @@ pub struct Allocator {
 }
 
 impl Allocator {
-    pub fn new(size: usize, debug_flags: DebugFlags) -> Self {
-        assert_eq!(size % 4, 0);
-        let size = size / 4;
-        assert!(size.is_power_of_two());
+    pub fn new(size_in_bytes: usize, debug_flags: DebugFlags) -> Self {
+        assert_eq!(size_in_bytes % WORD_SIZE_IN_BYTES as usize, 0);
+        let size_in_words = bytes_to_word(size_in_bytes as _) as usize;
+        assert!(size_in_words.is_power_of_two());
         Self {
-            data: vec![0; size],
-            buckets: vec![BucketEntry::root(size)],
+            data: vec![0; size_in_words],
+            buckets: vec![BucketEntry::root(size_in_words)],
             debug_heap_as_string: debug_flags.print_heap_as_string,
         }
     }
@@ -24,7 +24,7 @@ impl Allocator {
     fn find_bucket_from_address(&self, address: usize) -> &Bucket {
         for bucket in &self.buckets {
             if let BucketEntry::Bucket(bucket) = bucket {
-                if bucket.address * 4 <= address && (bucket.address + bucket.size) * 4 > address {
+                if bucket.address * WORD_SIZE_IN_BYTES as usize <= address && (bucket.address + bucket.size_in_words) * WORD_SIZE_IN_BYTES as usize > address {
                     return bucket;
                 }
             }
@@ -46,12 +46,14 @@ impl Allocator {
                 _ => None,
             })
             .collect();
-        result.sort_by_key(|b| usize::MAX - b.size);
+        result.sort_by_key(|b| usize::MAX - b.size_in_words);
         result
     }
 
-    pub fn allocate(&mut self, size: u64) -> u64 {
+    pub fn allocate(&mut self, size_in_bytes: u64) -> u64 {
         let result = {
+            let size_in_words = bytes_to_word(size_in_bytes);
+            let expected_size = size_in_words.next_power_of_two() as usize;
             let mut bucket_index = {
                 let mut free_buckets = self.free_buckets();
                 if free_buckets.is_empty() {
@@ -60,11 +62,8 @@ impl Allocator {
                 }
                 free_buckets.remove(0).index
             };
-            let size = (size + 3) / 4;
-            let expected_size = size.next_power_of_two() as usize;
-            let expected_size = expected_size.max(4);
 
-            while self.buckets[bucket_index].size() / 2 >= expected_size {
+            while self.buckets[bucket_index].size_in_words() / 2 >= expected_size {
                 let old_buddy_index = self.buckets[bucket_index].buddy_index().clone();
                 let new_index = self.buckets.len();
                 let (tmp_bucket, parent) = Bucket::split(
@@ -83,7 +82,7 @@ impl Allocator {
             }
             let result_bucket = self.buckets[bucket_index].as_bucket_mut().unwrap();
             result_bucket.is_used = true;
-            result_bucket.address as u64 * 4
+            result_bucket.address as u64 * WORD_SIZE_IN_BYTES
         };
         let result = result | HEAP_POINTER;
         if self.debug_heap_as_string {
@@ -96,24 +95,18 @@ impl Allocator {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(self.find_bucket_from_address(address).is_used);
-        let word_address = address & !3;
-        let word = self.read_word_aligned(word_address / 4);
-        let word = match address % 4 {
-            0 => word,
-            1 => word >> 8,
-            2 => word >> 16,
-            3 => word >> 24,
-            _ => unreachable!(),
-        };
-        (word & 0xFF) as u8
+        let word_address = address & !(WORD_SIZE_IN_BYTES as usize - 1);
+        let word = self.read_word_aligned(word_address / WORD_SIZE_IN_BYTES as usize);
+        let bytes = word.to_be_bytes();
+        bytes[address % WORD_SIZE_IN_BYTES as usize]
     }
 
     pub fn read_word(&self, address: usize) -> u64 {
-        let address = clear_address(address);
+        let address = clear_address(address) as u64;
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).is_used);
-        if address % 4 == 0 {
-            self.read_word_aligned(address / 4)
+        assert!(self.find_bucket_from_address(address as _).is_used);
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.read_word_aligned((address / WORD_SIZE_IN_BYTES) as _)
         } else {
             todo!("address = {:x}", address)
         }
@@ -122,7 +115,7 @@ impl Allocator {
     pub fn read_word_aligned(&self, address: usize) -> u64 {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address * 4).is_used);
+        assert!(self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES as usize).is_used);
         self.data[address]
     }
 
@@ -130,34 +123,21 @@ impl Allocator {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(self.find_bucket_from_address(address).is_used);
-        let word_address = address & !3;
-        let old_value = self.read_word_aligned(word_address / 4);
-        let value = value as u64;
-        let value = match address % 4 {
-            0 => value,
-            1 => value << 8,
-            2 => value << 16,
-            3 => value << 24,
-            _ => unreachable!(),
-        };
-        let clear_value: u64 = !match address % 4 {
-            0 => 0xFF,
-            1 => 0xFF << 8,
-            2 => 0xFF << 16,
-            3 => 0xFF << 24,
-            _ => unreachable!(),
-        };
-        let value = (old_value & clear_value) | value;
-        self.write_word_aligned(word_address / 4, value)
+        let word_address = address & !(WORD_SIZE_IN_BYTES as usize - 1);
+        let old_value = self.read_word_aligned(word_address / WORD_SIZE_IN_BYTES as usize);
+        let mut bytes = old_value.to_be_bytes();
+        bytes[address % WORD_SIZE_IN_BYTES as usize] = value;
+        let value = u64::from_be_bytes(bytes);
+        self.write_word_aligned(word_address / WORD_SIZE_IN_BYTES as usize, value)
     }
 
     pub fn write_word(&mut self, address: usize, value: u64) {
-        let address = clear_address(address);
+        let address = clear_address(address) as u64;
 
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).is_used);
-        if address % 4 == 0 {
-            self.write_word_aligned(address / 4, value)
+        assert!(self.find_bucket_from_address(address as _).is_used);
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.write_word_aligned((address / WORD_SIZE_IN_BYTES) as _, value)
         } else {
             todo!("address = {:x}", address)
         }
@@ -166,7 +146,7 @@ impl Allocator {
     fn write_word_aligned(&mut self, address: usize, value: u64) {
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * 4).is_used,
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES as usize).is_used,
             "bucket = {:#?}, address = 0x{:x}",
             self.find_bucket_from_address(address),
             address
@@ -180,9 +160,9 @@ impl Allocator {
 }
 
 pub fn print_heap_as_string(heap: &[u64]) {
-    let mut string_buffer = Vec::with_capacity(heap.len() * 8);
+    let mut string_buffer = Vec::with_capacity(heap.len() * WORD_SIZE_IN_BYTES as usize);
     for &word in heap {
-        string_buffer.extend_from_slice(&word.to_ne_bytes());
+        string_buffer.extend_from_slice(&word.to_be_bytes());
     }
     println!("heap = {:x?}", heap);
     println!("= '{}'", String::from_utf8_lossy(&string_buffer));
@@ -212,10 +192,10 @@ impl BucketEntry {
         }
     }
 
-    pub fn size(&self) -> usize {
+    pub fn size_in_words(&self) -> usize {
         match self {
-            BucketEntry::Bucket(e) => e.size,
-            BucketEntry::Parent(e) => e.size,
+            BucketEntry::Bucket(e) => e.size_in_words,
+            BucketEntry::Parent(e) => e.size_in_words,
         }
     }
 
@@ -241,7 +221,7 @@ struct BucketParent {
     buddy_index: Option<usize>,
     parent_index: Option<usize>,
     address: usize,
-    size: usize,
+    size_in_words: usize,
     depth: usize,
     child_indices: [usize; 2],
 }
@@ -252,7 +232,7 @@ struct Bucket {
     buddy_index: Option<usize>,
     parent_index: Option<usize>,
     address: usize,
-    size: usize,
+    size_in_words: usize,
     depth: usize,
     is_used: bool,
 }
@@ -264,20 +244,20 @@ impl Bucket {
             buddy_index: None,
             parent_index: None,
             address: 0,
-            size,
+            size_in_words: size,
             depth: 0,
             is_used: false,
         }
     }
 
     pub fn buddy(buddy: &Self, index: usize, parent_index: usize) -> Self {
-        let address = buddy.address + buddy.size / 2;
+        let address = buddy.address + buddy.size_in_words / 2;
         Self {
             index,
             buddy_index: Some(buddy.index),
             parent_index: Some(parent_index),
             address,
-            size: buddy.size / 2,
+            size_in_words: buddy.size_in_words / 2,
             depth: buddy.depth + 1,
             is_used: false,
         }
@@ -290,14 +270,14 @@ impl Bucket {
             buddy_index: buddy.buddy_index,
             parent_index: buddy.parent_index,
             address: buddy.address,
-            size: buddy.size,
+            size_in_words: buddy.size_in_words,
             depth: buddy.depth,
             child_indices: [result.index, buddy.index],
         };
 
         buddy.buddy_index = Some(result.index);
         buddy.parent_index = Some(parent.index);
-        buddy.size /= 2;
+        buddy.size_in_words /= 2;
         buddy.depth += 1;
 
         (result, parent)

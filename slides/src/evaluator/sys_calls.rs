@@ -1,7 +1,9 @@
-use crate::{binder::typing::Type, evaluator::is_heap_pointer};
+use crate::{
+    binder::typing::Type,
+    evaluator::{bytes_to_word, is_heap_pointer},
+};
 
-use super::{EvaluatorState, TypedU64};
-
+use super::{EvaluatorState, TypedU64, WORD_SIZE_IN_BYTES};
 
 pub fn print(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
     println!("{}", to_string_native(type_, argument, state));
@@ -10,10 +12,10 @@ pub fn print(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
 pub fn to_string(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
     let string = to_string_native(type_, argument, state);
     let string_length = string.len() as u64;
-    let mut pointer = state.heap.allocate(4 + string_length);
+    let mut pointer = state.heap.allocate(WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
     state.heap.write_word(pointer as _, string_length);
-    pointer += 4;
+    pointer += WORD_SIZE_IN_BYTES;
     for &byte in string.as_bytes() {
         state.heap.write_byte(pointer as _, byte);
         pointer += 1;
@@ -63,7 +65,7 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
         Type::Void => todo!(),
         Type::Any => todo!(),
         Type::Integer => {
-            for i in (array_end..array_start).rev() {
+            for i in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 let value = if is_heap_pointer(i) {
                     state.heap.read_word(i as _)
                 } else {
@@ -73,7 +75,7 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
             }
         }
         Type::Boolean => {
-            for i in (array_end..array_start).rev() {
+            for i in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 let value = if is_heap_pointer(i) {
                     state.heap.read_word(i as _)
                 } else {
@@ -87,17 +89,17 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
             }
         }
         Type::SystemCall(kind) => {
-            for _ in (array_end..array_start).rev() {
+            for _ in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 result.push_str(&format!("system call {}, ", kind));
             }
         }
         Type::Function(kind) => {
-            for _ in (array_end..array_start).rev() {
+            for _ in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 result.push_str(&format!("fn {}, ", kind));
             }
         }
         Type::Array(base_type) => {
-            for pointer_index in (array_end..array_start).rev() {
+            for pointer_index in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 let pointer = if is_heap_pointer(pointer_index) {
                     state.heap.read_word(pointer_index as _)
                 } else {
@@ -112,7 +114,7 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
             }
         }
         Type::String => {
-            for pointer_index in (array_end..array_start).rev() {
+            for pointer_index in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 let pointer = if is_heap_pointer(pointer_index) {
                     state.heap.read_word(pointer_index as _)
                 } else {
@@ -133,45 +135,29 @@ fn array_to_string_native(base_type: Type, argument: TypedU64, state: &mut Evalu
 }
 
 fn string_to_string_native(argument: TypedU64, state: &mut EvaluatorState) -> String {
-    let mut is_heap_string;
-    let mut string_start = argument.value;
-    let mut pointer = if is_heap_pointer(string_start) {
-        is_heap_string = true;
+    let string_start = argument.value;
+    let pointer = if is_heap_pointer(string_start) {
         state.heap.read_word(string_start as _)
     } else {
-        is_heap_string = false;
         state.stack.read_word(string_start as _)
     };
 
-    while state.is_pointer(string_start as _) && !is_heap_string {
-        string_start = pointer;
-        pointer = if is_heap_pointer(pointer) {
-            is_heap_string = true;
-            state.heap.read_word(pointer as _)
-        } else {
-            is_heap_string = false;
-            state.stack.read_word(pointer as _)
-        };
-    }
     let string_length_in_bytes = pointer;
-    let string_length_in_words = (string_length_in_bytes + 3) / 4;
-    let string_end = string_start - string_length_in_words;
-    let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as usize);
+    let string_length_in_words = bytes_to_word(string_length_in_bytes);
+    let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as _);
 
     let range = (string_start + WORD_SIZE_IN_BYTES
         ..string_start + WORD_SIZE_IN_BYTES + string_length_in_words * WORD_SIZE_IN_BYTES)
         .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {
-        let word = if is_heap_string {
-            state.heap.read_word(i as usize)
+        let word = if is_heap_pointer(i) {
+            state.heap.read_word(i as _)
         } else {
             state.stack.read_word(i as _)
         };
-        string_buffer.push((word & 0xFF) as u8);
-        string_buffer.push((word >> 8 & 0xFF) as u8);
-        string_buffer.push((word >> 16 & 0xFF) as u8);
-        string_buffer.push((word >> 24 & 0xFF) as u8);
+        let bytes = word.to_be_bytes();
+        string_buffer.extend_from_slice(&bytes);
     }
     String::from_utf8_lossy(&string_buffer).into_owned()
 }
@@ -203,10 +189,9 @@ pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         Type::Void => todo!(),
         Type::Any => todo!(),
         Type::Function(_) => todo!(),
-        Type::Integer |
-        Type::Boolean |
-        Type::SystemCall(_) |
-        Type::Array(_) => pointer / 4,
+        Type::Integer | Type::Boolean | Type::SystemCall(_) | Type::Array(_) => {
+            pointer / WORD_SIZE_IN_BYTES
+        }
         Type::String => pointer,
     };
 
