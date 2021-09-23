@@ -144,6 +144,7 @@ pub enum SyntaxTokenKind {
     Identifier,
 
     // Keywords
+    ElseKeyword,
     FalseKeyword,
     ForKeyword,
     FuncKeyword,
@@ -195,6 +196,7 @@ impl SyntaxTokenKind {
 
     pub fn keyword(identifier: &str) -> Option<Self> {
         match identifier {
+            "else" => Some(Self::ElseKeyword),
             "false" => Some(Self::FalseKeyword),
             "for" => Some(Self::ForKeyword),
             "func" => Some(Self::FuncKeyword),
@@ -270,6 +272,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::BangEquals => write!(f, "Bang-Equals-Token"),
             SyntaxTokenKind::EqualsEquals => write!(f, "Equals-Equals-Token"),
             SyntaxTokenKind::Identifier => write!(f, "Identifier"),
+            SyntaxTokenKind::ElseKeyword => write!(f, "else"),
             SyntaxTokenKind::FalseKeyword => write!(f, "false"),
             SyntaxTokenKind::ForKeyword => write!(f, "for"),
             SyntaxTokenKind::FuncKeyword => write!(f, "func"),

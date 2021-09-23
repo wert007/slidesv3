@@ -224,6 +224,7 @@ impl<'a> SyntaxNode<'a> {
         if_keyword: SyntaxToken<'a>,
         condition: SyntaxNode<'a>,
         body: SyntaxNode<'a>,
+        else_clause: Option<ElseClause<'a>>,
     ) -> Self {
         let span = TextSpan::bounds(if_keyword.span(), body.span());
         Self {
@@ -231,6 +232,7 @@ impl<'a> SyntaxNode<'a> {
                 if_keyword,
                 condition: Box::new(condition),
                 body: Box::new(body),
+                else_clause,
             }),
             span,
             is_inserted: false,
@@ -556,6 +558,22 @@ pub struct IfStatementNodeKind<'a> {
     pub if_keyword: SyntaxToken<'a>,
     pub condition: Box<SyntaxNode<'a>>,
     pub body: Box<SyntaxNode<'a>>,
+    pub else_clause: Option<ElseClause<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ElseClause<'a> {
+    pub else_keyword: SyntaxToken<'a>,
+    pub body: Box<SyntaxNode<'a>>,
+}
+
+impl<'a> ElseClause<'a> {
+    pub fn new(else_keyword: SyntaxToken<'a>, body: SyntaxNode<'a>) -> Self {
+        Self {
+            else_keyword,
+            body: Box::new(body),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

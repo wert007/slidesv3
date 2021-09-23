@@ -10,7 +10,7 @@ use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
         syntax_token::{SyntaxToken, SyntaxTokenKind},
     }, parser::syntax_nodes::FunctionTypeNode, text::{SourceText, TextSpan}};
 
-use self::syntax_nodes::{ParameterNode, SyntaxNode, TypeNode};
+use self::syntax_nodes::{ElseClause, ParameterNode, SyntaxNode, TypeNode};
 use crate::match_token;
 
 pub fn parse<'a>(
@@ -205,8 +205,25 @@ fn parse_if_statement<'a>(
     let if_keyword = match_token!(tokens, diagnostic_bag, IfKeyword);
     let condition = parse_expression(tokens, diagnostic_bag);
     let body = parse_block_statement(tokens, diagnostic_bag);
+    let else_clause = if matches!(&peek_token(tokens).kind, SyntaxTokenKind::ElseKeyword) {
+        Some(parse_else_clause(tokens, diagnostic_bag))
+    } else {
+        None
+    };
+    SyntaxNode::if_statement(if_keyword, condition, body, else_clause)
+}
 
-    SyntaxNode::if_statement(if_keyword, condition, body)
+fn parse_else_clause<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> ElseClause<'a> {
+    let else_keyword = match_token!(tokens, diagnostic_bag, ElseKeyword);
+    let body = if matches!(peek_token(tokens).kind, SyntaxTokenKind::IfKeyword) {
+        parse_if_statement(tokens, diagnostic_bag)
+    } else {
+        parse_block_statement(tokens, diagnostic_bag)
+    };
+    ElseClause::new(else_keyword, body)
 }
 
 fn parse_variable_declaration<'a>(

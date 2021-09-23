@@ -169,6 +169,19 @@ macro_rules! match_token {
             SyntaxToken::operator(current.span().start(), ",")
         }
     };
+    ($tokens:expr, $diagnostic_bag:expr, ElseKeyword) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::ElseKeyword) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::ElseKeyword,
+            );
+            SyntaxToken::keyword(current.span().start(), "else")
+        }
+    };
     ($tokens:expr, $diagnostic_bag:expr, ForKeyword) => {
         if matches!(peek_token($tokens).kind, SyntaxTokenKind::ForKeyword) {
             next_token($tokens)
