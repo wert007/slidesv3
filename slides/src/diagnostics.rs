@@ -183,4 +183,9 @@ impl<'a> DiagnosticBag<'a> {
         let message = format!("Unknown type {} found.", type_name);
         self.report(message, span);
     }
+
+    pub fn report_missing_return_value(&mut self, span: TextSpan, expected_return_type: &Type) {
+        let message = format!("Function returns type {} and needs a value of type {}.", expected_return_type, expected_return_type);
+        self.report(message, span);
+    }
 }

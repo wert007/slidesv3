@@ -258,6 +258,23 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn return_statement(
+        return_keyword: SyntaxToken<'a>,
+        optional_expression: Option<SyntaxNode<'a>>,
+        semicolon_token: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(return_keyword.span(), semicolon_token.span());
+        Self {
+            kind: SyntaxNodeKind::ReturnStatement(ReturnStatementNodeKind {
+                return_keyword,
+                optional_expression: optional_expression.map(|n| Box::new(n)),
+                semicolon_token,
+            }),
+            span,
+            is_inserted: false,
+        }
+    }
+
     pub fn while_statement(
         while_keyword: SyntaxToken<'a>,
         condition: SyntaxNode<'a>,
@@ -363,6 +380,7 @@ pub enum SyntaxNodeKind<'a> {
     ForStatement(ForStatementNodeKind<'a>),
     IfStatement(IfStatementNodeKind<'a>),
     VariableDeclaration(VariableDeclarationNodeKind<'a>),
+    ReturnStatement(ReturnStatementNodeKind<'a>),
     WhileStatement(WhileStatementNodeKind<'a>),
     Assignment(AssignmentNodeKind<'a>),
     ExpressionStatement(ExpressionStatementNodeKind<'a>),
@@ -546,6 +564,13 @@ pub struct VariableDeclarationNodeKind<'a> {
     pub identifier: SyntaxToken<'a>,
     pub equals_token: SyntaxToken<'a>,
     pub initializer: Box<SyntaxNode<'a>>,
+    pub semicolon_token: SyntaxToken<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ReturnStatementNodeKind<'a> {
+    pub return_keyword: SyntaxToken<'a>,
+    pub optional_expression: Option<Box<SyntaxNode<'a>>>,
     pub semicolon_token: SyntaxToken<'a>,
 }
 

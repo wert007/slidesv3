@@ -133,6 +133,7 @@ fn parse_statement<'a>(
         SyntaxTokenKind::ForKeyword => parse_for_statement(tokens, diagnostic_bag),
         SyntaxTokenKind::IfKeyword => parse_if_statement(tokens, diagnostic_bag),
         SyntaxTokenKind::LetKeyword => parse_variable_declaration(tokens, diagnostic_bag),
+        SyntaxTokenKind::ReturnKeyword => parse_return_statement(tokens, diagnostic_bag),
         SyntaxTokenKind::WhileKeyword => parse_while_statement(tokens, diagnostic_bag),
         _ => parse_assignment_statement(tokens, diagnostic_bag),
     }
@@ -228,6 +229,25 @@ fn parse_variable_declaration<'a>(
         identifier,
         equals_token,
         initializer,
+        semicolon_token,
+    )
+}
+
+fn parse_return_statement<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let return_keyword = match_token!(tokens, diagnostic_bag, ReturnKeyword);
+    let optional_expression = if matches!(&peek_token(tokens).kind, SyntaxTokenKind::Semicolon) {
+        None
+    } else {
+        Some(parse_expression(tokens, diagnostic_bag))
+    };
+    let semicolon_token = match_token!(tokens, diagnostic_bag, Semicolon);
+
+    SyntaxNode::return_statement(
+        return_keyword,
+        optional_expression,
         semicolon_token,
     )
 }

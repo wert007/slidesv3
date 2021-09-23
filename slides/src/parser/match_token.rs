@@ -234,6 +234,19 @@ macro_rules! match_token {
             SyntaxToken::keyword(current.span().start(), "let")
         }
     };
+    ($tokens:expr, $diagnostic_bag:expr, ReturnKeyword) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::ReturnKeyword) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::ReturnKeyword,
+            );
+            SyntaxToken::keyword(current.span().start(), "return")
+        }
+    };
     ($tokens:expr, $diagnostic_bag:expr, WhileKeyword) => {
         if matches!(peek_token($tokens).kind, SyntaxTokenKind::WhileKeyword) {
             next_token($tokens)

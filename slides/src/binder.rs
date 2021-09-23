@@ -6,25 +6,7 @@ pub mod typing;
 
 use std::collections::HashMap;
 
-use crate::{
-    binder::{operators::BoundUnaryOperator, typing::Type},
-    diagnostics::DiagnosticBag,
-    lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind},
-    parser::{
-        self,
-        syntax_nodes::{
-            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
-            BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
-            ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
-            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind,
-            SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind,
-            VariableNodeKind, WhileStatementNodeKind,
-        },
-    },
-    text::{SourceText, TextSpan},
-    value::Value,
-    DebugFlags,
-};
+use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{NumberLiteralKind, SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, ReturnStatementNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
 use self::{
     bound_nodes::{BoundNode, BoundNodeKind},
@@ -76,6 +58,7 @@ struct BindingState<'a, 'b> {
     functions: Vec<FunctionDeclarationBody<'a>>,
     print_variable_table: bool,
     max_used_variables: usize,
+    function_return_type: Type,
 }
 
 impl<'a> BindingState<'a, '_> {
@@ -195,6 +178,7 @@ pub fn bind<'a>(
         functions: vec![],
         print_variable_table: debug_flags.print_variable_table(),
         max_used_variables: 0,
+        function_return_type: Type::Error,
     };
     let span = node.span();
     let mut statements = default_statements(&mut binder);
@@ -212,7 +196,7 @@ pub fn bind<'a>(
                 panic!("Could not declare a parameter! This sounds like an error in the binder!");
             }
         }
-
+        binder.function_return_type = node.return_type;
         let body = bind_node(node.body, &mut binder);
         let body = BoundNode::block_statement(body.span, vec![body, BoundNode::return_statement(TextSpan::zero(), None)]);
 
@@ -302,6 +286,7 @@ struct FunctionDeclarationBody<'a> {
     is_main: bool,
     function_id: u64,
     function_type: Type,
+    return_type: Type,
 }
 
 fn bind_function_declaration<'a, 'b>(
@@ -327,6 +312,7 @@ fn bind_function_declaration<'a, 'b>(
         is_main,
         function_id,
         function_type,
+        return_type: Type::Void,
     });
 }
 
@@ -400,6 +386,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         }
         SyntaxNodeKind::VariableDeclaration(variable_declaration) => {
             bind_variable_declaration(node.span, variable_declaration, binder)
+        }
+        SyntaxNodeKind::ReturnStatement(return_statement) => {
+            bind_return_statement(node.span, return_statement, binder)
         }
         SyntaxNodeKind::WhileStatement(while_statement) => {
             bind_while_statement(node.span, while_statement, binder)
@@ -992,6 +981,23 @@ fn bind_variable_declaration<'a, 'b>(
             .report_cannot_declare_variable(span, variable_declaration.identifier.lexeme);
         BoundNode::error(span)
     }
+}
+
+fn bind_return_statement<'a, 'b>(
+    span: TextSpan,
+    return_statement: ReturnStatementNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> BoundNode<'a> {
+    let expression = return_statement.optional_expression.map(|e| bind_node(*e, binder));
+    let function_return_type = &binder.function_return_type;
+    if expression.is_none() && !function_return_type.can_be_converted_to(&Type::Void) {
+        binder.diagnostic_bag.report_missing_return_value(span, function_return_type);
+    } else if let Some(expression) = &expression {
+        if !expression.type_.can_be_converted_to(&function_return_type) {
+            binder.diagnostic_bag.report_cannot_convert(expression.span, &expression.type_, function_return_type);
+        }
+    }
+    BoundNode::return_statement(span, expression)
 }
 
 fn bind_while_statement<'a, 'b>(
