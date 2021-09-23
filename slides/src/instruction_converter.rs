@@ -365,9 +365,18 @@ fn convert_if_statement(
 ) -> Vec<InstructionOrLabel> {
     let mut result = convert_node(*if_statement.condition, converter);
     let mut body = convert_node(*if_statement.body, converter);
-    let jmp = Instruction::jump_if_false(body.len() as i64);
+    let mut body_len = body.len() as i64;
+    if if_statement.else_body.is_some() {
+        body_len += 1
+    }
+    let jmp = Instruction::jump_if_false(body_len);
     result.push(jmp.into());
     result.append(&mut body);
+    if let Some(else_body) = if_statement.else_body {
+        let mut else_body = convert_node(*else_body, converter);
+        result.push(Instruction::jump_relative(else_body.len() as i64).into());
+        result.append(&mut else_body);
+    }
     result
 }
 

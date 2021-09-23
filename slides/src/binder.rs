@@ -950,7 +950,8 @@ fn bind_if_statement<'a, 'b>(
         );
     }
     let body = bind_node(*if_statement.body, binder);
-    BoundNode::if_statement(span, condition, body)
+    let else_body = if_statement.else_clause.map(|e| bind_node(*e.body, binder));
+    BoundNode::if_statement(span, condition, body, else_body)
 }
 
 fn bind_variable_declaration<'a, 'b>(

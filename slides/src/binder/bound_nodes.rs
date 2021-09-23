@@ -239,12 +239,13 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn if_statement(span: TextSpan, condition: BoundNode<'a>, body: BoundNode<'a>) -> Self {
+    pub fn if_statement(span: TextSpan, condition: BoundNode<'a>, body: BoundNode<'a>, else_body: Option<BoundNode<'a>>) -> Self {
         Self {
             span,
             kind: BoundNodeKind::IfStatement(BoundIfStatementNodeKind {
                 condition: Box::new(condition),
                 body: Box::new(body),
+                else_body: else_body.map(|n|Box::new(n)),
             }),
             type_: Type::Void,
             byte_width: 0,
@@ -411,6 +412,7 @@ pub struct BoundFieldAccessNodeKind<'a> {
 pub struct BoundIfStatementNodeKind<'a> {
     pub condition: Box<BoundNode<'a>>,
     pub body: Box<BoundNode<'a>>,
+    pub else_body: Option<Box<BoundNode<'a>>>,
 }
 
 #[derive(Debug, Clone)]

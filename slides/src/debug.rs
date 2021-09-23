@@ -166,6 +166,11 @@ fn print_bound_node_if_statement_as_code(if_statement: &BoundIfStatementNodeKind
     print_bound_node_as_code_with_indent(&if_statement.condition, printer);
     print!(" ");
     print_bound_node_as_code_with_indent(&if_statement.body, printer);
+    if let Some(else_body) = &if_statement.else_body {
+        printer.print_indentation();
+        print!("else ");
+        print_bound_node_as_code_with_indent(&else_body, printer);
+    }
 }
 
 fn print_bound_node_variable_declaration_as_code(variable_declaration: &BoundVariableDeclarationNodeKind, printer: DebugPrinter) {
