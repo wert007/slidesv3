@@ -15,6 +15,10 @@
 func count_up(n: int) {
     if n > 0 {
         count_up(n - 1);
+        // Same as n % 2 == 0
+        if n / 2 == (n + 1) / 2 {
+            return;
+        }
     }
     print(n);
 }
