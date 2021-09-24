@@ -41,15 +41,17 @@ impl<'a> BoundNode<'a> {
     pub fn literal_from_value(value: Value) -> Self {
         let type_ = value.infer_type();
         let byte_width = match &value {
-            Value::Integer(_) |
-            Value::Boolean(_) |
-            Value::SystemCall(_) => 4,
+            Value::Integer(_) | Value::Boolean(_) | Value::SystemCall(_) => 4,
             Value::String(value) => 8 + value.len(),
         } as _;
         Self {
             span: TextSpan::zero(),
             kind: BoundNodeKind::LiteralExpression(LiteralNodeKind {
-                token: crate::lexer::syntax_token::SyntaxToken { kind: crate::lexer::syntax_token::SyntaxTokenKind::Eoi, lexeme: "", start: 0 },
+                token: crate::lexer::syntax_token::SyntaxToken {
+                    kind: crate::lexer::syntax_token::SyntaxTokenKind::Eoi,
+                    lexeme: "",
+                    start: 0,
+                },
                 value: value.clone(),
             }),
             type_,
@@ -62,9 +64,7 @@ impl<'a> BoundNode<'a> {
         let value = literal.value.clone();
         let type_ = value.infer_type();
         let byte_width = match &value {
-            Value::Integer(_) |
-            Value::Boolean(_) |
-            Value::SystemCall(_) => 4,
+            Value::Integer(_) | Value::Boolean(_) | Value::SystemCall(_) => 4,
             Value::String(value) => 8 + value.len(),
         } as _;
         Self {
@@ -77,9 +77,7 @@ impl<'a> BoundNode<'a> {
     }
 
     pub fn array_literal(span: TextSpan, children: Vec<BoundNode<'a>>, type_: Type) -> Self {
-        let byte_width = 8 + children.iter().map(|b|{
-            (b.byte_width + 3) / 4
-        }).sum::<u64>() * 4;
+        let byte_width = 8 + children.iter().map(|b| (b.byte_width + 3) / 4).sum::<u64>() * 4;
         Self {
             span,
             kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
@@ -176,11 +174,7 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn field_access(
-        span: TextSpan,
-        base: BoundNode<'a>,
-        type_: Type,
-    ) -> Self {
+    pub fn field_access(span: TextSpan, base: BoundNode<'a>, type_: Type) -> Self {
         let byte_width = base.byte_width;
         Self {
             span,
@@ -199,7 +193,8 @@ impl<'a> BoundNode<'a> {
         arguments: Vec<BoundNode<'a>>,
         type_: Type,
     ) -> Self {
-        let byte_width = 4 * (arguments.len() as u64 + 1) + arguments.iter().map(|b| b.byte_width).sum::<u64>();
+        let byte_width =
+            4 * (arguments.len() as u64 + 1) + arguments.iter().map(|b| b.byte_width).sum::<u64>();
         Self {
             span,
             kind: BoundNodeKind::SystemCall(BoundSystemCallNodeKind { base, arguments }),
@@ -308,13 +303,18 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn if_statement(span: TextSpan, condition: BoundNode<'a>, body: BoundNode<'a>, else_body: Option<BoundNode<'a>>) -> Self {
+    pub fn if_statement(
+        span: TextSpan,
+        condition: BoundNode<'a>,
+        body: BoundNode<'a>,
+        else_body: Option<BoundNode<'a>>,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::IfStatement(BoundIfStatementNodeKind {
                 condition: Box::new(condition),
                 body: Box::new(body),
-                else_body: else_body.map(|n|Box::new(n)),
+                else_body: else_body.map(|n| Box::new(n)),
             }),
             type_: Type::Void,
             byte_width: 0,
@@ -357,7 +357,12 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn function_declaration(index: usize, is_main: bool, body: BoundNode<'a>, parameters: Vec<u64>) -> Self {
+    pub fn function_declaration(
+        index: usize,
+        is_main: bool,
+        body: BoundNode<'a>,
+        parameters: Vec<u64>,
+    ) -> Self {
         Self {
             span: body.span,
             kind: BoundNodeKind::FunctionDeclaration(BoundFunctionDeclarationNodeKind {
@@ -381,7 +386,6 @@ impl<'a> BoundNode<'a> {
             constant_value: None,
         }
     }
-
 
     pub fn return_statement(span: TextSpan, expression: Option<BoundNode<'a>>) -> Self {
         Self {
