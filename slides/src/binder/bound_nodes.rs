@@ -222,6 +222,75 @@ impl<'a> BoundNode<'a> {
         }
     }
 
+    pub fn for_statement(
+        span: TextSpan,
+        index_variable: u64,
+        collection_variable: u64,
+        variable: BoundNode<'a>,
+        collection: BoundNode<'a>,
+        body: BoundNode<'a>,
+    ) -> Self {
+        let while_condition = BoundNode::binary(
+            span,
+            BoundNode::variable(span, index_variable, Type::Integer),
+            BoundBinaryOperator::LessThan,
+            BoundNode::system_call(
+                span,
+                SystemCallKind::ArrayLength,
+                vec![BoundNode::variable(
+                    span,
+                    collection_variable,
+                    collection.type_.clone(),
+                )],
+                Type::Integer,
+            ),
+            Type::Boolean,
+        );
+        let while_body = BoundNode::block_statement(
+            span,
+            vec![
+                // variable = $collection[$index];
+                BoundNode::assignment(
+                    span,
+                    variable,
+                    BoundNode::array_index(
+                        span,
+                        BoundNode::variable(span, collection_variable, collection.type_.clone()),
+                        BoundNode::variable(span, index_variable, Type::Integer),
+                        collection.type_.array_base_type().unwrap().clone(),
+                    ),
+                ),
+                // {
+                body,
+                // }
+                // $index = $index + 1;
+                BoundNode::assignment(
+                    span,
+                    BoundNode::variable(span, index_variable, Type::Integer),
+                    BoundNode::binary(
+                        span,
+                        BoundNode::variable(span, index_variable, Type::Integer),
+                        BoundBinaryOperator::ArithmeticAddition,
+                        BoundNode::literal_from_value(Value::Integer(1)),
+                        Type::Integer,
+                    ),
+                ),
+            ],
+        );
+        BoundNode::block_statement(
+            span,
+            vec![
+                BoundNode::variable_declaration(
+                    span,
+                    index_variable,
+                    BoundNode::literal_from_value(Value::Integer(1)),
+                ), // let $index = 0;
+                BoundNode::variable_declaration(span, collection_variable, collection), // let $collection = collection;
+                BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
+            ],
+        )
+    }
+
     pub fn variable_declaration(
         span: TextSpan,
         variable_index: u64,

@@ -839,95 +839,15 @@ fn bind_for_statement<'a, 'b>(
     }
     let index_variable = index_variable.unwrap();
     let collection_variable = binder
-        .register_generated_variable(
-            format!("{}$collection", for_statement.variable.lexeme),
-            collection.type_.clone(),
-            true,
-        )
-        .unwrap();
-    let body = bind_node(*for_statement.body, binder);
-    let while_condition = BoundNode::binary(
-        span,
-        BoundNode::variable(span, index_variable, Type::Integer),
-        BoundBinaryOperator::LessThan,
-        BoundNode::system_call(
-            span,
-            SystemCallKind::ArrayLength,
-            vec![BoundNode::variable(
-                span,
-                collection_variable,
+            .register_generated_variable(
+                format!("{}$collection", for_statement.variable.lexeme),
                 collection.type_.clone(),
-            )],
-            Type::Integer,
-        ),
-        Type::Boolean,
-    );
-    let while_body = BoundNode::block_statement(
-        span,
-        vec![
-            // variable = $collection[$index];
-            BoundNode::assignment(
-                span,
-                BoundNode::variable(span, variable, variable_type.clone()),
-                BoundNode::array_index(
-                    span,
-                    BoundNode::variable(span, collection_variable, collection.type_.clone()),
-                    BoundNode::variable(span, index_variable, Type::Integer),
-                    collection.type_.array_base_type().unwrap().clone(),
-                ),
-            ),
-            // {
-            body,
-            // }
-            // $index = $index + 1;
-            BoundNode::assignment(
-                span,
-                BoundNode::variable(span, index_variable, Type::Integer),
-                BoundNode::binary(
-                    span,
-                    BoundNode::variable(span, index_variable, Type::Integer),
-                    BoundBinaryOperator::ArithmeticAddition,
-                    BoundNode::literal(
-                        span,
-                        LiteralNodeKind {
-                            value: 1.into(),
-                            token: SyntaxToken {
-                                kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind {
-                                    value: 1,
-                                }),
-                                lexeme: "1",
-                                start: 0,
-                            },
-                        },
-                    ),
-                    Type::Integer,
-                ),
-            ),
-        ],
-    );
-    let result = BoundNode::block_statement(
-        span,
-        vec![
-            BoundNode::variable_declaration(
-                span,
-                index_variable,
-                BoundNode::literal(
-                    span,
-                    LiteralNodeKind {
-                        value: 0.into(),
-                        token: SyntaxToken {
-                            kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 0 }),
-                            lexeme: "0",
-                            start: 0,
-                        },
-                    },
-                ),
-            ), // let $index = 0;
-            BoundNode::variable_declaration(span, collection_variable, collection), // let $collection = collection;
-            BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
-        ],
-    );
-
+                true,
+            )
+            .unwrap();
+    let body = bind_node(*for_statement.body, binder);
+    let variable = BoundNode::variable(span, variable, variable_type.clone());
+    let result = BoundNode::for_statement(span, index_variable, collection_variable, variable, collection, body);
     if binder.print_variable_table {
         print_variable_table(&binder.variable_table);
     }
