@@ -16,10 +16,12 @@ pub(crate) fn replace_labels(instructions: Vec<InstructionOrLabelReference>, deb
             InstructionOrLabelReference::LabelReference(l) => Instruction::load_pointer(labels[l.0]),
         })
         .map(|i| {
-            if i.op_code == OpCode::Label {
-                Instruction::noop()
-            } else {
-                i
+            match i.op_code {
+                OpCode::Label => Instruction::noop(),
+                OpCode::Jump => Instruction::jump(labels[i.arg as usize]),
+                OpCode::JumpIfFalse => Instruction::jump_if_false(labels[i.arg as usize]),
+                OpCode::JumpIfTrue => Instruction::jump_if_true(labels[i.arg as usize]),
+                _ => i,
             }
         })
         .collect()

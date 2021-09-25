@@ -34,9 +34,10 @@ pub enum OpCode {
     GreaterThanEquals = 39,
     StringConcat = 40,
     //Jumps
-    JmpRelative = 58,
-    JmpIfFalse = 59,
-    SysCall = 60,
-    FunctionCall = 61,
-    Return = 62,
+    Jump = 60,
+    JumpIfFalse = 61,
+    JumpIfTrue = 62,
+    SysCall = 63,
+    FunctionCall = 64,
+    Return = 65,
 }

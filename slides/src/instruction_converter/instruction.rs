@@ -218,17 +218,43 @@ impl Instruction {
         }
     }
 
-    pub const fn jump_relative(relative_address: i64) -> Self {
+    pub const fn jump_to_label(label_index: usize) -> Self {
         Self {
-            op_code: OpCode::JmpRelative,
-            arg: relative_address as _,
+            op_code: OpCode::Jump,
+            arg: label_index as _,
         }
     }
 
-    pub const fn jump_if_false(relative_address: i64) -> Self {
+    pub const fn jump(address: u64) -> Self {
         Self {
-            op_code: OpCode::JmpIfFalse,
-            arg: relative_address as _,
+            op_code: OpCode::Jump,
+            arg: address,
+        }
+    }
+
+    pub const fn jump_to_label_conditionally(label_index: usize, jump_if_true: bool) -> Self {
+        let op_code = if jump_if_true {
+            OpCode::JumpIfTrue
+        } else {
+            OpCode::JumpIfFalse
+        };
+        Self {
+            op_code,
+            arg: label_index as _,
+        }
+    }
+
+    pub const fn jump_if_false(address: u64) -> Self {
+        Self {
+            op_code: OpCode::JumpIfFalse,
+            arg: address,
+        }
+    }
+
+    pub const fn jump_if_true(address: u64) -> Self {
+        Self {
+            op_code: OpCode::JumpIfTrue,
+            arg: address,
         }
     }
 
