@@ -377,12 +377,64 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn label_address(index: usize) -> Self {
+    pub fn label_reference(index: usize) -> Self {
         Self {
             span: TextSpan::zero(),
-            kind: BoundNodeKind::LabelAddress(index),
+            kind: BoundNodeKind::LabelReference(index),
             type_: Type::Integer, // FIXME: Type::Pointer
             byte_width: 4,
+            constant_value: None,
+        }
+    }
+
+    pub fn label(index: usize) -> Self {
+        Self {
+            span: TextSpan::zero(),
+            kind: BoundNodeKind::Label(index),
+            type_: Type::Void,
+            byte_width: 4,
+            constant_value: None,
+        }
+    }
+
+    pub fn jump(target: BoundNode<'a>) -> Self {
+        Self {
+            span: TextSpan::zero(),
+            kind: BoundNodeKind::Jump(BoundJumpNodeKind {
+                condition: None,
+                target: Box::new(target),
+                jump_if_true: true,
+            }),
+            type_: Type::Void,
+            byte_width: 0,
+            constant_value: None,
+        }
+    }
+
+    pub fn jump_if_true(condition: BoundNode<'a>, target: BoundNode<'a>) -> Self {
+        Self {
+            span: TextSpan::zero(),
+            kind: BoundNodeKind::Jump(BoundJumpNodeKind {
+                condition: Some(Box::new(condition)),
+                target: Box::new(target),
+                jump_if_true: true,
+            }),
+            type_: Type::Void,
+            byte_width: 0,
+            constant_value: None,
+        }
+    }
+
+    pub fn jump_if_false(condition: BoundNode<'a>, target: BoundNode<'a>) -> Self {
+        Self {
+            span: TextSpan::zero(),
+            kind: BoundNodeKind::Jump(BoundJumpNodeKind {
+                condition: Some(Box::new(condition)),
+                target: Box::new(target),
+                jump_if_true: false,
+            }),
+            type_: Type::Void,
+            byte_width: 0,
             constant_value: None,
         }
     }
@@ -404,9 +456,12 @@ impl<'a> BoundNode<'a> {
 pub enum BoundNodeKind<'a> {
     // Top Level Statements
     FunctionDeclaration(BoundFunctionDeclarationNodeKind<'a>),
-    // Expressions
+    // Generated
     ErrorExpression,
-    LabelAddress(usize),
+    Label(usize),
+    LabelReference(usize),
+    Jump(BoundJumpNodeKind<'a>),
+    // Expressions
     LiteralExpression(LiteralNodeKind<'a>),
     ArrayLiteralExpression(BoundArrayLiteralNodeKind<'a>),
     VariableExpression(BoundVariableNodeKind),
@@ -433,6 +488,13 @@ pub struct BoundFunctionDeclarationNodeKind<'a> {
     pub is_main: bool,
     pub body: Box<BoundNode<'a>>,
     pub parameters: Vec<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundJumpNodeKind<'a> {
+    pub condition: Option<Box<BoundNode<'a>>>,
+    pub target: Box<BoundNode<'a>>,
+    pub jump_if_true: bool,
 }
 
 #[derive(Debug, Clone)]

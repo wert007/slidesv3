@@ -203,7 +203,7 @@ pub fn bind<'a>(
         statements.insert(0, BoundNode::assignment(
             TextSpan::zero(),
             BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
-            BoundNode::label_address(index),
+            BoundNode::label_reference(index),
         ));
         statements.push(BoundNode::function_declaration(index, node.is_main, body, parameters));
         binder.delete_variables_until(fixed_variable_count);
