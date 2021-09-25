@@ -3,12 +3,15 @@ use crate::{binder::bound_nodes::*, parser::syntax_nodes::LiteralNodeKind};
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DebugFlags {
     pub print_instructions: bool,
+    pub print_instructions_and_labels: bool,
     pub print_current_instruction: bool,
     pub print_variable_table: bool,
     pub print_tokens: bool,
     pub print_heap_as_string: bool,
     pub print_bound_program: bool,
     pub print_stack: bool,
+    pub print_labels: bool,
+    pub run_program: bool,
 }
 
 impl DebugFlags {

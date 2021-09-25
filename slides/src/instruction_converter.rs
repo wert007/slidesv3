@@ -93,7 +93,13 @@ pub fn convert<'a>(
         fixed_variable_count: bound_program.fixed_variable_count,
     };
     let instructions = convert_node(bound_node, &mut converter);
-    let instructions = label_replacer::replace_labels(instructions);
+    if debug_flags.print_instructions_and_labels {
+        for (i, instruction) in instructions.iter().enumerate() {
+            println!("  {:000}: {}", i, instruction);
+        }
+    }
+
+    let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.print_instructions() {
         for (i, instruction) in instructions.iter().enumerate() {
             println!("  {:000}: {:?}", i, instruction);

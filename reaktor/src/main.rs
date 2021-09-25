@@ -7,12 +7,15 @@ fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().collect();
     let debug_flags = DebugFlags {
         print_instructions: args.contains(&String::from("-di")),
+        print_instructions_and_labels: args.contains(&String::from("-dil")),
         print_tokens: args.contains(&String::from("-dt")),
         print_current_instruction: args.contains(&String::from("-dci")),
         print_variable_table: args.contains(&String::from("-dbv")),
         print_heap_as_string: args.contains(&String::from("-dheap")),
         print_bound_program: args.contains(&String::from("-dbp")),
         print_stack: args.contains(&String::from("-dstack")),
+        print_labels: args.contains(&String::from("-dlabels")),
+        run_program: !args.contains(&String::from("-no-run")),
     };
     if args.len() == 1 || args[1].starts_with('-') {
         repl(debug_flags)

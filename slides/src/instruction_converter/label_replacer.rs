@@ -4,6 +4,11 @@ use super::{instruction::Instruction, InstructionOrLabelReference};
 
 pub(crate) fn replace_labels(instructions: Vec<InstructionOrLabelReference>, debug_flags: DebugFlags) -> Vec<Instruction> {
     let labels = collect_labels(&instructions);
+    if debug_flags.print_labels {
+        for (index, label) in labels.iter().enumerate() {
+            println!("L{}: #{}", index, label);
+        }
+    }
     instructions
         .into_iter()
         .map(|i_l| match i_l {

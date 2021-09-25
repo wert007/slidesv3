@@ -18,7 +18,7 @@ pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = instruction_converter::convert(&source_text, &mut diagnostic_bag, debug_flags);
     // let result = binder::bind(input, &mut diagnostic_bag);
-    if diagnostic_bag.has_errors() {
+    if diagnostic_bag.has_errors() || !debug_flags.run_program {
         diagnostic_bag.flush_to_console();
         return;
     }
