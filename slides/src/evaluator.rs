@@ -106,8 +106,9 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
         OpCode::StringConcat => evaluate_string_concat(state, instruction),
-        OpCode::JmpRelative => evaluate_jmp_relative(state, instruction),
-        OpCode::JmpIfFalse => evaluate_jmp_if_false(state, instruction),
+        OpCode::Jump => evaluate_jump(state, instruction),
+        OpCode::JumpIfFalse => evaluate_jump_if_false(state, instruction),
+        OpCode::JumpIfTrue => evaluate_jump_if_true(state, instruction),
         OpCode::SysCall => evaluate_sys_call(state, instruction),
         OpCode::FunctionCall => evaluate_function_call(state, instruction),
         OpCode::Return => evaluate_return(state, instruction),
@@ -464,14 +465,21 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
     state.stack.push_pointer(pointer);
 }
 
-fn evaluate_jmp_relative(state: &mut EvaluatorState, instruction: Instruction) {
-    state.pc = ((state.pc as i64) + (instruction.arg as i64)) as usize;
+fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {
+    state.pc = instruction.arg as _;
 }
 
-fn evaluate_jmp_if_false(state: &mut EvaluatorState, instruction: Instruction) {
+fn evaluate_jump_if_false(state: &mut EvaluatorState, instruction: Instruction) {
     let condition = state.stack.pop().value;
     if condition == 0 {
-        state.pc = ((state.pc as i64) + (instruction.arg as i64)) as usize;
+        state.pc = instruction.arg as _;
+    }
+}
+
+fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
+    let condition = state.stack.pop().value;
+    if condition != 0 {
+        state.pc = instruction.arg as _;
     }
 }
 
