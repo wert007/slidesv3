@@ -114,6 +114,8 @@ pub fn convert<'a>(
 
 fn convert_node(node: BoundNode, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
     match node.kind {
+        BoundNodeKind::IfStatement(_) |
+        BoundNodeKind::WhileStatement(_) |
         BoundNodeKind::ErrorExpression => unreachable!(),
         BoundNodeKind::FunctionDeclaration(function_declaration) => convert_function_declaration(function_declaration, converter),
         BoundNodeKind::LiteralExpression(literal) => convert_literal(literal, converter),
@@ -132,14 +134,8 @@ fn convert_node(node: BoundNode, converter: &mut InstructionConverter) -> Vec<In
         BoundNodeKind::BlockStatement(block_statement) => {
             convert_block_statement(block_statement, converter)
         }
-        BoundNodeKind::IfStatement(if_statement) => {
-            convert_if_statement(if_statement, converter)
-        }
         BoundNodeKind::VariableDeclaration(variable_declaration) => {
             convert_variable_declaration(variable_declaration, converter)
-        }
-        BoundNodeKind::WhileStatement(while_statement) => {
-            convert_while_statement(while_statement, converter)
         }
         BoundNodeKind::Assignment(assignment) => convert_assignment(assignment, converter),
         BoundNodeKind::ExpressionStatement(expression_statement) => {
@@ -385,27 +381,6 @@ fn convert_field_access(
     convert_node(*field_access.base, converter)
 }
 
-fn convert_if_statement(
-    if_statement: BoundIfStatementNodeKind,
-    converter: &mut InstructionConverter,
-) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*if_statement.condition, converter);
-    let mut body = convert_node(*if_statement.body, converter);
-    let mut body_len = body.len() as i64;
-    if if_statement.else_body.is_some() {
-        body_len += 1
-    }
-    let jmp = Instruction::jump_if_false(body_len);
-    result.push(jmp.into());
-    result.append(&mut body);
-    if let Some(else_body) = if_statement.else_body {
-        let mut else_body = convert_node(*else_body, converter);
-        result.push(Instruction::jump_relative(else_body.len() as i64).into());
-        result.append(&mut else_body);
-    }
-    result
-}
-
 fn convert_variable_declaration(
     variable_declaration: BoundVariableDeclarationNodeKind,
     converter: &mut InstructionConverter,
@@ -414,20 +389,6 @@ fn convert_variable_declaration(
     result.push(Instruction::store_in_register(
         variable_declaration.variable_index,
     ).into());
-    result
-}
-
-fn convert_while_statement(
-    while_statement: BoundWhileStatementNodeKind,
-    converter: &mut InstructionConverter,
-) -> Vec<InstructionOrLabel> {
-    let mut result = convert_node(*while_statement.condition, converter);
-    let mut body = convert_node(*while_statement.body, converter);
-    let jmp = Instruction::jump_if_false(body.len() as i64 + 1);
-    result.push(jmp.into());
-    result.append(&mut body);
-    let jmp = Instruction::jump_relative(-(result.len() as i64 + 1));
-    result.push(jmp.into());
     result
 }
 

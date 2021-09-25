@@ -4,6 +4,8 @@ pub mod operators;
 mod tests;
 pub mod typing;
 
+mod lowerer;
+
 use std::collections::HashMap;
 
 use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, ReturnStatementNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
@@ -186,6 +188,7 @@ pub fn bind<'a>(
     statements.push(call_main(&mut binder));
 
     let fixed_variable_count = binder.variable_table.len();
+    let mut label_count = binder.functions.len();
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
         let mut parameters = Vec::with_capacity(node.parameters.len());
         for (variable_name, variable_type) in node.parameters {
@@ -199,7 +202,7 @@ pub fn bind<'a>(
         binder.function_return_type = node.return_type;
         let body = bind_node(node.body, &mut binder);
         let body = BoundNode::block_statement(body.span, vec![body, BoundNode::return_statement(TextSpan::zero(), None)]);
-
+        let body = BoundNode::block_statement(span, lowerer::flatten(body, &mut label_count));
         statements.insert(0, BoundNode::assignment(
             TextSpan::zero(),
             BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
