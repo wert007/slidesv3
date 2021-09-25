@@ -33,7 +33,13 @@ fn collect_labels(instructions: &[InstructionOrLabelReference]) -> Vec<u64> {
         match instruction {
             InstructionOrLabelReference::Instruction(instruction) => match instruction.op_code {
                 OpCode::Label => {
-                    result.push(index as _);
+                    while result.len() <= instruction.arg as _ {
+                        // Extend the labels to the needed label index and
+                        // insert improbable results, so if there will be a bug,
+                        // where labels are not defined, it will crash loudly.
+                        result.push(u64::MAX);
+                    }
+                    result[instruction.arg as usize] = index as _;
                 }
                 _ => {}
             },
