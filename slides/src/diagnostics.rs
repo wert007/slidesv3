@@ -188,4 +188,9 @@ impl<'a> DiagnosticBag<'a> {
         let message = format!("Function returns type {} and needs a value of type {}.", expected_return_type, expected_return_type);
         self.report(message, span);
     }
+
+    pub fn report_missing_return_statement(&mut self, span: TextSpan, expected_return_type: &Type) {
+        let message = format!("Not all paths in function return. Every path needs a return value of type {}", expected_return_type);
+        self.report(message, span);
+    }
 }

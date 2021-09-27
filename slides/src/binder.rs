@@ -5,6 +5,7 @@ mod tests;
 pub mod typing;
 
 mod lowerer;
+mod control_flow_analyzer;
 
 use std::collections::HashMap;
 
@@ -203,6 +204,11 @@ pub fn bind<'a>(
         let body = bind_node(node.body, &mut binder);
         let body = BoundNode::block_statement(body.span, vec![body, BoundNode::return_statement(TextSpan::zero(), None)]);
         let body = BoundNode::block_statement(span, lowerer::flatten(body, &mut label_count));
+        if !matches!(&binder.function_return_type, Type::Void) {
+            if !control_flow_analyzer::check_if_all_paths_return(&body) {
+                binder.diagnostic_bag.report_missing_return_statement(span, &binder.function_return_type);
+            }
+        }
         statements.insert(0, BoundNode::assignment(
             TextSpan::zero(),
             BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
