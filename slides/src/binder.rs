@@ -317,6 +317,7 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
 
 #[derive(Clone, Debug)]
 struct FunctionDeclarationBody<'a> {
+    function_name: &'a str,
     body: SyntaxNode<'a>,
     parameters: Vec<(&'a str, Type)>,
     is_main: bool,
@@ -344,6 +345,7 @@ fn bind_function_declaration<'a, 'b>(
         0
     };
     binder.functions.push(FunctionDeclarationBody {
+        function_name: function_declaration.identifier.lexeme,
         body: *function_declaration.body,
         parameters: variables,
         is_main,
