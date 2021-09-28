@@ -10,7 +10,10 @@ use self::instruction::Instruction;
 use super::evaluator::stack::Stack;
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct LabelReference(usize);
+pub(crate) struct LabelReference {
+    label_reference: usize,
+    span: TextSpan,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum InstructionOrLabelReference {
@@ -22,7 +25,7 @@ impl std::fmt::Display for InstructionOrLabelReference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InstructionOrLabelReference::Instruction(i) => write!(f, "  {:?}", i),
-            InstructionOrLabelReference::LabelReference(l) => write!(f, "L{}:", l.0),
+            InstructionOrLabelReference::LabelReference(l) => write!(f, "L{}:", l.label_reference),
         }
     }
 }
@@ -155,9 +158,9 @@ fn convert_node(node: BoundNode, converter: &mut InstructionConverter) -> Vec<In
 
 fn convert_function_declaration(span: TextSpan, function_declaration: BoundFunctionDeclarationNodeKind, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    result.push(Instruction::label(function_declaration.index).into());
+    result.push(Instruction::label(function_declaration.index).span(span).into());
     for parameter in function_declaration.parameters {
-        result.push(Instruction::store_in_register(parameter).into());
+        result.push(Instruction::store_in_register(parameter).span(span).into());
     }
     result.append(&mut convert_node(*function_declaration.body, converter));
     result
@@ -195,7 +198,7 @@ fn convert_literal(
         Value::SystemCall(kind) => kind as u64,
         Value::String(value) => return convert_string_literal(span, value, converter),
     };
-    vec![Instruction::load_immediate(value).into()]
+    vec![Instruction::load_immediate(value).span(span).into()]
 }
 
 fn convert_string_literal(span: TextSpan, value: String, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
@@ -226,7 +229,7 @@ fn convert_string_literal(span: TextSpan, value: String, converter: &mut Instruc
         let word = u64::from_be_bytes(word);
         converter.stack.write_word(address, word);
     }
-    vec![Instruction::load_pointer(pointer).into()]
+    vec![Instruction::load_pointer(pointer).span(span).into()]
 }
 
 fn convert_array_literal(
@@ -249,24 +252,24 @@ fn convert_array_literal(
         Type::Integer | Type::Boolean | Type::SystemCall(_) => {
             for child in array_literal.children.into_iter() {
                 result.append(&mut convert_node(child, converter));
-                result.push(Instruction::write_to_stack(address as _).into());
+                result.push(Instruction::write_to_stack(address as _).span(span).into());
                 address += WORD_SIZE_IN_BYTES;
             }
         }
     }
-    result.push(Instruction::load_pointer(pointer).into());
+    result.push(Instruction::load_pointer(pointer).span(span).into());
     result
 }
 
 fn convert_variable(span: TextSpan, variable: BoundVariableNodeKind) -> Vec<InstructionOrLabelReference> {
-    vec![Instruction::load_register(variable.variable_index).into()]
+    vec![Instruction::load_register(variable.variable_index).span(span).into()]
 }
 
 fn convert_variable_for_assignment(
     span: TextSpan,
     variable: BoundVariableNodeKind,
 ) -> Vec<InstructionOrLabelReference> {
-    vec![Instruction::store_in_register(variable.variable_index).into()]
+    vec![Instruction::store_in_register(variable.variable_index).span(span).into()]
 }
 
 fn convert_array_index_for_assignment(
@@ -276,7 +279,7 @@ fn convert_array_index_for_assignment(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*array_index.base, converter);
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(Instruction::store_in_memory().into());
+    result.push(Instruction::store_in_memory().span(span).into());
     result
 }
 
@@ -287,7 +290,7 @@ fn convert_unary(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*unary.operand, converter);
     match unary.operator_token {
-        BoundUnaryOperator::ArithmeticNegate => result.push(Instruction::twos_complement().into()),
+        BoundUnaryOperator::ArithmeticNegate => result.push(Instruction::twos_complement().span(span).into()),
         BoundUnaryOperator::ArithmeticIdentity => {}
     }
     result
@@ -322,21 +325,21 @@ fn convert_binary(
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(),
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
         BoundBinaryOperator::StringConcat => Instruction::string_concat(),
-    };
+    }.span(span);
     let mut result = vec![];
     let lhs_is_string = matches!(binary.lhs.type_, Type::String);
     let lhs_type_identifier = binary.lhs.type_.type_identifier();
     result.append(&mut convert_node(*binary.lhs, converter));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !lhs_is_string {
-        result.push(Instruction::type_identifier(lhs_type_identifier).into());
-        result.push(Instruction::system_call(SystemCallKind::ToString, 1).into());
+        result.push(Instruction::type_identifier(lhs_type_identifier).span(span).into());
+        result.push(Instruction::system_call(SystemCallKind::ToString, 1).span(span).into());
     }
     let rhs_is_string = matches!(binary.rhs.type_, Type::String);
     let rhs_type_identifier = binary.rhs.type_.type_identifier();
     result.append(&mut convert_node(*binary.rhs, converter));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !rhs_is_string {
-        result.push(Instruction::type_identifier(rhs_type_identifier).into());
-        result.push(Instruction::system_call(SystemCallKind::ToString, 1).into());
+        result.push(Instruction::type_identifier(rhs_type_identifier).span(span).into());
+        result.push(Instruction::system_call(SystemCallKind::ToString, 1).span(span).into());
     }
     result.push(operator_instruction.into());
     result
@@ -353,7 +356,7 @@ fn convert_function_call(
         result.append(&mut convert_node(argument, converter));
     }
     result.append(&mut convert_node(*function_call.base, converter));
-    result.push(Instruction::function_call(argument_count).into());
+    result.push(Instruction::function_call(argument_count).span(span).into());
     result
 }
 
@@ -367,9 +370,9 @@ fn convert_system_call(
     for argument in system_call.arguments {
         let type_identifier = argument.type_.type_identifier();
         result.append(&mut convert_node(argument, converter));
-        result.push(Instruction::type_identifier(type_identifier).into());
+        result.push(Instruction::type_identifier(type_identifier).span(span).into());
     }
-    result.push(Instruction::system_call(system_call.base, argument_count).into());
+    result.push(Instruction::system_call(system_call.base, argument_count).span(span).into());
     result
 }
 
@@ -380,12 +383,12 @@ fn convert_array_index(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*array_index.base, converter);
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(Instruction::array_index().into());
+    result.push(Instruction::array_index().span(span).into());
     result
 }
 
 fn convert_field_access(
-    span: TextSpan,
+    _span: TextSpan,
     field_access: BoundFieldAccessNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -400,12 +403,12 @@ fn convert_variable_declaration(
     let mut result = convert_node(*variable_declaration.initializer, converter);
     result.push(Instruction::store_in_register(
         variable_declaration.variable_index,
-    ).into());
+    ).span(span).into());
     result
 }
 
 fn convert_assignment(
-    span: TextSpan,
+    _span: TextSpan,
     assignment: BoundAssignmentNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -418,7 +421,7 @@ fn convert_assignment(
 }
 
 fn convert_block_statement(
-    span: TextSpan,
+    _span: TextSpan,
     block_statement: BoundBlockStatementNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -437,7 +440,7 @@ fn convert_expression_statement(
     let pushes_on_stack = !matches!(expression_statement.expression.type_, Type::Void);
     let mut result = convert_node(*expression_statement.expression, converter);
     if pushes_on_stack {
-        result.push(Instruction::pop().into());
+        result.push(Instruction::pop().span(span).into());
     }
     result
 }
@@ -454,7 +457,7 @@ fn convert_return_statement(
     } else {
         vec![]
     };
-    result.push(Instruction::return_from_function(pushes_on_stack).into());
+    result.push(Instruction::return_from_function(pushes_on_stack).span(span).into());
     result
 }
 
@@ -462,14 +465,17 @@ fn convert_label(
     span: TextSpan,
     index: usize,
 ) -> Vec<InstructionOrLabelReference> {
-    vec![Instruction::label(index).into()]
+    vec![Instruction::label(index).span(span).into()]
 }
 
 fn convert_label_reference(
     span: TextSpan,
     label_reference: usize,
 ) -> Vec<InstructionOrLabelReference> {
-    vec![LabelReference(label_reference).into()]
+    vec![LabelReference {
+        label_reference,
+        span,
+    }.into()]
 }
 
 fn convert_jump(
@@ -480,13 +486,13 @@ fn convert_jump(
     let mut label = convert_node(*jump.target, converter);
     assert_eq!(label.len(), 1);
     let label = label.pop().unwrap();
-    let label = label.as_label().unwrap_or_else(|| panic!("{:?}", label)).0;
+    let label = label.as_label().unwrap_or_else(|| panic!("{:?}", label)).label_reference;
     match jump.condition {
         Some(condition) => {
             let mut result = convert_node(*condition, converter);
-            result.push(Instruction::jump_to_label_conditionally(label, jump.jump_if_true).into());
+            result.push(Instruction::jump_to_label_conditionally(label, jump.jump_if_true).span(span).into());
             result
         },
-        None => vec![Instruction::jump_to_label(label).into()],
+        None => vec![Instruction::jump_to_label(label).span(span).into()],
     }
 }

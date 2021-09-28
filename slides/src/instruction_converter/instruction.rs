@@ -15,6 +15,12 @@ pub struct Instruction {
 
 #[allow(dead_code)]
 impl Instruction {
+    pub fn span(mut self, span: TextSpan) -> Self {
+        assert!(self.span.is_none());
+        self.span = Some(span);
+        self
+    }
+
     pub const fn noop() -> Instruction {
         Self {
             op_code: OpCode::NoOp,

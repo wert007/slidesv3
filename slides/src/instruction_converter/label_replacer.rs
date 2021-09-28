@@ -13,9 +13,10 @@ pub(crate) fn replace_labels(instructions: Vec<InstructionOrLabelReference>, deb
         .into_iter()
         .map(|i_l| match i_l {
             InstructionOrLabelReference::Instruction(i) => i,
-            InstructionOrLabelReference::LabelReference(l) => Instruction::load_pointer(labels[l.0]),
+            InstructionOrLabelReference::LabelReference(l) => Instruction::load_pointer(labels[l.label_reference]).span(l.span),
         })
         .map(|i| {
+            // TODO: We lose the span here. This is easily fixable.
             match i.op_code {
                 OpCode::Label => Instruction::noop(),
                 OpCode::Jump => Instruction::jump(labels[i.arg as usize]),
