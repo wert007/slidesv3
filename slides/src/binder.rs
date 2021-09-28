@@ -4,7 +4,7 @@ pub mod operators;
 mod tests;
 pub mod typing;
 
-mod control_flow_analyzer;
+pub mod control_flow_analyzer;
 mod lowerer;
 
 use std::collections::HashMap;
