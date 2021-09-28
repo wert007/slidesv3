@@ -4,12 +4,30 @@ pub mod operators;
 mod tests;
 pub mod typing;
 
-mod lowerer;
 mod control_flow_analyzer;
+mod lowerer;
 
 use std::collections::HashMap;
 
-use crate::{DebugFlags, binder::{operators::BoundUnaryOperator, typing::Type}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind, ReturnStatementNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+use crate::{
+    binder::{operators::BoundUnaryOperator, typing::Type},
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    parser::{
+        self,
+        syntax_nodes::{
+            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
+            BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
+            ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
+            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind,
+            ReturnStatementNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
+            VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
+        },
+    },
+    text::{SourceText, TextSpan},
+    value::Value,
+    DebugFlags,
+};
 
 use self::{
     bound_nodes::{BoundNode, BoundNodeKind},
@@ -211,15 +229,25 @@ pub fn bind<'a>(
         body = BoundNode::block_statement(span, lowerer::flatten(body, &mut label_count));
         if !matches!(&binder.function_return_type, Type::Void) {
             if !control_flow_analyzer::check_if_all_paths_return(&body) {
-                binder.diagnostic_bag.report_missing_return_statement(span, &binder.function_return_type);
+                binder
+                    .diagnostic_bag
+                    .report_missing_return_statement(span, &binder.function_return_type);
             }
         }
-        statements.insert(0, BoundNode::assignment(
-            TextSpan::zero(),
-            BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
-            BoundNode::label_reference(index),
+        statements.insert(
+            0,
+            BoundNode::assignment(
+                TextSpan::zero(),
+                BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
+                BoundNode::label_reference(index),
+            ),
+        );
+        statements.push(BoundNode::function_declaration(
+            index,
+            node.is_main,
+            body,
+            parameters,
         ));
-        statements.push(BoundNode::function_declaration(index, node.is_main, body, parameters));
         binder.delete_variables_until(fixed_variable_count);
     }
 
@@ -258,10 +286,7 @@ fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
     call_main
 }
 
-fn bind_top_level_statements<'a, 'b>(
-    node: SyntaxNode<'a>,
-    binder: &mut BindingState<'a, 'b>,
-) {
+fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
     match node.kind {
         SyntaxNodeKind::CompilationUnit(compilation_unit) => {
             for statement in compilation_unit.statements {
@@ -277,10 +302,7 @@ fn bind_top_level_statements<'a, 'b>(
     }
 }
 
-fn bind_top_level_statement<'a, 'b>(
-    node: SyntaxNode<'a>,
-    binder: &mut BindingState<'a, 'b>,
-) {
+fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
     match node.kind {
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(function_declaration, binder)
@@ -867,15 +889,22 @@ fn bind_for_statement<'a, 'b>(
     }
     let index_variable = index_variable.unwrap();
     let collection_variable = binder
-            .register_generated_variable(
-                format!("{}$collection", for_statement.variable.lexeme),
-                collection.type_.clone(),
-                true,
-            )
-            .unwrap();
+        .register_generated_variable(
+            format!("{}$collection", for_statement.variable.lexeme),
+            collection.type_.clone(),
+            true,
+        )
+        .unwrap();
     let body = bind_node(*for_statement.body, binder);
     let variable = BoundNode::variable(span, variable, variable_type.clone());
-    let result = BoundNode::for_statement(span, index_variable, collection_variable, variable, collection, body);
+    let result = BoundNode::for_statement(
+        span,
+        index_variable,
+        collection_variable,
+        variable,
+        collection,
+        body,
+    );
     if binder.print_variable_table {
         print_variable_table(&binder.variable_table);
     }
@@ -937,13 +966,21 @@ fn bind_return_statement<'a, 'b>(
     return_statement: ReturnStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    let expression = return_statement.optional_expression.map(|e| bind_node(*e, binder));
+    let expression = return_statement
+        .optional_expression
+        .map(|e| bind_node(*e, binder));
     let function_return_type = &binder.function_return_type;
     if expression.is_none() && !function_return_type.can_be_converted_to(&Type::Void) {
-        binder.diagnostic_bag.report_missing_return_value(span, function_return_type);
+        binder
+            .diagnostic_bag
+            .report_missing_return_value(span, function_return_type);
     } else if let Some(expression) = &expression {
         if !expression.type_.can_be_converted_to(&function_return_type) {
-            binder.diagnostic_bag.report_cannot_convert(expression.span, &expression.type_, function_return_type);
+            binder.diagnostic_bag.report_cannot_convert(
+                expression.span,
+                &expression.type_,
+                function_return_type,
+            );
         }
     }
     BoundNode::return_statement(span, expression)

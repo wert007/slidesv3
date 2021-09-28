@@ -344,12 +344,12 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn compilation_unit(statements: Vec<SyntaxNode<'a>>, eoi: SyntaxToken<'a>) -> Self {
-        let span = TextSpan::bounds(statements.first().unwrap().span(), statements.last().unwrap().span());
+        let span = TextSpan::bounds(
+            statements.first().unwrap().span(),
+            statements.last().unwrap().span(),
+        );
         Self {
-            kind: SyntaxNodeKind::CompilationUnit(CompilationUnitNodeKind {
-                statements,
-                eoi,
-            }),
+            kind: SyntaxNodeKind::CompilationUnit(CompilationUnitNodeKind { statements, eoi }),
             span,
             is_inserted: false,
         }
@@ -400,7 +400,6 @@ pub struct CompilationUnitNodeKind<'a> {
     pub eoi: SyntaxToken<'a>,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct FunctionDeclarationNodeKind<'a> {
     pub identifier: SyntaxToken<'a>,
@@ -414,29 +413,40 @@ pub struct FunctionTypeNode<'a> {
     pub parameters: Vec<ParameterNode<'a>>,
     pub comma_tokens: Vec<SyntaxToken<'a>>,
     pub rparen: SyntaxToken<'a>,
+    pub return_type: Option<ReturnTypeNode<'a>>,
 }
 
 impl<'a> FunctionTypeNode<'a> {
-    pub fn new(lparen: SyntaxToken<'a>, parameters: Vec<ParameterNode<'a>>, comma_tokens: Vec<SyntaxToken<'a>>, rparen: SyntaxToken<'a>) -> Self {
+    pub fn new(
+        lparen: SyntaxToken<'a>,
+        parameters: Vec<ParameterNode<'a>>,
+        comma_tokens: Vec<SyntaxToken<'a>>,
+        rparen: SyntaxToken<'a>,
+        return_type: Option<ReturnTypeNode<'a>>,
+    ) -> Self {
         Self {
             lparen,
             parameters,
             comma_tokens,
             rparen,
+            return_type,
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct ParameterNode<'a> {
     pub identifier: SyntaxToken<'a>,
     pub colon_token: SyntaxToken<'a>,
-    pub type_: TypeNode<'a>
+    pub type_: TypeNode<'a>,
 }
 
 impl<'a> ParameterNode<'a> {
-    pub fn new(identifier: SyntaxToken<'a>, colon_token: SyntaxToken<'a>, type_: TypeNode<'a>) -> Self {
+    pub fn new(
+        identifier: SyntaxToken<'a>,
+        colon_token: SyntaxToken<'a>,
+        type_: TypeNode<'a>,
+    ) -> Self {
         Self {
             identifier,
             colon_token,
@@ -466,9 +476,12 @@ impl<'a> TypeNode<'a> {
     }
 
     pub fn span(&self) -> TextSpan {
-        TextSpan::bounds(self.identifier.span(), self.brackets.last().unwrap_or(&self.identifier).span())
+        TextSpan::bounds(
+            self.identifier.span(),
+            self.brackets.last().unwrap_or(&self.identifier).span(),
+        )
     }
-}    
+}
 
 #[derive(Debug, Clone)]
 pub struct LiteralNodeKind<'a> {
