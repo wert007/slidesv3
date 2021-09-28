@@ -1,6 +1,6 @@
 use num_enum::TryFromPrimitive;
 
-use crate::binder::typing::SystemCallKind;
+use crate::{binder::typing::SystemCallKind, text::TextSpan};
 
 use self::op_codes::OpCode;
 
@@ -10,6 +10,7 @@ pub mod op_codes;
 pub struct Instruction {
     pub op_code: OpCode,
     pub arg: u64,
+    pub span: Option<TextSpan>,
 }
 
 #[allow(dead_code)]
@@ -18,6 +19,7 @@ impl Instruction {
         Self {
             op_code: OpCode::NoOp,
             arg: 0,
+            span: None,
         }
     }
 
@@ -25,6 +27,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LoadImmediate,
             arg: immediate,
+            span: None,
         }
     }
 
@@ -32,6 +35,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LoadPointer,
             arg: pointer,
+            span: None,
         }
     }
 
@@ -39,6 +43,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Pop,
             arg: 0,
+            span: None,
         }
     }
 
@@ -46,6 +51,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LoadRegister,
             arg: register,
+            span: None,
         }
     }
 
@@ -53,6 +59,7 @@ impl Instruction {
         Self {
             op_code: OpCode::StoreInRegister,
             arg: register,
+            span: None,
         }
     }
 
@@ -60,6 +67,7 @@ impl Instruction {
         Self {
             op_code: OpCode::CreateStackPointer,
             arg: offset,
+            span: None,
         }
     }
 
@@ -67,6 +75,7 @@ impl Instruction {
         Self {
             op_code: OpCode::ArrayIndex,
             arg: 0,
+            span: None,
         }
     }
 
@@ -74,6 +83,7 @@ impl Instruction {
         Self {
             op_code: OpCode::StoreInMemory,
             arg: 0,
+            span: None,
         }
     }
 
@@ -81,6 +91,7 @@ impl Instruction {
         Self {
             op_code: OpCode::WriteToStack,
             arg: address,
+            span: None,
         }
     }
 
@@ -88,6 +99,7 @@ impl Instruction {
         Self {
             op_code: OpCode::TypeIdentifier,
             arg: type_identifier,
+            span: None,
         }
     }
 
@@ -95,6 +107,7 @@ impl Instruction {
         Self {
             op_code: OpCode::BitwiseTwosComplement,
             arg: 0,
+            span: None,
         }
     }
 
@@ -102,6 +115,7 @@ impl Instruction {
         Self {
             op_code: OpCode::BitwiseXor,
             arg: 0,
+            span: None,
         }
     }
 
@@ -109,6 +123,7 @@ impl Instruction {
         Self {
             op_code: OpCode::BitwiseNxor,
             arg: 0,
+            span: None,
         }
     }
 
@@ -116,6 +131,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Addition,
             arg: 0,
+            span: None,
         }
     }
 
@@ -123,6 +139,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Subtraction,
             arg: 0,
+            span: None,
         }
     }
 
@@ -130,6 +147,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Multiplication,
             arg: 0,
+            span: None,
         }
     }
 
@@ -137,6 +155,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Division,
             arg: 0,
+            span: None,
         }
     }
 
@@ -144,6 +163,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Equals,
             arg: 0,
+            span: None,
         }
     }
 
@@ -151,6 +171,7 @@ impl Instruction {
         Self {
             op_code: OpCode::NotEquals,
             arg: 0,
+            span: None,
         }
     }
 
@@ -159,6 +180,7 @@ impl Instruction {
         Self {
             op_code: OpCode::ArrayEquals,
             arg: 0,
+            span: None,
         }
     }
 
@@ -166,6 +188,7 @@ impl Instruction {
         Self {
             op_code: OpCode::ArrayNotEquals,
             arg: 0,
+            span: None,
         }
     }
 
@@ -173,6 +196,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LessThan,
             arg: 0,
+            span: None,
         }
     }
 
@@ -180,6 +204,7 @@ impl Instruction {
         Self {
             op_code: OpCode::GreaterThan,
             arg: 0,
+            span: None,
         }
     }
 
@@ -187,6 +212,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LessThanEquals,
             arg: 0,
+            span: None,
         }
     }
 
@@ -194,6 +220,7 @@ impl Instruction {
         Self {
             op_code: OpCode::GreaterThanEquals,
             arg: 0,
+            span: None,
         }
     }
 
@@ -201,6 +228,7 @@ impl Instruction {
         Self {
             op_code: OpCode::StringConcat,
             arg: 0,
+            span: None,
         }
     }
 
@@ -208,6 +236,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Jump,
             arg: label_index as _,
+            span: None,
         }
     }
 
@@ -215,6 +244,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Jump,
             arg: address,
+            span: None,
         }
     }
 
@@ -227,6 +257,7 @@ impl Instruction {
         Self {
             op_code,
             arg: label_index as _,
+            span: None,
         }
     }
 
@@ -234,6 +265,7 @@ impl Instruction {
         Self {
             op_code: OpCode::JumpIfFalse,
             arg: address,
+            span: None,
         }
     }
 
@@ -241,6 +273,7 @@ impl Instruction {
         Self {
             op_code: OpCode::JumpIfTrue,
             arg: address,
+            span: None,
         }
     }
 
@@ -249,6 +282,7 @@ impl Instruction {
         Self {
             op_code: OpCode::SysCall,
             arg,
+            span: None,
         }
     }
 
@@ -256,6 +290,7 @@ impl Instruction {
         Self {
             op_code: OpCode::FunctionCall,
             arg: argument_count as _,
+            span: None,
         }
     }
 
@@ -263,6 +298,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Label,
             arg: index as _,
+            span: None,
         }
     }
 
@@ -270,6 +306,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Return,
             arg: returns_value as _,
+            span: None,
         }
     }
 }

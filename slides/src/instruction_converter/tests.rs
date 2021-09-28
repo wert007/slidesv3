@@ -12,14 +12,16 @@ fn instruction_converter_success() {
             instructions[0],
             Instruction {
                 op_code: OpCode::LoadImmediate,
-                arg: 1
+                arg: 1,
+                span: None,
             }
         );
         assert_matches!(
             instructions[1],
             Instruction {
                 op_code: OpCode::Pop,
-                arg: 0
+                arg: 0,
+                span: None,
             }
         );
     });
@@ -30,21 +32,24 @@ fn instruction_converter_success() {
             instructions[0],
             Instruction {
                 op_code: OpCode::LoadImmediate,
-                arg: 99
+                arg: 99,
+                span: None,
             }
         );
         assert_matches!(
             instructions[1],
             Instruction {
                 op_code: OpCode::BitwiseTwosComplement,
-                arg: 0
+                arg: 0,
+                span: None,
             }
         );
         assert_matches!(
             instructions[2],
             Instruction {
                 op_code: OpCode::Pop,
-                arg: 0
+                arg: 0,
+                span: None,
             }
         );
     });
@@ -55,28 +60,32 @@ fn instruction_converter_success() {
             instructions[0],
             Instruction {
                 op_code: OpCode::LoadImmediate,
-                arg: 321
+                arg: 321,
+                span: None,
             }
         );
         assert_matches!(
             instructions[1],
             Instruction {
                 op_code: OpCode::LoadImmediate,
-                arg: 99
+                arg: 99,
+                span: None,
             }
         );
         assert_matches!(
             instructions[2],
             Instruction {
                 op_code: OpCode::Subtraction,
-                arg: 0
+                arg: 0,
+                span: None,
             }
         );
         assert_matches!(
             instructions[3],
             Instruction {
                 op_code: OpCode::Pop,
-                arg: 0
+                arg: 0,
+                span: None,
             }
         );
     });
@@ -87,28 +96,32 @@ fn instruction_converter_success() {
             instructions[0],
             Instruction {
                 op_code: OpCode::LoadImmediate,
-                arg: 321
+                arg: 321,
+                span: None,
             }
         );
         assert_matches!(
             instructions[1],
             Instruction {
                 op_code: OpCode::LoadImmediate,
-                arg: 99
+                arg: 99,
+                span: None,
             }
         );
         assert_matches!(
             instructions[2],
             Instruction {
                 op_code: OpCode::NotEquals,
-                arg: 0
+                arg: 0,
+                span: None,
             }
         );
         assert_matches!(
             instructions[3],
             Instruction {
                 op_code: OpCode::Pop,
-                arg: 0
+                arg: 0,
+                span: None,
             }
         );
     });

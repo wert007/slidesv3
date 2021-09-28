@@ -4,7 +4,7 @@ mod tests;
 
 mod label_replacer;
 
-use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::{WORD_SIZE_IN_BYTES, bytes_to_word}, parser::syntax_nodes::LiteralNodeKind, text::SourceText, value::Value};
+use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::{WORD_SIZE_IN_BYTES, bytes_to_word}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
 
 use self::instruction::Instruction;
 use super::evaluator::stack::Stack;
@@ -120,40 +120,40 @@ fn convert_node(node: BoundNode, converter: &mut InstructionConverter) -> Vec<In
         BoundNodeKind::IfStatement(_) |
         BoundNodeKind::WhileStatement(_) |
         BoundNodeKind::ErrorExpression => unreachable!(),
-        BoundNodeKind::FunctionDeclaration(function_declaration) => convert_function_declaration(function_declaration, converter),
-        BoundNodeKind::LiteralExpression(literal) => convert_literal(literal, converter),
+        BoundNodeKind::FunctionDeclaration(function_declaration) => convert_function_declaration(node.span, function_declaration, converter),
+        BoundNodeKind::LiteralExpression(literal) => convert_literal(node.span, literal, converter),
         BoundNodeKind::ArrayLiteralExpression(array_literal) => {
-            convert_array_literal(array_literal, converter)
+            convert_array_literal(node.span, array_literal, converter)
         }
-        BoundNodeKind::VariableExpression(variable) => convert_variable(variable),
-        BoundNodeKind::UnaryExpression(unary) => convert_unary(unary, converter),
-        BoundNodeKind::BinaryExpression(binary) => convert_binary(binary, converter),
+        BoundNodeKind::VariableExpression(variable) => convert_variable(node.span, variable),
+        BoundNodeKind::UnaryExpression(unary) => convert_unary(node.span, unary, converter),
+        BoundNodeKind::BinaryExpression(binary) => convert_binary(node.span, binary, converter),
         BoundNodeKind::FunctionCall(function_call) => {
-            convert_function_call(function_call, converter)
+            convert_function_call(node.span, function_call, converter)
         }
-        BoundNodeKind::SystemCall(system_call) => convert_system_call(system_call, converter),
-        BoundNodeKind::ArrayIndex(array_index) => convert_array_index(array_index, converter),
-        BoundNodeKind::FieldAccess(field_access) => convert_field_access(field_access, converter),
+        BoundNodeKind::SystemCall(system_call) => convert_system_call(node.span, system_call, converter),
+        BoundNodeKind::ArrayIndex(array_index) => convert_array_index(node.span, array_index, converter),
+        BoundNodeKind::FieldAccess(field_access) => convert_field_access(node.span, field_access, converter),
         BoundNodeKind::BlockStatement(block_statement) => {
-            convert_block_statement(block_statement, converter)
+            convert_block_statement(node.span, block_statement, converter)
         }
         BoundNodeKind::VariableDeclaration(variable_declaration) => {
-            convert_variable_declaration(variable_declaration, converter)
+            convert_variable_declaration(node.span, variable_declaration, converter)
         }
-        BoundNodeKind::Assignment(assignment) => convert_assignment(assignment, converter),
+        BoundNodeKind::Assignment(assignment) => convert_assignment(node.span, assignment, converter),
         BoundNodeKind::ExpressionStatement(expression_statement) => {
-            convert_expression_statement(expression_statement, converter)
+            convert_expression_statement(node.span, expression_statement, converter)
         }
         BoundNodeKind::ReturnStatement(return_statement) => {
-            convert_return_statement(return_statement, converter)
+            convert_return_statement(node.span, return_statement, converter)
         }
-        BoundNodeKind::Label(index) => convert_label(index),
-        BoundNodeKind::LabelReference(label_reference) => convert_label_reference(label_reference),
-        BoundNodeKind::Jump(jump) => convert_jump(jump, converter),
+        BoundNodeKind::Label(index) => convert_label(node.span, index),
+        BoundNodeKind::LabelReference(label_reference) => convert_label_reference(node.span, label_reference),
+        BoundNodeKind::Jump(jump) => convert_jump(node.span, jump, converter),
     }
 }
 
-fn convert_function_declaration(function_declaration: BoundFunctionDeclarationNodeKind, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
+fn convert_function_declaration(span: TextSpan, function_declaration: BoundFunctionDeclarationNodeKind, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
     result.push(Instruction::label(function_declaration.index).into());
     for parameter in function_declaration.parameters {
@@ -169,16 +169,17 @@ fn convert_node_for_assignment(
 ) -> Vec<InstructionOrLabelReference> {
     match node.kind {
         BoundNodeKind::VariableExpression(variable) => {
-            convert_variable_for_assignment(variable)
+            convert_variable_for_assignment(node.span, variable)
         }
         BoundNodeKind::ArrayIndex(array_index) => {
-            convert_array_index_for_assignment(array_index, converter)
+            convert_array_index_for_assignment(node.span, array_index, converter)
         }
         _ => unreachable!(),
     }
 }
 
 fn convert_literal(
+    span: TextSpan,
     literal: LiteralNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -192,12 +193,12 @@ fn convert_literal(
             }
         }
         Value::SystemCall(kind) => kind as u64,
-        Value::String(value) => return convert_string_literal(value, converter),
+        Value::String(value) => return convert_string_literal(span, value, converter),
     };
     vec![Instruction::load_immediate(value).into()]
 }
 
-fn convert_string_literal(value: String, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
+fn convert_string_literal(span: TextSpan, value: String, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
     let length_in_bytes = value.len() as u64;
     let mut address = allocate(&mut converter.stack, length_in_bytes + WORD_SIZE_IN_BYTES);
     let pointer = address as _;
@@ -229,6 +230,7 @@ fn convert_string_literal(value: String, converter: &mut InstructionConverter) -
 }
 
 fn convert_array_literal(
+    span: TextSpan,
     array_literal: BoundArrayLiteralNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -256,17 +258,19 @@ fn convert_array_literal(
     result
 }
 
-fn convert_variable(variable: BoundVariableNodeKind) -> Vec<InstructionOrLabelReference> {
+fn convert_variable(span: TextSpan, variable: BoundVariableNodeKind) -> Vec<InstructionOrLabelReference> {
     vec![Instruction::load_register(variable.variable_index).into()]
 }
 
 fn convert_variable_for_assignment(
+    span: TextSpan,
     variable: BoundVariableNodeKind,
 ) -> Vec<InstructionOrLabelReference> {
     vec![Instruction::store_in_register(variable.variable_index).into()]
 }
 
 fn convert_array_index_for_assignment(
+    span: TextSpan,
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -277,6 +281,7 @@ fn convert_array_index_for_assignment(
 }
 
 fn convert_unary(
+    span: TextSpan,
     unary: BoundUnaryNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -289,6 +294,7 @@ fn convert_unary(
 }
 
 fn convert_binary(
+    span: TextSpan,
     binary: BoundBinaryNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -337,6 +343,7 @@ fn convert_binary(
 }
 
 fn convert_function_call(
+    span: TextSpan,
     function_call: BoundFunctionCallNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -351,6 +358,7 @@ fn convert_function_call(
 }
 
 fn convert_system_call(
+    span: TextSpan,
     system_call: BoundSystemCallNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -366,6 +374,7 @@ fn convert_system_call(
 }
 
 fn convert_array_index(
+    span: TextSpan,
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -376,6 +385,7 @@ fn convert_array_index(
 }
 
 fn convert_field_access(
+    span: TextSpan,
     field_access: BoundFieldAccessNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -383,6 +393,7 @@ fn convert_field_access(
 }
 
 fn convert_variable_declaration(
+    span: TextSpan,
     variable_declaration: BoundVariableDeclarationNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -394,6 +405,7 @@ fn convert_variable_declaration(
 }
 
 fn convert_assignment(
+    span: TextSpan,
     assignment: BoundAssignmentNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -406,6 +418,7 @@ fn convert_assignment(
 }
 
 fn convert_block_statement(
+    span: TextSpan,
     block_statement: BoundBlockStatementNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -417,6 +430,7 @@ fn convert_block_statement(
 }
 
 fn convert_expression_statement(
+    span: TextSpan,
     expression_statement: BoundExpressionStatementNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -429,6 +443,7 @@ fn convert_expression_statement(
 }
 
 fn convert_return_statement(
+    span: TextSpan,
     return_statement: BoundReturnStatementNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -444,18 +459,21 @@ fn convert_return_statement(
 }
 
 fn convert_label(
+    span: TextSpan,
     index: usize,
 ) -> Vec<InstructionOrLabelReference> {
     vec![Instruction::label(index).into()]
 }
 
 fn convert_label_reference(
+    span: TextSpan,
     label_reference: usize,
 ) -> Vec<InstructionOrLabelReference> {
     vec![LabelReference(label_reference).into()]
 }
 
 fn convert_jump(
+    span: TextSpan,
     jump: BoundJumpNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
