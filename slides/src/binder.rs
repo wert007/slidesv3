@@ -201,9 +201,14 @@ pub fn bind<'a>(
             }
         }
         binder.function_return_type = node.return_type;
-        let body = bind_node(node.body, &mut binder);
-        let body = BoundNode::block_statement(body.span, vec![body, BoundNode::return_statement(TextSpan::zero(), None)]);
-        let body = BoundNode::block_statement(span, lowerer::flatten(body, &mut label_count));
+        let mut body = bind_node(node.body, &mut binder);
+        if matches!(&binder.function_return_type, Type::Void) {
+            body = BoundNode::block_statement(
+                body.span,
+                vec![body, BoundNode::return_statement(TextSpan::zero(), None)],
+            );
+        }
+        body = BoundNode::block_statement(span, lowerer::flatten(body, &mut label_count));
         if !matches!(&binder.function_return_type, Type::Void) {
             if !control_flow_analyzer::check_if_all_paths_return(&body) {
                 binder.diagnostic_bag.report_missing_return_statement(span, &binder.function_return_type);
