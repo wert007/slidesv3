@@ -76,14 +76,14 @@ fn parse_function_type<'a>(
 ) -> FunctionTypeNode<'a> {
     let lparen = match_token!(tokens, diagnostic_bag, LParen);
     let mut parameters = vec![];
-    let mut commas = vec![];
+    let mut comma_tokens = vec![];
     while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RParen) {
         let token_count = tokens.len();
         let parameter = parse_parameter(tokens, diagnostic_bag);
         parameters.push(parameter);
         if !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RParen) {
             let comma = match_token!(tokens, diagnostic_bag, Comma);
-            commas.push(comma);
+            comma_tokens.push(comma);
         }
         if token_count == tokens.len() {
             next_token(tokens);
@@ -103,7 +103,7 @@ fn parse_function_type<'a>(
         None
     };
 
-    FunctionTypeNode::new(lparen, parameters, commas, rparen, return_type)
+    FunctionTypeNode::new(lparen, parameters, comma_tokens, rparen, return_type)
 }
 
 fn parse_parameter<'a>(
