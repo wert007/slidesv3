@@ -15,6 +15,7 @@ fn main() -> Result<(), std::io::Error> {
         print_bound_program: args.contains(&String::from("-dbp")),
         print_stack: args.contains(&String::from("-dstack")),
         print_labels: args.contains(&String::from("-dlabels")),
+        output_basic_blocks_to_dot: args.contains(&String::from("-dbb")),
         run_program: !args.contains(&String::from("-no-run")),
     };
     if args.len() == 1 || args[1].starts_with('-') {
