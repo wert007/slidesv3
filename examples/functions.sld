@@ -24,11 +24,34 @@
 // }
 
 func add(a: int, b: int) -> int {
-    return a + b;
+    if a == 0 {
+        return b;
+    } else if b == 0 {
+        return a;
+    } else {
+        return a + b;
+    }
+}
+
+func fac(n: int) -> int {
+    if n <= 1 {
+        return 1;
+    } else {
+        return n * fac(n - 1);
+    }
+}
+
+func with_while(n: int) -> int {
+    let og = n;
+    while n >= og / 10 {
+        n = n / 2;
+    }
+    return n;
 }
 
 func main() {
-    print(add(1, 2));
+    print(fac(add(1, 2)));
+    print(with_while(1000));
     // count_up(10);
     // print('add(1, 2)');
     // add(1, 2);
