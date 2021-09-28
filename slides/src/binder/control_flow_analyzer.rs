@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::binder::bound_nodes::BoundNodeKind;
+use crate::{DebugFlags, binder::bound_nodes::BoundNodeKind};
 
 use super::bound_nodes::BoundNode;
 
@@ -104,27 +104,26 @@ pub struct BasicCodeBlock {
     pub length: usize,
 }
 
-pub fn check_if_all_paths_return(body: &BoundNode) -> bool {
-    if let BoundNodeKind::BlockStatement(block_statement) = &body.kind {
-        let mut basic_blocks = collect_basic_blocks(&block_statement.statements);
-        connect_basic_blocks(&mut basic_blocks, &block_statement.statements);
-        let incoming = basic_blocks.last().unwrap().incoming_connections.to_vec();
-        for incoming in incoming {
-            let basic_block = &basic_blocks[incoming];
-            if let BasicBlockKind::CodeBlock(code_block) = basic_block.kind {
-                let last_statement =
-                    &block_statement.statements[code_block.index + code_block.length - 1];
-                if !matches!(last_statement.kind, BoundNodeKind::ReturnStatement(_)) {
-                    return false;
-                }
-            } else {
+pub fn check_if_all_paths_return(function_name: &str, statements: &[BoundNode], debug_flags: DebugFlags) -> bool {
+    let mut basic_blocks = collect_basic_blocks(statements);
+    connect_basic_blocks(&mut basic_blocks, statements);
+    if debug_flags.output_basic_blocks_to_dot {
+        crate::debug::output_basic_blocks_to_dot(function_name, &basic_blocks, statements);
+        println!("Outputted BasicBlocks for func {}() to debug-out/{}.svg", function_name, function_name);
+    }
+    let incoming = basic_blocks.last().unwrap().incoming_connections.to_vec();
+    for incoming in incoming {
+        let basic_block = &basic_blocks[incoming];
+        if let BasicBlockKind::CodeBlock(code_block) = basic_block.kind {
+            let last_statement = &statements[code_block.index + code_block.length - 1];
+            if !matches!(last_statement.kind, BoundNodeKind::ReturnStatement(_)) {
                 return false;
             }
+        } else {
+            return false;
         }
-        true
-    } else {
-        panic!("Unexpected BoundNodeKind {:#?}!", body);
     }
+    true
 }
 
 fn collect_basic_blocks<'a>(statements: &[BoundNode<'a>]) -> Vec<BasicBlock<'a>> {
