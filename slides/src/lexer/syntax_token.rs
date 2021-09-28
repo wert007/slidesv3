@@ -140,7 +140,7 @@ pub enum SyntaxTokenKind {
     Equals,
     BangEquals,
     EqualsEquals,
-
+    Arrow,
     Identifier,
 
     // Keywords
@@ -236,6 +236,7 @@ impl From<&str> for SyntaxTokenKind {
             ">=" => Self::GreaterThanEquals,
             "<" => Self::LessThan,
             ">" => Self::GreaterThan,
+            "->" => Self::Arrow,
             "" => Self::Eoi,
             _ => panic!("Unrecognized Lexeme '{}'", lexeme),
         }
@@ -271,6 +272,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::Equals => write!(f, "EqualsToken"),
             SyntaxTokenKind::BangEquals => write!(f, "Bang-Equals-Token"),
             SyntaxTokenKind::EqualsEquals => write!(f, "Equals-Equals-Token"),
+            SyntaxTokenKind::Arrow => write!(f, "Arrow-Token"),
             SyntaxTokenKind::Identifier => write!(f, "Identifier"),
             SyntaxTokenKind::ElseKeyword => write!(f, "else"),
             SyntaxTokenKind::FalseKeyword => write!(f, "false"),

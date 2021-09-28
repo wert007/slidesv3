@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    }, parser::syntax_nodes::FunctionTypeNode, text::{SourceText, TextSpan}};
+    }, parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode}, text::{SourceText, TextSpan}};
 
 use self::syntax_nodes::{ElseClause, ParameterNode, SyntaxNode, TypeNode};
 use crate::match_token;
@@ -92,7 +92,18 @@ fn parse_function_type<'a>(
     let rparen = match_token!(tokens, diagnostic_bag, RParen);
     // TODO: Parse return type.
 
-    FunctionTypeNode::new(lparen, parameters, commas, rparen)
+    let return_type = if matches!(&peek_token(tokens).kind, SyntaxTokenKind::Arrow) {
+        let arrow_token = next_token(tokens);
+        let return_type = parse_type(tokens, diagnostic_bag);
+        Some(ReturnTypeNode {
+            arrow_token,
+            return_type,
+        })
+    } else {
+        None
+    };
+
+    FunctionTypeNode::new(lparen, parameters, commas, rparen, return_type)
 }
 
 fn parse_parameter<'a>(

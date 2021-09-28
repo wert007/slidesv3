@@ -446,6 +446,12 @@ impl<'a> ParameterNode<'a> {
 }
 
 #[derive(Debug, Clone)]
+pub struct ReturnTypeNode<'a> {
+    pub arrow_token: SyntaxToken<'a>,
+    pub return_type: TypeNode<'a>,
+}
+
+#[derive(Debug, Clone)]
 pub struct TypeNode<'a> {
     pub identifier: SyntaxToken<'a>,
     pub brackets: Vec<SyntaxToken<'a>>,
