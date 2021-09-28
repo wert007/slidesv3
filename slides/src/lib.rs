@@ -22,6 +22,6 @@ pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
         diagnostic_bag.flush_to_console();
         return;
     }
-    let result = evaluator::evaluate(result, debug_flags);
+    let result = evaluator::evaluate(result, &source_text, debug_flags);
     println!("= {}", result);
 }

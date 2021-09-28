@@ -10,10 +10,19 @@ use crate::{
     },
     value::Value,
     DebugFlags,
+    DiagnosticBag,
 };
 use num_enum::TryFromPrimitive;
 
 use self::{allocator::Allocator, stack::Stack};
+
+macro_rules! runtime_error {
+    ($evaluator:ident, $($fn_call:tt)*) => {
+        $evaluator.runtime_diagnostics.$($fn_call)*;
+        $evaluator.runtime_diagnostics.clone().flush_to_console();
+        $evaluator.runtime_diagnostics.diagnostics.clear();
+    };
+}
 
 type ResultType = Value;
 
@@ -24,16 +33,17 @@ pub const fn bytes_to_word(bytes: u64) -> u64 {
     (bytes + WORD_SIZE_IN_BYTES - 1) / WORD_SIZE_IN_BYTES
 }
 
-pub struct EvaluatorState {
+pub struct EvaluatorState<'a> {
     stack: Stack,
     heap: Allocator,
     registers: Vec<TypedU64>,
     protected_registers: usize,
     pc: usize,
     is_main_call: bool,
+    runtime_diagnostics: DiagnosticBag<'a>,
 }
 
-impl EvaluatorState {
+impl EvaluatorState<'_> {
     fn set_variable(&mut self, variable: u64, value: u64, is_pointer: bool) {
         let variable = variable as usize;
         self.registers[variable] = TypedU64 { value, is_pointer };
@@ -44,7 +54,7 @@ impl EvaluatorState {
     }
 }
 
-pub fn evaluate(program: Program, debug_flags: DebugFlags) -> ResultType {
+pub fn evaluate<'a>(program: Program, source_text: &crate::text::SourceText<'a>, debug_flags: DebugFlags) -> ResultType {
     let mut state = EvaluatorState {
         stack: program.stack,
         heap: Allocator::new(1024, debug_flags),
@@ -52,6 +62,7 @@ pub fn evaluate(program: Program, debug_flags: DebugFlags) -> ResultType {
         protected_registers: program.protected_variables,
         pc: 0,
         is_main_call: true,
+        runtime_diagnostics: DiagnosticBag::new(source_text),
     };
     let instructions = program.instructions;
     while state.pc < instructions.len() {
@@ -150,7 +161,7 @@ fn evaluate_create_stack_pointer(state: &mut EvaluatorState, instruction: Instru
     state.stack.push_pointer(stack_pointer);
 }
 
-fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
     let index_in_words = state.stack.pop().value;
     let array = state.stack.pop();
     assert!(
@@ -167,10 +178,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
     };
     let array_length_in_words = bytes_to_word(array_length_in_bytes);
     if (index_in_words as i64) < 0 || index_in_words > array_length_in_words {
-        println!(
-            "RuntimeError: Index {} is out of Bounds ({}) for this array!",
-            index_in_words as i64, array_length_in_words
-        );
+        runtime_error!(state, index_out_of_bounds(instruction.span, index_in_words as i64, array_length_in_words));
         state.stack.push(0);
         return;
     }
@@ -187,7 +195,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, _: Instruction) {
     }
 }
 
-fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_write_to_memory(state: &mut EvaluatorState, instruction: Instruction) {
     let index = state.stack.pop().value;
     let array = state.stack.pop();
     assert!(
@@ -204,10 +212,7 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
     };
     let array_length_in_words = bytes_to_word(array_length_in_bytes);
     if (index as i64) < 0 || index > array_length_in_words {
-        println!(
-            "RuntimeError: Index {} is out of Bounds ({}) for this array!",
-            index as i64, array_length_in_words
-        );
+        runtime_error!(state, index_out_of_bounds(instruction.span, index as i64, array_length_in_words));
         return;
     }
     let index = array + index * WORD_SIZE_IN_BYTES + WORD_SIZE_IN_BYTES;
@@ -375,7 +380,7 @@ fn evaluate_greater_than_equals(state: &mut EvaluatorState, _: Instruction) {
     state.stack.push((lhs >= rhs) as _);
 }
 
-fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     assert!(rhs.is_pointer, "{:#?}", rhs);
     let lhs = state.stack.pop();
@@ -398,10 +403,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, _: Instruction) {
     let result_length = lhs_length + rhs_length;
     let mut pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
-        println!(
-            "RuntimeError: No memory left for string with length {} + {}.",
-            result_length, WORD_SIZE_IN_BYTES,
-        );
+        runtime_error!(state, no_heap_memory_left(instruction.span, result_length + WORD_SIZE_IN_BYTES));
         pointer = HEAP_POINTER;
     } else {
         let mut writing_pointer = pointer;

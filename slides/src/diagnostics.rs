@@ -1,9 +1,30 @@
-use crate::{binder::typing::Type, lexer::syntax_token::SyntaxTokenKind, parser::syntax_nodes::SyntaxNodeKind, text::{SourceText, TextLocation, TextSpan}};
+use crate::{
+    binder::typing::Type,
+    lexer::syntax_token::SyntaxTokenKind,
+    parser::syntax_nodes::SyntaxNodeKind,
+    text::{SourceText, TextLocation, TextSpan},
+};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Diagnostic<'a> {
     message: String,
     location: TextLocation<'a>,
+}
+
+impl<'a> Diagnostic<'a> {
+    pub fn runtime(
+        message: String,
+        span: Option<TextSpan>,
+        source_text: &'a SourceText<'a>,
+    ) -> Self {
+        Self {
+            message,
+            location: TextLocation {
+                span: span.unwrap_or(TextSpan::zero()),
+                source_text,
+            },
+        }
+    }
 }
 
 impl std::fmt::Display for Diagnostic<'_> {
@@ -12,6 +33,7 @@ impl std::fmt::Display for Diagnostic<'_> {
     }
 }
 
+#[derive(Clone)]
 pub struct DiagnosticBag<'a> {
     pub diagnostics: Vec<Diagnostic<'a>>,
     pub source_text: &'a SourceText<'a>,
@@ -43,6 +65,11 @@ impl<'a> DiagnosticBag<'a> {
                 source_text: self.source_text,
             },
         };
+        self.diagnostics.push(diagnostic);
+    }
+
+    fn report_runtime(&mut self, message: String, span: Option<TextSpan>) {
+        let diagnostic = Diagnostic::runtime(message, span, self.source_text);
         self.diagnostics.push(diagnostic);
     }
 
@@ -160,7 +187,10 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_unterminated_string(&mut self, span: TextSpan, expected_char: char) {
-        let message = format!("Unterminated string found here. Expected `{}`.", expected_char);
+        let message = format!(
+            "Unterminated string found here. Expected `{}`.",
+            expected_char
+        );
         self.report(message, span);
     }
 
@@ -169,13 +199,24 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_no_field_named_on_type(&mut self, span: TextSpan, field_name: &str, type_: &Type) {
-        let message = format!("There are no fields named '{}' on type {}.", field_name, type_);
+    pub fn report_no_field_named_on_type(
+        &mut self,
+        span: TextSpan,
+        field_name: &str,
+        type_: &Type,
+    ) {
+        let message = format!(
+            "There are no fields named '{}' on type {}.",
+            field_name, type_
+        );
         self.report(message, span);
     }
 
     pub fn report_invalid_top_level_statement(&mut self, span: TextSpan, kind: SyntaxNodeKind) {
-        let message = format!("{:?} is no valid top level statement. Use functions instead.", kind);
+        let message = format!(
+            "{:?} is no valid top level statement. Use functions instead.",
+            kind
+        );
         self.report(message, span);
     }
 
@@ -185,12 +226,32 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_missing_return_value(&mut self, span: TextSpan, expected_return_type: &Type) {
-        let message = format!("Function returns type {} and needs a value of type {}.", expected_return_type, expected_return_type);
+        let message = format!(
+            "Function returns type {} and needs a value of type {}.",
+            expected_return_type, expected_return_type
+        );
         self.report(message, span);
     }
 
     pub fn report_missing_return_statement(&mut self, span: TextSpan, expected_return_type: &Type) {
-        let message = format!("Not all paths in function return. Every path needs a return value of type {}", expected_return_type);
+        let message = format!(
+            "Not all paths in function return. Every path needs a return value of type {}",
+            expected_return_type
+        );
         self.report(message, span);
+    }
+
+    // Runtime Errors
+    pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
+        let message = format!(
+            "Index out of Bounds. Index was {} and length was {}.",
+            index, length
+        );
+        self.report_runtime(message, span);
+    }
+
+    pub fn no_heap_memory_left(&mut self, span: Option<TextSpan>, needed_memory_in_bytes: u64) {
+        let message = format!("Out of memory. No heap memory for {} bytes left.", needed_memory_in_bytes);
+        self.report_runtime(message, span);
     }
 }
