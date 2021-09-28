@@ -8,6 +8,7 @@ pub fn output_basic_blocks_to_dot(function_name: &str, basic_blocks: &[BasicBloc
     result.push_str("digraph \"");
     result.push_str(function_name);
     result.push_str("\" {\n");
+    result.push_str("    splines = ortho;\n");
     let mut generated_node_count = 0;
     let mut block_index_to_node_id = HashMap::new();
     for (index, basic_block) in basic_blocks.iter().enumerate() {
@@ -46,13 +47,36 @@ pub fn output_basic_blocks_to_dot(function_name: &str, basic_blocks: &[BasicBloc
         // TODO: Add code as label here!
         result.push_str(";\n");
     }
+    let mut add_connection = |block_index, target, label:&str| {
+        result.push_str("    ");
+        result.push_str(&block_index_to_node_id[&block_index]);
+        result.push_str(" -> ");
+        result.push_str(&block_index_to_node_id[&target]);
+        if !label.is_empty() {
+            result.push_str(" [ label = \"");
+            result.push_str(label);
+            result.push_str("\" ]");
+        }
+        result.push_str(";\n");
+    };
     for (block_index, basic_block) in basic_blocks.iter().enumerate() {
-        for outgoing in basic_block.outgoing_connections.to_vec() {
-            result.push_str("    ");
-            result.push_str(&block_index_to_node_id[&block_index]);
-            result.push_str(" -> ");
-            result.push_str(&block_index_to_node_id[&outgoing]);
-            result.push_str(";\n");
+        match basic_block.outgoing_connections {
+            crate::binder::control_flow_analyzer::OutgoingConnections::None => {},
+            crate::binder::control_flow_analyzer::OutgoingConnections::Single(target) => {
+                add_connection(block_index, target, "");
+            },
+            crate::binder::control_flow_analyzer::OutgoingConnections::IfTrue(condition, then_target, else_target) => {
+                let mut buffer = String::new();
+                super::bound_nodes::bound_node_as_code_to_string(condition, &mut buffer);
+                add_connection(block_index, then_target, &format!("{} is true", buffer));
+                add_connection(block_index, else_target, "else");
+            },
+            crate::binder::control_flow_analyzer::OutgoingConnections::IfFalse(condition, then_target, else_target) => {
+                let mut buffer = String::new();
+                super::bound_nodes::bound_node_as_code_to_string(condition, &mut buffer);
+                add_connection(block_index, then_target, &format!("{} is false", buffer));
+                add_connection(block_index, else_target, "else");
+            }
         }
     }
     result.push_str("}\n");
