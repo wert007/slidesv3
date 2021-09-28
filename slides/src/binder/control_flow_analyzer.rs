@@ -261,7 +261,10 @@ fn connect_basic_blocks<'a>(
                         basic_block.outgoing_connections = OutgoingConnections::Single(end_index);
                         incoming_connections.push((basic_block.index, end_index));
                     }
-                    unexpected => unreachable!("Unexptected BoundNodeKind {:#?}", unexpected),
+                    _ => {
+                        basic_block.outgoing_connections = OutgoingConnections::Single(basic_block.index + 1);
+                        incoming_connections.push((basic_block.index, basic_block.index + 1));
+                    }
                 }
             }
         }
