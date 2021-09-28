@@ -3,9 +3,11 @@ use std::{collections::HashMap, process::Command};
 use crate::binder::control_flow_analyzer::BasicBlock;
 use crate::binder::{bound_nodes::BoundNode, control_flow_analyzer::BasicBlockKind};
 
-pub fn output_basic_blocks_to_dot(basic_blocks: &[BasicBlock], statements: &[BoundNode]) {
+pub fn output_basic_blocks_to_dot(function_name: &str, basic_blocks: &[BasicBlock], statements: &[BoundNode]) {
     let mut result = String::new();
-    result.push_str("digraph Hello {\n");
+    result.push_str("digraph \"");
+    result.push_str(function_name);
+    result.push_str("\" {\n");
     let mut generated_node_count = 0;
     let mut block_index_to_node_id = HashMap::new();
     for (index, basic_block) in basic_blocks.iter().enumerate() {
@@ -37,7 +39,7 @@ pub fn output_basic_blocks_to_dot(basic_blocks: &[BasicBlock], statements: &[Bou
             for statement in statements {
                 super::bound_nodes::bound_node_as_code_to_string(statement, &mut buffer);
             }
-            result.push_str(" [label = \"\\N\n");
+            result.push_str(" [label = \"\\N\\n");
             result.push_str(&buffer.replace('\n', "\\l"));
             result.push_str("\"]");
         }
@@ -55,9 +57,11 @@ pub fn output_basic_blocks_to_dot(basic_blocks: &[BasicBlock], statements: &[Bou
     }
     result.push_str("}\n");
 
-    std::fs::write("../out.dot", result).unwrap();
+    let out_dot_path = format!("../debug-out/{}.dot", function_name);
+    let out_svg_path = format!("../debug-out/{}.svg", function_name);
+    std::fs::write(&out_dot_path, result).unwrap();
     let output = Command::new("dot")
-        .args(&["../out.dot", "-Tsvg", "-o../out.svg"])
+        .args(&[&out_dot_path, "-Tsvg", &format!("-o{}", out_svg_path)])
         .output()
         .unwrap();
     assert!(
