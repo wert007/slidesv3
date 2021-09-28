@@ -236,5 +236,5 @@ fn is_multi_char_operator(character: char) -> bool {
 }
 
 fn is_valid_operator(operator: &str) -> bool {
-    matches!(operator, "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->")
+    matches!(operator, "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-")
 }
