@@ -67,14 +67,6 @@ impl IncomingConnections {
             IncomingConnections::Multiple(values) => values.push(from),
         }
     }
-
-    pub fn to_vec(&self) -> Vec<usize> {
-        match self {
-            IncomingConnections::None => vec![],
-            IncomingConnections::Single(value) => vec![*value],
-            IncomingConnections::Multiple(values) => values.clone(),
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -111,8 +103,8 @@ pub fn check_if_all_paths_return(function_name: &str, statements: &[BoundNode], 
         crate::debug::output_basic_blocks_to_dot(function_name, &basic_blocks, statements);
         println!("Outputted BasicBlocks for func {}() to debug-out/{}.svg", function_name, function_name);
     }
-    let incoming = basic_blocks.last().unwrap().incoming_connections.to_vec();
-    for incoming in incoming {
+    let accessible_incoming_to_end_block = collect_paths_to_end(&basic_blocks);
+    for incoming in accessible_incoming_to_end_block {
         let basic_block = &basic_blocks[incoming];
         if let BasicBlockKind::CodeBlock(code_block) = basic_block.kind {
             let last_statement = &statements[code_block.index + code_block.length - 1];
@@ -124,6 +116,27 @@ pub fn check_if_all_paths_return(function_name: &str, statements: &[BoundNode], 
         }
     }
     true
+}
+
+fn collect_paths_to_end(basic_blocks: &[BasicBlock]) -> Vec<usize> {
+    let mut result = vec![];
+    let mut gray_list = basic_blocks[0].outgoing_connections.to_vec();
+    let mut already_seen = vec![];
+    let end_index = basic_blocks.len() - 1;
+    while let Some(next) = gray_list.pop() {
+        if already_seen.contains(&next) {
+            continue;
+        } else {
+            already_seen.push(next);
+        }
+        let mut next_connections = basic_blocks[next].outgoing_connections.to_vec();
+        if next_connections.contains(&end_index) {
+            result.push(next);
+        }
+        gray_list.append(&mut next_connections);
+        gray_list.dedup();
+    }
+    result
 }
 
 fn collect_basic_blocks<'a>(statements: &[BoundNode<'a>]) -> Vec<BasicBlock<'a>> {
