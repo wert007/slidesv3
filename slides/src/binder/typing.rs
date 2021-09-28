@@ -23,16 +23,6 @@ impl Type {
         Self::Array(Box::new(base_type))
     }
 
-    pub fn function(parameter_types: Vec<Type>) -> Type {
-        let function_type = FunctionType {
-            parameter_types,
-            this_type: None,
-            return_type: Self::Void,
-            system_call_kind: None,
-        };
-        Self::Function(Box::new(function_type))
-    }
-
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         self == other || other == &Type::Any
     }

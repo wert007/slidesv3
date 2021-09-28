@@ -303,9 +303,10 @@ fn bind_function_declaration<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) {
     let (function_type, variables) = bind_function_type(function_declaration.function_type, binder);
+    let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
     let function_id = if let Some(it) =
-        binder.register_variable(function_declaration.identifier.lexeme, function_type.clone(), false)
+        binder.register_variable(function_declaration.identifier.lexeme, type_.clone(), false)
     {
         it
     } else {
@@ -320,15 +321,15 @@ fn bind_function_declaration<'a, 'b>(
         parameters: variables,
         is_main,
         function_id,
-        function_type,
-        return_type: Type::Void,
+        function_type: type_,
+        return_type: function_type.return_type,
     });
 }
 
 fn bind_function_type<'a>(
     function_type: FunctionTypeNode<'a>,
     binder: &mut BindingState,
-) -> (Type, Vec<(&'a str, Type)>) {
+) -> (FunctionType, Vec<(&'a str, Type)>) {
     let variable_count = binder.variable_table.len();
     let mut parameter_types = Vec::with_capacity(function_type.parameters.len());
     let mut parameter_names = Vec::with_capacity(function_type.parameters.len());
@@ -339,12 +340,25 @@ fn bind_function_type<'a>(
         parameter_names.push(parameter_name);
         binder.register_generated_variable(parameter_name.into(), parameter_type, false);
     }
+    let return_type = if let Some(it) = function_type.return_type {
+        bind_type(it.return_type, binder)
+    } else {
+        Type::Void
+    };
     binder.delete_variables_until(variable_count);
     let variables: Vec<(&'a str, Type)> = parameter_names
         .into_iter()
         .zip(parameter_types.iter().map(|t| t.clone()))
         .collect();
-    (Type::function(parameter_types), variables)
+    (
+        FunctionType {
+            parameter_types,
+            this_type: None,
+            return_type,
+            system_call_kind: None,
+        },
+        variables,
+    )
 }
 
 fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {

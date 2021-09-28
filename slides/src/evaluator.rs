@@ -538,20 +538,14 @@ fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) 
 fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
     let has_return_value = instruction.arg != 0;
     if has_return_value {
-        todo!()
-        // let result = pop_array(state);
-        // let return_address = state.stack.pop().unwrap();
-        // state.pc = return_address as _;
-        // for v in result.1 {
-        //     if v.is_pointer {
-        //         state.stack.set_pointer(state.stack.len());
-        //     }
-        //     state.stack.push(v.value);
-        // }
-        // if result.0.is_pointer {
-        //     state.stack.set_pointer(state.stack.len());
-        // }
-        // state.stack.push(result.0.value);
+        let result = state.stack.pop();
+        let return_address = state.stack.pop().value;
+        state.pc = return_address as _;
+        if result.is_pointer {
+            state.stack.push_pointer(result.value);
+        } else {
+            state.stack.push(result.value);
+        }
     } else {
         let return_address = state.stack.pop().value;
         state.pc = return_address as _;
