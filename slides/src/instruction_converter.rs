@@ -57,6 +57,7 @@ pub struct Program {
     pub stack: Stack,
     pub instructions: Vec<Instruction>,
     pub max_used_variables: usize,
+    pub protected_variables: usize,
 }
 
 impl Program {
@@ -65,6 +66,7 @@ impl Program {
             stack: Stack::new(DebugFlags::default()),
             instructions: vec![],
             max_used_variables: 0,
+            protected_variables: 0,
         }
     }
 }
@@ -109,6 +111,7 @@ pub fn convert<'a>(
         instructions,
         stack: converter.stack,
         max_used_variables: bound_program.max_used_variables,
+        protected_variables: converter.fixed_variable_count,
     }
 }
 
@@ -339,13 +342,11 @@ fn convert_function_call(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
     let argument_count = function_call.arguments.len();
-    result.push(Instruction::write_registers_to_stack(converter.fixed_variable_count).into());
     for argument in function_call.arguments {
         result.append(&mut convert_node(argument, converter));
     }
     result.append(&mut convert_node(*function_call.base, converter));
     result.push(Instruction::function_call(argument_count).into());
-    result.push(Instruction::read_registers_from_stack(converter.fixed_variable_count).into());
     result
 }
 

@@ -12,10 +12,8 @@ pub enum OpCode {
     ArrayIndex = 7,
     StoreInMemory = 8,
     WriteToStack = 9,
-    WriteRegistersToStack = 10,
-    ReadRegistersFromStack = 11,
-    TypeIdentifier = 12,
-    Label = 13,
+    TypeIdentifier = 10,
+    Label = 11,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,

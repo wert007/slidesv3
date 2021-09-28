@@ -84,20 +84,6 @@ impl Instruction {
         }
     }
 
-    pub const fn write_registers_to_stack(start_register: usize) -> Self {
-        Self {
-            op_code: OpCode::WriteRegistersToStack,
-            arg: start_register as _,
-        }
-    }
-
-    pub const fn read_registers_from_stack(start_register: usize) -> Self {
-        Self {
-            op_code: OpCode::ReadRegistersFromStack,
-            arg: start_register as _,
-        }
-    }
-
     pub const fn type_identifier(type_identifier: u64) -> Self {
         Self {
             op_code: OpCode::TypeIdentifier,

@@ -28,6 +28,7 @@ pub struct EvaluatorState {
     stack: Stack,
     heap: Allocator,
     registers: Vec<TypedU64>,
+    protected_registers: usize,
     pc: usize,
     is_main_call: bool,
 }
@@ -48,6 +49,7 @@ pub fn evaluate(program: Program, debug_flags: DebugFlags) -> ResultType {
         stack: program.stack,
         heap: Allocator::new(1024, debug_flags),
         registers: vec![TypedU64::default(); program.max_used_variables],
+        protected_registers: program.protected_variables,
         pc: 0,
         is_main_call: true,
     };
@@ -87,8 +89,6 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
-        OpCode::ReadRegistersFromStack => evaluate_read_registers_from_stack(state, instruction),
-        OpCode::WriteRegistersToStack => evaluate_write_registers_to_stack(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
@@ -225,24 +225,6 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
     state.stack.write_word(address, value.value);
     if value.is_pointer {
         state.stack.set_pointer(address);
-    }
-}
-
-fn evaluate_read_registers_from_stack(state: &mut EvaluatorState, instruction: Instruction) {
-    let start_index = instruction.arg as usize;
-    for register in state.registers.iter_mut().skip(start_index).rev() {
-        *register = state.stack.pop();
-    }
-}
-
-fn evaluate_write_registers_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
-    let start_index = instruction.arg as usize;
-    for register in state.registers.iter().skip(start_index) {
-        if register.is_pointer {
-            state.stack.push_pointer(register.value);
-        } else {
-            state.stack.push(register.value);
-        }
     }
 }
 
@@ -525,6 +507,15 @@ fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) 
         argument_values.push(state.stack.pop());
     }
     state.stack.push(return_address as _);
+
+    for register in state.registers.iter().skip(state.protected_registers) {
+        if register.is_pointer {
+            state.stack.push_pointer(register.value);
+        } else {
+            state.stack.push(register.value);
+        }
+    }
+
     for v in argument_values.into_iter().rev() {
         if v.is_pointer {
             state.stack.push_pointer(v.value);
@@ -539,6 +530,11 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
     let has_return_value = instruction.arg != 0;
     if has_return_value {
         let result = state.stack.pop();
+
+        for register in state.registers.iter_mut().skip(state.protected_registers).rev() {
+            *register = state.stack.pop();
+        }
+
         let return_address = state.stack.pop().value;
         state.pc = return_address as _;
         if result.is_pointer {
@@ -547,7 +543,12 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
             state.stack.push(result.value);
         }
     } else {
+        for register in state.registers.iter_mut().skip(state.protected_registers).rev() {
+            *register = state.stack.pop();
+        }
+
         let return_address = state.stack.pop().value;
         state.pc = return_address as _;
     }
+
 }
