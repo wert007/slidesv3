@@ -223,7 +223,7 @@ pub fn bind<'a>(
         if matches!(&binder.function_return_type, Type::Void) {
             body = BoundNode::block_statement(
                 body.span,
-                vec![body, BoundNode::return_statement(TextSpan::zero(), None)],
+                vec![body, BoundNode::return_statement(TextSpan::zero(), None, !node.is_main)],
             );
         }
         let body_statements = lowerer::flatten(body, &mut label_count);
@@ -986,7 +986,11 @@ fn bind_return_statement<'a, 'b>(
             );
         }
     }
-    BoundNode::return_statement(span, expression)
+    // TODO: This works with implicit returns in main only. Because for main
+    // restores_variables must be false. There needs to be a flag in the binder
+    // not only knowing the return type of the current function but also if it
+    // is the main function or not.
+    BoundNode::return_statement(span, expression, true)
 }
 
 fn bind_while_statement<'a, 'b>(

@@ -457,7 +457,7 @@ fn convert_return_statement(
     } else {
         vec![]
     };
-    result.push(Instruction::return_from_function(pushes_on_stack).span(span).into());
+    result.push(Instruction::return_from_function(pushes_on_stack, return_statement.restores_variables).span(span).into());
     result
 }
 

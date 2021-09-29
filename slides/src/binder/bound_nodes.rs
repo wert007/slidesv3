@@ -439,11 +439,12 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn return_statement(span: TextSpan, expression: Option<BoundNode<'a>>) -> Self {
+    pub fn return_statement(span: TextSpan, expression: Option<BoundNode<'a>>, restores_variables: bool) -> Self {
         Self {
             span,
             kind: BoundNodeKind::ReturnStatement(BoundReturnStatementNodeKind {
                 expression: expression.map(|n| Box::new(n)),
+                restores_variables,
             }),
             type_: Type::Void,
             byte_width: 0,
@@ -581,4 +582,5 @@ pub struct BoundExpressionStatementNodeKind<'a> {
 #[derive(Debug, Clone)]
 pub struct BoundReturnStatementNodeKind<'a> {
     pub expression: Option<Box<BoundNode<'a>>>,
+    pub restores_variables: bool,
 }

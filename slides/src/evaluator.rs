@@ -529,12 +529,16 @@ fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) 
 }
 
 fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
-    let has_return_value = instruction.arg != 0;
+    let has_return_value = instruction.arg & 0x1 == 0x1;
     if has_return_value {
         let result = state.stack.pop();
 
         for register in state.registers.iter_mut().skip(state.protected_registers).rev() {
-            *register = state.stack.pop();
+            if instruction.arg & 0x2 == 0x2 {
+                state.stack.pop();
+            } else {
+                *register = state.stack.pop();
+            }
         }
 
         let return_address = state.stack.pop().value;
@@ -546,7 +550,11 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         }
     } else {
         for register in state.registers.iter_mut().skip(state.protected_registers).rev() {
-            *register = state.stack.pop();
+            if instruction.arg & 0x2 == 0x2 {
+                state.stack.pop();
+            } else {
+                *register = state.stack.pop();
+            }
         }
 
         let return_address = state.stack.pop().value;

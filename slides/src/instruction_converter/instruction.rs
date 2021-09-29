@@ -308,10 +308,17 @@ impl Instruction {
         }
     }
 
-    pub const fn return_from_function(returns_value: bool) -> Self {
+    pub fn return_from_function(returns_value: bool, restores_registers: bool) -> Self {
+        let mut arg = 0;
+        if returns_value {
+            arg += 1;
+        }
+        if !restores_registers {
+            arg += 2;
+        }
         Self {
             op_code: OpCode::Return,
-            arg: returns_value as _,
+            arg,
             span: None,
         }
     }
