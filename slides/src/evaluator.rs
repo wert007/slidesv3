@@ -271,7 +271,12 @@ fn evaluate_multiplication(state: &mut EvaluatorState, _: Instruction) {
 fn evaluate_division(state: &mut EvaluatorState, _: Instruction) {
     let rhs = state.stack.pop().value;
     let lhs = state.stack.pop().value;
-    state.stack.push(lhs.wrapping_div(rhs));
+    if rhs == 0 {
+        println!("Runtime Error: Division by zero!");
+        state.stack.push(0);
+    } else {
+        state.stack.push(lhs.wrapping_div(rhs));
+    }
 }
 
 fn evaluate_equals(state: &mut EvaluatorState, _: Instruction) {

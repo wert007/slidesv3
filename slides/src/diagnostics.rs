@@ -241,6 +241,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_cannot_print_type(&mut self, span: TextSpan, type_: &Type) {
+        let message = format!("Cannot print values of type {}.", type_);
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(
@@ -251,7 +256,10 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn no_heap_memory_left(&mut self, span: Option<TextSpan>, needed_memory_in_bytes: u64) {
-        let message = format!("Out of memory. No heap memory for {} bytes left.", needed_memory_in_bytes);
+        let message = format!(
+            "Out of memory. No heap memory for {} bytes left.",
+            needed_memory_in_bytes
+        );
         self.report_runtime(message, span);
     }
 }
