@@ -193,4 +193,9 @@ impl<'a> DiagnosticBag<'a> {
         let message = format!("Not all paths in function return. Every path needs a return value of type {}", expected_return_type);
         self.report(message, span);
     }
+
+    pub fn report_cannot_print_type(&mut self, span: TextSpan, type_: &Type) {
+        let message = format!("Cannot print values of type {}.", type_);
+        self.report(message, span);
+    }
 }

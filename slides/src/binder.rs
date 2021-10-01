@@ -845,6 +845,11 @@ fn bind_arguments_for_function<'a, 'b>(
         if !argument.type_.can_be_converted_to(parameter_type) {
             binder.diagnostic_bag.report_cannot_convert(argument.span, &argument.type_, parameter_type);
         }
+        if let Type::Function(_) = argument.type_ {
+            if let Some(SystemCallKind::Print) = function_type.system_call_kind {
+                binder.diagnostic_bag.report_cannot_print_type(argument.span, &argument.type_);
+            }
+        }
         result.push(argument);
     }
     result
