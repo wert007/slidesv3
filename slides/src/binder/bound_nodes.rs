@@ -278,7 +278,7 @@ impl<'a> BoundNode<'a> {
                 BoundNode::variable_declaration(
                     span,
                     index_variable,
-                    BoundNode::literal_from_value(Value::Integer(1)),
+                    BoundNode::literal_from_value(Value::Integer(0)),
                 ), // let $index = 0;
                 BoundNode::variable_declaration(span, collection_variable, collection), // let $collection = collection;
                 BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
