@@ -202,7 +202,7 @@ fn convert_function_declaration(
             .span(span)
             .into(),
     );
-    for parameter in function_declaration.parameters {
+    for parameter in function_declaration.parameters.into_iter().rev() {
         result.push(Instruction::store_in_register(parameter).span(span).into());
     }
     result.append(&mut convert_node(*function_declaration.body, converter));
