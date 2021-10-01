@@ -76,6 +76,7 @@ struct BoundVariableName<'a> {
 struct BindingState<'a, 'b> {
     diagnostic_bag: &'b mut DiagnosticBag<'a>,
     variable_table: HashMap<u64, BoundVariableName<'a>>,
+    type_table: HashMap<u64, BoundVariableName<'a>>,
     functions: Vec<FunctionDeclarationBody<'a>>,
     print_variable_table: bool,
     max_used_variables: usize,
@@ -126,6 +127,27 @@ impl<'a> BindingState<'a, '_> {
                     identifier: name.into(),
                     type_,
                     is_read_only,
+                },
+            );
+            Some(index)
+        }
+    }
+
+    fn register_type(&mut self, name: &'a str, type_: Type) -> Option<u64> {
+        let index = self.type_table.len() as u64;
+        let type_name_already_registered = self
+            .type_table
+            .values()
+            .any(|type_| type_.identifier.as_ref() == name);
+        if type_name_already_registered {
+            None
+        } else {
+            self.type_table.insert(
+                index,
+                BoundVariableName {
+                    identifier: name.into(),
+                    type_,
+                    is_read_only: true,
                 },
             );
             Some(index)
@@ -188,6 +210,35 @@ impl BoundProgram<'_> {
     }
 }
 
+fn type_table() -> HashMap<u64, BoundVariableName<'static>> {
+    let mut result = HashMap::new();
+    result.insert(
+        0,
+        BoundVariableName {
+            identifier: "int".into(),
+            type_: Type::Integer,
+            is_read_only: true,
+        },
+    );
+    result.insert(
+        1,
+        BoundVariableName {
+            identifier: "bool".into(),
+            type_: Type::Boolean,
+            is_read_only: true,
+        },
+    );
+    result.insert(
+        2,
+        BoundVariableName {
+            identifier: "string".into(),
+            type_: Type::String,
+            is_read_only: true,
+        },
+    );
+    result
+}
+
 pub fn bind<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
@@ -200,6 +251,7 @@ pub fn bind<'a>(
     let mut binder = BindingState {
         diagnostic_bag,
         variable_table: HashMap::new(),
+        type_table: type_table(),
         functions: vec![],
         print_variable_table: debug_flags.print_variable_table(),
         max_used_variables: 0,
