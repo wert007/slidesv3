@@ -156,7 +156,7 @@ fn convert_node(node: BoundNode, converter: &mut InstructionConverter) -> Vec<In
 fn convert_function_declaration(function_declaration: BoundFunctionDeclarationNodeKind, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
     result.push(Instruction::label(function_declaration.index).into());
-    for parameter in function_declaration.parameters {
+    for parameter in function_declaration.parameters.into_iter().rev() {
         result.push(Instruction::store_in_register(parameter).into());
     }
     result.append(&mut convert_node(*function_declaration.body, converter));
