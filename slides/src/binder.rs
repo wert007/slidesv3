@@ -152,6 +152,10 @@ impl<'a> BindingState<'a, '_> {
                 is_read_only: v.is_read_only,
             })
     }
+
+    fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
+        self.type_table.iter().find(|(_, v)|v.identifier.as_ref() == name).map(|(_, v)|v.type_.clone())
+    }
 }
 
 fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
@@ -358,17 +362,14 @@ fn bind_function_declaration<'a, 'b>(
 
 fn bind_function_type<'a>(
     function_type: FunctionTypeNode<'a>,
-    binder: &mut BindingState,
+    binder: &mut BindingState<'a, '_>,
 ) -> (FunctionType, Vec<(&'a str, Type)>) {
     let variable_count = binder.variable_table.len();
-    let mut parameter_types = Vec::with_capacity(function_type.parameters.len());
-    let mut parameter_names = Vec::with_capacity(function_type.parameters.len());
+    let mut parameters = vec![];
     for parameter in function_type.parameters {
-        let parameter_name = parameter.identifier.lexeme;
-        let parameter_type = bind_type(parameter.type_, binder);
-        parameter_types.push(parameter_type.clone());
-        parameter_names.push(parameter_name);
-        binder.register_generated_variable(parameter_name.into(), parameter_type, false);
+        let parameter = bind_parameter(parameter, binder);
+        binder.register_generated_variable(parameter.0.into(), parameter.1.clone(), false);
+        parameters.push(parameter);
     }
     let return_type = if let Some(it) = function_type.return_type {
         bind_type(it.return_type, binder)
@@ -376,33 +377,31 @@ fn bind_function_type<'a>(
         Type::Void
     };
     binder.delete_variables_until(variable_count);
-    let variables: Vec<(&'a str, Type)> = parameter_names
-        .into_iter()
-        .zip(parameter_types.iter().map(|t| t.clone()))
-        .collect();
     (
         FunctionType {
-            parameter_types,
+            parameter_types: parameters.clone().into_iter().map(|(_, t)| t).collect(),
             this_type: None,
             return_type,
             system_call_kind: None,
         },
-        variables,
+        parameters,
     )
 }
 
-fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
-    let mut result = match type_.identifier.lexeme {
-        "int" => Type::Integer,
-        "string" => Type::String,
-        "bool" => Type::Boolean,
-        type_name => {
-            binder
-                .diagnostic_bag
-                .report_unknown_type(type_.span(), type_name);
-            return Type::Error;
-        }
-    };
+fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -> (&'a str, Type) {
+    let name = parameter.identifier.lexeme;
+    let type_ = bind_type(parameter.type_, binder);
+    (name, type_)
+}
+
+fn bind_type<'a>(type_: TypeNode, binder: &mut BindingState) -> Type {
+    let type_name = type_.identifier.lexeme;
+    let mut result = binder.look_up_type_by_name(type_name).unwrap_or_else(|| {
+        binder
+            .diagnostic_bag
+            .report_unknown_type(type_.span(), type_name);
+        Type::Error
+    });
     for _ in &type_.brackets {
         result = Type::array(result);
     }
@@ -643,6 +642,7 @@ fn bind_unary_operator<'a, 'b>(
         | Type::Any
         | Type::SystemCall(_)
         | Type::Function(_)
+        | Type::Struct(_)
         | Type::Boolean
         | Type::String
         | Type::Array(_) => {
@@ -801,6 +801,7 @@ fn bind_field_access<'a, 'b>(
     match &base.type_ {
         Type::Error => todo!(),
         Type::Any => todo!(),
+        Type::Struct(_) => todo!(),
         Type::Void | Type::Integer | Type::Boolean | Type::Function(_) | Type::SystemCall(_) => {
             binder
                 .diagnostic_bag
