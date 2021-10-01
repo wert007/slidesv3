@@ -90,7 +90,6 @@ fn parse_function_type<'a>(
         }
     }
     let rparen = match_token!(tokens, diagnostic_bag, RParen);
-    // TODO: Parse return type.
 
     let return_type = if matches!(&peek_token(tokens).kind, SyntaxTokenKind::Arrow) {
         let arrow_token = next_token(tokens);

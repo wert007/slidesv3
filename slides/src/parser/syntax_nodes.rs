@@ -45,6 +45,7 @@ impl<'a> SyntaxNode<'a> {
         Self {
             span,
             kind: SyntaxNodeKind::FunctionDeclaration(FunctionDeclarationNodeKind {
+                func_keyword,
                 identifier,
                 function_type,
                 body: Box::new(body),
@@ -402,6 +403,7 @@ pub struct CompilationUnitNodeKind<'a> {
 
 #[derive(Debug, Clone)]
 pub struct FunctionDeclarationNodeKind<'a> {
+    pub func_keyword: SyntaxToken<'a>,
     pub identifier: SyntaxToken<'a>,
     pub function_type: FunctionTypeNode<'a>,
     pub body: Box<SyntaxNode<'a>>,
