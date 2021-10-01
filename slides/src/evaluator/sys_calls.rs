@@ -28,6 +28,7 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
+        Type::Struct(_) => todo!(),
         Type::Integer => {
             format!("{}", argument.value as i64)
         }
@@ -64,6 +65,7 @@ fn array_to_string_native(
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
+        Type::Struct(_) => todo!(),
         Type::Integer => {
             for i in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 let value = if is_heap_pointer(i) {
@@ -188,7 +190,7 @@ pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
-        Type::Function(_) => todo!(),
+        Type::Function(_) | Type::Struct(_) => todo!(),
         Type::Integer | Type::Boolean | Type::SystemCall(_) | Type::Array(_) => {
             pointer / WORD_SIZE_IN_BYTES
         }

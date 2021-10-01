@@ -16,6 +16,7 @@ pub enum Type {
     Array(Box<Type>),
     String,
     Function(Box<FunctionType>),
+    Struct(Box<StructType>),
 }
 
 impl Type {
@@ -62,6 +63,7 @@ impl Type {
             Type::Boolean => 8,
             Type::String => 10,
             Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 16,
+            Type::Struct(_) |
             Type::Function(_) => unimplemented!(),
         }
     }
@@ -108,6 +110,9 @@ impl std::fmt::Display for Type {
             Type::String => write!(f, "string"),
             Type::Function(function_type) => {
                 write!(f, "fn {}", function_type)
+            }
+            Type::Struct(struct_type) => {
+                write!(f, "struct {}", struct_type)
             }
         }
     }
@@ -161,6 +166,7 @@ impl std::fmt::Display for FunctionType {
         Ok(())
     }
 }
+
 impl FunctionType {
     pub fn error() -> Self {
         Self {
@@ -169,5 +175,21 @@ impl FunctionType {
             return_type: Type::Void,
             system_call_kind: None,
         }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct StructType {
+    pub id: u64,
+    pub fields: Vec<Type>,
+}
+
+impl std::fmt::Display for StructType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "t{} {{\n", self.id)?;
+        for (index, field_type) in self.fields.iter().enumerate() {
+            write!(f, "field{}: {};\n", index, field_type)?;
+        }
+        write!(f, "}}")
     }
 }

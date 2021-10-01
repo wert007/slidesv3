@@ -247,7 +247,7 @@ fn convert_array_literal(
     match &array_literal.children[0].type_ {
         Type::Error | Type::Void => unreachable!(),
         Type::Any => todo!(),
-        Type::Function(_) => todo!(),
+        Type::Function(_) | Type::Struct(_) => todo!(),
         Type::Array(_) | Type::String |
         Type::Integer | Type::Boolean | Type::SystemCall(_) => {
             for child in array_literal.children.into_iter() {
