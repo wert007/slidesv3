@@ -54,6 +54,19 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn struct_declaration(struct_keyword: SyntaxToken<'a>, identifier: SyntaxToken<'a>, body: StructBodyNode<'a>) -> Self {
+        let span = TextSpan::bounds(struct_keyword.span(), body.span);
+        Self {
+            span,
+            kind: SyntaxNodeKind::StructDeclaration(StructDeclarationNodeKind {
+                struct_keyword,
+                identifier,
+                body: Box::new(body),
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn literal(token: SyntaxToken<'a>) -> Self {
         let value = match &token.kind {
             SyntaxTokenKind::NumberLiteral(n) => (n.value as i64).into(),
@@ -366,6 +379,7 @@ pub enum SyntaxNodeKind<'a> {
     // Top Level Statements
     CompilationUnit(CompilationUnitNodeKind<'a>),
     FunctionDeclaration(FunctionDeclarationNodeKind<'a>),
+    StructDeclaration(StructDeclarationNodeKind<'a>),
 
     //Expressions
     Literal(LiteralNodeKind<'a>),
@@ -432,6 +446,35 @@ impl<'a> FunctionTypeNode<'a> {
             comma_tokens,
             rparen,
             return_type,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StructDeclarationNodeKind<'a> {
+    pub struct_keyword: SyntaxToken<'a>,
+    pub identifier: SyntaxToken<'a>,
+    pub body: Box<StructBodyNode<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructBodyNode<'a> {
+    pub lbrace: SyntaxToken<'a>,
+    pub statements: Vec<ParameterNode<'a>>,
+    pub semicolon_tokens: Vec<SyntaxToken<'a>>,
+    pub rbrace: SyntaxToken<'a>,
+    pub span: TextSpan,
+}
+
+impl<'a> StructBodyNode<'a> {
+    pub fn new(lbrace: SyntaxToken<'a>, statements: Vec<ParameterNode<'a>>, semicolon_tokens: Vec<SyntaxToken<'a>>, rbrace: SyntaxToken<'a>) -> Self {
+        let span = TextSpan::bounds(lbrace.span(), rbrace.span());
+        Self {
+            lbrace,
+            statements,
+            semicolon_tokens,
+            rbrace,
+            span,
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
         syntax_token::{SyntaxToken, SyntaxTokenKind},
     }, parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode}, text::{SourceText, TextSpan}};
 
-use self::syntax_nodes::{ElseClause, ParameterNode, SyntaxNode, TypeNode};
+use self::syntax_nodes::{ElseClause, ParameterNode, StructBodyNode, SyntaxNode, TypeNode};
 use crate::match_token;
 
 pub fn parse<'a>(
@@ -48,6 +48,7 @@ fn parse_top_level_statement<'a>(
 ) -> SyntaxNode<'a> {
     match &peek_token(tokens).kind {
         SyntaxTokenKind::FuncKeyword => parse_function_statement(tokens, diagnostic_bag),
+        SyntaxTokenKind::StructKeyword => parse_struct_statement(tokens, diagnostic_bag),
         _ => {
             let token = next_token(tokens);
             let span = token.span();
@@ -68,6 +69,17 @@ fn parse_function_statement<'a>(
     let body = parse_block_statement(tokens, diagnostic_bag);
 
     SyntaxNode::function_declaration(func_keyword, identifier, function_type, body)
+}
+
+fn parse_struct_statement<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let struct_keyword = match_token!(tokens, diagnostic_bag, StructKeyword);
+    let identifier = match_token!(tokens, diagnostic_bag, Identifier);
+    let body = parse_struct_body(tokens, diagnostic_bag);
+
+    SyntaxNode::struct_declaration(struct_keyword, identifier, body)
 }
 
 fn parse_function_type<'a>(
@@ -103,6 +115,22 @@ fn parse_function_type<'a>(
     };
 
     FunctionTypeNode::new(lparen, parameters, comma_tokens, rparen, return_type)
+}
+
+fn parse_struct_body<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> StructBodyNode<'a> {
+    let lbrace = match_token!(tokens, diagnostic_bag, LBrace);
+    let mut statements = vec![];
+    let mut semicolon_tokens = vec![];
+    while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RBrace) {
+        statements.push(parse_parameter(tokens, diagnostic_bag));
+        semicolon_tokens.push(match_token!(tokens, diagnostic_bag, Semicolon));
+    }
+    let rbrace = match_token!(tokens, diagnostic_bag, RBrace);
+
+    StructBodyNode::new(lbrace, statements, semicolon_tokens, rbrace)
 }
 
 fn parse_parameter<'a>(

@@ -152,6 +152,7 @@ pub enum SyntaxTokenKind {
     InKeyword,
     LetKeyword,
     ReturnKeyword,
+    StructKeyword,
     TrueKeyword,
     WhileKeyword,
 }
@@ -204,6 +205,7 @@ impl SyntaxTokenKind {
             "in" => Some(Self::InKeyword),
             "let" => Some(Self::LetKeyword),
             "return" => Some(Self::ReturnKeyword),
+            "struct" => Some(Self::StructKeyword),
             "true" => Some(Self::TrueKeyword),
             "while" => Some(Self::WhileKeyword),
             _ => None,
@@ -282,6 +284,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::InKeyword => write!(f, "in"),
             SyntaxTokenKind::LetKeyword => write!(f, "let"),
             SyntaxTokenKind::ReturnKeyword => write!(f, "return"),
+            SyntaxTokenKind::StructKeyword => write!(f, "struct"),
             SyntaxTokenKind::TrueKeyword => write!(f, "true"),
             SyntaxTokenKind::WhileKeyword => write!(f, "while"),
         }

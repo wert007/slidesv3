@@ -208,6 +208,19 @@ macro_rules! match_token {
             SyntaxToken::keyword(current.span().start(), "func")
         }
     };
+    ($tokens:expr, $diagnostic_bag:expr, StructKeyword) => {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::StructKeyword) {
+            next_token($tokens)
+        } else {
+            let current = peek_token($tokens);
+            $diagnostic_bag.report_unexpected_token_kind(
+                current.span(),
+                &current.kind,
+                &SyntaxTokenKind::StructKeyword,
+            );
+            SyntaxToken::keyword(current.span().start(), "struct")
+        }
+    };
     ($tokens:expr, $diagnostic_bag:expr, IfKeyword) => {
         if matches!(peek_token($tokens).kind, SyntaxTokenKind::IfKeyword) {
             next_token($tokens)
