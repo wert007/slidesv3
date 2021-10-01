@@ -62,7 +62,10 @@ impl Type {
             Type::Boolean => 8,
             Type::String => 10,
             Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 16,
-            Type::Function(_) => unimplemented!(),
+            Type::Function(_) => {
+                eprintln!("Unimplented type_identifer for functions expected..");
+                u64::MAX
+            },
         }
     }
 
