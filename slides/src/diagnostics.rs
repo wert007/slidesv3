@@ -262,4 +262,9 @@ impl<'a> DiagnosticBag<'a> {
         );
         self.report_runtime(message, span);
     }
+
+    pub fn division_by_zero(&mut self, span: Option<TextSpan>) {
+        let message = format!("Divison by Zero.");
+        self.report_runtime(message, span);
+    }
 }
