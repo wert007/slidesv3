@@ -19,8 +19,9 @@ use crate::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
             BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
             ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
-            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParenthesizedNodeKind,
-            ReturnStatementNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
+            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode,
+            ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode,
+            StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
             VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
         },
     },
@@ -32,7 +33,7 @@ use crate::{
 use self::{
     bound_nodes::{BoundNode, BoundNodeKind},
     operators::BoundBinaryOperator,
-    typing::{FunctionType, SystemCallKind},
+    typing::{FunctionType, StructType, SystemCallKind},
 };
 
 enum SmartString<'a> {
@@ -353,6 +354,9 @@ fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingS
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(function_declaration, binder)
         }
+        SyntaxNodeKind::StructDeclaration(struct_declaration) => {
+            bind_struct_declaration(struct_declaration, binder)
+        }
         _ => binder
             .diagnostic_bag
             .report_invalid_top_level_statement(node.span(), node.kind),
@@ -363,6 +367,9 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
     match node.kind {
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(function_declaration, binder)
+        }
+        SyntaxNodeKind::StructDeclaration(struct_declaration) => {
+            bind_struct_declaration(struct_declaration, binder)
         }
         _ => {
             binder
@@ -412,6 +419,28 @@ fn bind_function_declaration<'a, 'b>(
     });
 }
 
+fn bind_struct_declaration<'a, 'b>(
+    struct_declaration: StructDeclarationNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) {
+    // TODO: Bind fields later, so that structs can be declared out of order.
+    let fields = bind_struct_body(*struct_declaration.body, binder);
+    let id = binder.type_table.len() as _;
+    let struct_type = StructType {
+        id,
+        fields: fields.into_iter().map(|(_, t)| t).collect(),
+    };
+    let type_ = Type::Struct(Box::new(struct_type));
+    let id = binder.register_type(struct_declaration.identifier.lexeme, type_);
+    if id.is_none() {
+        binder.diagnostic_bag.report_cannot_declare_variable(
+            struct_declaration.identifier.span(),
+            struct_declaration.identifier.lexeme,
+        );
+    }
+    let _id = id.unwrap();
+}
+
 fn bind_function_type<'a>(
     function_type: FunctionTypeNode<'a>,
     binder: &mut BindingState<'a, '_>,
@@ -438,6 +467,17 @@ fn bind_function_type<'a>(
         },
         parameters,
     )
+}
+
+fn bind_struct_body<'a>(
+    struct_body: StructBodyNode<'a>,
+    binder: &mut BindingState,
+) -> Vec<(&'a str, Type)> {
+    let mut result = vec![];
+    for statement in struct_body.statements {
+        result.push(bind_parameter(statement, binder));
+    }
+    result
 }
 
 fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -> (&'a str, Type) {
