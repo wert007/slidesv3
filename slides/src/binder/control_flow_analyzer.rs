@@ -104,6 +104,9 @@ pub fn check_if_all_paths_return(function_name: &str, statements: &[BoundNode], 
         println!("Outputted BasicBlocks for func {}() to debug-out/{}.svg", function_name, function_name);
     }
     let accessible_incoming_to_end_block = collect_paths_to_end(&basic_blocks);
+    if accessible_incoming_to_end_block.is_empty() {
+        return false;
+    }
     for incoming in accessible_incoming_to_end_block {
         let basic_block = &basic_blocks[incoming];
         if let BasicBlockKind::CodeBlock(code_block) = basic_block.kind {
