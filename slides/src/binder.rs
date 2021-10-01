@@ -280,15 +280,22 @@ pub fn bind<'a>(
         if matches!(&binder.function_return_type, Type::Void) {
             body = BoundNode::block_statement(
                 body.span,
-                vec![body, BoundNode::return_statement(TextSpan::zero(), None, !node.is_main)],
+                vec![
+                    body,
+                    BoundNode::return_statement(TextSpan::zero(), None, !node.is_main),
+                ],
             );
         }
         let body_statements = lowerer::flatten(body, &mut label_count);
         if !matches!(&binder.function_return_type, Type::Void) {
-            if !control_flow_analyzer::check_if_all_paths_return(node.function_name, &body_statements, debug_flags) {
+            if !control_flow_analyzer::check_if_all_paths_return(
+                node.function_name,
+                &body_statements,
+                debug_flags,
+            ) {
                 binder
-                .diagnostic_bag
-                .report_missing_return_statement(span, &binder.function_return_type);
+                    .diagnostic_bag
+                    .report_missing_return_statement(span, &binder.function_return_type);
             }
         }
         let body = BoundNode::block_statement(span, body_statements);
