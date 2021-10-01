@@ -829,18 +829,21 @@ fn bind_arguments_for_function<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> Vec<BoundNode<'a>> {
     let mut result = vec![];
-    if matches!(function_type.system_call_kind, Some(SystemCallKind::Print)) && arguments.len() != 1
+    if function_type.parameter_types.len() != arguments.len()
     {
         binder
             .diagnostic_bag
-            .report_unexpected_argument_count(span, arguments.len(), 1);
+            .report_unexpected_argument_count(span, arguments.len(), function_type.parameter_types.len());
     }
-    for argument in arguments {
+    for (argument, parameter_type) in arguments.into_iter().zip(function_type.parameter_types.iter()) {
         let argument = bind_node(argument, binder);
         if matches!(argument.type_, Type::Void) {
             binder
                 .diagnostic_bag
                 .report_invalid_void_expression(argument.span);
+        }
+        if !argument.type_.can_be_converted_to(parameter_type) {
+            binder.diagnostic_bag.report_cannot_convert(argument.span, &argument.type_, parameter_type);
         }
         result.push(argument);
     }

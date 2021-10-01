@@ -66,9 +66,6 @@ func fac(n: int) -> int {
 // }
 
 func main() {
-    // print(fac(add(1, 2)));
-    // print(with_while(1000));
-
     let basic_arith = [
         add,
         sub,
@@ -79,8 +76,6 @@ func main() {
     ];
 
     for arithmetic_function in basic_arith {
-        // Does not throw a diagnostic, but does crash;
-        // let result = arithmetic_function(5, 3, 2, 1);
         let result = arithmetic_function(5, 3);
         // Make printing of functions illegal. Maybe later print the type, but
         // the time is currently already known during compile time, so that
