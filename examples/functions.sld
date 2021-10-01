@@ -33,6 +33,18 @@ func add(a: int, b: int) -> int {
     }
 }
 
+func sub(a: int, b: int) -> int {
+    return a - b;
+}
+
+func mul(a: int, b: int) -> int {
+    return a * b;
+}
+
+func div(a: int, b: int) -> int {
+    return a / b;
+}
+
 func fac(n: int) -> int {
     if n <= 1 {
         return 1;
@@ -41,17 +53,46 @@ func fac(n: int) -> int {
     }
 }
 
-func with_while(n: int) -> int {
-    let og = n;
-    while n >= og / 10 {
-        n = n / 2;
-    }
-    return n;
-}
+// func addr(n: string) -> string {
+//     return n;
+// }
+
+// func with_while(n: int) -> int {
+//     let og = n;
+//     while n >= og / 10 {
+//         n = n / 2;
+//     }
+//     return n;
+// }
 
 func main() {
-    print(fac(add(1, 2)));
-    print(with_while(1000));
+    // print(fac(add(1, 2)));
+    // print(with_while(1000));
+
+    let basic_arith = [
+        add,
+        sub,
+        mul,
+        div,
+        // Throws rightfully diagnostic
+        // fac,
+    ];
+
+    for arithmetic_function in basic_arith {
+        // Does not throw a diagnostic, but does crash;
+        // let result = arithmetic_function(5, 3, 2, 1);
+        let result = arithmetic_function(5, 3);
+        // Make printing of functions illegal. Maybe later print the type, but
+        // the time is currently already known during compile time, so that
+        // there still would be no need for a type identifier. On the other
+        // hand, this is always true. So it would be possible to have a
+        // print(msg: string) and call int$to$string(arg) or
+        // int$array$to&string(arg, dimension).
+        //
+        //      print(arithmetic_function);
+        print('fn(5, 3) = ' + result);
+    }
+
     // count_up(10);
     // print('add(1, 2)');
     // add(1, 2);
