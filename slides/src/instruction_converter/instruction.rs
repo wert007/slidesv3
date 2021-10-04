@@ -45,6 +45,14 @@ impl Instruction {
         }
     }
 
+    pub const fn duplicate() -> Self {
+        Self {
+            op_code: OpCode::Duplicate,
+            arg: 0,
+            span: None,
+        }
+    }
+
     pub const fn pop() -> Self {
         Self {
             op_code: OpCode::Pop,

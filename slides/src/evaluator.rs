@@ -93,6 +93,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::NoOp => {}
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),
         OpCode::LoadPointer => evaluate_load_pointer(state, instruction),
+        OpCode::Duplicate => evaluate_duplicate(state, instruction),
         OpCode::Pop => evaluate_pop(state, instruction),
         OpCode::LoadRegister => evaluate_load_register(state, instruction),
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
@@ -135,6 +136,17 @@ fn evaluate_load_pointer(state: &mut EvaluatorState, instruction: Instruction) {
 
 fn is_heap_pointer(address: u64) -> bool {
     address & HEAP_POINTER > 0
+}
+
+fn evaluate_duplicate(state: &mut EvaluatorState, _: Instruction) {
+    let value = state.stack.pop();
+    if value.is_pointer {
+        state.stack.push_pointer(value.value);
+        state.stack.push_pointer(value.value);
+    } else {
+        state.stack.push(value.value);
+        state.stack.push(value.value);
+    }
 }
 
 fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
