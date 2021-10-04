@@ -451,6 +451,7 @@ fn parse_primary<'a>(
         SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => {
             parse_boolean_literal(tokens, diagnostic_bag)
         }
+        SyntaxTokenKind::NewKeyword => parse_constructor(tokens, diagnostic_bag),
         SyntaxTokenKind::Identifier => parse_identifier(tokens, diagnostic_bag),
         unexpected_token => {
             diagnostic_bag.report_unexpected_token_kind(
@@ -521,6 +522,37 @@ fn parse_boolean_literal<'a>(
         SyntaxTokenKind::FalseKeyword => SyntaxNode::false_literal(token),
         _ => unreachable!(),
     }
+}
+
+fn parse_constructor<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let new_keyword = match_token!(tokens, diagnostic_bag, NewKeyword);
+    let type_name = match_token!(tokens, diagnostic_bag, Identifier);
+
+    // FIXME: Copy-Paste from function call.
+    let open_parenthesis_token = next_token(tokens);
+    let mut arguments = vec![];
+    let mut comma_tokens = vec![];
+    while !matches!(
+        peek_token(tokens).kind,
+        // Currently there are no statements allowed as arguments to a
+        // function. This may change..
+        SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi | SyntaxTokenKind::Semicolon
+    ) {
+        let token_count = tokens.len();
+        arguments.push(parse_expression(tokens, diagnostic_bag));
+        if !matches!(peek_token(tokens).kind, SyntaxTokenKind::RParen) {
+            comma_tokens.push(match_token!(tokens, diagnostic_bag, Comma));
+        }
+        if token_count == tokens.len() {
+            next_token(tokens);
+        }
+    }
+    let close_parenthesis_token = match_token!(tokens, diagnostic_bag, RParen);
+
+    SyntaxNode::constructor_call(new_keyword, type_name, open_parenthesis_token, arguments, comma_tokens, close_parenthesis_token)
 }
 
 fn parse_identifier<'a>(

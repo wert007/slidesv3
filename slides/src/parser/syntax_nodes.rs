@@ -117,6 +117,22 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn constructor_call(new_keyword: SyntaxToken<'a>, type_name: SyntaxToken<'a>, open_parenthesis_token: SyntaxToken<'a>, arguments: Vec<SyntaxNode<'a>>, comma_tokens: Vec<SyntaxToken<'a>>, close_parenthesis_token: SyntaxToken<'a>) -> Self {
+        let span = TextSpan::bounds(new_keyword.span(), close_parenthesis_token.span());
+        Self {
+            span,
+            kind: SyntaxNodeKind::ConstructorCall(ConstructorCallNodeKind {
+                new_keyword,
+                type_name,
+                open_parenthesis_token,
+                arguments,
+                comma_tokens,
+                close_parenthesis_token
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn variable(token: SyntaxToken<'a>) -> Self {
         Self {
             span: token.span(),
@@ -384,6 +400,7 @@ pub enum SyntaxNodeKind<'a> {
     //Expressions
     Literal(LiteralNodeKind<'a>),
     ArrayLiteral(ArrayLiteralNodeKind<'a>),
+    ConstructorCall(ConstructorCallNodeKind<'a>),
     Variable(VariableNodeKind<'a>),
     Binary(BinaryNodeKind<'a>),
     Unary(UnaryNodeKind<'a>),
@@ -540,6 +557,16 @@ pub struct ArrayLiteralNodeKind<'a> {
     pub children: Vec<SyntaxNode<'a>>,
     pub comma_tokens: Vec<SyntaxToken<'a>>,
     pub rbracket: SyntaxToken<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConstructorCallNodeKind<'a> {
+    pub new_keyword: SyntaxToken<'a>,
+    pub type_name: SyntaxToken<'a>,
+    pub open_parenthesis_token: SyntaxToken<'a>,
+    pub arguments: Vec<SyntaxNode<'a>>,
+    pub comma_tokens: Vec<SyntaxToken<'a>>,
+    pub close_parenthesis_token: SyntaxToken<'a>,
 }
 
 #[derive(Debug, Clone)]
