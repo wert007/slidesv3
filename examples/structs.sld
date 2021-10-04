@@ -8,6 +8,16 @@ struct Rect {
     bottom_right: Point;
 }
 
+struct Cube {
+    // sides: Rect[];
+    top: Rect;
+    bottom: Rect;
+    north: Rect;
+    east: Rect;
+    south: Rect;
+    west: Rect;
+}
+
 // TODO: Field Access
 // func field_access(rect: Rect) -> int {
 //     return rect.top_left.x;
@@ -20,11 +30,6 @@ struct Rect {
 
 // struct Foo {
 //     a: int;
-// }
-
-// TODO: Constructors
-// func example(a: int) -> Bar {
-//     return new Bar(new Foo(a));
 // }
 
 // TODO: Recursion?
@@ -42,4 +47,7 @@ struct Rect {
 
 func main() {
     print('Hello World!');
+    let p = new Point(43, 87);
+    let r = new Rect(p, new Point(1200, 3400));
+    let c = new Cube(r, r, r, r, r, r);
 }
