@@ -177,7 +177,10 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
-        self.type_table.iter().find(|(_, v)|v.identifier.as_ref() == name).map(|(_, v)|v.type_.clone())
+        self.type_table
+            .iter()
+            .find(|(_, v)| v.identifier.as_ref() == name)
+            .map(|(_, v)| v.type_.clone())
     }
 }
 
@@ -287,16 +290,16 @@ pub fn bind<'a>(
             );
         }
         let body_statements = lowerer::flatten(body, &mut label_count);
-        if !matches!(&binder.function_return_type, Type::Void) {
-            if !control_flow_analyzer::check_if_all_paths_return(
+        if !matches!(&binder.function_return_type, Type::Void)
+            && !control_flow_analyzer::check_if_all_paths_return(
                 node.function_name,
                 &body_statements,
                 debug_flags,
-            ) {
-                binder
-                    .diagnostic_bag
-                    .report_missing_return_statement(span, &binder.function_return_type);
-            }
+            )
+        {
+            binder
+                .diagnostic_bag
+                .report_missing_return_statement(span, &binder.function_return_type);
         }
         let body = BoundNode::block_statement(span, body_statements);
         statements.insert(
@@ -347,8 +350,7 @@ fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
         .expect("No main function found..");
     let base = BoundNode::variable(span, base.id, base.type_);
     let call_main = BoundNode::function_call(span, base, vec![], Type::Void);
-    let call_main = BoundNode::expression_statement(span, call_main);
-    call_main
+    BoundNode::expression_statement(span, call_main)
 }
 
 fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
@@ -359,7 +361,7 @@ fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingS
             }
         }
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
-            bind_function_declaration(function_declaration, binder)
+            bind_function_declaration(*function_declaration, binder)
         }
         SyntaxNodeKind::StructDeclaration(struct_declaration) => {
             bind_struct_declaration(struct_declaration, binder)
@@ -373,7 +375,7 @@ fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingS
 fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
     match node.kind {
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
-            bind_function_declaration(function_declaration, binder)
+            bind_function_declaration(*function_declaration, binder)
         }
         SyntaxNodeKind::StructDeclaration(struct_declaration) => {
             bind_struct_declaration(struct_declaration, binder)
@@ -493,7 +495,7 @@ fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -
     (name, type_)
 }
 
-fn bind_type<'a>(type_: TypeNode, binder: &mut BindingState) -> Type {
+fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     let type_name = type_.identifier.lexeme;
     let mut result = binder.look_up_type_by_name(type_name).unwrap_or_else(|| {
         binder
@@ -621,7 +623,7 @@ fn bind_constructor_call<'a>(
         binder,
     );
     let struct_type = if let Type::Struct(it) = type_ {
-        *it.clone()
+        *it
     } else {
         binder
             .diagnostic_bag
@@ -981,13 +983,17 @@ fn bind_arguments_for_function<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> Vec<BoundNode<'a>> {
     let mut result = vec![];
-    if function_type.parameter_types.len() != arguments.len()
-    {
-        binder
-            .diagnostic_bag
-            .report_unexpected_argument_count(span, arguments.len(), function_type.parameter_types.len());
+    if function_type.parameter_types.len() != arguments.len() {
+        binder.diagnostic_bag.report_unexpected_argument_count(
+            span,
+            arguments.len(),
+            function_type.parameter_types.len(),
+        );
     }
-    for (argument, parameter_type) in arguments.into_iter().zip(function_type.parameter_types.iter()) {
+    for (argument, parameter_type) in arguments
+        .into_iter()
+        .zip(function_type.parameter_types.iter())
+    {
         let argument = bind_node(argument, binder);
         if matches!(argument.type_, Type::Void) {
             binder
@@ -995,11 +1001,17 @@ fn bind_arguments_for_function<'a, 'b>(
                 .report_invalid_void_expression(argument.span);
         }
         if !argument.type_.can_be_converted_to(parameter_type) {
-            binder.diagnostic_bag.report_cannot_convert(argument.span, &argument.type_, parameter_type);
+            binder.diagnostic_bag.report_cannot_convert(
+                argument.span,
+                &argument.type_,
+                parameter_type,
+            );
         }
         if let Type::Function(_) = argument.type_ {
             if let Some(SystemCallKind::Print) = function_type.system_call_kind {
-                binder.diagnostic_bag.report_cannot_print_type(argument.span, &argument.type_);
+                binder
+                    .diagnostic_bag
+                    .report_cannot_print_type(argument.span, &argument.type_);
             }
         }
         result.push(argument);

@@ -53,10 +53,7 @@ impl<'a> SyntaxToken<'a> {
         }
     }
 
-    pub fn string_literal(
-        start: usize,
-        lexeme: &'a str,
-    ) -> Self {
+    pub fn string_literal(start: usize, lexeme: &'a str) -> Self {
         let value = lexeme[1..lexeme.len() - 1].to_owned();
         Self {
             start,
@@ -95,7 +92,7 @@ impl<'a> SyntaxToken<'a> {
         Self {
             kind: SyntaxTokenKind::BracketPair,
             lexeme: "[]", // TODO: use actual lexeme
-            start: lbracket.start
+            start: lbracket.start,
         }
     }
 
@@ -193,7 +190,9 @@ impl SyntaxTokenKind {
     }
 
     pub fn default_string_literal() -> Self {
-        SyntaxTokenKind::StringLiteral(StringLiteralKind { value: String::default() })
+        SyntaxTokenKind::StringLiteral(StringLiteralKind {
+            value: String::default(),
+        })
     }
 
     pub fn keyword(identifier: &str) -> Option<Self> {
@@ -309,7 +308,6 @@ impl std::fmt::Debug for NumberLiteralKind {
 pub struct StringLiteralKind {
     pub value: String,
 }
-
 
 impl std::fmt::Debug for StringLiteralKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

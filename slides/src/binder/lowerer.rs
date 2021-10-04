@@ -11,9 +11,7 @@ struct Flattener {
 
 impl Flattener {
     pub fn new(label_count: usize) -> Self {
-        Self {
-            label_count,
-        }
+        Self { label_count }
     }
     pub fn next_label_index(&mut self) -> usize {
         let label = self.label_count;
@@ -51,25 +49,30 @@ fn flatten_node<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Vec<Bound
         BoundNodeKind::FunctionDeclaration(function_declaration) => {
             flatten_function_declaration(function_declaration, flattener)
         }
-        BoundNodeKind::BlockStatement(block_statement) => flatten_block_statement(block_statement, flattener),
+        BoundNodeKind::BlockStatement(block_statement) => {
+            flatten_block_statement(block_statement, flattener)
+        }
         BoundNodeKind::IfStatement(if_statement) => flatten_if_statement(if_statement, flattener),
-        BoundNodeKind::WhileStatement(while_statement) => flatten_while_statement(while_statement, flattener),
+        BoundNodeKind::WhileStatement(while_statement) => {
+            flatten_while_statement(while_statement, flattener)
+        }
         BoundNodeKind::Jump(_) => unreachable!(),
     }
 }
 
 fn flatten_function_declaration<'a>(
     function_declaration: BoundFunctionDeclarationNodeKind<'a>,
-    flattener: &mut Flattener,
+    _flattener: &mut Flattener,
 ) -> Vec<BoundNode<'a>> {
-    let mut result = vec![];
-    result.push(BoundNode::label(function_declaration.index));
+    let mut _result = vec![BoundNode::label(function_declaration.index)];
     // TODO: assign parameters here!
-    result.append(&mut flatten_node(*function_declaration.body, flattener));
-    result
+    unimplemented!();
+    // result.append(&mut flatten_node(*function_declaration.body, flattener));
+    // result
 }
 
-fn flatten_block_statement<'a>(block_statement: BoundBlockStatementNodeKind<'a>,
+fn flatten_block_statement<'a>(
+    block_statement: BoundBlockStatementNodeKind<'a>,
     flattener: &mut Flattener,
 ) -> Vec<BoundNode<'a>> {
     let mut result = Vec::with_capacity(block_statement.statements.len());
@@ -79,7 +82,8 @@ fn flatten_block_statement<'a>(block_statement: BoundBlockStatementNodeKind<'a>,
     result
 }
 
-fn flatten_if_statement<'a>(if_statement: BoundIfStatementNodeKind<'a>,
+fn flatten_if_statement<'a>(
+    if_statement: BoundIfStatementNodeKind<'a>,
     flattener: &mut Flattener,
 ) -> Vec<BoundNode<'a>> {
     let mut result = vec![];
@@ -89,7 +93,10 @@ fn flatten_if_statement<'a>(if_statement: BoundIfStatementNodeKind<'a>,
     } else {
         (end_label.clone(), end_label_ref.clone())
     };
-    result.push(BoundNode::jump_if_false(*if_statement.condition, else_label_ref));
+    result.push(BoundNode::jump_if_false(
+        *if_statement.condition,
+        else_label_ref,
+    ));
     result.append(&mut flatten_node(*if_statement.body, flattener));
     if if_statement.else_body.is_some() {
         result.push(BoundNode::jump(end_label_ref));
@@ -102,14 +109,18 @@ fn flatten_if_statement<'a>(if_statement: BoundIfStatementNodeKind<'a>,
     result
 }
 
-fn flatten_while_statement<'a>(while_statement: BoundWhileStatementNodeKind<'a>,
+fn flatten_while_statement<'a>(
+    while_statement: BoundWhileStatementNodeKind<'a>,
     flattener: &mut Flattener,
 ) -> Vec<BoundNode<'a>> {
     let mut result = vec![];
     let (label, label_ref) = create_label(flattener);
     result.push(label);
     result.append(&mut flatten_node(*while_statement.body, flattener));
-    result.push(BoundNode::jump_if_true(*while_statement.condition, label_ref));
+    result.push(BoundNode::jump_if_true(
+        *while_statement.condition,
+        label_ref,
+    ));
     result
 }
 

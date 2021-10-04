@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{DebugFlags, binder::bound_nodes::BoundNodeKind};
+use crate::{binder::bound_nodes::BoundNodeKind, DebugFlags};
 
 use super::bound_nodes::BoundNode;
 
@@ -96,12 +96,19 @@ pub struct BasicCodeBlock {
     pub length: usize,
 }
 
-pub fn check_if_all_paths_return(function_name: &str, statements: &[BoundNode], debug_flags: DebugFlags) -> bool {
+pub fn check_if_all_paths_return(
+    function_name: &str,
+    statements: &[BoundNode],
+    debug_flags: DebugFlags,
+) -> bool {
     let mut basic_blocks = collect_basic_blocks(statements);
     connect_basic_blocks(&mut basic_blocks, statements);
     if debug_flags.output_basic_blocks_to_dot {
         crate::debug::output_basic_blocks_to_dot(function_name, &basic_blocks, statements);
-        println!("Outputted BasicBlocks for func {}() to debug-out/{}.svg", function_name, function_name);
+        println!(
+            "Outputted BasicBlocks for func {}() to debug-out/{}.svg",
+            function_name, function_name
+        );
     }
     let accessible_incoming_to_end_block = collect_paths_to_end(&basic_blocks);
     if accessible_incoming_to_end_block.is_empty() {
@@ -265,7 +272,8 @@ fn connect_basic_blocks<'a>(
                         incoming_connections.push((basic_block.index, end_index));
                     }
                     _ => {
-                        basic_block.outgoing_connections = OutgoingConnections::Single(basic_block.index + 1);
+                        basic_block.outgoing_connections =
+                            OutgoingConnections::Single(basic_block.index + 1);
                         incoming_connections.push((basic_block.index, basic_block.index + 1));
                     }
                 }

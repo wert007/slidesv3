@@ -3,7 +3,11 @@ use std::{collections::HashMap, process::Command};
 use crate::binder::control_flow_analyzer::BasicBlock;
 use crate::binder::{bound_nodes::BoundNode, control_flow_analyzer::BasicBlockKind};
 
-pub fn output_basic_blocks_to_dot(function_name: &str, basic_blocks: &[BasicBlock], statements: &[BoundNode]) {
+pub fn output_basic_blocks_to_dot(
+    function_name: &str,
+    basic_blocks: &[BasicBlock],
+    statements: &[BoundNode],
+) {
     let mut result = String::new();
     result.push_str("digraph \"");
     result.push_str(function_name);
@@ -47,7 +51,7 @@ pub fn output_basic_blocks_to_dot(function_name: &str, basic_blocks: &[BasicBloc
         // TODO: Add code as label here!
         result.push_str(";\n");
     }
-    let mut add_connection = |block_index, target, label:&str| {
+    let mut add_connection = |block_index, target, label: &str| {
         result.push_str("    ");
         result.push_str(&block_index_to_node_id[&block_index]);
         result.push_str(" -> ");
@@ -61,17 +65,25 @@ pub fn output_basic_blocks_to_dot(function_name: &str, basic_blocks: &[BasicBloc
     };
     for (block_index, basic_block) in basic_blocks.iter().enumerate() {
         match basic_block.outgoing_connections {
-            crate::binder::control_flow_analyzer::OutgoingConnections::None => {},
+            crate::binder::control_flow_analyzer::OutgoingConnections::None => {}
             crate::binder::control_flow_analyzer::OutgoingConnections::Single(target) => {
                 add_connection(block_index, target, "");
-            },
-            crate::binder::control_flow_analyzer::OutgoingConnections::IfTrue(condition, then_target, else_target) => {
+            }
+            crate::binder::control_flow_analyzer::OutgoingConnections::IfTrue(
+                condition,
+                then_target,
+                else_target,
+            ) => {
                 let mut buffer = String::new();
                 super::bound_nodes::bound_node_as_code_to_string(condition, &mut buffer);
                 add_connection(block_index, then_target, &format!("{} is true", buffer));
                 add_connection(block_index, else_target, "else");
-            },
-            crate::binder::control_flow_analyzer::OutgoingConnections::IfFalse(condition, then_target, else_target) => {
+            }
+            crate::binder::control_flow_analyzer::OutgoingConnections::IfFalse(
+                condition,
+                then_target,
+                else_target,
+            ) => {
                 let mut buffer = String::new();
                 super::bound_nodes::bound_node_as_code_to_string(condition, &mut buffer);
                 add_connection(block_index, then_target, &format!("{} is false", buffer));

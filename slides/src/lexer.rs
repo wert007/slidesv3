@@ -4,7 +4,12 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::syntax_token::SyntaxToken, text::{SourceText, TextSpan}};
+use crate::{
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::SyntaxToken,
+    text::{SourceText, TextSpan},
+    DebugFlags,
+};
 
 use self::syntax_token::SyntaxTokenKind;
 
@@ -132,10 +137,15 @@ pub fn lex<'a>(
                     if c == '\n' || c == string_state.enclosing_char {
                         state = State::Default;
                         if c == '\n' {
-                            let span = TextSpan::new(start.char_index, char_index - start.char_index);
-                            diagnostic_bag.report_unterminated_string(span, string_state.enclosing_char);
+                            let span =
+                                TextSpan::new(start.char_index, char_index - start.char_index);
+                            diagnostic_bag
+                                .report_unterminated_string(span, string_state.enclosing_char);
                         }
-                        result.push_back(SyntaxToken::string_literal(start.char_index, &text[start.byte_index..byte_index + 1]));
+                        result.push_back(SyntaxToken::string_literal(
+                            start.char_index,
+                            &text[start.byte_index..byte_index + 1],
+                        ));
                     }
                 }
                 (State::Identifier(start), c) => {
@@ -185,7 +195,10 @@ pub fn lex<'a>(
         State::String(start, string_state) => {
             let span = TextSpan::new(start.char_index, char_len - start.char_index);
             diagnostic_bag.report_unterminated_string(span, string_state.enclosing_char);
-            result.push_back(SyntaxToken::string_literal(start.char_index, &text[start.byte_index..]));
+            result.push_back(SyntaxToken::string_literal(
+                start.char_index,
+                &text[start.byte_index..],
+            ));
         }
         State::Identifier(start) => {
             let lexeme = &text[start.byte_index..];
@@ -236,5 +249,8 @@ fn is_multi_char_operator(character: char) -> bool {
 }
 
 fn is_valid_operator(operator: &str) -> bool {
-    matches!(operator, "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-")
+    matches!(
+        operator,
+        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-"
+    )
 }

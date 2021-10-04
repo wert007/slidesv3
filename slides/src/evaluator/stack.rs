@@ -96,7 +96,7 @@ pub struct Flags {
 }
 
 impl Flags {
-    pub fn pointer(mut self) -> Self{
+    pub fn pointer(mut self) -> Self {
         self.is_pointer = true;
         self
     }

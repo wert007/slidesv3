@@ -44,17 +44,21 @@ impl<'a> SyntaxNode<'a> {
         let span = TextSpan::bounds(func_keyword.span(), body.span());
         Self {
             span,
-            kind: SyntaxNodeKind::FunctionDeclaration(FunctionDeclarationNodeKind {
+            kind: SyntaxNodeKind::FunctionDeclaration(Box::new(FunctionDeclarationNodeKind {
                 func_keyword,
                 identifier,
                 function_type,
                 body: Box::new(body),
-            }),
+            })),
             is_inserted: false,
         }
     }
 
-    pub fn struct_declaration(struct_keyword: SyntaxToken<'a>, identifier: SyntaxToken<'a>, body: StructBodyNode<'a>) -> Self {
+    pub fn struct_declaration(
+        struct_keyword: SyntaxToken<'a>,
+        identifier: SyntaxToken<'a>,
+        body: StructBodyNode<'a>,
+    ) -> Self {
         let span = TextSpan::bounds(struct_keyword.span(), body.span);
         Self {
             span,
@@ -117,7 +121,14 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
-    pub fn constructor_call(new_keyword: SyntaxToken<'a>, type_name: SyntaxToken<'a>, open_parenthesis_token: SyntaxToken<'a>, arguments: Vec<SyntaxNode<'a>>, comma_tokens: Vec<SyntaxToken<'a>>, close_parenthesis_token: SyntaxToken<'a>) -> Self {
+    pub fn constructor_call(
+        new_keyword: SyntaxToken<'a>,
+        type_name: SyntaxToken<'a>,
+        open_parenthesis_token: SyntaxToken<'a>,
+        arguments: Vec<SyntaxNode<'a>>,
+        comma_tokens: Vec<SyntaxToken<'a>>,
+        close_parenthesis_token: SyntaxToken<'a>,
+    ) -> Self {
         let span = TextSpan::bounds(new_keyword.span(), close_parenthesis_token.span());
         Self {
             span,
@@ -127,7 +138,7 @@ impl<'a> SyntaxNode<'a> {
                 open_parenthesis_token,
                 arguments,
                 comma_tokens,
-                close_parenthesis_token
+                close_parenthesis_token,
             }),
             is_inserted: false,
         }
@@ -299,7 +310,7 @@ impl<'a> SyntaxNode<'a> {
         Self {
             kind: SyntaxNodeKind::ReturnStatement(ReturnStatementNodeKind {
                 return_keyword,
-                optional_expression: optional_expression.map(|n| Box::new(n)),
+                optional_expression: optional_expression.map(Box::new),
                 semicolon_token,
             }),
             span,
@@ -394,7 +405,7 @@ impl<'a> SyntaxNode<'a> {
 pub enum SyntaxNodeKind<'a> {
     // Top Level Statements
     CompilationUnit(CompilationUnitNodeKind<'a>),
-    FunctionDeclaration(FunctionDeclarationNodeKind<'a>),
+    FunctionDeclaration(Box<FunctionDeclarationNodeKind<'a>>),
     StructDeclaration(StructDeclarationNodeKind<'a>),
 
     //Expressions
@@ -484,7 +495,12 @@ pub struct StructBodyNode<'a> {
 }
 
 impl<'a> StructBodyNode<'a> {
-    pub fn new(lbrace: SyntaxToken<'a>, statements: Vec<ParameterNode<'a>>, semicolon_tokens: Vec<SyntaxToken<'a>>, rbrace: SyntaxToken<'a>) -> Self {
+    pub fn new(
+        lbrace: SyntaxToken<'a>,
+        statements: Vec<ParameterNode<'a>>,
+        semicolon_tokens: Vec<SyntaxToken<'a>>,
+        rbrace: SyntaxToken<'a>,
+    ) -> Self {
         let span = TextSpan::bounds(lbrace.span(), rbrace.span());
         Self {
             lbrace,

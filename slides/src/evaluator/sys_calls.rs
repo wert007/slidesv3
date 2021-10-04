@@ -132,7 +132,7 @@ fn array_to_string_native(
             }
         }
     }
-    result.push_str("]");
+    result.push(']');
     result
 }
 

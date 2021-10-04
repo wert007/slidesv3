@@ -1,6 +1,9 @@
 use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
 
-use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{StructType, SystemCallKind, Type}};
+use super::{
+    operators::{BoundBinaryOperator, BoundUnaryOperator},
+    typing::{StructType, SystemCallKind, Type},
+};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -84,10 +87,17 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn constructor_call(span: TextSpan, arguments: Vec<BoundNode<'a>>, base_type: StructType) -> Self {
+    pub fn constructor_call(
+        span: TextSpan,
+        arguments: Vec<BoundNode<'a>>,
+        base_type: StructType,
+    ) -> Self {
         Self {
             span,
-            kind: BoundNodeKind::ConstructorCall(BoundConstructorCallNodeKind { arguments, base_type: base_type.clone() }),
+            kind: BoundNodeKind::ConstructorCall(BoundConstructorCallNodeKind {
+                arguments,
+                base_type: base_type.clone(),
+            }),
             type_: Type::Struct(Box::new(base_type)),
             byte_width: 4,
             constant_value: None,
@@ -321,7 +331,7 @@ impl<'a> BoundNode<'a> {
             kind: BoundNodeKind::IfStatement(BoundIfStatementNodeKind {
                 condition: Box::new(condition),
                 body: Box::new(body),
-                else_body: else_body.map(|n| Box::new(n)),
+                else_body: else_body.map(Box::new),
             }),
             type_: Type::Void,
             byte_width: 0,
@@ -446,11 +456,15 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn return_statement(span: TextSpan, expression: Option<BoundNode<'a>>, restores_variables: bool) -> Self {
+    pub fn return_statement(
+        span: TextSpan,
+        expression: Option<BoundNode<'a>>,
+        restores_variables: bool,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::ReturnStatement(BoundReturnStatementNodeKind {
-                expression: expression.map(|n| Box::new(n)),
+                expression: expression.map(Box::new),
                 restores_variables,
             }),
             type_: Type::Void,

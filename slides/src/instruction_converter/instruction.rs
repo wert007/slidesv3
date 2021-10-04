@@ -198,7 +198,6 @@ impl Instruction {
         }
     }
 
-
     pub const fn array_equals() -> Self {
         Self {
             op_code: OpCode::ArrayEquals,
@@ -350,10 +349,14 @@ impl std::fmt::Debug for Instruction {
                 let kind = SystemCallKind::try_from_primitive(kind).map_err(|_| kind);
                 let kind = match kind {
                     Ok(v) => v.to_string(),
-                    Err(v) =>v.to_string(),
+                    Err(v) => v.to_string(),
                 };
                 let arg_count = self.arg >> 8;
-                write!(f, "{:?} arg: sys call {}, arg_count {}", self.op_code, kind, arg_count)
+                write!(
+                    f,
+                    "{:?} arg: sys call {}, arg_count {}",
+                    self.op_code, kind, arg_count
+                )
             }
             _ => {
                 write!(

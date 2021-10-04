@@ -1,4 +1,7 @@
-use crate::{DebugFlags, evaluator::{WORD_SIZE_IN_BYTES, bytes_to_word}};
+use crate::{
+    evaluator::{bytes_to_word, WORD_SIZE_IN_BYTES},
+    DebugFlags,
+};
 
 use super::HEAP_POINTER;
 
@@ -24,7 +27,10 @@ impl Allocator {
     fn find_bucket_from_address(&self, address: usize) -> &Bucket {
         for bucket in &self.buckets {
             if let BucketEntry::Bucket(bucket) = bucket {
-                if bucket.address * WORD_SIZE_IN_BYTES as usize <= address && (bucket.address + bucket.size_in_words) * WORD_SIZE_IN_BYTES as usize > address {
+                if bucket.address * WORD_SIZE_IN_BYTES as usize <= address
+                    && (bucket.address + bucket.size_in_words) * WORD_SIZE_IN_BYTES as usize
+                        > address
+                {
                     return bucket;
                 }
             }
@@ -64,7 +70,7 @@ impl Allocator {
             };
 
             while self.buckets[bucket_index].size_in_words() / 2 >= expected_size {
-                let old_buddy_index = self.buckets[bucket_index].buddy_index().clone();
+                let old_buddy_index = self.buckets[bucket_index].buddy_index();
                 let new_index = self.buckets.len();
                 let (tmp_bucket, parent) = Bucket::split(
                     self.buckets[bucket_index].as_bucket_mut().unwrap(),
@@ -115,7 +121,10 @@ impl Allocator {
     pub fn read_word_aligned(&self, address: usize) -> u64 {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES as usize).is_used);
+        assert!(
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES as usize)
+                .is_used
+        );
         self.data[address]
     }
 
@@ -146,7 +155,8 @@ impl Allocator {
     fn write_word_aligned(&mut self, address: usize, value: u64) {
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES as usize).is_used,
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES as usize)
+                .is_used,
             "bucket = {:#?}, address = 0x{:x}",
             self.find_bucket_from_address(address),
             address

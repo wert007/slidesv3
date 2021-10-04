@@ -51,7 +51,7 @@ impl Type {
             Type::Array(base_type) => {
                 let mut array_count = 0u8;
                 let mut base_type = base_type;
-                while let &Type::Array(child) = &base_type.deref() {
+                while let Type::Array(child) = base_type.deref() {
                     base_type = &child;
                     array_count += 1;
                 }
@@ -102,15 +102,11 @@ impl Type {
 
     pub fn size_in_bytes(&self) -> u64 {
         match self {
-            Type::Any |
-            Type::Function(_) |
-            Type::Error => unreachable!(),
+            Type::Any | Type::Function(_) | Type::Error => unreachable!(),
             Type::Void => 0,
-            Type::Integer |
-            Type::Boolean |
-            Type::SystemCall(_) |
-            Type::Array(_) |
-            Type::String => WORD_SIZE_IN_BYTES,
+            Type::Integer | Type::Boolean | Type::SystemCall(_) | Type::Array(_) | Type::String => {
+                WORD_SIZE_IN_BYTES
+            }
             Type::Struct(struct_type) => struct_type.size_in_bytes(),
         }
     }
@@ -216,9 +212,9 @@ impl StructType {
 
 impl std::fmt::Display for StructType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "t{} {{\n", self.id)?;
+        writeln!(f, "t{} {{", self.id)?;
         for (index, field_type) in self.fields.iter().enumerate() {
-            write!(f, "field{}: {};\n", index, field_type)?;
+            writeln!(f, "field{}: {};", index, field_type)?;
         }
         write!(f, "}}")
     }

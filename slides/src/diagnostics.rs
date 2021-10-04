@@ -20,7 +20,7 @@ impl<'a> Diagnostic<'a> {
         Self {
             message,
             location: TextLocation {
-                span: span.unwrap_or(TextSpan::zero()),
+                span: span.unwrap_or_else(TextSpan::zero),
                 source_text,
             },
         }
@@ -264,7 +264,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn division_by_zero(&mut self, span: Option<TextSpan>) {
-        let message = format!("Divison by Zero.");
+        let message = "Divison by Zero.".into();
         self.report_runtime(message, span);
     }
 }

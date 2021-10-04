@@ -9,8 +9,7 @@ use crate::{
         Program,
     },
     value::Value,
-    DebugFlags,
-    DiagnosticBag,
+    DebugFlags, DiagnosticBag,
 };
 use num_enum::TryFromPrimitive;
 
@@ -54,7 +53,11 @@ impl EvaluatorState<'_> {
     }
 }
 
-pub fn evaluate<'a>(program: Program, source_text: &crate::text::SourceText<'a>, debug_flags: DebugFlags) -> ResultType {
+pub fn evaluate(
+    program: Program,
+    source_text: &crate::text::SourceText<'_>,
+    debug_flags: DebugFlags,
+) -> ResultType {
     let mut state = EvaluatorState {
         stack: program.stack,
         heap: Allocator::new(1024, debug_flags),
@@ -185,11 +188,20 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
     };
     let array_length_in_words = bytes_to_word(array_length_in_bytes);
     if (index_in_words as i64) < 0 || index_in_words > array_length_in_words {
-        runtime_error!(state, index_out_of_bounds(instruction.span, index_in_words as i64, array_length_in_words));
+        runtime_error!(
+            state,
+            index_out_of_bounds(
+                instruction.span,
+                index_in_words as i64,
+                array_length_in_words
+            )
+        );
         state.stack.push(0);
         return;
     }
-    let index_in_bytes = array as usize + index_in_words as usize * WORD_SIZE_IN_BYTES as usize + WORD_SIZE_IN_BYTES as usize;
+    let index_in_bytes = array as usize
+        + index_in_words as usize * WORD_SIZE_IN_BYTES as usize
+        + WORD_SIZE_IN_BYTES as usize;
     let value = if is_heap_pointer(array) {
         state.heap.read_word(index_in_bytes)
     } else {
@@ -219,7 +231,10 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, instruction: Instruction
     };
     let array_length_in_words = bytes_to_word(array_length_in_bytes);
     if (index as i64) < 0 || index > array_length_in_words {
-        runtime_error!(state, index_out_of_bounds(instruction.span, index as i64, array_length_in_words));
+        runtime_error!(
+            state,
+            index_out_of_bounds(instruction.span, index as i64, array_length_in_words)
+        );
         return;
     }
     let index = array + index * WORD_SIZE_IN_BYTES + WORD_SIZE_IN_BYTES;
@@ -364,11 +379,7 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     // If two arrays are not equal in length, we don't compare their elements.
     // But when we compare their elements we expect a true result and only
     // change it if its false.
-    let mut result = if lhs_length_in_bytes == rhs_length_in_bytes {
-        true
-    } else {
-        false
-    };
+    let mut result = lhs_length_in_bytes == rhs_length_in_bytes;
     if lhs_address != rhs_address && lhs_length_in_bytes == rhs_length_in_bytes {
         for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
             let lhs_index = lhs_address as usize + i as usize;
@@ -449,7 +460,10 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
     let result_length = lhs_length + rhs_length;
     let mut pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
-        runtime_error!(state, no_heap_memory_left(instruction.span, result_length + WORD_SIZE_IN_BYTES));
+        runtime_error!(
+            state,
+            no_heap_memory_left(instruction.span, result_length + WORD_SIZE_IN_BYTES)
+        );
         pointer = HEAP_POINTER;
     } else {
         let mut writing_pointer = pointer;
@@ -460,9 +474,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             let address = lhs_address + i + WORD_SIZE_IN_BYTES;
             let address = address as usize;
             let lhs_byte = if is_heap_pointer(address as _) {
-                state
-                    .heap
-                    .read_byte(address)
+                state.heap.read_byte(address)
             } else {
                 let word = state
                     .stack
@@ -478,9 +490,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             let address = rhs_address + i + WORD_SIZE_IN_BYTES;
             let address = address as usize;
             let rhs_byte = if is_heap_pointer(address as _) {
-                state
-                    .heap
-                    .read_byte(address)
+                state.heap.read_byte(address)
             } else {
                 let word = state
                     .stack
@@ -579,7 +589,12 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
     if has_return_value {
         let result = state.stack.pop();
 
-        for register in state.registers.iter_mut().skip(state.protected_registers).rev() {
+        for register in state
+            .registers
+            .iter_mut()
+            .skip(state.protected_registers)
+            .rev()
+        {
             if instruction.arg & 0x2 == 0x2 {
                 state.stack.pop();
             } else {
@@ -595,7 +610,12 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
             state.stack.push(result.value);
         }
     } else {
-        for register in state.registers.iter_mut().skip(state.protected_registers).rev() {
+        for register in state
+            .registers
+            .iter_mut()
+            .skip(state.protected_registers)
+            .rev()
+        {
             if instruction.arg & 0x2 == 0x2 {
                 state.stack.pop();
             } else {
@@ -606,5 +626,4 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         let return_address = state.stack.pop().value;
         state.pc = return_address as _;
     }
-
 }

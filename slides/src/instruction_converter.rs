@@ -199,12 +199,9 @@ fn convert_function_declaration(
     function_declaration: BoundFunctionDeclarationNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let mut result = vec![];
-    result.push(
-        Instruction::label(function_declaration.index)
-            .span(span)
-            .into(),
-    );
+    let mut result = vec![Instruction::label(function_declaration.index)
+        .span(span)
+        .into()];
     for parameter in function_declaration.parameters.into_iter().rev() {
         result.push(Instruction::store_in_register(parameter).span(span).into());
     }
@@ -468,7 +465,11 @@ fn convert_constructor_call(
         result.append(&mut convert_node(argument, converter));
         if let Type::Struct(argument) = &type_ {
             result.push(Instruction::load_pointer(writing_pointer).span(span).into());
-            result.push(Instruction::memory_copy_fixed_size(argument.size_in_bytes()).span(span).into());
+            result.push(
+                Instruction::memory_copy_fixed_size(argument.size_in_bytes())
+                    .span(span)
+                    .into(),
+            );
         } else {
             result.push(
                 Instruction::write_to_stack(writing_pointer)

@@ -5,10 +5,16 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
+use crate::{
+    diagnostics::DiagnosticBag,
+    lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    }, parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode}, text::{SourceText, TextSpan}};
+    },
+    parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode},
+    text::{SourceText, TextSpan},
+    DebugFlags,
+};
 
 use self::syntax_nodes::{ElseClause, ParameterNode, StructBodyNode, SyntaxNode, TypeNode};
 use crate::match_token;
@@ -22,8 +28,7 @@ pub fn parse<'a>(
     if diagnostic_bag.has_errors() {
         return SyntaxNode::error(0);
     }
-    let result = parse_compilation_unit(&mut tokens, diagnostic_bag);
-    result
+    parse_compilation_unit(&mut tokens, diagnostic_bag)
 }
 
 fn parse_compilation_unit<'a>(
@@ -53,7 +58,11 @@ fn parse_top_level_statement<'a>(
             let token = next_token(tokens);
             let span = token.span();
             let actual_token_kind = &token.kind;
-            diagnostic_bag.report_unexpected_token_kind(span, actual_token_kind, &SyntaxTokenKind::FuncKeyword);
+            diagnostic_bag.report_unexpected_token_kind(
+                span,
+                actual_token_kind,
+                &SyntaxTokenKind::FuncKeyword,
+            );
             SyntaxNode::error(span.start())
         }
     }
@@ -233,7 +242,14 @@ fn parse_for_statement<'a>(
     let collection = parse_expression(tokens, diagnostic_bag);
     let body = parse_block_statement(tokens, diagnostic_bag);
 
-    SyntaxNode::for_statement(for_keyword, optional_index_variable, variable, in_keyword, collection, body)
+    SyntaxNode::for_statement(
+        for_keyword,
+        optional_index_variable,
+        variable,
+        in_keyword,
+        collection,
+        body,
+    )
 }
 
 fn parse_if_statement<'a>(
@@ -300,11 +316,7 @@ fn parse_return_statement<'a>(
     };
     let semicolon_token = match_token!(tokens, diagnostic_bag, Semicolon);
 
-    SyntaxNode::return_statement(
-        return_keyword,
-        optional_expression,
-        semicolon_token,
-    )
+    SyntaxNode::return_statement(return_keyword, optional_expression, semicolon_token)
 }
 
 fn parse_while_statement<'a>(
@@ -552,7 +564,14 @@ fn parse_constructor<'a>(
     }
     let close_parenthesis_token = match_token!(tokens, diagnostic_bag, RParen);
 
-    SyntaxNode::constructor_call(new_keyword, type_name, open_parenthesis_token, arguments, comma_tokens, close_parenthesis_token)
+    SyntaxNode::constructor_call(
+        new_keyword,
+        type_name,
+        open_parenthesis_token,
+        arguments,
+        comma_tokens,
+        close_parenthesis_token,
+    )
 }
 
 fn parse_identifier<'a>(
