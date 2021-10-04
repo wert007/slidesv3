@@ -5,6 +5,8 @@ use std::ops::Deref;
 
 use num_enum::TryFromPrimitive;
 
+use crate::evaluator::WORD_SIZE_IN_BYTES;
+
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Type {
     Error,
@@ -97,6 +99,21 @@ impl Type {
             }
         }
     }
+
+    pub fn size_in_bytes(&self) -> u64 {
+        match self {
+            Type::Any |
+            Type::Function(_) |
+            Type::Error => unreachable!(),
+            Type::Void => 0,
+            Type::Integer |
+            Type::Boolean |
+            Type::SystemCall(_) |
+            Type::Array(_) |
+            Type::String => WORD_SIZE_IN_BYTES,
+            Type::Struct(struct_type) => struct_type.size_in_bytes(),
+        }
+    }
 }
 
 impl std::fmt::Display for Type {
@@ -184,6 +201,17 @@ impl FunctionType {
 pub struct StructType {
     pub id: u64,
     pub fields: Vec<Type>,
+}
+
+impl StructType {
+    pub fn size_in_bytes(&self) -> u64 {
+        let mut result = 0;
+        for field in &self.fields {
+            // FIXME: This is only true if all sizes are a multiple of words.
+            result += field.size_in_bytes();
+        }
+        result
+    }
 }
 
 impl std::fmt::Display for StructType {
