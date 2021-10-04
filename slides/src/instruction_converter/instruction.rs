@@ -101,6 +101,23 @@ impl Instruction {
         }
     }
 
+    pub const fn memory_copy() -> Self {
+        Self {
+            op_code: OpCode::MemoryCopy,
+            arg: 0,
+            span: None,
+        }
+    }
+
+    pub fn memory_copy_fixed_size(size_in_bytes: u64) -> Self {
+        assert_ne!(size_in_bytes, 0);
+        Self {
+            op_code: OpCode::MemoryCopy,
+            arg: size_in_bytes,
+            span: None,
+        }
+    }
+
     pub const fn type_identifier(type_identifier: u64) -> Self {
         Self {
             op_code: OpCode::TypeIdentifier,

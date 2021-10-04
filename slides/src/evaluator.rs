@@ -100,6 +100,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
+        OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
@@ -236,6 +237,40 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
     state.stack.write_word(address, value.value);
     if value.is_pointer {
         state.stack.set_pointer(address);
+    }
+}
+
+fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
+    let size_in_bytes = if instruction.arg == 0 {
+        state.stack.pop().value
+    } else {
+        instruction.arg
+    };
+    // FIXME: Currently there are only complete words and no single bytes
+    // supported!
+    assert_eq!(size_in_bytes % WORD_SIZE_IN_BYTES, 0);
+    let size_in_words = bytes_to_word(size_in_bytes);
+    let dest = state.stack.pop();
+    assert!(dest.is_pointer);
+    let dest = dest.value;
+    let src = state.stack.pop();
+    assert!(src.is_pointer);
+    let src = src.value;
+    for word_index in 0..size_in_words {
+        let src = src + word_index * WORD_SIZE_IN_BYTES;
+        let src = src as usize;
+        let dest = dest + word_index * WORD_SIZE_IN_BYTES;
+        let dest = dest as usize;
+        let buffer = if is_heap_pointer(src as _) {
+            state.heap.read_word(src)
+        } else {
+            state.stack.read_word(src)
+        };
+        if is_heap_pointer(dest as _) {
+            state.heap.write_word(dest, buffer);
+        } else {
+            state.stack.write_word(dest, buffer);
+        }
     }
 }
 
