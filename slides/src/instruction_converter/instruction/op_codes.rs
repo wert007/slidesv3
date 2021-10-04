@@ -8,7 +8,6 @@ pub enum OpCode {
     Pop = 3,
     LoadRegister = 4,
     StoreInRegister = 5,
-    CreateStackPointer = 6,
     ArrayIndex = 7,
     StoreInMemory = 8,
     WriteToStack = 9,

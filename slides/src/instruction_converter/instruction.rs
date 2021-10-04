@@ -69,14 +69,6 @@ impl Instruction {
         }
     }
 
-    pub const fn create_stack_pointer(offset: u64) -> Self {
-        Self {
-            op_code: OpCode::CreateStackPointer,
-            arg: offset,
-            span: None,
-        }
-    }
-
     pub const fn array_index() -> Self {
         Self {
             op_code: OpCode::ArrayIndex,
