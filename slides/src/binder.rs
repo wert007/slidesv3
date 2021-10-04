@@ -17,10 +17,10 @@ use crate::{
         self,
         syntax_nodes::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
-            BlockStatementNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
-            ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
-            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode,
-            ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode,
+            BlockStatementNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind,
+            FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind,
+            FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind,
+            ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode,
             StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
             VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
         },
@@ -513,6 +513,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::ArrayLiteral(array_literal) => {
             bind_array_literal(node.span, array_literal, binder)
         }
+        SyntaxNodeKind::ConstructorCall(constructor_call) => {
+            bind_constructor_call(node.span, constructor_call, binder)
+        }
         SyntaxNodeKind::Variable(variable) => bind_variable(node.span, variable, binder),
         SyntaxNodeKind::Binary(binary) => bind_binary(node.span, binary, binder),
         SyntaxNodeKind::Unary(unary) => bind_unary(node.span, unary, binder),
@@ -601,6 +604,55 @@ fn bind_array_literal<'a, 'b>(
         }
     }
     BoundNode::array_literal(span, children, Type::array(type_))
+}
+
+fn bind_constructor_call<'a>(
+    span: TextSpan,
+    constructor_call: ConstructorCallNodeKind<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> BoundNode<'a> {
+    let type_name = constructor_call.type_name.lexeme;
+    let type_name_span = constructor_call.type_name.span();
+    let type_ = bind_type(
+        TypeNode {
+            identifier: constructor_call.type_name,
+            brackets: vec![],
+        },
+        binder,
+    );
+    let struct_type = if let Type::Struct(it) = type_ {
+        *it.clone()
+    } else {
+        binder
+            .diagnostic_bag
+            .report_unknown_type(type_name_span, type_name);
+        return BoundNode::error(span);
+    };
+    if constructor_call.arguments.len() != struct_type.fields.len() {
+        binder.diagnostic_bag.report_unexpected_argument_count(
+            span,
+            constructor_call.arguments.len(),
+            struct_type.fields.len(),
+        );
+    }
+    let mut arguments = vec![];
+    for (argument, parameter_type) in constructor_call
+        .arguments
+        .into_iter()
+        .zip(struct_type.fields.iter())
+    {
+        let argument = bind_node(argument, binder);
+        if !argument.type_.can_be_converted_to(parameter_type) {
+            binder.diagnostic_bag.report_cannot_convert(
+                argument.span,
+                &argument.type_,
+                parameter_type,
+            );
+        }
+        arguments.push(argument);
+    }
+
+    BoundNode::constructor_call(span, arguments, struct_type)
 }
 
 fn bind_variable<'a, 'b>(

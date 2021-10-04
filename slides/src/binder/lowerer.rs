@@ -41,6 +41,7 @@ fn flatten_node<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Vec<Bound
         | BoundNodeKind::FunctionCall(_)
         | BoundNodeKind::BinaryExpression(_)
         | BoundNodeKind::UnaryExpression(_)
+        | BoundNodeKind::ConstructorCall(_)
         | BoundNodeKind::VariableExpression(_)
         | BoundNodeKind::ArrayLiteralExpression(_)
         | BoundNodeKind::LiteralExpression(_)

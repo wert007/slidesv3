@@ -1,9 +1,6 @@
 use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
 
-use super::{
-    operators::{BoundBinaryOperator, BoundUnaryOperator},
-    typing::{SystemCallKind, Type},
-};
+use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{StructType, SystemCallKind, Type}};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -83,6 +80,16 @@ impl<'a> BoundNode<'a> {
             kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
             type_,
             byte_width,
+            constant_value: None,
+        }
+    }
+
+    pub fn constructor_call(span: TextSpan, arguments: Vec<BoundNode<'a>>, base_type: StructType) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::ConstructorCall(BoundConstructorCallNodeKind { arguments, base_type: base_type.clone() }),
+            type_: Type::Struct(Box::new(base_type)),
+            byte_width: 4,
             constant_value: None,
         }
     }
@@ -465,6 +472,7 @@ pub enum BoundNodeKind<'a> {
     // Expressions
     LiteralExpression(LiteralNodeKind<'a>),
     ArrayLiteralExpression(BoundArrayLiteralNodeKind<'a>),
+    ConstructorCall(BoundConstructorCallNodeKind<'a>),
     VariableExpression(BoundVariableNodeKind),
     UnaryExpression(BoundUnaryNodeKind<'a>),
     BinaryExpression(BoundBinaryNodeKind<'a>),
@@ -501,6 +509,12 @@ pub struct BoundJumpNodeKind<'a> {
 #[derive(Debug, Clone)]
 pub struct BoundArrayLiteralNodeKind<'a> {
     pub children: Vec<BoundNode<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundConstructorCallNodeKind<'a> {
+    pub arguments: Vec<BoundNode<'a>>,
+    pub base_type: StructType,
 }
 
 #[derive(Debug, Clone)]

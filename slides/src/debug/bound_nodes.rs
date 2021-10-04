@@ -20,6 +20,7 @@ fn print_bound_node_as_code_with_indent(node: &BoundNode, printer: DebugPrinter,
         BoundNodeKind::FunctionDeclaration(function_declaration) => print_bound_node_function_declaration_as_code(function_declaration, printer, buffer),
         BoundNodeKind::LiteralExpression(literal_expression) => print_bound_node_literal_expression_as_code(literal_expression, printer, buffer),
         BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => print_bound_node_array_literal_expression_as_code(array_literal_expression, printer, buffer),
+        BoundNodeKind::ConstructorCall(constructor_call) => print_bound_node_constructor_call_as_code(constructor_call, printer, buffer),
         BoundNodeKind::VariableExpression(variable_expression) => print_bound_node_variable_expression_as_code(variable_expression, printer, buffer),
         BoundNodeKind::UnaryExpression(unary_expression) => print_bound_node_unary_expression_as_code(unary_expression, printer, buffer),
         BoundNodeKind::BinaryExpression(binary_expression) => print_bound_node_binary_expression_as_code(binary_expression, printer, buffer),
@@ -70,6 +71,19 @@ fn print_bound_node_array_literal_expression_as_code(array_literal_expression: &
         buffer.push_str(&format!(", "));
     }
     buffer.push_str(&format!("]"));
+}
+
+fn print_bound_node_constructor_call_as_code(constructor_call: &BoundConstructorCallNodeKind, printer: DebugPrinter, buffer: &mut String) {
+    buffer.push_str("new ");
+    buffer.push_str(&constructor_call.base_type.to_string());
+    buffer.push('(');
+    for (i, argument) in constructor_call.arguments.iter().enumerate() {
+        if i != 0 {
+            buffer.push_str(", ");
+        }
+        print_bound_node_as_code_with_indent(argument, printer, buffer);
+    }
+    buffer.push(')');
 }
 
 fn print_bound_node_variable_expression_as_code(variable_expression: &BoundVariableNodeKind, _: DebugPrinter, buffer: &mut String) {
