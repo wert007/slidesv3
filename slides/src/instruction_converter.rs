@@ -9,11 +9,11 @@ use crate::{
         self,
         bound_nodes::{
             BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
-            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundExpressionStatementNodeKind,
-            BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind,
-            BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind,
-            BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind,
-            BoundVariableNodeKind,
+            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundConstructorCallNodeKind,
+            BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind,
+            BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
+            BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
+            BoundVariableDeclarationNodeKind, BoundVariableNodeKind,
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         typing::{SystemCallKind, Type},
@@ -158,6 +158,9 @@ fn convert_node(
         BoundNodeKind::BinaryExpression(binary) => convert_binary(node.span, binary, converter),
         BoundNodeKind::FunctionCall(function_call) => {
             convert_function_call(node.span, function_call, converter)
+        }
+        BoundNodeKind::ConstructorCall(constructor_call) => {
+            convert_constructor_call(node.span, constructor_call, converter)
         }
         BoundNodeKind::SystemCall(system_call) => {
             convert_system_call(node.span, system_call, converter)
@@ -442,6 +445,40 @@ fn convert_function_call(
     }
     result.append(&mut convert_node(*function_call.base, converter));
     result.push(Instruction::function_call(argument_count).span(span).into());
+    result
+}
+
+fn convert_constructor_call(
+    span: TextSpan,
+    constructor_call: BoundConstructorCallNodeKind,
+    converter: &mut InstructionConverter,
+) -> Vec<InstructionOrLabelReference> {
+    let mut result = vec![];
+    let pointer = allocate(
+        &mut converter.stack,
+        constructor_call.base_type.size_in_bytes(),
+    ) as _;
+    let mut writing_pointer = pointer;
+    for (argument, type_) in constructor_call
+        .arguments
+        .into_iter()
+        .zip(constructor_call.base_type.fields.iter())
+    {
+        let argument_span = argument.span;
+        result.append(&mut convert_node(argument, converter));
+        if let Type::Struct(argument) = &type_ {
+            result.push(Instruction::load_pointer(writing_pointer).span(span).into());
+            result.push(Instruction::memory_copy_fixed_size(argument.size_in_bytes()).span(span).into());
+        } else {
+            result.push(
+                Instruction::write_to_stack(writing_pointer)
+                    .span(argument_span)
+                    .into(),
+            );
+        }
+        writing_pointer += type_.size_in_bytes();
+    }
+    result.push(Instruction::load_pointer(pointer).span(span).into());
     result
 }
 
