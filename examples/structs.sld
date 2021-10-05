@@ -53,5 +53,6 @@ func main() {
     let c = new Cube(r, r, r, r, r, r);
     print(p.x);
     print(r.bottom_right.y);
+    r.bottom_right.x = 99;
     print(c.north.bottom_right.x);
 }
