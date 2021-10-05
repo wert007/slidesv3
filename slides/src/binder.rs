@@ -963,7 +963,12 @@ fn bind_field_access<'a, 'b>(
         }
         Type::Array(_) | Type::String => {
             if field_access.field.lexeme == "length" {
-                BoundNode::field_access(span, base, Type::SystemCall(SystemCallKind::ArrayLength))
+                BoundNode::field_access(
+                    span,
+                    base,
+                    0,
+                    Type::SystemCall(SystemCallKind::ArrayLength),
+                )
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     span,

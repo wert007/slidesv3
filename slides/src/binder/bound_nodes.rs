@@ -191,12 +191,14 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn field_access(span: TextSpan, base: BoundNode<'a>, type_: Type) -> Self {
+    pub fn field_access(span: TextSpan, base: BoundNode<'a>, offset: u64, type_: Type) -> Self {
         let byte_width = base.byte_width;
         Self {
             span,
             kind: BoundNodeKind::FieldAccess(BoundFieldAccessNodeKind {
                 base: Box::new(base),
+                offset,
+                type_: type_.clone(),
             }),
             type_,
             byte_width,
@@ -570,6 +572,8 @@ pub struct BoundArrayIndexNodeKind<'a> {
 #[derive(Debug, Clone)]
 pub struct BoundFieldAccessNodeKind<'a> {
     pub base: Box<BoundNode<'a>>,
+    pub offset: u64,
+    pub type_: Type,
 }
 
 #[derive(Debug, Clone)]
