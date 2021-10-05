@@ -1,5 +1,5 @@
 use crate::{
-    binder::typing::Type,
+    binder::{typing::Type, BoundStructType},
     lexer::syntax_token::SyntaxTokenKind,
     parser::syntax_nodes::SyntaxNodeKind,
     text::{SourceText, TextLocation, TextSpan},
@@ -209,6 +209,31 @@ impl<'a> DiagnosticBag<'a> {
             "There are no fields named '{}' on type {}.",
             field_name, type_
         );
+        self.report(message, span);
+    }
+
+    pub fn report_no_field_named_on_struct(
+        &mut self,
+        span: TextSpan,
+        field_name: &str,
+        bound_struct_type: BoundStructType,
+    ) {
+        let mut message = format!(
+            "There is no field named {} on struct {}.",
+            field_name, bound_struct_type.name
+        );
+        // TODO: Add optional information field and have a span for the Struct
+        // source code.
+        if !bound_struct_type.fields.is_empty() {
+            message.push_str("\n  Available fields are:\n");
+            for field in &bound_struct_type.fields {
+                message.push_str("    ");
+                message.push_str(field.name);
+                message.push_str(": ");
+                message.push_str(&field.type_.to_string());
+                message.push_str(";\n");
+            }
+        }
         self.report(message, span);
     }
 
