@@ -354,6 +354,14 @@ impl Instruction {
             span: None,
         }
     }
+
+    pub const fn check_array_bounds() -> Self {
+        Self {
+            op_code: OpCode::CheckArrayBounds,
+            arg: 0,
+            span: None,
+        }
+    }
 }
 
 impl std::fmt::Debug for Instruction {

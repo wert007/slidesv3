@@ -129,6 +129,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::SysCall => evaluate_sys_call(state, instruction),
         OpCode::FunctionCall => evaluate_function_call(state, instruction),
         OpCode::Return => evaluate_return(state, instruction),
+        OpCode::CheckArrayBounds => evaluate_check_array_bounds(state, instruction),
     }
 }
 
@@ -216,7 +217,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
     }
 }
 
-fn evaluate_write_to_memory(state: &mut EvaluatorState, instruction: Instruction) {
+fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
     let index = state.stack.pop().value;
     let array = state.stack.pop();
     assert!(
@@ -226,20 +227,7 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, instruction: Instruction
     );
     let array = array.value;
     let value = state.stack.pop().value;
-    let array_length_in_bytes = if is_heap_pointer(array) {
-        state.heap.read_word(array as _)
-    } else {
-        state.stack.read_word(array as usize)
-    };
-    let array_length_in_words = bytes_to_word(array_length_in_bytes);
-    if (index as i64) < 0 || index > array_length_in_words {
-        runtime_error!(
-            state,
-            index_out_of_bounds(instruction.span, index as i64, array_length_in_words)
-        );
-        return;
-    }
-    let index = array + index * WORD_SIZE_IN_BYTES + WORD_SIZE_IN_BYTES;
+    let index = array + index;
     let index = index as _;
     if is_heap_pointer(array) {
         state.heap.write_word(index, value);
@@ -664,4 +652,23 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         let return_address = state.stack.pop().value;
         state.pc = return_address as _;
     }
+}
+
+fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruction) {
+    let index = state.stack.pop().value;
+    let array = state.stack.pop();
+    assert!(array.is_pointer);
+    let array = array.value;
+    let array_length_in_bytes = if is_heap_pointer(array) {
+        state.heap.read_word(array as _)
+    } else {
+        state.stack.read_word(array as _)
+    };
+    if index - WORD_SIZE_IN_BYTES >= array_length_in_bytes {
+        let array_length_in_words = bytes_to_word(array_length_in_bytes);
+        let index = (index - WORD_SIZE_IN_BYTES) as _;
+        runtime_error!(state, index_out_of_bounds(instruction.span, index, array_length_in_words));
+    }
+    state.stack.push_pointer(array);
+    state.stack.push(index);
 }
