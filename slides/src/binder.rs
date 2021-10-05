@@ -227,10 +227,37 @@ impl<'a> BindingState<'a, '_> {
             .iter()
             .find(|(_, v)| v.identifier.as_ref() == name)
             .map(|(_, v)| v.type_.clone())
+            .map(|t| {
+                if let Type::Struct(struct_type) = t {
+                    Type::StructReference(struct_type.id)
+                } else {
+                    t
+                }
+            })
     }
 
     fn get_struct_type_by_id(&self, id: u64) -> Option<&BoundStructType<'a>> {
         self.struct_table.get(&id)
+    }
+
+    fn get_struct_by_id(&self, id: u64) -> Option<StructType> {
+        let mut iterator =
+            self.type_table
+                .iter()
+                .filter_map(|(_, BoundVariableName { type_, .. })| {
+                    if let Type::Struct(it) = type_ {
+                        if it.id == id {
+                            Some(*it.clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                });
+        let result = iterator.next();
+        assert!(iterator.next().is_none());
+        result
     }
 }
 
@@ -675,13 +702,15 @@ fn bind_constructor_call<'a>(
         },
         binder,
     );
-    let struct_type = if let Type::Struct(it) = type_ {
-        *it
-    } else {
-        binder
-            .diagnostic_bag
-            .report_unknown_type(type_name_span, type_name);
-        return BoundNode::error(span);
+    let struct_type = match type_ {
+        Type::Struct(it) => *it,
+        Type::StructReference(id) => binder.get_struct_by_id(id).unwrap(),
+        _ => {
+            binder
+                .diagnostic_bag
+                .report_unknown_type(type_name_span, type_name);
+            return BoundNode::error(span);
+        }
     };
     if constructor_call.arguments.len() != struct_type.fields.len() {
         binder.diagnostic_bag.report_unexpected_argument_count(
