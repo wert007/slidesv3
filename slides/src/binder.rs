@@ -1004,7 +1004,21 @@ fn bind_field_access<'a, 'b>(
     match &base.type_ {
         Type::Error => base,
         Type::Any => todo!(),
-        Type::Struct(_) => todo!(),
+        Type::Struct(struct_type) => {
+            let field_name = field_access.field.lexeme;
+            let bound_struct_type =
+                binder
+                    .get_struct_type_by_id(struct_type.id)
+                    .unwrap_or_else(|| {
+                        panic!("Referenced a struct, which doesn't exist, somehow.");
+                    }).clone();
+            if let Some(field) = bound_struct_type.field(field_name) {
+                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+            } else {
+                binder.diagnostic_bag.report_no_field_named_on_struct(field_access.field.span(), field_name, bound_struct_type);
+                BoundNode::error(span)
+            }
+        }
         Type::Void | Type::Integer | Type::Boolean | Type::Function(_) | Type::SystemCall(_) => {
             binder
                 .diagnostic_bag
