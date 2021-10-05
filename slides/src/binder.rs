@@ -952,7 +952,7 @@ fn bind_field_access<'a, 'b>(
     let base_span = field_access.base.span();
     let base = bind_node(*field_access.base, binder);
     match &base.type_ {
-        Type::Error => todo!(),
+        Type::Error => base,
         Type::Any => todo!(),
         Type::Struct(_) => todo!(),
         Type::Void | Type::Integer | Type::Boolean | Type::Function(_) | Type::SystemCall(_) => {
