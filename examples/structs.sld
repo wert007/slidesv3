@@ -18,11 +18,6 @@ struct Cube {
     west: Rect;
 }
 
-// TODO: Field Access
-// func field_access(rect: Rect) -> int {
-//     return rect.top_left.x;
-// }
-
 // TODO: Any order
 // struct Bar {
 //     a: Foo;
@@ -39,10 +34,16 @@ struct Cube {
 // }
 
 // TODO: Functions on structs
-// func Rect::area() -> int {
-//     let w = this.bottom_right.x - this.top_left.x;
-//     let h = this.bottom_right.y - this.top_left.y;
-//     return w * h;
+// struct Square {
+//     side: int;
+
+//     func area() -> int {
+//         return this.side * this.side;
+//     }
+
+//     func circumference() -> int {
+//         return 4 * this.side;
+//     }
 // }
 
 func main() {
@@ -50,4 +51,7 @@ func main() {
     let p = new Point(43, 87);
     let r = new Rect(p, new Point(1200, 3400));
     let c = new Cube(r, r, r, r, r, r);
+    print(p.x);
+    print(r.bottom_right.y);
+    print(c.north.bottom_right.x);
 }
