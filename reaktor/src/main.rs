@@ -11,6 +11,7 @@ fn main() -> Result<(), std::io::Error> {
         print_tokens: args.contains(&String::from("-dt")),
         print_current_instruction: args.contains(&String::from("-dci")),
         print_variable_table: args.contains(&String::from("-dbv")),
+        print_struct_table: args.contains(&String::from("-dbst")),
         print_heap_as_string: args.contains(&String::from("-dheap")),
         print_bound_program: args.contains(&String::from("-dbp")),
         print_stack: args.contains(&String::from("-dstack")),

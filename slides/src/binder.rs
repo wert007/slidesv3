@@ -374,6 +374,11 @@ pub fn bind<'a>(
     if debug_flags.print_bound_program {
         crate::debug::print_bound_node_as_code(&program);
     }
+    if debug_flags.print_struct_table {
+        for (id, entry) in &binder.struct_table {
+            println!("  {}: {:#?}", id, entry);
+        }
+    }
     BoundProgram {
         program,
         fixed_variable_count,
