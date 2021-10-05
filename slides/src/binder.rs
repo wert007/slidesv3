@@ -74,10 +74,30 @@ struct BoundVariableName<'a> {
     pub is_read_only: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct BoundField<'a> {
+    pub name: &'a str,
+    pub offset: u64,
+    pub type_: Type,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundStructType<'a> {
+    pub name: &'a str,
+    pub fields: Vec<BoundField<'a>>,
+}
+
+impl<'a> BoundStructType<'a> {
+    pub fn field(&self, name: &'a str) -> Option<&BoundField> {
+        self.fields.iter().find(|f| f.name == name)
+    }
+}
+
 struct BindingState<'a, 'b> {
     diagnostic_bag: &'b mut DiagnosticBag<'a>,
     variable_table: HashMap<u64, BoundVariableName<'a>>,
     type_table: HashMap<u64, BoundVariableName<'a>>,
+    struct_table: HashMap<u64, BoundStructType<'a>>,
     functions: Vec<FunctionDeclarationBody<'a>>,
     print_variable_table: bool,
     max_used_variables: usize,
@@ -134,6 +154,32 @@ impl<'a> BindingState<'a, '_> {
         }
     }
 
+    fn register_struct(&mut self, name: &'a str, fields: Vec<(&'a str, Type)>) -> Option<u64> {
+        let id = self.type_table.len() as u64;
+        let struct_type = StructType {
+            id,
+            fields: fields.iter().map(|(_, t)| t.clone()).collect(),
+        };
+        let id = self.register_type(name, Type::Struct(Box::new(struct_type)))?;
+        let mut offset = 0;
+        let bound_struct_type = BoundStructType {
+            name,
+            fields: fields
+                .into_iter()
+                .map(|(name, type_)| {
+                    offset += type_.size_in_bytes();
+                    BoundField {
+                        name,
+                        offset: offset - type_.size_in_bytes(),
+                        type_,
+                    }
+                })
+                .collect(),
+        };
+        self.struct_table.insert(id, bound_struct_type);
+        Some(id)
+    }
+
     fn register_type(&mut self, name: &'a str, type_: Type) -> Option<u64> {
         let index = self.type_table.len() as u64;
         let type_name_already_registered = self
@@ -181,6 +227,10 @@ impl<'a> BindingState<'a, '_> {
             .iter()
             .find(|(_, v)| v.identifier.as_ref() == name)
             .map(|(_, v)| v.type_.clone())
+    }
+
+    fn get_struct_type_by_id(&self, id: u64) -> Option<&BoundStructType<'a>> {
+        self.struct_table.get(&id)
     }
 }
 
@@ -256,6 +306,7 @@ pub fn bind<'a>(
         diagnostic_bag,
         variable_table: HashMap::new(),
         type_table: type_table(),
+        struct_table: HashMap::new(),
         functions: vec![],
         print_variable_table: debug_flags.print_variable_table(),
         max_used_variables: 0,
@@ -434,13 +485,7 @@ fn bind_struct_declaration<'a, 'b>(
 ) {
     // TODO: Bind fields later, so that structs can be declared out of order.
     let fields = bind_struct_body(*struct_declaration.body, binder);
-    let id = binder.type_table.len() as _;
-    let struct_type = StructType {
-        id,
-        fields: fields.into_iter().map(|(_, t)| t).collect(),
-    };
-    let type_ = Type::Struct(Box::new(struct_type));
-    let id = binder.register_type(struct_declaration.identifier.lexeme, type_);
+    let id = binder.register_struct(struct_declaration.identifier.lexeme, fields);
     if id.is_none() {
         binder.diagnostic_bag.report_cannot_declare_variable(
             struct_declaration.identifier.span(),
