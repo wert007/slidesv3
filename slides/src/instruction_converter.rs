@@ -220,6 +220,9 @@ fn convert_node_for_assignment(
         BoundNodeKind::ArrayIndex(array_index) => {
             convert_array_index_for_assignment(node.span, array_index, converter)
         }
+        BoundNodeKind::FieldAccess(field_access) => {
+            convert_field_access_for_assignment(node.span, field_access, converter)
+        }
         _ => unreachable!(),
     }
 }
@@ -349,6 +352,17 @@ fn convert_array_index_for_assignment(
     result.push(Instruction::multiplication().span(span).into());
 
     result.push(Instruction::check_array_bounds().span(span).into());
+    result.push(Instruction::store_in_memory().span(span).into());
+    result
+}
+
+fn convert_field_access_for_assignment(
+    span: TextSpan,
+    field_access: BoundFieldAccessNodeKind,
+    converter: &mut InstructionConverter,
+) -> Vec<InstructionOrLabelReference> {
+    let mut result = convert_node(*field_access.base, converter);
+    result.push(Instruction::load_immediate(field_access.offset).span(span).into());
     result.push(Instruction::store_in_memory().span(span).into());
     result
 }

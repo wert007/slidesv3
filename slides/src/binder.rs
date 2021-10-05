@@ -622,6 +622,9 @@ fn bind_node_for_assignment<'a, 'b>(
         SyntaxNodeKind::ArrayIndex(array_index) => {
             bind_array_index_for_assignment(node.span, array_index, binder)
         }
+        SyntaxNodeKind::FieldAccess(field_access) => {
+            bind_field_access_for_assignment(node.span, field_access, binder)
+        }
         _ => unreachable!("Unexpected left hand side of assignment {:#?}", node),
     }
 }
@@ -1042,6 +1045,46 @@ fn bind_field_access<'a, 'b>(
                 BoundNode::error(span)
             }
         }
+    }
+}
+
+fn bind_field_access_for_assignment<'a>(
+    span: TextSpan,
+    field_access: FieldAccessNodeKind<'a>,
+    binder: &mut BindingState<'a, '_>
+) -> BoundNode<'a> {
+    let base = bind_node_for_assignment(*field_access.base, binder);
+    match &base.type_ {
+        Type::Error => base,
+        Type::Any => todo!(),
+        Type::Void |
+        Type::Integer |
+        Type::Boolean |
+        Type::SystemCall(_) |
+        Type::Function(_) => {
+            binder.diagnostic_bag.report_no_fields_on_type(base.span, &base.type_);
+            BoundNode::error(span)
+        }
+        Type::Array(_) |
+        Type::String => {
+            binder.diagnostic_bag.report_cannot_assign_to(span);
+            BoundNode::error(span)
+        }
+        Type::Struct(struct_type) => {
+            let field_name = field_access.field.lexeme;
+            let bound_struct_type =
+                binder
+                    .get_struct_type_by_id(struct_type.id)
+                    .unwrap_or_else(|| {
+                        panic!("Referenced a struct, which doesn't exist, somehow.");
+                    }).clone();
+            if let Some(field) = bound_struct_type.field(field_name) {
+                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+            } else {
+                binder.diagnostic_bag.report_no_field_named_on_struct(field_access.field.span(), field_name, bound_struct_type);
+                BoundNode::error(span)
+            }
+        },
     }
 }
 
