@@ -122,6 +122,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
         OpCode::StringConcat => evaluate_string_concat(state, instruction),
+        OpCode::PointerAddition => evaluate_pointer_addition(state, instruction),
         OpCode::Jump => evaluate_jump(state, instruction),
         OpCode::JumpIfFalse => evaluate_jump_if_false(state, instruction),
         OpCode::JumpIfTrue => evaluate_jump_if_true(state, instruction),
@@ -527,6 +528,19 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
         }
     }
     state.stack.push_pointer(pointer);
+}
+
+fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instruction) {
+    let lhs = state.stack.pop();
+    assert!(lhs.is_pointer);
+    let lhs = lhs.value;
+    let rhs = instruction.arg as i64;
+    let result = if rhs < 0 {
+        lhs - (-rhs) as u64
+    } else {
+        lhs + rhs as u64
+    };
+    state.stack.push_pointer(result);
 }
 
 fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {

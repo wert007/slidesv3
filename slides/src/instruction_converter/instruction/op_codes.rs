@@ -34,6 +34,7 @@ pub enum OpCode {
     LessThanEquals = 38,
     GreaterThanEquals = 39,
     StringConcat = 40,
+    PointerAddition = 41,
     //Jumps
     Jump = 60,
     JumpIfFalse = 61,

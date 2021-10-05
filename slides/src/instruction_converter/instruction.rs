@@ -262,6 +262,14 @@ impl Instruction {
         }
     }
 
+    pub const fn add_to_pointer(value: i64) -> Self {
+        Self {
+            op_code: OpCode::PointerAddition,
+            arg: value as _,
+            span: None,
+        }
+    }
+
     pub const fn jump_to_label(label_index: usize) -> Self {
         Self {
             op_code: OpCode::Jump,
