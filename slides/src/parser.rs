@@ -134,8 +134,12 @@ fn parse_struct_body<'a>(
     let mut statements = vec![];
     let mut semicolon_tokens = vec![];
     while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RBrace) {
+        let token_count = tokens.len();
         statements.push(parse_parameter(tokens, diagnostic_bag));
         semicolon_tokens.push(match_token!(tokens, diagnostic_bag, Semicolon));
+        if token_count == tokens.len() {
+            next_token(tokens);
+        }
     }
     let rbrace = match_token!(tokens, diagnostic_bag, RBrace);
 
