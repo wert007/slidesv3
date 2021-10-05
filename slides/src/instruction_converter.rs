@@ -463,20 +463,11 @@ fn convert_constructor_call(
     {
         let argument_span = argument.span;
         result.append(&mut convert_node(argument, converter));
-        if let Type::Struct(argument) = &type_ {
-            result.push(Instruction::load_pointer(writing_pointer).span(span).into());
-            result.push(
-                Instruction::memory_copy_fixed_size(argument.size_in_bytes())
-                    .span(span)
-                    .into(),
-            );
-        } else {
-            result.push(
-                Instruction::write_to_stack(writing_pointer)
-                    .span(argument_span)
-                    .into(),
-            );
-        }
+        result.push(
+            Instruction::write_to_stack(writing_pointer)
+                .span(argument_span)
+                .into(),
+        );
         writing_pointer += type_.size_in_bytes();
     }
     result.push(Instruction::load_pointer(pointer).span(span).into());
@@ -524,14 +515,8 @@ fn convert_field_access(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
-    match field_access.type_ {
-        Type::SystemCall(_) => {},
-        Type::Struct(_) => {
-            result.push(Instruction::add_to_pointer(field_access.offset as _).span(span).into());
-        }
-        _ => {
-            result.push(Instruction::read_word_with_offset(field_access.offset).span(span).into());
-        }
+    if !matches!(field_access.type_, Type::SystemCall(_)) {
+        result.push(Instruction::read_word_with_offset(field_access.offset).span(span).into());
     }
     result
 }

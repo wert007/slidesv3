@@ -104,10 +104,12 @@ impl Type {
         match self {
             Type::Any | Type::Function(_) | Type::Error => unreachable!(),
             Type::Void => 0,
-            Type::Integer | Type::Boolean | Type::SystemCall(_) | Type::Array(_) | Type::String => {
-                WORD_SIZE_IN_BYTES
-            }
-            Type::Struct(struct_type) => struct_type.size_in_bytes(),
+            Type::Struct(_)
+            | Type::Integer
+            | Type::Boolean
+            | Type::SystemCall(_)
+            | Type::Array(_)
+            | Type::String => WORD_SIZE_IN_BYTES,
         }
     }
 }
