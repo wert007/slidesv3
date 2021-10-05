@@ -519,11 +519,21 @@ fn convert_array_index(
 }
 
 fn convert_field_access(
-    _span: TextSpan,
+    span: TextSpan,
     field_access: BoundFieldAccessNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    convert_node(*field_access.base, converter)
+    let mut result = convert_node(*field_access.base, converter);
+    match field_access.type_ {
+        Type::SystemCall(_) => {},
+        Type::Struct(_) => {
+            result.push(Instruction::add_to_pointer(field_access.offset as _).span(span).into());
+        }
+        _ => {
+            result.push(Instruction::read_word_with_offset(field_access.offset).span(span).into());
+        }
+    }
+    result
 }
 
 fn convert_variable_declaration(
