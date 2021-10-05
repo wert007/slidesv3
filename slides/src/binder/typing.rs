@@ -19,6 +19,7 @@ pub enum Type {
     String,
     Function(Box<FunctionType>),
     Struct(Box<StructType>),
+    StructReference(u64),
 }
 
 impl Type {
@@ -27,7 +28,13 @@ impl Type {
     }
 
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
-        self == other || other == &Type::Any
+        match (self, other) {
+            _ if self == other => true,
+            (_, Type::Any) => true,
+            (Type::Struct(id), Type::StructReference(other_id)) if id.id == *other_id => true,
+            (Type::StructReference(id), Type::Struct(other)) if *id == other.id => true,
+            _ => false,
+        }
     }
 
     pub fn as_system_call(&self) -> Option<SystemCallKind> {
@@ -65,8 +72,8 @@ impl Type {
             Type::Boolean => 8,
             Type::String => 10,
             Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 16,
-            Type::Struct(_) | Type::Function(_) => {
-                eprintln!("Unimplented type_identifer for functions expected..");
+            Type::StructReference(_) | Type::Struct(_) | Type::Function(_) => {
+                eprintln!("Unimplented type_identifer for functions or structs expected..");
                 u64::MAX
             }
         }
@@ -102,9 +109,11 @@ impl Type {
 
     pub fn size_in_bytes(&self) -> u64 {
         match self {
-            Type::Any | Type::Function(_) | Type::Error => unreachable!(),
+            Type::Any | Type::Function(_) => unreachable!(),
+            Type::Error => 0,
             Type::Void => 0,
             Type::Struct(_)
+            | Type::StructReference(_)
             | Type::Integer
             | Type::Boolean
             | Type::SystemCall(_)
@@ -130,6 +139,9 @@ impl std::fmt::Display for Type {
             }
             Type::Struct(struct_type) => {
                 write!(f, "struct {}", struct_type)
+            }
+            Type::StructReference(struct_id) => {
+                write!(f, "struct#{}", struct_id)
             }
         }
     }
