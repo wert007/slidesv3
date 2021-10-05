@@ -103,6 +103,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
+        OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction),
         OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
@@ -252,6 +253,29 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
     state.stack.write_word(address, value.value);
     if value.is_pointer {
         state.stack.set_pointer(address);
+    }
+}
+
+fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instruction) {
+    let address = state.stack.pop().value;
+    let offset = instruction.arg;
+    let address = address + offset;
+    let value = if is_heap_pointer(address) {
+        todo!();
+        // TypedU64 {
+        //     value: state.heap.read_word(address),
+        //     is_pointer: false,
+        // }
+    } else {
+        TypedU64 {
+            value: state.stack.read_word(address as _),
+            is_pointer: state.stack.is_pointer(address as _),
+        }
+    };
+    if value.is_pointer {
+        state.stack.push_pointer(value.value);
+    } else {
+        state.stack.push(value.value);
     }
 }
 

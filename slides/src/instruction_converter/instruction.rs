@@ -101,6 +101,14 @@ impl Instruction {
         }
     }
 
+    pub const fn read_word_with_offset(offset: u64) -> Self {
+        Self {
+            op_code: OpCode::ReadWordWithOffset,
+            arg: offset,
+            span: None,
+        }
+    }
+
     pub const fn memory_copy() -> Self {
         Self {
             op_code: OpCode::MemoryCopy,
