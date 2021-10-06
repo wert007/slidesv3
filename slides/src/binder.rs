@@ -1092,7 +1092,12 @@ fn bind_field_access<'a, 'b>(
                 })
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
-                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                if let Type::Function(_) = field.type_ {
+                    let function_id = binder.look_up_variable_by_name(&format!("{}::{}", bound_struct_type.name, field_name)).unwrap();
+                    BoundNode::field_access(span, base, function_id.id, field.type_.clone())
+                } else {
+                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                }
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_struct(
                     field_access.field.span(),
@@ -1111,7 +1116,12 @@ fn bind_field_access<'a, 'b>(
                 })
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
-                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                if let Type::Function(_) = field.type_ {
+                    let function_id = binder.look_up_variable_by_name(&format!("{}::{}", bound_struct_type.name, field_name)).unwrap();
+                    BoundNode::field_access(span, base, function_id.id, field.type_.clone())
+                } else {
+                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                }
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_struct(
                     field_access.field.span(),

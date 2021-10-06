@@ -537,8 +537,18 @@ fn convert_field_access(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
-    if !matches!(field_access.type_, Type::SystemCall(_)) {
-        result.push(Instruction::read_word_with_offset(field_access.offset).span(span).into());
+    match field_access.type_ {
+        Type::SystemCall(_) => {}
+        Type::Function(_) => {
+            result.push(Instruction::load_register(field_access.offset).span(span).into());
+        },
+        _ => {
+            result.push(
+                Instruction::read_word_with_offset(field_access.offset)
+                    .span(span)
+                    .into(),
+            );
+        }
     }
     result
 }
