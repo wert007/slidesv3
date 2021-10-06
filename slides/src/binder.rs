@@ -99,6 +99,7 @@ struct BindingState<'a, 'b> {
     type_table: HashMap<u64, BoundVariableName<'a>>,
     struct_table: HashMap<u64, BoundStructType<'a>>,
     functions: Vec<FunctionDeclarationBody<'a>>,
+    structs: Vec<StructDeclarationBody<'a>>,
     print_variable_table: bool,
     max_used_variables: usize,
     function_return_type: Type,
@@ -154,13 +155,22 @@ impl<'a> BindingState<'a, '_> {
         }
     }
 
-    fn register_struct(&mut self, name: &'a str, fields: Vec<(&'a str, Type)>) -> Option<u64> {
+    fn register_struct_name(&mut self, name: &'a str) -> Option<u64> {
         let id = self.type_table.len() as u64;
+        self.register_type(name, Type::StructReference(id))
+    }
+
+    fn register_struct(&mut self, id: u64, fields: Vec<(&'a str, Type)>) -> u64 {
         let struct_type = StructType {
             id,
             fields: fields.iter().map(|(_, t)| t.clone()).collect(),
         };
-        let id = self.register_type(name, Type::Struct(Box::new(struct_type)))?;
+        self.type_table.get_mut(&id).unwrap().type_ = Type::Struct(Box::new(struct_type));
+        let name = if let SmartString::Reference(it) = self.type_table[&id].identifier {
+            it
+        } else {
+            unreachable!("There should be no generated Struct Names!");
+        };
         let mut offset = 0;
         let bound_struct_type = BoundStructType {
             name,
@@ -177,7 +187,7 @@ impl<'a> BindingState<'a, '_> {
                 .collect(),
         };
         self.struct_table.insert(id, bound_struct_type);
-        Some(id)
+        id
     }
 
     fn register_type(&mut self, name: &'a str, type_: Type) -> Option<u64> {
@@ -335,6 +345,7 @@ pub fn bind<'a>(
         type_table: type_table(),
         struct_table: HashMap::new(),
         functions: vec![],
+        structs: vec![],
         print_variable_table: debug_flags.print_variable_table(),
         max_used_variables: 0,
         function_return_type: Type::Error,
@@ -343,6 +354,11 @@ pub fn bind<'a>(
     let mut statements = default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     statements.push(call_main(&mut binder));
+
+    for node in binder.structs.clone() {
+        let fields = bind_struct_body(node.body, &mut binder);
+        binder.register_struct(node.id, fields);
+    }
 
     let fixed_variable_count = binder.variable_table.len();
     let mut label_count = binder.functions.len();
@@ -482,6 +498,12 @@ struct FunctionDeclarationBody<'a> {
     return_type: Type,
 }
 
+#[derive(Clone, Debug)]
+struct StructDeclarationBody<'a> {
+    id: u64,
+    body: StructBodyNode<'a>,
+}
+
 fn bind_function_declaration<'a, 'b>(
     function_declaration: FunctionDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
@@ -515,16 +537,14 @@ fn bind_struct_declaration<'a, 'b>(
     struct_declaration: StructDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) {
-    // TODO: Bind fields later, so that structs can be declared out of order.
-    let fields = bind_struct_body(*struct_declaration.body, binder);
-    let id = binder.register_struct(struct_declaration.identifier.lexeme, fields);
-    if id.is_none() {
-        binder.diagnostic_bag.report_cannot_declare_variable(
-            struct_declaration.identifier.span(),
-            struct_declaration.identifier.lexeme,
-        );
+    if let Some(id) = binder.register_struct_name(struct_declaration.identifier.lexeme) {
+        binder.structs.push(StructDeclarationBody {
+            id,
+            body: *struct_declaration.body,
+        });
+    } else {
+        binder.diagnostic_bag.report_cannot_declare_struct(struct_declaration.identifier.span(), struct_declaration.identifier.lexeme);
     }
-    let _id = id.unwrap();
 }
 
 fn bind_function_type<'a>(

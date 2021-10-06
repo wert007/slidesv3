@@ -140,6 +140,12 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub(crate) fn report_cannot_declare_struct(&mut self, span: TextSpan, struct_name: &str) {
+        let message = format!("A struct named {} was already declared.", struct_name);
+        // FIXME: Reference the first declaration of a struct with that name.
+        self.report(message, span);
+    }
+
     pub fn report_cannot_declare_keyword_as_variable(
         &mut self,
         span: TextSpan,
