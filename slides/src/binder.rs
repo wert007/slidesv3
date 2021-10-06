@@ -359,7 +359,7 @@ pub fn bind<'a>(
     statements.push(call_main(&mut binder));
 
     for node in binder.structs.clone() {
-        let fields = bind_struct_body(node.body, &mut binder);
+        let fields = bind_struct_body(node.name, node.body, &mut binder);
         binder.register_struct(node.id, fields);
     }
 
@@ -503,6 +503,7 @@ struct FunctionDeclarationBody<'a> {
 
 #[derive(Clone, Debug)]
 struct StructDeclarationBody<'a> {
+    name: &'a str,
     id: u64,
     body: StructBodyNode<'a>,
 }
@@ -575,6 +576,7 @@ fn bind_struct_declaration<'a, 'b>(
 ) {
     if let Some(id) = binder.register_struct_name(struct_declaration.identifier.lexeme) {
         binder.structs.push(StructDeclarationBody {
+            name: struct_declaration.identifier.lexeme,
             id,
             body: *struct_declaration.body,
         });
