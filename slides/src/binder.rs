@@ -1003,46 +1003,18 @@ fn bind_function_call<'a, 'b>(
 ) -> BoundNode<'a> {
     let argument_span = function_call.argument_span();
     let function = bind_node(*function_call.base, binder);
-    let this = match &function.kind {
-        BoundNodeKind::FieldAccess(field_access) => Some(*field_access.base.clone()),
-        _ => None,
-    };
     let function_type = function_type(&function.type_);
-    // match (&this, &function_type.this_type) {
-    //     (Some(this), Some(type_)) => {
-    //         if !this.type_.can_be_converted_to(type_) {
-    //             binder.diagnostic_bag.report_cannot_convert(this.span, &this.type_, type_);
-    //             return BoundNode::error(span);
-    //         }
-    //     }
-    //     (None, None) => {},
-    //     (Some(this), None) => {
-    //         binder.diagnostic_bag.report_expected_no_this(this.span, &function_type);
-    //         return BoundNode::error(span)
-    //     }
-    //     (None, Some(_)) => {
-    //         binder.diagnostic_bag.report_expected_this_parameter(function.span, &function_type);
-    //         return BoundNode::error(span)
-    //     }
-    // }
-    let mut arguments = bind_arguments_for_function(
+    let arguments = bind_arguments_for_function(
         argument_span,
         function_call.arguments,
         &function_type,
         binder,
     );
-    if function_type.this_type.is_some() {
-        arguments.insert(
-            0,
-            this.unwrap_or_else(|| {
-                function.clone() // Wrong Type, wrong idea!
-            }),
-        );
-    }
     if let Type::SystemCall(system_call) = function.type_ {
-        return BoundNode::system_call(span, system_call, arguments, function_type.return_type);
+        BoundNode::system_call(span, system_call, arguments, function_type.return_type)
+    } else {
+        BoundNode::function_call(span, function, arguments, function_type.this_type.is_some(), function_type.return_type)
     }
-    BoundNode::function_call(span, function, arguments, function_type.return_type)
 }
 
 fn bind_array_index<'a, 'b>(

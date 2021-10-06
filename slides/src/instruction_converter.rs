@@ -458,7 +458,7 @@ fn convert_function_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let argument_count = function_call.arguments.len();
+    let argument_count = function_call.arguments.len() + if function_call.has_this_argument { 1 } else { 0 };
     for argument in function_call.arguments {
         result.append(&mut convert_node(argument, converter));
     }

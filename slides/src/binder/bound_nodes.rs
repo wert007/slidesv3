@@ -158,6 +158,7 @@ impl<'a> BoundNode<'a> {
         span: TextSpan,
         base: BoundNode<'a>,
         arguments: Vec<BoundNode<'a>>,
+        has_this_argument: bool,
         type_: Type,
     ) -> Self {
         Self {
@@ -165,6 +166,7 @@ impl<'a> BoundNode<'a> {
             kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
                 base: Box::new(base),
                 arguments,
+                has_this_argument,
             }),
             type_,
             byte_width: 4,
@@ -555,6 +557,7 @@ pub struct BoundBinaryNodeKind<'a> {
 pub struct BoundFunctionCallNodeKind<'a> {
     pub base: Box<BoundNode<'a>>,
     pub arguments: Vec<BoundNode<'a>>,
+    pub has_this_argument: bool,
 }
 
 #[derive(Debug, Clone)]
