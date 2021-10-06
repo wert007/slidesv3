@@ -31,31 +31,45 @@ struct ListNode {
     next: ListNode;
 }
 
-// TODO: Functions on structs
-// struct Square {
-//     side: int;
+struct Square {
+    side: int;
 
-//     func area() -> int {
-//         return this.side * this.side;
-//     }
+    func area() -> int {
+        return this.side * this.side;
+    }
 
-//     func circumference() -> int {
-//         return 4 * this.side;
-//     }
-// }
+    func circumference() -> int {
+        return 4 * this.side;
+    }
+
+    func resize(side: int) {
+        this.side = side;
+        // TODO: make this an error:
+        this = new Square(side);
+    }
+}
 
 func main() {
-    print('Hello World!');
     let p = new Point(43, 87);
     let r = new Rect(p, new Point(1200, 3400));
     let c = new Cube(r, r, r, r, r, r);
-    print(p.x);
-    print(r.bottom_right.y);
+    print('Point.x = ' + p.x);
+    print('Rect.bottom_right.y = ' + r.bottom_right.y);
     r.bottom_right.x = 99;
-    print(c.north.bottom_right.x);
+    print('Cube.north.bottom_right.x = ' + c.north.bottom_right.x);
 
     let b = new Bar(new Foo(2312));
-    print(b.a.a);
+    print('Bar.Foo.a = ' + b.a.a);
 
+    let s = new Square(5);
+    print('Square.side = ' + s.side);
+    s.resize(7);
+    print('Square.area() = ' + s.area());
+    print('Square.circumference() = ' + s.circumference());
+    // This doesn't work right now!
+    // let area = s.area;
+    // print(area());
+
+    // This needs noneable pointers!
     // let impossible = new ListNode(0, new ListNode(1, new ListNode(2, '')));
 }
