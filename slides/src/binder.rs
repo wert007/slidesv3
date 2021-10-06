@@ -561,7 +561,12 @@ fn bind_struct_body<'a>(
 ) -> Vec<(&'a str, Type)> {
     let mut result = vec![];
     for statement in struct_body.statements {
-        result.push(bind_parameter(statement, binder));
+        let span = statement.span;
+        let (name, type_) = bind_parameter(statement, binder);
+        if result.iter().find(|(n, _)| n == &name).is_some() {
+            binder.diagnostic_bag.report_parameter_already_declared(span, name);
+        }
+        result.push((name, type_));
     }
     result
 }

@@ -152,6 +152,12 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_parameter_already_declared(&mut self, span: TextSpan, name: &str) {
+        let message = format!("Parameter named {} already declared in struct.", name);
+        // FIXME: Reference the first declaration of a struct with that name.
+        self.report(message, span);
+    }
+
     pub fn report_variable_not_found(&mut self, span: TextSpan, variable_name: &str) {
         let message = format!("No variable named '{}' could be found.", variable_name);
         self.report(message, span);
