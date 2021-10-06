@@ -448,7 +448,7 @@ fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
         .look_up_variable_by_name("main")
         .expect("No main function found..");
     let base = BoundNode::variable(span, base.id, base.type_);
-    let call_main = BoundNode::function_call(span, base, vec![], Type::Void);
+    let call_main = BoundNode::function_call(span, base, vec![], false, Type::Void);
     BoundNode::expression_statement(span, call_main)
 }
 
@@ -508,7 +508,7 @@ fn bind_function_declaration<'a, 'b>(
     function_declaration: FunctionDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) {
-    let (function_type, variables) = bind_function_type(function_declaration.function_type, binder);
+    let (function_type, variables) = bind_function_type(None, function_declaration.function_type, binder);
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
     let function_id = if let Some(it) =
@@ -533,6 +533,39 @@ fn bind_function_declaration<'a, 'b>(
     });
 }
 
+fn bind_function_declaration_for_struct<'a, 'b>(
+    struct_name: &'a str,
+    function_declaration: FunctionDeclarationNodeKind<'a>,
+    binder: &mut BindingState<'a, 'b>,
+) -> (&'a str, Type, bool) {
+    let struct_type = binder.look_up_type_by_name(struct_name).unwrap();
+    let (function_type, mut variables) = bind_function_type(Some(struct_type.clone()), function_declaration.function_type, binder);
+    variables.push(("this", struct_type));
+    let function_name = format!("{}::{}", struct_name, function_declaration.identifier.lexeme);
+    let type_ = Type::Function(Box::new(function_type.clone()));
+    let function_id = if let Some(it) =
+        binder.register_generated_variable(function_name.clone(), type_.clone(), true)
+    {
+        it
+    } else {
+        binder.diagnostic_bag.report_cannot_declare_variable(
+            function_declaration.identifier.span(),
+            function_declaration.identifier.lexeme,
+        );
+        0
+    };
+    binder.functions.push(FunctionDeclarationBody {
+        function_name: function_declaration.identifier.lexeme,
+        body: *function_declaration.body,
+        parameters: variables,
+        is_main: false,
+        function_id,
+        function_type: type_.clone(),
+        return_type: function_type.return_type,
+    });
+    (function_declaration.identifier.lexeme, type_, true)
+}
+
 fn bind_struct_declaration<'a, 'b>(
     struct_declaration: StructDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
@@ -548,6 +581,7 @@ fn bind_struct_declaration<'a, 'b>(
 }
 
 fn bind_function_type<'a>(
+    this_type: Option<Type>,
     function_type: FunctionTypeNode<'a>,
     binder: &mut BindingState<'a, '_>,
 ) -> (FunctionType, Vec<(&'a str, Type)>) {
@@ -567,7 +601,7 @@ fn bind_function_type<'a>(
     (
         FunctionType {
             parameter_types: parameters.clone().into_iter().map(|(_, t)| t).collect(),
-            this_type: None,
+            this_type,
             return_type,
             system_call_kind: None,
         },
