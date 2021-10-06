@@ -79,6 +79,7 @@ pub struct BoundField<'a> {
     pub name: &'a str,
     pub offset: u64,
     pub type_: Type,
+    pub is_read_only: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -176,12 +177,13 @@ impl<'a> BindingState<'a, '_> {
             name,
             fields: fields
                 .into_iter()
-                .map(|(name, type_)| {
+                .map(|(name, type_, is_read_only)| {
                     offset += type_.size_in_bytes();
                     BoundField {
                         name,
                         offset: offset - type_.size_in_bytes(),
                         type_,
+                        is_read_only,
                     }
                 })
                 .collect(),
@@ -610,17 +612,27 @@ fn bind_function_type<'a>(
 }
 
 fn bind_struct_body<'a>(
+    struct_name: &'a str,
     struct_body: StructBodyNode<'a>,
-    binder: &mut BindingState,
-) -> Vec<(&'a str, Type)> {
+    binder: &mut BindingState<'a, '_>,
+) -> Vec<(&'a str, Type, bool)> {
     let mut result = vec![];
     for statement in struct_body.statements {
         let span = statement.span;
-        let (name, type_) = bind_parameter(statement, binder);
-        if result.iter().find(|(n, _)| n == &name).is_some() {
+        let (name, type_, is_read_only) = match statement.kind {
+            SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
+                bind_function_declaration_for_struct(struct_name, *function_declaration, binder)
+            }
+            SyntaxNodeKind::StructField(struct_field) => {
+                let field = bind_parameter(struct_field.field, binder);
+                (field.0, field.1, false)
+            },
+            unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
+        };
+        if result.iter().find(|(n, _, _)| n == &name).is_some() {
             binder.diagnostic_bag.report_parameter_already_declared(span, name);
         }
-        result.push((name, type_));
+        result.push((name, type_, is_read_only));
     }
     result
 }
@@ -1188,7 +1200,12 @@ fn bind_field_access_for_assignment<'a>(
                 })
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
-                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                if field.is_read_only {
+                    binder.diagnostic_bag.report_cannot_assign_to(span);
+                    BoundNode::error(span)
+                } else {
+                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                }
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_struct(
                     field_access.field.span(),
@@ -1207,7 +1224,12 @@ fn bind_field_access_for_assignment<'a>(
                 })
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
-                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                if field.is_read_only {
+                    binder.diagnostic_bag.report_cannot_assign_to(span);
+                    BoundNode::error(span)
+                } else {
+                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
+                }
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_struct(
                     field_access.field.span(),
