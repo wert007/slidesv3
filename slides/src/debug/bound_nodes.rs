@@ -225,7 +225,10 @@ fn print_bound_node_field_access_as_code(
     buffer: &mut String,
 ) {
     print_bound_node_as_code_with_indent(&field_access.base, printer, buffer);
-    buffer.push_str(".length");
+    buffer.push_str(".field#");
+    buffer.push_str(&field_access.offset.to_string());
+    buffer.push_str(":");
+    buffer.push_str(&field_access.type_.to_string());
 }
 
 fn print_bound_node_block_statement_as_code(
