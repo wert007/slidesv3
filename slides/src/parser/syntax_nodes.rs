@@ -71,6 +71,21 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn struct_field(
+        field: ParameterNode<'a>,
+        semicolon_token: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(field.span, semicolon_token.span());
+        Self {
+            span,
+            kind: SyntaxNodeKind::StructField(StructFieldNodeKind {
+                field,
+                semicolon_token,
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn literal(token: SyntaxToken<'a>) -> Self {
         let value = match &token.kind {
             SyntaxTokenKind::NumberLiteral(n) => (n.value as i64).into(),
@@ -408,7 +423,7 @@ pub enum SyntaxNodeKind<'a> {
     FunctionDeclaration(Box<FunctionDeclarationNodeKind<'a>>),
     StructDeclaration(StructDeclarationNodeKind<'a>),
 
-    //Expressions
+    // Expressions
     Literal(LiteralNodeKind<'a>),
     ArrayLiteral(ArrayLiteralNodeKind<'a>),
     ConstructorCall(ConstructorCallNodeKind<'a>),
@@ -429,6 +444,9 @@ pub enum SyntaxNodeKind<'a> {
     WhileStatement(WhileStatementNodeKind<'a>),
     Assignment(AssignmentNodeKind<'a>),
     ExpressionStatement(ExpressionStatementNodeKind<'a>),
+
+    // Trivia
+    StructField(StructFieldNodeKind<'a>),
 }
 
 impl SyntaxNodeKind<'_> {
@@ -488,8 +506,7 @@ pub struct StructDeclarationNodeKind<'a> {
 #[derive(Debug, Clone)]
 pub struct StructBodyNode<'a> {
     pub lbrace: SyntaxToken<'a>,
-    pub statements: Vec<ParameterNode<'a>>,
-    pub semicolon_tokens: Vec<SyntaxToken<'a>>,
+    pub statements: Vec<SyntaxNode<'a>>,
     pub rbrace: SyntaxToken<'a>,
     pub span: TextSpan,
 }
@@ -497,15 +514,13 @@ pub struct StructBodyNode<'a> {
 impl<'a> StructBodyNode<'a> {
     pub fn new(
         lbrace: SyntaxToken<'a>,
-        statements: Vec<ParameterNode<'a>>,
-        semicolon_tokens: Vec<SyntaxToken<'a>>,
+        statements: Vec<SyntaxNode<'a>>,
         rbrace: SyntaxToken<'a>,
     ) -> Self {
         let span = TextSpan::bounds(lbrace.span(), rbrace.span());
         Self {
             lbrace,
             statements,
-            semicolon_tokens,
             rbrace,
             span,
         }
@@ -719,5 +734,11 @@ pub struct AssignmentNodeKind<'a> {
 #[derive(Debug, Clone)]
 pub struct ExpressionStatementNodeKind<'a> {
     pub expression: Box<SyntaxNode<'a>>,
+    pub semicolon_token: SyntaxToken<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StructFieldNodeKind<'a> {
+    pub field: ParameterNode<'a>,
     pub semicolon_token: SyntaxToken<'a>,
 }

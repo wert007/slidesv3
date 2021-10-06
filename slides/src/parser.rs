@@ -132,18 +132,31 @@ fn parse_struct_body<'a>(
 ) -> StructBodyNode<'a> {
     let lbrace = match_token!(tokens, diagnostic_bag, LBrace);
     let mut statements = vec![];
-    let mut semicolon_tokens = vec![];
     while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RBrace) {
         let token_count = tokens.len();
-        statements.push(parse_parameter(tokens, diagnostic_bag));
-        semicolon_tokens.push(match_token!(tokens, diagnostic_bag, Semicolon));
+        let statement = match &peek_token(tokens).kind {
+            SyntaxTokenKind::FuncKeyword => {
+                parse_function_statement(tokens, diagnostic_bag)
+            },
+            SyntaxTokenKind::Identifier => {
+                let field = parse_parameter(tokens, diagnostic_bag);
+                let semicolon_token = match_token!(tokens, diagnostic_bag, Semicolon);
+                SyntaxNode::struct_field(field, semicolon_token)
+            }
+            _ => {
+                let current = next_token(tokens);
+                diagnostic_bag.report_unexpected_token_kind(current.span(), &current.kind, &SyntaxTokenKind::Identifier);
+                SyntaxNode::error(current.start)
+            },
+        };
+        statements.push(statement);
         if token_count == tokens.len() {
             next_token(tokens);
         }
     }
     let rbrace = match_token!(tokens, diagnostic_bag, RBrace);
 
-    StructBodyNode::new(lbrace, statements, semicolon_tokens, rbrace)
+    StructBodyNode::new(lbrace, statements, rbrace)
 }
 
 fn parse_parameter<'a>(
