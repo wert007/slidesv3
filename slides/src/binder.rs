@@ -31,7 +31,7 @@ use crate::{
 };
 
 use self::{
-    bound_nodes::{BoundNode, BoundNodeKind},
+    bound_nodes::BoundNode,
     operators::BoundBinaryOperator,
     typing::{FunctionType, StructType, SystemCallKind},
 };

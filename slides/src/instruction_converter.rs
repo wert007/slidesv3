@@ -348,7 +348,11 @@ fn convert_array_index_for_assignment(
     result.append(&mut convert_node(*array_index.index, converter));
     result.push(Instruction::load_immediate(1).span(span).into());
     result.push(Instruction::addition().span(span).into());
-    result.push(Instruction::load_immediate(WORD_SIZE_IN_BYTES).span(span).into());
+    result.push(
+        Instruction::load_immediate(WORD_SIZE_IN_BYTES)
+            .span(span)
+            .into(),
+    );
     result.push(Instruction::multiplication().span(span).into());
 
     result.push(Instruction::check_array_bounds().span(span).into());
@@ -362,7 +366,11 @@ fn convert_field_access_for_assignment(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
-    result.push(Instruction::load_immediate(field_access.offset).span(span).into());
+    result.push(
+        Instruction::load_immediate(field_access.offset)
+            .span(span)
+            .into(),
+    );
     result.push(Instruction::store_in_memory().span(span).into());
     result
 }
