@@ -109,11 +109,12 @@ impl Type {
 
     pub fn size_in_bytes(&self) -> u64 {
         match self {
-            Type::Any | Type::Function(_) => unreachable!(),
+            Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
             Type::Struct(_)
             | Type::StructReference(_)
+            | Type::Function(_)
             | Type::Integer
             | Type::Boolean
             | Type::SystemCall(_)
