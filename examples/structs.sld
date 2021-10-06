@@ -18,20 +18,18 @@ struct Cube {
     west: Rect;
 }
 
-// TODO: Any order
-// struct Bar {
-//     a: Foo;
-// }
+struct Bar {
+    a: Foo;
+}
 
-// struct Foo {
-//     a: int;
-// }
+struct Foo {
+    a: int;
+}
 
-// TODO: Recursion?
-// struct ListNode {
-//     value: int;
-//     next: ListNode?;
-// }
+struct ListNode {
+    value: int;
+    next: ListNode;
+}
 
 // TODO: Functions on structs
 // struct Square {
@@ -55,4 +53,9 @@ func main() {
     print(r.bottom_right.y);
     r.bottom_right.x = 99;
     print(c.north.bottom_right.x);
+
+    let b = new Bar(new Foo(2312));
+    print(b.a.a);
+
+    // let impossible = new ListNode(0, new ListNode(1, new ListNode(2, '')));
 }
