@@ -161,10 +161,11 @@ impl<'a> BindingState<'a, '_> {
         self.register_type(name, Type::StructReference(id))
     }
 
-    fn register_struct(&mut self, id: u64, fields: Vec<(&'a str, Type)>) -> u64 {
+    fn register_struct(&mut self, id: u64, fields: Vec<(&'a str, Type, bool)>) -> u64 {
         let struct_type = StructType {
             id,
-            fields: fields.iter().map(|(_, t)| t.clone()).collect(),
+            fields: fields.iter().filter(|(_, t, _)| !matches!(t, &Type::Function(_))).map(|(_, t, _)| t.clone()).collect(),
+            functions: fields.iter().filter(|(_, t, _)| matches!(t, &Type::Function(_))).map(|(_, t, _)| t.clone()).collect(),
         };
         self.type_table.get_mut(&id).unwrap().type_ = Type::Struct(Box::new(struct_type));
         let name = if let SmartString::Reference(it) = self.type_table[&id].identifier {

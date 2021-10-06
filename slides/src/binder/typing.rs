@@ -211,6 +211,7 @@ impl FunctionType {
 pub struct StructType {
     pub id: u64,
     pub fields: Vec<Type>,
+    pub functions: Vec<Type>,
 }
 
 impl StructType {
