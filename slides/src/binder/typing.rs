@@ -122,6 +122,22 @@ impl Type {
             | Type::String => WORD_SIZE_IN_BYTES,
         }
     }
+
+    pub fn array_element_size_in_bytes(&self) -> u64 {
+        match self {
+            Type::Void |
+            Type::Any |
+            Type::Error => unreachable!(),
+            Type::String => 1,
+            Type::Integer |
+            Type::Boolean |
+            Type::SystemCall(_) |
+            Type::Array(_) |
+            Type::Function(_) |
+            Type::Struct(_) |
+            Type::StructReference(_) => WORD_SIZE_IN_BYTES,
+        }
+    }
 }
 
 impl std::fmt::Display for Type {

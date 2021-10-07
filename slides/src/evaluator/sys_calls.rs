@@ -186,16 +186,7 @@ pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         };
     }
 
-    let array_length = match type_ {
-        Type::Error => todo!(),
-        Type::Void => todo!(),
-        Type::Any => todo!(),
-        Type::Function(_) | Type::Struct(_) | Type::StructReference(_) => todo!(),
-        Type::Integer | Type::Boolean | Type::SystemCall(_) | Type::Array(_) => {
-            pointer / WORD_SIZE_IN_BYTES
-        }
-        Type::String => pointer,
-    };
+    let array_length = pointer / type_.array_element_size_in_bytes();
 
     state.stack.push(array_length);
 }
