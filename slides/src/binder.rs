@@ -7,8 +7,6 @@ pub mod typing;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use std::collections::HashMap;
-
 use crate::{
     binder::{operators::BoundUnaryOperator, typing::Type},
     diagnostics::DiagnosticBag,
@@ -120,9 +118,9 @@ impl<'a> BoundStructType<'a> {
 
 struct BindingState<'a, 'b> {
     diagnostic_bag: &'b mut DiagnosticBag<'a>,
-    variable_table: HashMap<u64, BoundVariableName<'a>>,
-    type_table: HashMap<u64, BoundVariableName<'a>>,
-    struct_table: HashMap<u64, BoundStructType<'a>>,
+    variable_table: Vec<BoundVariableName<'a>>,
+    type_table: Vec<BoundVariableName<'a>>,
+    struct_table: Vec<BoundStructType<'a>>,
     functions: Vec<FunctionDeclarationBody<'a>>,
     structs: Vec<StructDeclarationBody<'a>>,
     print_variable_table: bool,
@@ -136,13 +134,11 @@ impl<'a> BindingState<'a, '_> {
         self.max_used_variables = self.max_used_variables.max(index as usize + 1);
         let variable_already_registered = self
             .variable_table
-            .values()
-            .any(|variable| variable.identifier.as_ref() == name);
+            .iter().any(|variable| variable.identifier.as_ref() == name);
         if variable_already_registered {
             None
         } else {
-            self.variable_table.insert(
-                index,
+            self.variable_table.push(
                 BoundVariableName {
                     identifier: name.into(),
                     type_,
@@ -160,16 +156,15 @@ impl<'a> BindingState<'a, '_> {
         is_read_only: bool,
     ) -> Option<u64> {
         let index = self.variable_table.len() as u64;
-        self.max_used_variables = self.max_used_variables.max(index as _);
+        self.max_used_variables = self.max_used_variables.max(index as usize + 1);
         let variable_already_registered = self
             .variable_table
-            .values()
+            .iter()
             .any(|variable| variable.identifier.as_ref() == name);
         if variable_already_registered {
             None
         } else {
-            self.variable_table.insert(
-                index,
+            self.variable_table.push(
                 BoundVariableName {
                     identifier: name.into(),
                     type_,
@@ -191,8 +186,8 @@ impl<'a> BindingState<'a, '_> {
             fields: fields.iter().filter(|f| !matches!(&f.type_, &Type::Function(_))).map(|f| f.type_.clone()).collect(),
             functions: fields.iter().filter(|f| matches!(&f.type_, &Type::Function(_))).map(|f| f.type_.clone()).collect(),
         };
-        self.type_table.get_mut(&id).unwrap().type_ = Type::Struct(Box::new(struct_type));
-        let name = if let SmartString::Reference(it) = self.type_table[&id].identifier {
+        self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
+        let name = if let SmartString::Reference(it) = self.type_table[id as usize].identifier {
             it
         } else {
             unreachable!("There should be no generated Struct Names!");
@@ -213,7 +208,7 @@ impl<'a> BindingState<'a, '_> {
                 })
                 .collect(),
         };
-        self.struct_table.insert(id, bound_struct_type);
+        self.struct_table.push(bound_struct_type);
         id
     }
 
@@ -221,13 +216,12 @@ impl<'a> BindingState<'a, '_> {
         let index = self.type_table.len() as u64;
         let type_name_already_registered = self
             .type_table
-            .values()
+            .iter()
             .any(|type_| type_.identifier.as_ref() == name);
         if type_name_already_registered {
             None
         } else {
-            self.type_table.insert(
-                index,
+            self.type_table.push(
                 BoundVariableName {
                     identifier: name.into(),
                     type_,
@@ -243,17 +237,18 @@ impl<'a> BindingState<'a, '_> {
             return;
         }
         let current = self.variable_table.len() - 1;
-        for i in index..=current {
-            self.variable_table.remove(&(i as _));
+        for _ in index..=current {
+            self.variable_table.pop();
         }
     }
 
     fn look_up_variable_by_name(&self, name: &str) -> Option<VariableEntry> {
         self.variable_table
             .iter()
+            .enumerate()
             .find(|(_, v)| v.identifier.as_ref() == name)
-            .map(|(&i, v)| VariableEntry {
-                id: i,
+            .map(|(i, v)| VariableEntry {
+                id: i as u64,
                 type_: v.type_.clone(),
                 is_read_only: v.is_read_only,
             })
@@ -262,8 +257,8 @@ impl<'a> BindingState<'a, '_> {
     fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
         self.type_table
             .iter()
-            .find(|(_, v)| v.identifier.as_ref() == name)
-            .map(|(_, v)| v.type_.clone())
+            .find(|v| v.identifier.as_ref() == name)
+            .map(|v| v.type_.clone())
             .map(|t| {
                 if let Type::Struct(struct_type) = t {
                     Type::StructReference(struct_type.id)
@@ -274,14 +269,16 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn get_struct_type_by_id(&self, id: u64) -> Option<&BoundStructType<'a>> {
-        self.struct_table.get(&id)
+        // FIXME: The 3 are the three primary types in the type table (int,
+        // bool, and string), this could be moved to a better place i think.
+        self.struct_table.get(id as usize - 3)
     }
 
     fn get_struct_by_id(&self, id: u64) -> Option<StructType> {
         let mut iterator =
             self.type_table
                 .iter()
-                .filter_map(|(_, BoundVariableName { type_, .. })| {
+                .filter_map(|BoundVariableName { type_, .. }| {
                     if let Type::Struct(it) = type_ {
                         if it.id == id {
                             Some(*it.clone())
@@ -298,8 +295,8 @@ impl<'a> BindingState<'a, '_> {
     }
 }
 
-fn print_variable_table(variable_table: &HashMap<u64, BoundVariableName>) {
-    let mut variable_table: Vec<_> = variable_table.iter().collect();
+fn print_variable_table(variable_table: &Vec<BoundVariableName>) {
+    let mut variable_table: Vec<_> = variable_table.iter().enumerate().collect();
     variable_table.sort_unstable_by_key(|f| f.0);
     for (index, variable) in variable_table {
         println!(
@@ -328,33 +325,24 @@ impl BoundProgram<'_> {
     }
 }
 
-fn type_table() -> HashMap<u64, BoundVariableName<'static>> {
-    let mut result = HashMap::new();
-    result.insert(
-        0,
+fn type_table() -> Vec<BoundVariableName<'static>> {
+    vec![
         BoundVariableName {
             identifier: "int".into(),
             type_: Type::Integer,
             is_read_only: true,
         },
-    );
-    result.insert(
-        1,
         BoundVariableName {
             identifier: "bool".into(),
             type_: Type::Boolean,
             is_read_only: true,
         },
-    );
-    result.insert(
-        2,
         BoundVariableName {
             identifier: "string".into(),
             type_: Type::String,
             is_read_only: true,
         },
-    );
-    result
+    ]
 }
 
 pub fn bind<'a>(
@@ -368,9 +356,9 @@ pub fn bind<'a>(
     }
     let mut binder = BindingState {
         diagnostic_bag,
-        variable_table: HashMap::new(),
+        variable_table: vec![],
         type_table: type_table(),
-        struct_table: HashMap::new(),
+        struct_table: vec![],
         functions: vec![],
         structs: vec![],
         print_variable_table: debug_flags.print_variable_table(),
@@ -445,7 +433,7 @@ pub fn bind<'a>(
         crate::debug::print_bound_node_as_code(&program);
     }
     if debug_flags.print_struct_table {
-        for (id, entry) in &binder.struct_table {
+        for (id, entry) in binder.struct_table.iter().enumerate() {
             println!("  {}: {:#?}", id, entry);
         }
     }
