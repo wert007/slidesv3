@@ -1,6 +1,11 @@
 struct Point {
     x: int;
     y: int;
+
+    func length_squared() -> int {
+        this = 5;
+        return this.x * this.x + this.y * this.y;
+    }
 }
 
 struct Rect {
