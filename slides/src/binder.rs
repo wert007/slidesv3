@@ -1013,7 +1013,19 @@ fn bind_function_call<'a, 'b>(
         binder,
     );
     if let Type::SystemCall(system_call) = function.type_ {
-        BoundNode::system_call(span, system_call, arguments, function_type.return_type)
+        if system_call == SystemCallKind::ArrayLength {
+            let mut argument = function.clone();
+            // TODO: This only works if the function is directly called.
+            //
+            //      let len = [1, 2, 3,].length; len();
+            //
+            // This would not work.
+            let field_access = function.kind.as_field_access().unwrap();
+            argument.type_ = field_access.base.type_.clone();
+            BoundNode::system_call(span, system_call, vec![ argument ], function_type.return_type)
+        } else {
+            BoundNode::system_call(span, system_call, arguments, function_type.return_type)
+        }
     } else {
         BoundNode::function_call(span, function, arguments, function_type.this_type.is_some(), function_type.return_type)
     }

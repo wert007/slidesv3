@@ -510,7 +510,12 @@ fn convert_system_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let argument_count = system_call.arguments.len();
+    let argument_count = match system_call.base {
+        SystemCallKind::Print |
+        SystemCallKind::ToString |
+        SystemCallKind::ArrayLength => 1,
+    };
+
     for argument in system_call.arguments {
         let type_identifier = argument.type_.type_identifier();
         result.append(&mut convert_node(argument, converter));

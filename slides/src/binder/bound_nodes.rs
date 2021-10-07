@@ -509,6 +509,15 @@ pub enum BoundNodeKind<'a> {
     ReturnStatement(BoundReturnStatementNodeKind<'a>),
 }
 
+impl BoundNodeKind<'_> {
+    pub fn as_field_access(&self) -> Option<&BoundFieldAccessNodeKind<'_>> {
+        match self {
+            BoundNodeKind::FieldAccess(it) => Some(it),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BoundFunctionDeclarationNodeKind<'a> {
     pub index: usize,
