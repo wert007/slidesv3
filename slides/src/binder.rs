@@ -62,8 +62,32 @@ impl AsRef<str> for SmartString<'_> {
     }
 }
 
+#[derive(Clone, Debug)]
+struct FunctionDeclarationBody<'a> {
+    function_name: &'a str,
+    body: SyntaxNode<'a>,
+    parameters: Vec<(&'a str, Type)>,
+    is_main: bool,
+    function_id: u64,
+    function_type: Type,
+    return_type: Type,
+}
+
+#[derive(Clone, Debug)]
+struct StructDeclarationBody<'a> {
+    name: &'a str,
+    id: u64,
+    body: StructBodyNode<'a>,
+}
+
 struct VariableEntry {
     id: u64,
+    type_: Type,
+    is_read_only: bool,
+}
+
+struct StructField<'a> {
+    name: &'a str,
     type_: Type,
     is_read_only: bool,
 }
@@ -161,11 +185,11 @@ impl<'a> BindingState<'a, '_> {
         self.register_type(name, Type::StructReference(id))
     }
 
-    fn register_struct(&mut self, id: u64, fields: Vec<(&'a str, Type, bool)>) -> u64 {
+    fn register_struct(&mut self, id: u64, fields: Vec<StructField<'a>>) -> u64 {
         let struct_type = StructType {
             id,
-            fields: fields.iter().filter(|(_, t, _)| !matches!(t, &Type::Function(_))).map(|(_, t, _)| t.clone()).collect(),
-            functions: fields.iter().filter(|(_, t, _)| matches!(t, &Type::Function(_))).map(|(_, t, _)| t.clone()).collect(),
+            fields: fields.iter().filter(|f| !matches!(&f.type_, &Type::Function(_))).map(|f| f.type_.clone()).collect(),
+            functions: fields.iter().filter(|f| matches!(&f.type_, &Type::Function(_))).map(|f| f.type_.clone()).collect(),
         };
         self.type_table.get_mut(&id).unwrap().type_ = Type::Struct(Box::new(struct_type));
         let name = if let SmartString::Reference(it) = self.type_table[&id].identifier {
@@ -178,13 +202,13 @@ impl<'a> BindingState<'a, '_> {
             name,
             fields: fields
                 .into_iter()
-                .map(|(name, type_, is_read_only)| {
-                    offset += type_.size_in_bytes();
+                .map(|field| {
+                    offset += field.type_.size_in_bytes();
                     BoundField {
-                        name,
-                        offset: offset - type_.size_in_bytes(),
-                        type_,
-                        is_read_only,
+                        name: field.name,
+                        offset: offset - field.type_.size_in_bytes(),
+                        type_: field.type_,
+                        is_read_only: field.is_read_only,
                     }
                 })
                 .collect(),
@@ -490,24 +514,6 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
     }
 }
 
-#[derive(Clone, Debug)]
-struct FunctionDeclarationBody<'a> {
-    function_name: &'a str,
-    body: SyntaxNode<'a>,
-    parameters: Vec<(&'a str, Type)>,
-    is_main: bool,
-    function_id: u64,
-    function_type: Type,
-    return_type: Type,
-}
-
-#[derive(Clone, Debug)]
-struct StructDeclarationBody<'a> {
-    name: &'a str,
-    id: u64,
-    body: StructBodyNode<'a>,
-}
-
 fn bind_function_declaration<'a, 'b>(
     function_declaration: FunctionDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
@@ -541,7 +547,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     struct_name: &'a str,
     function_declaration: FunctionDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> (&'a str, Type, bool) {
+) -> StructField<'a> {
     let struct_type = binder.look_up_type_by_name(struct_name).unwrap();
     let (function_type, mut variables) = bind_function_type(Some(struct_type.clone()), function_declaration.function_type, binder);
     variables.push(("this", struct_type));
@@ -567,7 +573,11 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         function_type: type_.clone(),
         return_type: function_type.return_type,
     });
-    (function_declaration.identifier.lexeme, type_, true)
+    StructField {
+        name: function_declaration.identifier.lexeme,
+        type_,
+        is_read_only: true,
+    }
 }
 
 fn bind_struct_declaration<'a, 'b>(
@@ -618,24 +628,28 @@ fn bind_struct_body<'a>(
     struct_name: &'a str,
     struct_body: StructBodyNode<'a>,
     binder: &mut BindingState<'a, '_>,
-) -> Vec<(&'a str, Type, bool)> {
+) -> Vec<StructField<'a>> {
     let mut result = vec![];
     for statement in struct_body.statements {
         let span = statement.span;
-        let (name, type_, is_read_only) = match statement.kind {
+        let field = match statement.kind {
             SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
                 bind_function_declaration_for_struct(struct_name, *function_declaration, binder)
             }
             SyntaxNodeKind::StructField(struct_field) => {
-                let field = bind_parameter(struct_field.field, binder);
-                (field.0, field.1, false)
+                let (name, type_) = bind_parameter(struct_field.field, binder);
+                StructField {
+                    name,
+                    type_,
+                    is_read_only: false,
+                }
             },
             unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
         };
-        if result.iter().find(|(n, _, _)| n == &name).is_some() {
-            binder.diagnostic_bag.report_parameter_already_declared(span, name);
+        if result.iter().find(|f: &&StructField| f.name == field.name).is_some() {
+            binder.diagnostic_bag.report_parameter_already_declared(span, field.name);
         }
-        result.push((name, type_, is_read_only));
+        result.push(field);
     }
     result
 }
