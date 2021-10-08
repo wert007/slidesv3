@@ -3,7 +3,7 @@ struct Point {
     y: int;
 
     func length_squared() -> int {
-        this = 5;
+        // this = 5;
         return this.x * this.x + this.y * this.y;
     }
 }
@@ -71,9 +71,8 @@ func main() {
     s.resize(7);
     print('Square.area() = ' + s.area());
     print('Square.circumference() = ' + s.circumference());
-    // This doesn't work right now!
-    // let area = s.area;
-    // print(area());
+    let area = s.area;
+    print('area as closure() = ' + area());
 
     // This needs noneable pointers!
     // let impossible = new ListNode(0, new ListNode(1, new ListNode(2, '')));
