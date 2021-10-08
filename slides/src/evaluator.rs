@@ -132,6 +132,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::SysCall => evaluate_sys_call(state, instruction),
         OpCode::FunctionCall => evaluate_function_call(state, instruction),
         OpCode::Return => evaluate_return(state, instruction),
+        OpCode::DecodeClosure => evaluate_decode_closure(state, instruction),
         OpCode::CheckArrayBounds => evaluate_check_array_bounds(state, instruction),
     }
 }
@@ -655,6 +656,39 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         let return_address = state.stack.pop().value;
         state.pc = return_address as _;
     }
+}
+
+fn evaluate_decode_closure(state: &mut EvaluatorState, _: Instruction) {
+    let closure_pointer = state.stack.pop();
+    assert!(closure_pointer.is_pointer);
+    let mut closure_pointer = closure_pointer.value;
+
+    let closure_length_in_bytes = if is_heap_pointer(closure_pointer) {
+        state.heap.read_word(closure_pointer as _)
+    } else {
+        state.stack.read_word(closure_pointer as _)
+    };
+    closure_pointer += WORD_SIZE_IN_BYTES;
+    let end_address = closure_pointer + closure_length_in_bytes;
+
+    let function_pointer = if is_heap_pointer(closure_pointer) {
+        state.heap.read_word(closure_pointer as _)
+    } else {
+        state.stack.read_word(closure_pointer as _)
+    };
+    closure_pointer += WORD_SIZE_IN_BYTES;
+
+    while closure_pointer < end_address {
+        let argument = if is_heap_pointer(closure_pointer) {
+            state.heap.read_word(closure_pointer as _)
+        } else {
+            state.stack.read_word(closure_pointer as _)
+        };
+        state.stack.push(argument);
+        closure_pointer += WORD_SIZE_IN_BYTES;
+    }
+
+    state.stack.push_pointer(function_pointer);
 }
 
 fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruction) {

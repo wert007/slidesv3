@@ -42,6 +42,7 @@ pub enum OpCode {
     SysCall = 63,
     FunctionCall = 64,
     Return = 65,
+    DecodeClosure = 66,
     // Trivia
     CheckArrayBounds = 90,
 }

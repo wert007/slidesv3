@@ -355,6 +355,14 @@ impl Instruction {
         }
     }
 
+    pub const fn decode_closure() -> Self {
+        Self {
+            op_code: OpCode::DecodeClosure,
+            arg: 0,
+            span: None,
+        }
+    }
+
     pub const fn check_array_bounds() -> Self {
         Self {
             op_code: OpCode::CheckArrayBounds,
