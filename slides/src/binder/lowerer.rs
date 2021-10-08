@@ -34,6 +34,7 @@ fn flatten_node<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Vec<Bound
         | BoundNodeKind::ReturnStatement(_)
         | BoundNodeKind::ExpressionStatement(_)
         | BoundNodeKind::FieldAccess(_)
+        | BoundNodeKind::Closure(_)
         | BoundNodeKind::ArrayIndex(_)
         | BoundNodeKind::SystemCall(_)
         | BoundNodeKind::FunctionCall(_)

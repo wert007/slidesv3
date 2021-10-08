@@ -1,9 +1,6 @@
 use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
 
-use super::{
-    operators::{BoundBinaryOperator, BoundUnaryOperator},
-    typing::{StructType, SystemCallKind, Type},
-};
+use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{FunctionKind, StructType, SystemCallKind, Type}};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -204,6 +201,32 @@ impl<'a> BoundNode<'a> {
             }),
             type_,
             byte_width,
+            constant_value: None,
+        }
+    }
+
+    pub fn closure(span: TextSpan, base: BoundNode<'a>, id: u64, type_: Type) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::Closure(BoundClosureNodeKind {
+                base: Box::new(base),
+                function: FunctionKind::FunctionId(id),
+            }),
+            type_,
+            byte_width: 4,
+            constant_value: None,
+        }
+    }
+
+    pub fn system_call_closure(span: TextSpan, base: BoundNode<'a>, system_call_kind: SystemCallKind, type_: Type) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::Closure(BoundClosureNodeKind {
+                base: Box::new(base),
+                function: FunctionKind::SystemCall(system_call_kind),
+            }),
+            type_,
+            byte_width: 4,
             constant_value: None,
         }
     }
@@ -498,6 +521,7 @@ pub enum BoundNodeKind<'a> {
     SystemCall(BoundSystemCallNodeKind<'a>),
     ArrayIndex(BoundArrayIndexNodeKind<'a>),
     FieldAccess(BoundFieldAccessNodeKind<'a>),
+    Closure(BoundClosureNodeKind<'a>),
 
     // Statements
     BlockStatement(BoundBlockStatementNodeKind<'a>),
@@ -507,15 +531,6 @@ pub enum BoundNodeKind<'a> {
     Assignment(BoundAssignmentNodeKind<'a>),
     ExpressionStatement(BoundExpressionStatementNodeKind<'a>),
     ReturnStatement(BoundReturnStatementNodeKind<'a>),
-}
-
-impl BoundNodeKind<'_> {
-    pub fn as_field_access(&self) -> Option<&BoundFieldAccessNodeKind<'_>> {
-        match self {
-            BoundNodeKind::FieldAccess(it) => Some(it),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -586,6 +601,18 @@ pub struct BoundFieldAccessNodeKind<'a> {
     pub base: Box<BoundNode<'a>>,
     pub offset: u64,
     pub type_: Type,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundClosureNodeKind<'a> {
+    pub base: Box<BoundNode<'a>>,
+    pub function: FunctionKind,
+}
+
+impl<'a> BoundClosureNodeKind<'a> {
+    pub fn arguments(&self) -> Vec<BoundNode<'a>> {
+        vec![*self.base.clone()]
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -8,7 +8,11 @@ pub mod control_flow_analyzer;
 mod lowerer;
 
 use crate::{
-    binder::{operators::BoundUnaryOperator, typing::Type},
+    binder::{
+        bound_nodes::BoundNodeKind,
+        operators::BoundUnaryOperator,
+        typing::{ClosureType, Type},
+    },
     diagnostics::DiagnosticBag,
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
     parser::{
@@ -953,6 +957,7 @@ fn bind_unary_operator<'a, 'b>(
         | Type::Any
         | Type::SystemCall(_)
         | Type::Function(_)
+        | Type::Closure(_)
         | Type::Struct(_)
         | Type::StructReference(_)
         | Type::Boolean
@@ -993,6 +998,7 @@ fn function_type(type_: &Type) -> FunctionType {
             system_call_kind: type_.as_system_call(),
         },
         Type::Function(result) => *result.clone(),
+        Type::Closure(closure) => closure.base_function_type.clone(),
         Type::Error => FunctionType::error(),
         _ => unimplemented!("Not implemented for {}", type_),
     }
@@ -1005,29 +1011,58 @@ fn bind_function_call<'a, 'b>(
 ) -> BoundNode<'a> {
     let argument_span = function_call.argument_span();
     let function = bind_node(*function_call.base, binder);
+    let mut arguments = vec![];
+    let function = if let BoundNodeKind::Closure(closure) = function.kind {
+        arguments.append(&mut closure.arguments());
+        match closure.function {
+            typing::FunctionKind::FunctionId(id) => {
+                BoundNode::variable(function.span, id, function.type_)
+            }
+            typing::FunctionKind::SystemCall(kind) => {
+                BoundNode::literal_from_value(Value::SystemCall(kind))
+            }
+        }
+    } else {
+        function
+    };
     let function_type = function_type(&function.type_);
-    let arguments = bind_arguments_for_function(
+    arguments.append(&mut bind_arguments_for_function(
         argument_span,
         function_call.arguments,
         &function_type,
         binder,
-    );
-    if let Type::SystemCall(system_call) = function.type_ {
-        if system_call == SystemCallKind::ArrayLength {
-            let mut argument = function.clone();
-            // TODO: This only works if the function is directly called.
-            //
-            //      let len = [1, 2, 3,].length; len();
-            //
-            // This would not work.
-            let field_access = function.kind.as_field_access().unwrap();
-            argument.type_ = field_access.base.type_.clone();
-            BoundNode::system_call(span, system_call, vec![ argument ], function_type.return_type)
-        } else {
+    ));
+    match &function.type_ {
+        Type::Error => BoundNode::error(span),
+        &Type::SystemCall(system_call) => {
             BoundNode::system_call(span, system_call, arguments, function_type.return_type)
         }
-    } else {
-        BoundNode::function_call(span, function, arguments, function_type.this_type.is_some(), function_type.return_type)
+        Type::Function(_) => {
+            BoundNode::function_call(
+                span,
+                function,
+                arguments,
+                function_type.this_type.is_some(),
+                function_type.return_type,
+            )
+        }
+        Type::Closure(closure) => {
+            if let Some(system_call) = closure.base_function_type.system_call_kind {
+                if system_call == SystemCallKind::ArrayLength {
+                    arguments.push(function);
+                }
+                BoundNode::system_call(span, system_call, arguments, function_type.return_type)
+            } else {
+                BoundNode::function_call(
+                    span,
+                    function,
+                    arguments,
+                    function_type.this_type.is_some(),
+                    function_type.return_type,
+                )
+            }
+        },
+        _ => unreachable!(),
     }
 }
 
@@ -1145,7 +1180,12 @@ fn bind_field_access<'a, 'b>(
                 BoundNode::error(span)
             }
         }
-        Type::Void | Type::Integer | Type::Boolean | Type::Function(_) | Type::SystemCall(_) => {
+        Type::Void
+        | Type::Integer
+        | Type::Boolean
+        | Type::Function(_)
+        | Type::Closure(_)
+        | Type::SystemCall(_) => {
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base_span, &base.type_);
@@ -1153,11 +1193,14 @@ fn bind_field_access<'a, 'b>(
         }
         Type::Array(_) | Type::String => {
             if field_access.field.lexeme == "length" {
-                BoundNode::field_access(
+                let function_type = FunctionType::system_call(SystemCallKind::ArrayLength);
+                BoundNode::system_call_closure(
                     span,
                     base,
-                    0,
-                    Type::SystemCall(SystemCallKind::ArrayLength),
+                    SystemCallKind::ArrayLength,
+                    Type::Closure(Box::new(ClosureType {
+                        base_function_type: function_type,
+                    })),
                 )
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(
@@ -1180,7 +1223,12 @@ fn bind_field_access_for_assignment<'a>(
     match &base.type_ {
         Type::Error => base,
         Type::Any => todo!(),
-        Type::Void | Type::Integer | Type::Boolean | Type::SystemCall(_) | Type::Function(_) => {
+        Type::Void
+        | Type::Integer
+        | Type::Boolean
+        | Type::SystemCall(_)
+        | Type::Function(_)
+        | Type::Closure(_) => {
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base.span, &base.type_);
