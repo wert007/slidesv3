@@ -138,17 +138,16 @@ impl<'a> BindingState<'a, '_> {
         self.max_used_variables = self.max_used_variables.max(index as usize + 1);
         let variable_already_registered = self
             .variable_table
-            .iter().any(|variable| variable.identifier.as_ref() == name);
+            .iter()
+            .any(|variable| variable.identifier.as_ref() == name);
         if variable_already_registered {
             None
         } else {
-            self.variable_table.push(
-                BoundVariableName {
-                    identifier: name.into(),
-                    type_,
-                    is_read_only,
-                },
-            );
+            self.variable_table.push(BoundVariableName {
+                identifier: name.into(),
+                type_,
+                is_read_only,
+            });
             Some(index)
         }
     }
@@ -168,13 +167,11 @@ impl<'a> BindingState<'a, '_> {
         if variable_already_registered {
             None
         } else {
-            self.variable_table.push(
-                BoundVariableName {
-                    identifier: name.into(),
-                    type_,
-                    is_read_only,
-                },
-            );
+            self.variable_table.push(BoundVariableName {
+                identifier: name.into(),
+                type_,
+                is_read_only,
+            });
             Some(index)
         }
     }
@@ -187,8 +184,16 @@ impl<'a> BindingState<'a, '_> {
     fn register_struct(&mut self, id: u64, fields: Vec<StructField<'a>>) -> u64 {
         let struct_type = StructType {
             id,
-            fields: fields.iter().filter(|f| !matches!(&f.type_, &Type::Function(_))).map(|f| f.type_.clone()).collect(),
-            functions: fields.iter().filter(|f| matches!(&f.type_, &Type::Function(_))).map(|f| f.type_.clone()).collect(),
+            fields: fields
+                .iter()
+                .filter(|f| !matches!(&f.type_, &Type::Function(_)))
+                .map(|f| f.type_.clone())
+                .collect(),
+            functions: fields
+                .iter()
+                .filter(|f| matches!(&f.type_, &Type::Function(_)))
+                .map(|f| f.type_.clone())
+                .collect(),
         };
         self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
         let name = if let SmartString::Reference(it) = self.type_table[id as usize].identifier {
@@ -225,13 +230,11 @@ impl<'a> BindingState<'a, '_> {
         if type_name_already_registered {
             None
         } else {
-            self.type_table.push(
-                BoundVariableName {
-                    identifier: name.into(),
-                    type_,
-                    is_read_only: true,
-                },
-            );
+            self.type_table.push(BoundVariableName {
+                identifier: name.into(),
+                type_,
+                is_read_only: true,
+            });
             Some(index)
         }
     }
@@ -510,7 +513,8 @@ fn bind_function_declaration<'a, 'b>(
     function_declaration: FunctionDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) {
-    let (function_type, variables) = bind_function_type(None, function_declaration.function_type, binder);
+    let (function_type, variables) =
+        bind_function_type(None, function_declaration.function_type, binder);
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
     let function_id = if let Some(it) =
@@ -541,9 +545,16 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> StructField<'a> {
     let struct_type = binder.look_up_type_by_name(struct_name).unwrap();
-    let (function_type, mut variables) = bind_function_type(Some(struct_type.clone()), function_declaration.function_type, binder);
+    let (function_type, mut variables) = bind_function_type(
+        Some(struct_type.clone()),
+        function_declaration.function_type,
+        binder,
+    );
     variables.push(("this", struct_type));
-    let function_name = format!("{}::{}", struct_name, function_declaration.identifier.lexeme);
+    let function_name = format!(
+        "{}::{}",
+        struct_name, function_declaration.identifier.lexeme
+    );
     let type_ = Type::Function(Box::new(function_type.clone()));
     let function_id = if let Some(it) =
         binder.register_generated_variable(function_name.clone(), type_.clone(), true)
@@ -583,7 +594,10 @@ fn bind_struct_declaration<'a, 'b>(
             body: *struct_declaration.body,
         });
     } else {
-        binder.diagnostic_bag.report_cannot_declare_struct(struct_declaration.identifier.span(), struct_declaration.identifier.lexeme);
+        binder.diagnostic_bag.report_cannot_declare_struct(
+            struct_declaration.identifier.span(),
+            struct_declaration.identifier.lexeme,
+        );
     }
 }
 
@@ -635,11 +649,17 @@ fn bind_struct_body<'a>(
                     type_,
                     is_read_only: false,
                 }
-            },
+            }
             unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
         };
-        if result.iter().find(|f: &&StructField| f.name == field.name).is_some() {
-            binder.diagnostic_bag.report_parameter_already_declared(span, field.name);
+        if result
+            .iter()
+            .find(|f: &&StructField| f.name == field.name)
+            .is_some()
+        {
+            binder
+                .diagnostic_bag
+                .report_parameter_already_declared(span, field.name);
         }
         result.push(field);
     }
