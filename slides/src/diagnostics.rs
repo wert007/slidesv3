@@ -110,6 +110,7 @@ impl<'a> DiagnosticBag<'a> {
         match type_ {
             Type::Struct(struct_type) => self.registered_types[struct_type.id as usize].clone(),
             &Type::StructReference(id) => self.registered_types[id as usize].clone(),
+            Type::Array(base_type) => format!("{}[]", self.type_to_name(base_type)),
             _ => type_.to_string(),
         }
     }
