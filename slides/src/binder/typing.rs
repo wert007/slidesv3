@@ -28,6 +28,10 @@ impl Type {
         Self::Array(Box::new(base_type))
     }
 
+    pub fn closure(base_function_type: FunctionType) -> Self {
+        Self::Closure(Box::new(base_function_type.into()))
+    }
+
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         match (self, other) {
             _ if self == other => true,
@@ -256,6 +260,15 @@ impl FunctionType {
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ClosureType {
     pub base_function_type: FunctionType,
+}
+
+impl From<FunctionType> for ClosureType {
+    fn from(mut it: FunctionType) -> Self {
+        it.this_type = None;
+        Self {
+            base_function_type: it,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]

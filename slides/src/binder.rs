@@ -11,7 +11,7 @@ use crate::{
     binder::{
         bound_nodes::BoundNodeKind,
         operators::BoundUnaryOperator,
-        typing::{ClosureType, Type},
+        typing::Type,
     },
     diagnostics::DiagnosticBag,
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
@@ -1172,9 +1172,7 @@ fn bind_field_access<'a, 'b>(
                         span,
                         base,
                         function_id.id,
-                        Type::Closure(Box::new(ClosureType {
-                            base_function_type: *function_type.clone(),
-                        })),
+                        Type::closure(*function_type.clone()),
                     )
                 } else {
                     BoundNode::field_access(span, base, field.offset, field.type_.clone())
@@ -1208,9 +1206,7 @@ fn bind_field_access<'a, 'b>(
                         span,
                         base,
                         function_id.id,
-                        Type::Closure(Box::new(ClosureType {
-                            base_function_type: *function_type.clone(),
-                        })),
+                        Type::closure(*function_type.clone()),
                     )
                 } else {
                     BoundNode::field_access(span, base, field.offset, field.type_.clone())
@@ -1242,9 +1238,7 @@ fn bind_field_access<'a, 'b>(
                     span,
                     base,
                     SystemCallKind::ArrayLength,
-                    Type::Closure(Box::new(ClosureType {
-                        base_function_type: function_type,
-                    })),
+                    Type::closure(function_type),
                 )
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(
