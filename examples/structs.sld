@@ -14,12 +14,6 @@ struct Rect {
 
 struct Cube {
     sides: Rect[];
-    // top: Rect;
-    // bottom: Rect;
-    // north: Rect;
-    // east: Rect;
-    // south: Rect;
-    // west: Rect;
 }
 
 struct Bar {
@@ -48,8 +42,6 @@ struct Square {
 
     func resize(side: int) {
         this.side = side;
-        // TODO: make this an error:
-        this = new Square(side);
     }
 }
 
@@ -72,6 +64,9 @@ func main() {
     print('Square.circumference() = ' + s.circumference());
     let area = s.area;
     print('area as closure() = ' + area());
+
+    let this = 'Should this be a keyword??';
+    this = 'Idk';
 
     // This needs noneable pointers!
     // let impossible = new ListNode(0, new ListNode(1, new ListNode(2, '')));

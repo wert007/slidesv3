@@ -73,6 +73,7 @@ struct FunctionDeclarationBody<'a> {
     function_id: u64,
     function_type: Type,
     return_type: Type,
+    is_struct_function: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -130,6 +131,7 @@ struct BindingState<'a, 'b> {
     print_variable_table: bool,
     max_used_variables: usize,
     function_return_type: Type,
+    is_struct_function: bool,
 }
 
 impl<'a> BindingState<'a, '_> {
@@ -261,6 +263,10 @@ impl<'a> BindingState<'a, '_> {
             })
     }
 
+    fn get_variable_name_by_id(&self, id: u64) -> Option<&str> {
+        self.variable_table.get(id as usize).map(|v|v.identifier.as_ref())
+    }
+
     fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
         self.type_table
             .iter()
@@ -371,6 +377,7 @@ pub fn bind<'a>(
         print_variable_table: debug_flags.print_variable_table(),
         max_used_variables: 0,
         function_return_type: Type::Error,
+        is_struct_function: false,
     };
     let span = node.span();
     let mut statements = default_statements(&mut binder);
@@ -398,6 +405,7 @@ pub fn bind<'a>(
             }
         }
         binder.function_return_type = node.return_type;
+        binder.is_struct_function = node.is_struct_function;
         let mut body = bind_node(node.body, &mut binder);
         if matches!(&binder.function_return_type, Type::Void) {
             body = BoundNode::block_statement(
@@ -539,6 +547,7 @@ fn bind_function_declaration<'a, 'b>(
         function_id,
         function_type: type_,
         return_type: function_type.return_type,
+        is_struct_function: false,
     });
 }
 
@@ -578,6 +587,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         function_id,
         function_type: type_.clone(),
         return_type: function_type.return_type,
+        is_struct_function: true,
     });
     StructField {
         name: function_declaration.identifier.lexeme,
@@ -1549,6 +1559,12 @@ fn bind_assignment<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let lhs = bind_node_for_assignment(*assignment.lhs, binder);
+    if let BoundNodeKind::VariableExpression(variable) = &lhs.kind {
+        let name = binder.get_variable_name_by_id(variable.variable_index);
+        if name == Some("this") && binder.is_struct_function {
+            binder.diagnostic_bag.report_cannot_assign_to(lhs.span);
+        }
+    }
     let expression = bind_node(*assignment.expression, binder);
     if !expression.type_.can_be_converted_to(&lhs.type_) {
         binder
