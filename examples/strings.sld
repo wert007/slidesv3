@@ -34,7 +34,6 @@ func main() {
     let len = h.length();
     print('Len was ' + len);
 
-// TODO: This has the wrong result
-    // let len_fn = 'This is interesting'.length;
-    // print(len_fn());
+    let len_fn = 'This is interesting'.length;
+    print(len_fn());
 }
