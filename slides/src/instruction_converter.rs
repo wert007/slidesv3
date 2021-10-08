@@ -303,6 +303,7 @@ fn convert_array_literal(
         Type::Any => todo!(),
         Type::Struct(_) | Type::StructReference(_) => todo!(),
         Type::Function(_)
+        | Type::Closure(_)
         | Type::Array(_)
         | Type::String
         | Type::Integer

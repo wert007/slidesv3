@@ -41,6 +41,7 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         }
         Type::SystemCall(kind) => format!("system call {}", kind),
         Type::Function(kind) => format!("fn {}", kind),
+        Type::Closure(closure) => format!("fn {}", closure.base_function_type),
         Type::Array(base_type) => array_to_string_native(*base_type, argument, state),
         Type::String => string_to_string_native(argument, state),
     }
@@ -98,6 +99,11 @@ fn array_to_string_native(
         Type::Function(kind) => {
             for _ in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
                 result.push_str(&format!("fn {}, ", kind));
+            }
+        }
+        Type::Closure(closure) => {
+            for _ in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
+                result.push_str(&format!("fn {}, ", closure.base_function_type));
             }
         }
         Type::Array(base_type) => {

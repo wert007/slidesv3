@@ -18,6 +18,7 @@ pub enum Type {
     Array(Box<Type>),
     String,
     Function(Box<FunctionType>),
+    Closure(Box<ClosureType>),
     Struct(Box<StructType>),
     StructReference(u64),
 }
@@ -72,7 +73,7 @@ impl Type {
             Type::Boolean => 8,
             Type::String => 10,
             Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 16,
-            Type::StructReference(_) | Type::Struct(_) | Type::Function(_) => {
+            Type::StructReference(_) | Type::Struct(_) | Type::Function(_) | Type::Closure(_) => {
                 eprintln!("Unimplented type_identifer for functions or structs expected..");
                 u64::MAX
             }
@@ -115,6 +116,7 @@ impl Type {
             Type::Struct(_)
             | Type::StructReference(_)
             | Type::Function(_)
+            | Type::Closure(_)
             | Type::Integer
             | Type::Boolean
             | Type::SystemCall(_)
@@ -134,6 +136,7 @@ impl Type {
             Type::SystemCall(_) |
             Type::Array(_) |
             Type::Function(_) |
+            Type::Closure(_) |
             Type::Struct(_) |
             Type::StructReference(_) => WORD_SIZE_IN_BYTES,
         }
@@ -153,6 +156,9 @@ impl std::fmt::Display for Type {
             Type::String => write!(f, "string"),
             Type::Function(function_type) => {
                 write!(f, "fn {}", function_type)
+            }
+            Type::Closure(closure) => {
+                write!(f, "closure {}", closure.base_function_type)
             }
             Type::Struct(struct_type) => {
                 write!(f, "struct {}", struct_type)
@@ -222,6 +228,34 @@ impl FunctionType {
             system_call_kind: None,
         }
     }
+
+    pub fn system_call(system_call_kind: SystemCallKind) -> Self {
+        match system_call_kind {
+            SystemCallKind::Print => Self {
+                parameter_types: vec![ Type::Any ],
+                this_type: None,
+                return_type: Type::Void,
+                system_call_kind: Some(system_call_kind),
+            },
+            SystemCallKind::ToString => Self {
+                parameter_types: vec![ Type::Any ],
+                this_type: None,
+                return_type: Type::String,
+                system_call_kind: Some(system_call_kind),
+            },
+            SystemCallKind::ArrayLength => Self {
+                parameter_types: vec![],
+                this_type: Some(Type::Any),
+                return_type: Type::Integer,
+                system_call_kind: Some(system_call_kind),
+            },
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct ClosureType {
+    pub base_function_type: FunctionType,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -249,5 +283,20 @@ impl std::fmt::Display for StructType {
             writeln!(f, "field{}: {};", index, field_type)?;
         }
         write!(f, "}}")
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum FunctionKind {
+    FunctionId(u64),
+    SystemCall(SystemCallKind),
+}
+
+impl std::fmt::Display for FunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FunctionKind::FunctionId(id) => write!(f, "fn#{}", id),
+            FunctionKind::SystemCall(kind) => write!(f, "{}", kind),
+        }
     }
 }
