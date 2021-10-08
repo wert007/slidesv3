@@ -36,6 +36,7 @@ impl Type {
         match (self, other) {
             _ if self == other => true,
             (_, Type::Any) => true,
+            (Type::Array(base_type), Type::Array(other)) => base_type.can_be_converted_to(other),
             (Type::Struct(id), Type::StructReference(other_id)) if id.id == *other_id => true,
             (Type::StructReference(id), Type::Struct(other)) if *id == other.id => true,
             _ => false,
