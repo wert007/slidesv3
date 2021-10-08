@@ -73,6 +73,9 @@ pub fn evaluate(
         if debug_flags.print_current_instruction() {
             println!("  CI {}: {:?}", pc, instructions[pc]);
         }
+        if debug_flags.slow_mode {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
         execute_instruction(&mut state, instructions[pc]);
         state.pc += 1;
     }

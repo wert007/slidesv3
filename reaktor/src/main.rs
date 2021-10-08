@@ -18,6 +18,7 @@ fn main() -> Result<(), std::io::Error> {
         print_labels: args.contains(&String::from("-dlabels")),
         output_basic_blocks_to_dot: args.contains(&String::from("-dbb")),
         run_program: !args.contains(&String::from("-no-run")),
+        slow_mode: args.contains(&String::from("-slow")),
     };
     if args.len() == 1 || args[1].starts_with('-') {
         repl(debug_flags)

@@ -18,6 +18,7 @@ pub struct DebugFlags {
     pub print_labels: bool,
     pub output_basic_blocks_to_dot: bool,
     pub run_program: bool,
+    pub slow_mode: bool,
 }
 
 impl DebugFlags {
