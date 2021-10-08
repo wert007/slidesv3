@@ -9,14 +9,15 @@ use crate::{
         self,
         bound_nodes::{
             BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
-            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundConstructorCallNodeKind,
-            BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind,
-            BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
-            BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
-            BoundVariableDeclarationNodeKind, BoundVariableNodeKind,
+            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
+            BoundConstructorCallNodeKind, BoundExpressionStatementNodeKind,
+            BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind,
+            BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind,
+            BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind,
+            BoundVariableNodeKind,
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
-        typing::{SystemCallKind, Type},
+        typing::{FunctionKind, SystemCallKind, Type},
     },
     debug::DebugFlags,
     diagnostics::DiagnosticBag,
@@ -171,6 +172,7 @@ fn convert_node(
         BoundNodeKind::FieldAccess(field_access) => {
             convert_field_access(node.span, field_access, converter)
         }
+        BoundNodeKind::Closure(closure) => convert_closure(node.span, closure, converter),
         BoundNodeKind::BlockStatement(block_statement) => {
             convert_block_statement(node.span, block_statement, converter)
         }
@@ -467,11 +469,20 @@ fn convert_function_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let argument_count = function_call.arguments.len() + if function_call.has_this_argument { 1 } else { 0 };
+    let argument_count = function_call.arguments.len()
+        + if function_call.has_this_argument {
+            1
+        } else {
+            0
+        };
     for argument in function_call.arguments {
         result.append(&mut convert_node(argument, converter));
     }
+    let is_closure = matches!(function_call.base.type_, Type::Closure(_));
     result.append(&mut convert_node(*function_call.base, converter));
+    if is_closure {
+        result.push(Instruction::decode_closure().span(span).into());
+    }
     result.push(Instruction::function_call(argument_count).span(span).into());
     result
 }
@@ -510,24 +521,54 @@ fn convert_system_call(
     system_call: BoundSystemCallNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let mut result = vec![];
-    let argument_count = match system_call.base {
+    match system_call.base {
         SystemCallKind::Print |
-        SystemCallKind::ToString |
-        SystemCallKind::ArrayLength => 1,
-    };
+        SystemCallKind::ToString => {
+            let mut result = vec![];
+            let argument_count = match system_call.base {
+                SystemCallKind::Print | SystemCallKind::ToString | SystemCallKind::ArrayLength => 1,
+            };
 
-    for argument in system_call.arguments {
-        let type_identifier = argument.type_.type_identifier();
-        result.append(&mut convert_node(argument, converter));
-        result.push(
-            Instruction::type_identifier(type_identifier)
-                .span(span)
-                .into(),
-        );
+            for argument in system_call.arguments {
+                let type_identifier = argument.type_.type_identifier();
+                result.append(&mut convert_node(argument, converter));
+                result.push(
+                    Instruction::type_identifier(type_identifier)
+                        .span(span)
+                        .into(),
+                );
+            }
+            result.push(
+                Instruction::system_call(system_call.base, argument_count)
+                    .span(span)
+                    .into(),
+            );
+            result
+        },
+        SystemCallKind::ArrayLength => {
+            convert_array_length_system_call(span, system_call, converter)
+        }
     }
+}
+
+fn convert_array_length_system_call(
+    span: TextSpan,
+    mut system_call: BoundSystemCallNodeKind,
+    converter: &mut InstructionConverter,
+) -> Vec<InstructionOrLabelReference> {
+    let mut result = vec![];
+    let base = system_call.arguments.pop().unwrap();
+    let is_closure = matches!(base.type_, Type::Closure(_));
+    let type_identifier = base.type_.type_identifier();
+    result.append(&mut convert_node(base, converter));
+    if is_closure {
+        result.push(Instruction::decode_closure().span(span).into());
+    } else {
+        result.push(Instruction::type_identifier(type_identifier).span(span).into());
+    }
+
     result.push(
-        Instruction::system_call(system_call.base, argument_count)
+        Instruction::system_call(system_call.base, 1)
             .span(span)
             .into(),
     );
@@ -554,8 +595,12 @@ fn convert_field_access(
     match field_access.type_ {
         Type::SystemCall(_) => {}
         Type::Function(_) => {
-            result.push(Instruction::load_register(field_access.offset).span(span).into());
-        },
+            result.push(
+                Instruction::load_register(field_access.offset)
+                    .span(span)
+                    .into(),
+            );
+        }
         _ => {
             result.push(
                 Instruction::read_word_with_offset(field_access.offset)
@@ -564,6 +609,53 @@ fn convert_field_access(
             );
         }
     }
+    result
+}
+
+fn convert_closure(
+    span: TextSpan,
+    closure: BoundClosureNodeKind,
+    converter: &mut InstructionConverter,
+) -> Vec<InstructionOrLabelReference> {
+    let mut result = vec![];
+    let arguments = closure.arguments();
+    let is_system_call = matches!(closure.function, FunctionKind::SystemCall(_));
+    let size_in_words = if is_system_call { arguments.len() * 2 } else { 1 + arguments.len() } as u64 ;
+    let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
+    let pointer = allocate(&mut converter.stack, size_in_bytes + WORD_SIZE_IN_BYTES);
+    let mut writing_pointer = pointer as u64;
+    converter
+        .stack
+        .write_word(writing_pointer as _, size_in_bytes);
+    writing_pointer += WORD_SIZE_IN_BYTES;
+    match closure.function {
+        FunctionKind::FunctionId(id) => {
+            result.push(Instruction::load_register(id).span(span).into());
+            result.push(
+                Instruction::write_to_stack(writing_pointer)
+                    .span(span)
+                    .into(),
+            );
+            writing_pointer += WORD_SIZE_IN_BYTES;
+        }
+        FunctionKind::SystemCall(_) => {}
+    }
+
+    for argument in arguments {
+        if is_system_call {
+            let type_identifier = argument.type_.type_identifier();
+            converter.stack.write_word(writing_pointer as _, type_identifier);
+            writing_pointer += WORD_SIZE_IN_BYTES;
+        }
+        result.append(&mut convert_node(argument, converter));
+        result.push(
+            Instruction::write_to_stack(writing_pointer)
+                .span(span)
+                .into(),
+        );
+        writing_pointer += WORD_SIZE_IN_BYTES;
+    }
+    result.push(Instruction::load_pointer(pointer as _).span(span).into());
     result
 }
 
