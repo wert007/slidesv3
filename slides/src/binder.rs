@@ -1032,11 +1032,17 @@ fn bind_function_call<'a, 'b>(
     let argument_span = function_call.argument_span();
     let function = bind_node(*function_call.base, binder);
     let mut arguments = vec![];
+    let mut more_arguments = vec![];
     let function = if let BoundNodeKind::Closure(closure) = function.kind {
-        arguments.append(&mut closure.arguments());
+        more_arguments.append(&mut closure.arguments());
         match closure.function {
             typing::FunctionKind::FunctionId(id) => {
-                BoundNode::variable(function.span, id, function.type_)
+                let type_ = if let Type::Closure(closure_type) = function.type_ {
+                    Type::Function(Box::new(closure_type.base_function_type))
+                } else {
+                    unreachable!("There is a closure, which is not of type closure???");
+                };
+                BoundNode::variable(function.span, id, type_)
             }
             typing::FunctionKind::SystemCall(kind) => {
                 BoundNode::literal_from_value(Value::SystemCall(kind))
@@ -1052,6 +1058,7 @@ fn bind_function_call<'a, 'b>(
         &function_type,
         binder,
     ));
+    arguments.append(&mut more_arguments);
     match &function.type_ {
         Type::Error => BoundNode::error(span),
         &Type::SystemCall(system_call) => {
