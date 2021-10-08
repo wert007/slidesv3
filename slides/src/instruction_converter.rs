@@ -303,7 +303,7 @@ fn convert_array_literal(
     match &array_literal.children[0].type_ {
         Type::Error | Type::Void => unreachable!(),
         Type::Any => todo!(),
-        Type::Struct(_) | Type::StructReference(_) => todo!(),
+        Type::Struct(_) | Type::StructReference(_) |
         Type::Function(_)
         | Type::Closure(_)
         | Type::Array(_)
