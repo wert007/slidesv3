@@ -37,6 +37,7 @@ impl std::fmt::Display for Diagnostic<'_> {
 pub struct DiagnosticBag<'a> {
     pub diagnostics: Vec<Diagnostic<'a>>,
     pub source_text: &'a SourceText<'a>,
+    pub registered_types: Vec<String>,
 }
 
 impl<'a> DiagnosticBag<'a> {
@@ -44,6 +45,7 @@ impl<'a> DiagnosticBag<'a> {
         Self {
             diagnostics: vec![],
             source_text,
+            registered_types: vec![],
         }
     }
 
@@ -98,8 +100,18 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_cannot_convert(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
+        let from_type = self.type_to_name(from_type);
+        let to_type = self.type_to_name(to_type);
         let message = format!("Cannot convert type {} to type {}.", from_type, to_type);
         self.report(message, span)
+    }
+
+    fn type_to_name(&mut self, type_: &Type) -> String {
+        match type_ {
+            Type::Struct(struct_type) => self.registered_types[struct_type.id as usize].clone(),
+            &Type::StructReference(id) => self.registered_types[id as usize].clone(),
+            _ => type_.to_string(),
+        }
     }
 
     pub fn report_invalid_void_expression(&mut self, span: TextSpan) {
@@ -108,6 +120,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_no_unary_operator(&mut self, span: TextSpan, operator: &str, type_: &Type) {
+        let type_ = self.type_to_name(type_);
         let message = format!("No unary operator {} for type {}.", operator, type_);
         self.report(message, span);
     }
@@ -119,6 +132,8 @@ impl<'a> DiagnosticBag<'a> {
         operator: &str,
         rhs_type: &Type,
     ) {
+        let lhs_type = self.type_to_name(lhs_type);
+        let rhs_type = self.type_to_name(rhs_type);
         let message = format!(
             "No binary operator {} for types {} and {}.",
             operator, lhs_type, rhs_type
@@ -207,6 +222,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_no_fields_on_type(&mut self, span: TextSpan, type_: &Type) {
+        let type_ = self.type_to_name(type_);
         let message = format!("There are no fields on type {}.", type_);
         self.report(message, span);
     }
@@ -217,6 +233,7 @@ impl<'a> DiagnosticBag<'a> {
         field_name: &str,
         type_: &Type,
     ) {
+        let type_ = self.type_to_name(type_);
         let message = format!(
             "There are no fields named '{}' on type {}.",
             field_name, type_
@@ -263,6 +280,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_missing_return_value(&mut self, span: TextSpan, expected_return_type: &Type) {
+        let expected_return_type = self.type_to_name(expected_return_type);
         let message = format!(
             "Function returns type {} and needs a value of type {}.",
             expected_return_type, expected_return_type
@@ -271,6 +289,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_missing_return_statement(&mut self, span: TextSpan, expected_return_type: &Type) {
+        let expected_return_type = self.type_to_name(expected_return_type);
         let message = format!(
             "Not all paths in function return. Every path needs a return value of type {}",
             expected_return_type
@@ -279,6 +298,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_cannot_print_type(&mut self, span: TextSpan, type_: &Type) {
+        let type_ = self.type_to_name(type_);
         let message = format!("Cannot print values of type {}.", type_);
         self.report(message, span);
     }

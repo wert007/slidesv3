@@ -382,6 +382,9 @@ pub fn bind<'a>(
         binder.register_struct(node.id, fields);
     }
 
+    let mut type_names = binder.type_table.iter().map(|b|b.identifier.as_ref().to_owned()).collect();
+    binder.diagnostic_bag.registered_types.append(&mut type_names);
+
     let fixed_variable_count = binder.variable_table.len();
     let mut label_count = binder.functions.len();
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
