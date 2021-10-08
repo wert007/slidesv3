@@ -560,8 +560,9 @@ pub struct TypedU64 {
 }
 
 fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
-    let sys_call_kind = SystemCallKind::try_from_primitive((instruction.arg & 0xFF) as u8).unwrap();
-    let argument_count = (instruction.arg >> 8) as usize;
+    let sys_call_kind = SystemCallKind::try_from_primitive(instruction.arg as u8).unwrap();
+    let argument_count = state.stack.pop().value as usize;
+    let argument_count = argument_count / 2;
     let mut arguments = Vec::with_capacity(argument_count);
     let mut types = Vec::with_capacity(argument_count);
 
@@ -581,7 +582,8 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     }
 }
 
-fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) {
+fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
+    let argument_count = state.stack.pop().value;
     let base = state.stack.pop();
     assert!(base.is_pointer);
     let return_address = if state.is_main_call {
@@ -591,7 +593,7 @@ fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) 
         state.pc
     };
     let mut argument_values = vec![];
-    for _ in 0..instruction.arg {
+    for _ in 0..argument_count {
         argument_values.push(state.stack.pop());
     }
     state.stack.push(return_address as _);
@@ -658,7 +660,7 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
     }
 }
 
-fn evaluate_decode_closure(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction) {
     let closure_pointer = state.stack.pop();
     assert!(closure_pointer.is_pointer);
     let mut closure_pointer = closure_pointer.value;
@@ -668,6 +670,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, _: Instruction) {
     } else {
         state.stack.read_word(closure_pointer as _)
     };
+    let argument_count = bytes_to_word(closure_length_in_bytes) - 1 + instruction.arg;
     closure_pointer += WORD_SIZE_IN_BYTES;
     let end_address = closure_pointer + closure_length_in_bytes;
 
@@ -689,6 +692,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, _: Instruction) {
     }
 
     state.stack.push_pointer(function_pointer);
+    state.stack.push(argument_count);
 }
 
 fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruction) {

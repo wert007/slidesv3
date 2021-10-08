@@ -438,8 +438,9 @@ fn convert_binary(
                 .span(span)
                 .into(),
         );
+        result.push(Instruction::load_immediate(2).span(span).into());
         result.push(
-            Instruction::system_call(SystemCallKind::ToString, 1)
+            Instruction::system_call(SystemCallKind::ToString)
                 .span(span)
                 .into(),
         );
@@ -453,8 +454,9 @@ fn convert_binary(
                 .span(span)
                 .into(),
         );
+        result.push(Instruction::load_immediate(2).span(span).into());
         result.push(
-            Instruction::system_call(SystemCallKind::ToString, 1)
+            Instruction::system_call(SystemCallKind::ToString)
                 .span(span)
                 .into(),
         );
@@ -481,9 +483,11 @@ fn convert_function_call(
     let is_closure = matches!(function_call.base.type_, Type::Closure(_));
     result.append(&mut convert_node(*function_call.base, converter));
     if is_closure {
-        result.push(Instruction::decode_closure().span(span).into());
+        result.push(Instruction::decode_closure(argument_count as _).span(span).into());
+    } else {
+        result.push(Instruction::load_immediate(argument_count as _).span(span).into());
     }
-    result.push(Instruction::function_call(argument_count).span(span).into());
+    result.push(Instruction::function_call().span(span).into());
     result
 }
 
@@ -538,8 +542,9 @@ fn convert_system_call(
                         .into(),
                 );
             }
+            result.push(Instruction::load_immediate(argument_count * 2).span(span).into());
             result.push(
-                Instruction::system_call(system_call.base, argument_count)
+                Instruction::system_call(system_call.base)
                     .span(span)
                     .into(),
             );
@@ -562,13 +567,14 @@ fn convert_array_length_system_call(
     let type_identifier = base.type_.type_identifier();
     result.append(&mut convert_node(base, converter));
     if is_closure {
-        result.push(Instruction::decode_closure().span(span).into());
+        result.push(Instruction::decode_closure(2).span(span).into());
     } else {
         result.push(Instruction::type_identifier(type_identifier).span(span).into());
+        result.push(Instruction::load_immediate(2).span(span).into());
     }
 
     result.push(
-        Instruction::system_call(system_call.base, 1)
+        Instruction::system_call(system_call.base)
             .span(span)
             .into(),
     );

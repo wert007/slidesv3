@@ -315,8 +315,8 @@ impl Instruction {
         }
     }
 
-    pub const fn system_call(call_kind: SystemCallKind, argument_count: usize) -> Self {
-        let arg = (argument_count << 8) as u64 | call_kind as u64;
+    pub const fn system_call(call_kind: SystemCallKind) -> Self {
+        let arg = call_kind as u64;
         Self {
             op_code: OpCode::SysCall,
             arg,
@@ -324,10 +324,10 @@ impl Instruction {
         }
     }
 
-    pub const fn function_call(argument_count: usize) -> Self {
+    pub const fn function_call() -> Self {
         Self {
             op_code: OpCode::FunctionCall,
-            arg: argument_count as _,
+            arg: 0,
             span: None,
         }
     }
@@ -355,10 +355,10 @@ impl Instruction {
         }
     }
 
-    pub const fn decode_closure() -> Self {
+    pub const fn decode_closure(argument_count: u64) -> Self {
         Self {
             op_code: OpCode::DecodeClosure,
-            arg: 0,
+            arg: argument_count,
             span: None,
         }
     }
