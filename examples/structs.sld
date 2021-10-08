@@ -3,7 +3,6 @@ struct Point {
     y: int;
 
     func length_squared() -> int {
-        // this = 5;
         return this.x * this.x + this.y * this.y;
     }
 }
@@ -14,13 +13,13 @@ struct Rect {
 }
 
 struct Cube {
-    // sides: Rect[];
-    top: Rect;
-    bottom: Rect;
-    north: Rect;
-    east: Rect;
-    south: Rect;
-    west: Rect;
+    sides: Rect[];
+    // top: Rect;
+    // bottom: Rect;
+    // north: Rect;
+    // east: Rect;
+    // south: Rect;
+    // west: Rect;
 }
 
 struct Bar {
@@ -57,11 +56,11 @@ struct Square {
 func main() {
     let p = new Point(43, 87);
     let r = new Rect(p, new Point(1200, 3400));
-    let c = new Cube(r, r, r, r, r, r);
+    let c = new Cube([r, r, r, r, r, r]);
     print('Point.x = ' + p.x);
     print('Rect.bottom_right.y = ' + r.bottom_right.y);
     r.bottom_right.x = 99;
-    print('Cube.north.bottom_right.x = ' + c.north.bottom_right.x);
+    print('Cube.sides[0].bottom_right.x = ' + c.sides[0].bottom_right.x);
 
     let b = new Bar(new Foo(2312));
     print('Bar.Foo.a = ' + b.a.a);
