@@ -71,13 +71,13 @@ impl Type {
                 let base_type: u64 = base_type.type_identifier();
                 (base_type << 8) + (array_count << 1) as u64 + 1
             }
-            Type::Error => 0,
-            Type::Any => 2,
-            Type::Void => 4,
-            Type::Integer => 6,
-            Type::Boolean => 8,
-            Type::String => 10,
-            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 16,
+            Type::Error => 0 << 1,
+            Type::Any => 1 << 1,
+            Type::Void => 2 << 1,
+            Type::Integer => 3 << 1,
+            Type::Boolean => 4 << 1,
+            Type::String => 5 << 1,
+            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 8 << 1,
             Type::StructReference(_) | Type::Struct(_) | Type::Function(_) | Type::Closure(_) => {
                 eprintln!("Unimplented type_identifer for functions or structs expected..");
                 u64::MAX
