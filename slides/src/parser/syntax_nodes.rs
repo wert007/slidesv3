@@ -570,13 +570,15 @@ pub struct TypeDeclaration<'a> {
 #[derive(Debug, Clone)]
 pub struct TypeNode<'a> {
     pub identifier: SyntaxToken<'a>,
+    pub optional_question_mark: Option<SyntaxToken<'a>>,
     pub brackets: Vec<SyntaxToken<'a>>,
 }
 
 impl<'a> TypeNode<'a> {
-    pub fn new(identifier: SyntaxToken<'a>, brackets: Vec<SyntaxToken<'a>>) -> Self {
+    pub fn new(identifier: SyntaxToken<'a>, optional_question_mark: Option<SyntaxToken<'a>>, brackets: Vec<SyntaxToken<'a>>) -> Self {
         Self {
             identifier,
+            optional_question_mark,
             brackets,
         }
     }

@@ -168,6 +168,11 @@ fn parse_type<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> TypeNode<'a> {
     let identifier = match_token!(tokens, diagnostic_bag, Identifier);
+    let optional_question_mark = if matches!(&peek_token(tokens).kind, &SyntaxTokenKind::QuestionMark) {
+        Some(next_token(tokens))
+    } else {
+        None
+    };
     let mut brackets = vec![];
     while matches!(&peek_token(tokens).kind, SyntaxTokenKind::LBracket) {
         let token_count = tokens.len();
@@ -179,7 +184,7 @@ fn parse_type<'a>(
         brackets.push(SyntaxToken::bracket_pair(lbracket, rbracket));
     }
 
-    TypeNode::new(identifier, brackets)
+    TypeNode::new(identifier, optional_question_mark, brackets)
 }
 
 fn parse_statement<'a>(

@@ -811,6 +811,7 @@ fn bind_constructor_call<'a>(
     let type_ = bind_type(
         TypeNode {
             identifier: constructor_call.type_name,
+            optional_question_mark: None,
             brackets: vec![],
         },
         binder,
