@@ -7,8 +7,9 @@ func main() {
 
     // // Step 3. None Keyword
     let n : int? = none;
-    // TODO:
     print(n);
+    // TODO:
+    // print(m);
 
     // Step 3.1 ?? Operator
     // let a = n ?? 13;
