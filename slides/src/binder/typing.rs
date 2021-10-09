@@ -16,6 +16,7 @@ pub enum Type {
     Boolean,
     SystemCall(SystemCallKind),
     Array(Box<Type>),
+    Noneable(Box<Type>),
     String,
     Function(Box<FunctionType>),
     Closure(Box<ClosureType>),
@@ -32,10 +33,15 @@ impl Type {
         Self::Closure(Box::new(base_function_type.into()))
     }
 
+    pub fn noneable(base_type: Type) -> Self {
+        Self::Noneable(Box::new(base_type))
+    }
+
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         match (self, other) {
             _ if self == other => true,
             (_, Type::Any) => true,
+            (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
             (Type::Array(base_type), Type::Array(other)) => base_type.can_be_converted_to(other),
             (Type::Struct(id), Type::StructReference(other_id)) if id.id == *other_id => true,
             (Type::StructReference(id), Type::Struct(other)) if *id == other.id => true,
@@ -78,6 +84,7 @@ impl Type {
             Type::Boolean => 4 << 1,
             Type::String => 5 << 1,
             Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 8 << 1,
+            Type::Noneable(_) => todo!(),
             Type::StructReference(_) | Type::Struct(_) | Type::Function(_) | Type::Closure(_) => {
                 eprintln!("Unimplented type_identifer for functions or structs expected..");
                 u64::MAX
@@ -126,6 +133,7 @@ impl Type {
             | Type::Boolean
             | Type::SystemCall(_)
             | Type::Array(_)
+            | Type::Noneable(_)
             | Type::String => WORD_SIZE_IN_BYTES,
         }
     }
@@ -140,6 +148,7 @@ impl Type {
             Type::Boolean |
             Type::SystemCall(_) |
             Type::Array(_) |
+            Type::Noneable(_) |
             Type::Function(_) |
             Type::Closure(_) |
             Type::Struct(_) |
@@ -158,6 +167,7 @@ impl std::fmt::Display for Type {
             Type::Boolean => write!(f, "bool"),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
             Type::Array(base) => write!(f, "{}[]", base),
+            Type::Noneable(base) => write!(f, "{}?", base),
             Type::String => write!(f, "string"),
             Type::Function(function_type) => {
                 write!(f, "fn {}", function_type)

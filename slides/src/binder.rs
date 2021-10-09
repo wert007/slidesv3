@@ -693,6 +693,9 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
             .report_unknown_type(type_.span(), type_name);
         Type::Error
     });
+    if type_.optional_question_mark.is_some() {
+        result = Type::noneable(result);
+    }
     for _ in &type_.brackets {
         result = Type::array(result);
     }
@@ -996,7 +999,8 @@ fn bind_unary_operator<'a, 'b>(
         | Type::StructReference(_)
         | Type::Boolean
         | Type::String
-        | Type::Array(_) => {
+        | Type::Array(_)
+        | Type::Noneable(_) => {
             binder.diagnostic_bag.report_no_unary_operator(
                 span,
                 operator_token.lexeme,
@@ -1246,7 +1250,8 @@ fn bind_field_access<'a, 'b>(
         | Type::Boolean
         | Type::Function(_)
         | Type::Closure(_)
-        | Type::SystemCall(_) => {
+        | Type::SystemCall(_)
+        | Type::Noneable(_) => {
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base_span, &base.type_);
@@ -1286,6 +1291,7 @@ fn bind_field_access_for_assignment<'a>(
         | Type::Integer
         | Type::Boolean
         | Type::SystemCall(_)
+        | Type::Noneable(_)
         | Type::Function(_)
         | Type::Closure(_) => {
             binder
