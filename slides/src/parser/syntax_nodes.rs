@@ -532,8 +532,7 @@ impl<'a> StructBodyNode<'a> {
 #[derive(Debug, Clone)]
 pub struct ParameterNode<'a> {
     pub identifier: SyntaxToken<'a>,
-    pub colon_token: SyntaxToken<'a>,
-    pub type_: TypeNode<'a>,
+    pub type_declaration: TypeDeclaration<'a>,
     pub span: TextSpan,
 }
 
@@ -544,10 +543,13 @@ impl<'a> ParameterNode<'a> {
         type_: TypeNode<'a>,
     ) -> Self {
         let span = TextSpan::bounds(identifier.span(), type_.span());
-        Self {
-            identifier,
+        let type_declaration = TypeDeclaration {
             colon_token,
             type_,
+        };
+        Self {
+            identifier,
+            type_declaration,
             span,
         }
     }

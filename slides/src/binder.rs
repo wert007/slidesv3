@@ -681,7 +681,7 @@ fn bind_struct_body<'a>(
 
 fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -> (&'a str, Type) {
     let name = parameter.identifier.lexeme;
-    let type_ = bind_type(parameter.type_, binder);
+    let type_ = bind_type(parameter.type_declaration.type_, binder);
     (name, type_)
 }
 
