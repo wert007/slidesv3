@@ -300,23 +300,10 @@ fn convert_array_literal(
         .stack
         .write_word(address as _, length_in_bytes as _);
     address += WORD_SIZE_IN_BYTES;
-    match &array_literal.children[0].type_ {
-        Type::Error | Type::Void => unreachable!(),
-        Type::Any => todo!(),
-        Type::Struct(_) | Type::StructReference(_) |
-        Type::Function(_)
-        | Type::Closure(_)
-        | Type::Array(_)
-        | Type::String
-        | Type::Integer
-        | Type::Boolean
-        | Type::SystemCall(_) => {
-            for child in array_literal.children.into_iter() {
-                result.append(&mut convert_node(child, converter));
-                result.push(Instruction::write_to_stack(address as _).span(span).into());
-                address += WORD_SIZE_IN_BYTES;
-            }
-        }
+    for child in array_literal.children.into_iter() {
+        result.append(&mut convert_node(child, converter));
+        result.push(Instruction::write_to_stack(address as _).span(span).into());
+        address += WORD_SIZE_IN_BYTES;
     }
     result.push(Instruction::load_pointer(pointer).span(span).into());
     result
