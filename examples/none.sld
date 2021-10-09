@@ -6,7 +6,24 @@ func main() {
     let m : int? = 13;
 
     // // Step 3. None Keyword
-    // let n : int? = none;
+    let n : int? = none;
+    // TODO:
+    print(n);
+
+    // Step 3.1 ?? Operator
+    // let a = n ?? 13;
+
+    // // Step 3.2 if
+    // if m {
+    //     print(m + 3)
+    // }
+
+    // // Step 3.3 unary !
+    // if !n {
+    //     print('n has sadly no value :/')
+    // } else {
+    //     print(n)
+    // }
 
     // // Step 4. ???
 
