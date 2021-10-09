@@ -77,17 +77,17 @@ impl Type {
                     array_count += 1;
                 }
                 let base_type: u64 = base_type.type_identifier();
-                (base_type << 8) + (array_count << 1) as u64 + 1
+                (base_type << 8) + (array_count << 2) as u64 + 1
             }
-            Type::Error => 0 << 1,
-            Type::Any => 1 << 1,
-            Type::Void => 2 << 1,
-            Type::Integer => 3 << 1,
-            Type::Boolean => 4 << 1,
+            Type::Error => 0 << 2,
+            Type::Any => 1 << 2,
+            Type::Void => 2 << 2,
+            Type::Integer => 3 << 2,
+            Type::Boolean => 4 << 2,
             Type::None => Type::noneable(Type::Any).type_identifier(),
-            Type::String => 5 << 1,
-            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 8 << 1,
-            Type::Noneable(_) => todo!(),
+            Type::String => 5 << 2,
+            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 8 << 2,
+            Type::Noneable(base) => base.type_identifier() + 2,
             Type::StructReference(_) | Type::Struct(_) | Type::Function(_) | Type::Closure(_) => {
                 eprintln!("Unimplented type_identifer for functions or structs expected..");
                 u64::MAX
@@ -98,11 +98,11 @@ impl Type {
     pub fn from_type_identifier(value: u64) -> Option<Self> {
         match value {
             0 => Some(Self::Error),
-            2 => Some(Self::Any),
-            4 => Some(Self::Void),
-            6 => Some(Self::Integer),
-            8 => Some(Self::Boolean),
-            10 => Some(Self::String),
+            4 => Some(Self::Any),
+            8 => Some(Self::Void),
+            12 => Some(Self::Integer),
+            16 => Some(Self::Boolean),
+            20 => Some(Self::String),
             _ => {
                 if value & 1 == 1 {
                     let base_type = Self::from_type_identifier(value >> 8)?;
@@ -112,10 +112,13 @@ impl Type {
                         result = Type::array(result);
                     }
                     Some(result)
-                } else if value & 31 == 16 {
+                } else if value & 63 == 32 {
                     let kind =
                         SystemCallKind::try_from_primitive(((value >> 5) & 0xFF) as u8).ok()?;
                     Some(Self::SystemCall(kind))
+                } else if value & 2 == 2 {
+                    let base_type = Self::from_type_identifier(value & !2)?;
+                    Some(Type::noneable(base_type))
                 } else {
                     None
                 }

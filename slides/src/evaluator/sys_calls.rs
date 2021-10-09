@@ -28,7 +28,21 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
-        Type::None | Type::Noneable(_) => todo!(),
+        Type::None => "none".into(),
+        Type::Noneable(base_type) => {
+            if argument.value == 0 {
+                "none".into()
+            } else {
+                let argument = if is_heap_pointer(argument.value) {
+                    state.heap.read_word(argument.value as _)
+                } else {
+                    state.stack.read_word(argument.value as _)
+                };
+                // TODO: This could actually be a pointer. Read it from memory!
+                let argument = TypedU64 { value: argument, is_pointer: false };
+                to_string_native(*base_type, argument, state)
+            }
+        },
         Type::Struct(_) | Type::StructReference(_) => todo!(),
         Type::Integer => {
             format!("{}", argument.value as i64)
