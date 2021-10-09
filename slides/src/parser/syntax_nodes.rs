@@ -117,6 +117,15 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn none_literal(token: SyntaxToken<'a>) -> Self {
+        let value = Value::None;
+        Self {
+            span: token.span(),
+            kind: SyntaxNodeKind::Literal(LiteralNodeKind { token, value }),
+            is_inserted: false,
+        }
+    }
+
     pub fn array_literal(
         lbracket: SyntaxToken<'a>,
         children: Vec<SyntaxNode<'a>>,

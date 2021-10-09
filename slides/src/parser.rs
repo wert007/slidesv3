@@ -490,6 +490,9 @@ fn parse_primary<'a>(
         SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => {
             parse_boolean_literal(tokens, diagnostic_bag)
         }
+        SyntaxTokenKind::NoneKeyword => {
+            parse_none_literal(tokens, diagnostic_bag)
+        }
         SyntaxTokenKind::NewKeyword => parse_constructor(tokens, diagnostic_bag),
         SyntaxTokenKind::Identifier => parse_identifier(tokens, diagnostic_bag),
         unexpected_token => {
@@ -561,6 +564,14 @@ fn parse_boolean_literal<'a>(
         SyntaxTokenKind::FalseKeyword => SyntaxNode::false_literal(token),
         _ => unreachable!(),
     }
+}
+
+fn parse_none_literal<'a>(
+    tokens: &mut VecDeque<SyntaxToken<'a>>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+) -> SyntaxNode<'a> {
+    let token = match_token!(tokens, diagnostic_bag, NoneKeyword);
+    SyntaxNode::none_literal(token)
 }
 
 fn parse_constructor<'a>(

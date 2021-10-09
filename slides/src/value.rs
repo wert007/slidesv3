@@ -2,6 +2,7 @@ use crate::binder::typing::{SystemCallKind, Type};
 
 #[derive(Debug, Clone)]
 pub enum Value {
+    None,
     Integer(i64),
     Boolean(bool),
     SystemCall(SystemCallKind),
@@ -32,6 +33,7 @@ impl Value {
             Value::Boolean(_) => Type::Boolean,
             Value::SystemCall(kind) => Type::SystemCall(*kind),
             Value::String(_) => Type::String,
+            Value::None => Type::None,
         }
     }
 }
@@ -61,6 +63,7 @@ impl std::fmt::Display for Value {
             Value::Boolean(value) => write!(f, "{}", value),
             Value::SystemCall(value) => write!(f, "system call {}", value),
             Value::String(value) => write!(f, "'{}'", value),
+            Value::None => write!(f, "none"),
         }
     }
 }

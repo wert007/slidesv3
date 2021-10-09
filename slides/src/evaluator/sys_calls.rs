@@ -28,7 +28,7 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
-        Type::Noneable(_) => todo!(),
+        Type::None | Type::Noneable(_) => todo!(),
         Type::Struct(_) | Type::StructReference(_) => todo!(),
         Type::Integer => {
             format!("{}", argument.value as i64)
@@ -67,7 +67,7 @@ fn array_to_string_native(
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),
-        Type::Noneable(_) => todo!(),
+        Type::None | Type::Noneable(_) => todo!(),
         Type::Struct(_) | Type::StructReference(_) => todo!(),
         Type::Integer => {
             for i in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {

@@ -14,6 +14,7 @@ pub enum Type {
     Any,
     Integer,
     Boolean,
+    None,
     SystemCall(SystemCallKind),
     Array(Box<Type>),
     Noneable(Box<Type>),
@@ -41,6 +42,7 @@ impl Type {
         match (self, other) {
             _ if self == other => true,
             (_, Type::Any) => true,
+            (Type::None, Type::Noneable(_)) => true,
             (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
             (Type::Array(base_type), Type::Array(other)) => base_type.can_be_converted_to(other),
             (Type::Struct(id), Type::StructReference(other_id)) if id.id == *other_id => true,
@@ -82,6 +84,7 @@ impl Type {
             Type::Void => 2 << 1,
             Type::Integer => 3 << 1,
             Type::Boolean => 4 << 1,
+            Type::None => Type::noneable(Type::Any).type_identifier(),
             Type::String => 5 << 1,
             Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 8 << 1,
             Type::Noneable(_) => todo!(),
@@ -125,7 +128,8 @@ impl Type {
             Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
-            Type::Struct(_)
+            Type::None
+            | Type::Struct(_)
             | Type::StructReference(_)
             | Type::Function(_)
             | Type::Closure(_)
@@ -146,6 +150,7 @@ impl Type {
             Type::String => 1,
             Type::Integer |
             Type::Boolean |
+            Type::None |
             Type::SystemCall(_) |
             Type::Array(_) |
             Type::Noneable(_) |
@@ -165,6 +170,7 @@ impl std::fmt::Display for Type {
             Type::Any => write!(f, "any"),
             Type::Integer => write!(f, "int"),
             Type::Boolean => write!(f, "bool"),
+            Type::None => Type::noneable(Type::Any).fmt(f),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
             Type::Array(base) => write!(f, "{}[]", base),
             Type::Noneable(base) => write!(f, "{}?", base),

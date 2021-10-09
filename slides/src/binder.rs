@@ -998,6 +998,7 @@ fn bind_unary_operator<'a, 'b>(
         | Type::Struct(_)
         | Type::StructReference(_)
         | Type::Boolean
+        | Type::None
         | Type::String
         | Type::Array(_)
         | Type::Noneable(_) => {
@@ -1248,6 +1249,7 @@ fn bind_field_access<'a, 'b>(
         Type::Void
         | Type::Integer
         | Type::Boolean
+        | Type::None
         | Type::Function(_)
         | Type::Closure(_)
         | Type::SystemCall(_)
@@ -1290,6 +1292,7 @@ fn bind_field_access_for_assignment<'a>(
         Type::Void
         | Type::Integer
         | Type::Boolean
+        | Type::None
         | Type::SystemCall(_)
         | Type::Noneable(_)
         | Type::Function(_)

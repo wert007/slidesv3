@@ -40,6 +40,7 @@ impl<'a> BoundNode<'a> {
         let byte_width = match &value {
             Value::Integer(_) | Value::Boolean(_) | Value::SystemCall(_) => 4,
             Value::String(value) => 8 + value.len(),
+            Value::None => 4,
         } as _;
         Self {
             span: TextSpan::zero(),
@@ -63,6 +64,7 @@ impl<'a> BoundNode<'a> {
         let byte_width = match &value {
             Value::Integer(_) | Value::Boolean(_) | Value::SystemCall(_) => 4,
             Value::String(value) => 8 + value.len(),
+            Value::None => 4,
         } as _;
         Self {
             span,

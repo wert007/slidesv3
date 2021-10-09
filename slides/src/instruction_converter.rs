@@ -245,6 +245,7 @@ fn convert_literal(
         }
         Value::SystemCall(kind) => kind as u64,
         Value::String(value) => return convert_string_literal(span, value, converter),
+        Value::None => 0,
     };
     vec![Instruction::load_immediate(value).span(span).into()]
 }
