@@ -3,10 +3,10 @@ func main() {
     let i : int = 42;
 
     // // Step 2. Optional Types
-    // let m : int? = 13;
+    let m : int? = 13;
 
     // // Step 3. None Keyword
-    // let m : int? = none;
+    // let n : int? = none;
 
     // // Step 4. ???
 
