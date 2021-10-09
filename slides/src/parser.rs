@@ -5,16 +5,10 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{
-    diagnostics::DiagnosticBag,
-    lexer::{
+use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    },
-    parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode},
-    text::{SourceText, TextSpan},
-    DebugFlags,
-};
+    }, parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode, TypeDeclaration}, text::{SourceText, TextSpan}};
 
 use self::syntax_nodes::{ElseClause, ParameterNode, StructBodyNode, SyntaxNode, TypeNode};
 use crate::match_token;
@@ -309,12 +303,23 @@ fn parse_variable_declaration<'a>(
     } else {
         match_token!(tokens, diagnostic_bag, Identifier)
     };
+    let optional_type_declaration = if matches!(&peek_token(tokens).kind, &SyntaxTokenKind::Colon) {
+        let colon_token = next_token(tokens);
+        let type_ = parse_type(tokens, diagnostic_bag);
+        Some(TypeDeclaration {
+            colon_token,
+            type_,
+        })
+    } else {
+        None
+    };
     let equals_token = match_token!(tokens, diagnostic_bag, Equals);
     let initializer = parse_expression(tokens, diagnostic_bag);
     let semicolon_token = match_token!(tokens, diagnostic_bag, Semicolon);
     SyntaxNode::variable_declaration(
         let_keyword,
         identifier,
+        optional_type_declaration,
         equals_token,
         initializer,
         semicolon_token,

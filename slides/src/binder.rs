@@ -1488,9 +1488,18 @@ fn bind_variable_declaration<'a, 'b>(
             .diagnostic_bag
             .report_invalid_void_expression(initializer.span);
     }
+    let type_ = if let Some(type_declaration) = variable_declaration.optional_type_declaration {
+        let type_ = bind_type(type_declaration.type_, binder);
+        if !initializer.type_.can_be_converted_to(&type_) {
+            binder.diagnostic_bag.report_cannot_convert(initializer.span, &initializer.type_, &type_);
+        }
+        type_
+    } else {
+        initializer.type_.clone()
+    };
     let variable_index = binder.register_variable(
         variable_declaration.identifier.lexeme,
-        initializer.type_.clone(),
+        type_,
         false,
     );
     if let Some(variable_index) = variable_index {

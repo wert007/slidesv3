@@ -298,6 +298,7 @@ impl<'a> SyntaxNode<'a> {
     pub fn variable_declaration(
         let_keyword: SyntaxToken<'a>,
         identifier: SyntaxToken<'a>,
+        optional_type_declaration: Option<TypeDeclaration<'a>>,
         equals_token: SyntaxToken<'a>,
         initializer: SyntaxNode<'a>,
         semicolon_token: SyntaxToken<'a>,
@@ -307,6 +308,7 @@ impl<'a> SyntaxNode<'a> {
             kind: SyntaxNodeKind::VariableDeclaration(VariableDeclarationNodeKind {
                 let_keyword,
                 identifier,
+                optional_type_declaration,
                 equals_token,
                 initializer: Box::new(initializer),
                 semicolon_token,
@@ -558,6 +560,12 @@ pub struct ReturnTypeNode<'a> {
 }
 
 #[derive(Debug, Clone)]
+pub struct TypeDeclaration<'a> {
+    pub colon_token: SyntaxToken<'a>,
+    pub type_: TypeNode<'a>,
+}
+
+#[derive(Debug, Clone)]
 pub struct TypeNode<'a> {
     pub identifier: SyntaxToken<'a>,
     pub brackets: Vec<SyntaxToken<'a>>,
@@ -705,6 +713,7 @@ impl<'a> ElseClause<'a> {
 pub struct VariableDeclarationNodeKind<'a> {
     pub let_keyword: SyntaxToken<'a>,
     pub identifier: SyntaxToken<'a>,
+    pub optional_type_declaration: Option<TypeDeclaration<'a>>,
     pub equals_token: SyntaxToken<'a>,
     pub initializer: Box<SyntaxNode<'a>>,
     pub semicolon_token: SyntaxToken<'a>,
