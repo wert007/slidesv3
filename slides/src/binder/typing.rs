@@ -147,20 +147,40 @@ impl Type {
 
     pub fn array_element_size_in_bytes(&self) -> u64 {
         match self {
-            Type::Void |
-            Type::Any |
-            Type::Error => unreachable!(),
+            Type::Void | Type::Any | Type::Error => unreachable!(),
             Type::String => 1,
-            Type::Integer |
-            Type::Boolean |
-            Type::None |
-            Type::SystemCall(_) |
-            Type::Array(_) |
-            Type::Noneable(_) |
-            Type::Function(_) |
-            Type::Closure(_) |
-            Type::Struct(_) |
-            Type::StructReference(_) => WORD_SIZE_IN_BYTES,
+            Type::Integer
+            | Type::Boolean
+            | Type::None
+            | Type::SystemCall(_)
+            | Type::Array(_)
+            | Type::Noneable(_)
+            | Type::Function(_)
+            | Type::Closure(_)
+            | Type::Struct(_)
+            | Type::StructReference(_) => WORD_SIZE_IN_BYTES,
+        }
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        match self {
+            Type::Error
+            | Type::Void
+            | Type::Any
+            // Technically a pointer. But it does not get dereferenced, but
+            // instead the value itself is assigned to the program counter.
+            | Type::Function(_)
+            | Type::SystemCall(_)
+            | Type::Integer
+            | Type::Boolean => false,
+            // A none Pointer should never be dereferenced.
+            Type::None
+            | Type::Array(_)
+            | Type::Noneable(_)
+            | Type::String
+            | Type::Closure(_)
+            | Type::Struct(_)
+            | Type::StructReference(_) => true,
         }
     }
 }
@@ -256,13 +276,13 @@ impl FunctionType {
     pub fn system_call(system_call_kind: SystemCallKind) -> Self {
         match system_call_kind {
             SystemCallKind::Print => Self {
-                parameter_types: vec![ Type::Any ],
+                parameter_types: vec![Type::Any],
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
             },
             SystemCallKind::ToString => Self {
-                parameter_types: vec![ Type::Any ],
+                parameter_types: vec![Type::Any],
                 this_type: None,
                 return_type: Type::String,
                 system_call_kind: Some(system_call_kind),
