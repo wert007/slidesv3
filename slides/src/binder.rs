@@ -471,6 +471,7 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
         span,
         variable_index,
         BoundNode::literal_from_value(Value::SystemCall(SystemCallKind::Print)),
+        None,
     );
     vec![print_statement]
 }
@@ -1509,11 +1510,11 @@ fn bind_variable_declaration<'a, 'b>(
     };
     let variable_index = binder.register_variable(
         variable_declaration.identifier.lexeme,
-        type_,
+        type_.clone(),
         false,
     );
     if let Some(variable_index) = variable_index {
-        BoundNode::variable_declaration(span, variable_index, initializer)
+        BoundNode::variable_declaration(span, variable_index, initializer, Some(type_))
     } else {
         let span = TextSpan::bounds(
             variable_declaration.let_keyword.span(),

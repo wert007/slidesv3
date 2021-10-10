@@ -325,8 +325,9 @@ impl<'a> BoundNode<'a> {
                     span,
                     index_variable,
                     BoundNode::literal_from_value(Value::Integer(0)),
+                    None,
                 ), // let $index = 0;
-                BoundNode::variable_declaration(span, collection_variable, collection), // let $collection = collection;
+                BoundNode::variable_declaration(span, collection_variable, collection, None), // let $collection = collection;
                 BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
             ],
         )
@@ -336,11 +337,13 @@ impl<'a> BoundNode<'a> {
         span: TextSpan,
         variable_index: u64,
         initializer: BoundNode<'a>,
+        variable_type: Option<Type>,
     ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::VariableDeclaration(BoundVariableDeclarationNodeKind {
                 variable_index,
+                variable_type: variable_type.unwrap_or(initializer.type_.clone()),
                 initializer: Box::new(initializer),
             }),
             type_: Type::Void,
@@ -628,6 +631,7 @@ pub struct BoundIfStatementNodeKind<'a> {
 pub struct BoundVariableDeclarationNodeKind<'a> {
     pub variable_index: u64,
     pub initializer: Box<BoundNode<'a>>,
+    pub variable_type: Type,
 }
 
 #[derive(Debug, Clone)]
