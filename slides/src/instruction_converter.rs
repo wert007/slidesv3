@@ -394,6 +394,7 @@ fn convert_binary(
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(),
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
         BoundBinaryOperator::StringConcat => Instruction::string_concat(),
+        BoundBinaryOperator::NoneableOrValue => Instruction::noneable_or_value(!binary.lhs.type_.is_pointer())
     }
     .span(span);
     let mut result = vec![];

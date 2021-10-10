@@ -278,6 +278,14 @@ impl Instruction {
         }
     }
 
+    pub const fn noneable_or_value(needs_dereferencing: bool) -> Self {
+        Self {
+            op_code: OpCode::NoneableOrValue,
+            arg: needs_dereferencing as _,
+            span: None,
+        }
+    }
+
     pub const fn jump_to_label(label_index: usize) -> Self {
         Self {
             op_code: OpCode::Jump,

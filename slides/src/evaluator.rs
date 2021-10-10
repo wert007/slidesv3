@@ -127,6 +127,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
         OpCode::StringConcat => evaluate_string_concat(state, instruction),
         OpCode::PointerAddition => evaluate_pointer_addition(state, instruction),
+        OpCode::NoneableOrValue => evaluate_noneable_or_value(state, instruction),
         OpCode::Jump => evaluate_jump(state, instruction),
         OpCode::JumpIfFalse => evaluate_jump_if_false(state, instruction),
         OpCode::JumpIfTrue => evaluate_jump_if_true(state, instruction),
@@ -546,6 +547,34 @@ fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instructio
         lhs + rhs as u64
     };
     state.stack.push_pointer(result);
+}
+
+fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
+    let rhs = state.stack.pop();
+    let lhs = state.stack.pop();
+    let result = if lhs.value == 0 {
+        rhs
+    } else {
+        lhs
+    };
+    let result = if instruction.arg != 0 {
+        let value = if is_heap_pointer(result.value) {
+            state.heap.read_word(result.value as _)
+        } else {
+            state.stack.read_word(result.value as _)
+        };
+        TypedU64 {
+            value,
+            is_pointer: false, // Otherwise we would not need to dereference the pointer.
+        }
+    } else {
+        result
+    };
+    if result.is_pointer {
+        state.stack.push_pointer(result.value);
+    } else {
+        state.stack.push(result.value);
+    }
 }
 
 fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {
