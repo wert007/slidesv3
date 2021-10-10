@@ -671,7 +671,30 @@ fn convert_variable_declaration(
     variable_declaration: BoundVariableDeclarationNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
+    let needs_boxing = if let Type::Noneable(_) = &variable_declaration.variable_type {
+        match &variable_declaration.initializer.type_ {
+            Type::Void |
+            Type::Noneable(_) |
+            Type::Error => unreachable!(),
+            Type::Any => todo!(),
+            Type::Integer |
+            Type::Boolean |
+            Type::SystemCall(_) |
+            Type::Function(_) => true,
+            Type::None |
+            Type::Array(_) |
+            Type::String |
+            Type::Closure(_) |
+            Type::Struct(_) |
+            Type::StructReference(_) => false
+        }
+    } else {
+        false
+    };
     let mut result = convert_node(*variable_declaration.initializer, converter);
+    if needs_boxing {
+        result.push(Instruction::write_to_heap(1).span(span).into());
+    }
     result.push(
         Instruction::store_in_register(variable_declaration.variable_index)
             .span(span)
@@ -681,11 +704,34 @@ fn convert_variable_declaration(
 }
 
 fn convert_assignment(
-    _span: TextSpan,
+    span: TextSpan,
     assignment: BoundAssignmentNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
+    let needs_boxing = if let Type::Noneable(_) = &assignment.variable.type_ {
+        match &assignment.expression.type_ {
+            Type::Void |
+            Type::Noneable(_) |
+            Type::Error => unreachable!(),
+            Type::Any => todo!(),
+            Type::Integer |
+            Type::Boolean |
+            Type::SystemCall(_) |
+            Type::Function(_) => true,
+            Type::None |
+            Type::Array(_) |
+            Type::String |
+            Type::Closure(_) |
+            Type::Struct(_) |
+            Type::StructReference(_) => false
+        }
+    } else {
+        false
+    };
     let mut result = convert_node(*assignment.expression, converter);
+    if needs_boxing {
+        result.push(Instruction::write_to_heap(1).span(span).into());
+    }
     result.append(&mut convert_node_for_assignment(
         *assignment.variable,
         converter,
