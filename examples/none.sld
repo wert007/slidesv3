@@ -18,10 +18,11 @@ func main() {
     print_noneable(none);
 
     // Step 3.0.1 Make diagnostic for
-    let error = none;
+    // let error = none;
 
     // Step 3.1 ?? Operator
-    // let a = n ?? 13;
+    let a = n ?? 13;
+    let foo = none ?? 12;
 
     // // Step 3.2 if
     // if m {
