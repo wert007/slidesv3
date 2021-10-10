@@ -173,6 +173,7 @@ fn convert_node(
             convert_field_access(node.span, field_access, converter)
         }
         BoundNodeKind::Closure(closure) => convert_closure(node.span, closure, converter),
+        BoundNodeKind::Conversion(conversion) => convert_conversion(node.span, conversion, converter),
         BoundNodeKind::BlockStatement(block_statement) => {
             convert_block_statement(node.span, block_statement, converter)
         }

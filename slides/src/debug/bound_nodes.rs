@@ -65,6 +65,9 @@ fn print_bound_node_as_code_with_indent(
         BoundNodeKind::Closure(closure) => {
             print_bound_node_closure_as_code(closure, printer, buffer)
         }
+        BoundNodeKind::Conversion(conversion) => {
+            print_bound_node_conversion_as_code(conversion, printer, buffer)
+        }
         BoundNodeKind::BlockStatement(block_statement) => {
             print_bound_node_block_statement_as_code(block_statement, printer, buffer)
         }
@@ -242,6 +245,16 @@ fn print_bound_node_closure_as_code(
     print_bound_node_as_code_with_indent(&closure.base, printer, buffer);
     buffer.push_str(".");
     buffer.push_str(&closure.function.to_string());
+}
+
+fn print_bound_node_conversion_as_code(
+    closure: &BoundConversionNodeKind,
+    printer: DebugPrinter,
+    buffer: &mut String,
+) {
+    print_bound_node_as_code_with_indent(&closure.base, printer, buffer);
+    buffer.push_str(" as ");
+    buffer.push_str(&closure.type_.to_string());
 }
 
 fn print_bound_node_block_statement_as_code(

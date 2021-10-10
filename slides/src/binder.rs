@@ -1401,6 +1401,21 @@ fn bind_arguments_for_function<'a, 'b>(
     result
 }
 
+fn bind_conversion<'a> (
+    base: BoundNode<'a>,
+    type_: &Type,
+    binder: &mut BindingState<'a, '_>,
+) -> BoundNode<'a> {
+    if &base.type_ == type_ {
+        base
+    } else if base.type_.can_be_converted_to(type_) {
+        BoundNode::conversion(base.span, base, type_.clone())
+    } else {
+        binder.diagnostic_bag.report_cannot_convert(base.span, &base.type_, type_);
+        BoundNode::error(base.span)
+    }
+}
+
 fn bind_for_statement<'a, 'b>(
     span: TextSpan,
     for_statement: ForStatementNodeKind<'a>,

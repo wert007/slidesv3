@@ -233,6 +233,19 @@ impl<'a> BoundNode<'a> {
         }
     }
 
+    pub fn conversion(span: TextSpan, base: BoundNode<'a>, type_: Type) -> Self {
+        Self {
+            span,
+            kind: BoundNodeKind::Conversion(BoundConversionNodeKind {
+                base: Box::new(base),
+                type_: type_.clone(),
+            }),
+            type_,
+            byte_width: 4,
+            constant_value: None,
+        }
+    }
+
     pub fn system_call(
         span: TextSpan,
         base: SystemCallKind,
@@ -527,6 +540,7 @@ pub enum BoundNodeKind<'a> {
     ArrayIndex(BoundArrayIndexNodeKind<'a>),
     FieldAccess(BoundFieldAccessNodeKind<'a>),
     Closure(BoundClosureNodeKind<'a>),
+    Conversion(BoundConversionNodeKind<'a>),
 
     // Statements
     BlockStatement(BoundBlockStatementNodeKind<'a>),
@@ -617,6 +631,37 @@ pub struct BoundClosureNodeKind<'a> {
 impl<'a> BoundClosureNodeKind<'a> {
     pub fn arguments(&self) -> Vec<BoundNode<'a>> {
         vec![*self.base.clone()]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundConversionNodeKind<'a> {
+    pub base: Box<BoundNode<'a>>,
+    pub type_: Type,
+}
+
+impl BoundConversionNodeKind<'_> {
+    pub fn needs_boxing(&self) -> bool {
+        if let Type::Noneable(_) = self.type_ {
+            match &self.base.type_ {
+                Type::Error => unreachable!(),
+                Type::Void => unreachable!(),
+                Type::Noneable(_) => unreachable!(),
+                Type::Any => todo!(),
+                Type::Integer |
+                Type::Boolean |
+                Type::SystemCall(_) |
+                Type::Function(_) => true,
+                Type::None |
+                Type::Array(_) |
+                Type::String |
+                Type::Closure(_) |
+                Type::Struct(_) |
+                Type::StructReference(_) => false,
+            }
+        } else {
+            false
+        }
     }
 }
 
