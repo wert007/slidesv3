@@ -1486,6 +1486,9 @@ fn bind_variable_declaration<'a, 'b>(
     } else {
         initializer.type_.clone()
     };
+    if type_ == Type::None {
+        binder.diagnostic_bag.report_invalid_variable_type_none(span);
+    }
     let initializer = bind_conversion(initializer, &type_, binder);
     let variable_index = binder.register_variable(
         variable_declaration.identifier.lexeme,

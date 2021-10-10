@@ -18,7 +18,7 @@ func main() {
     print_noneable(none);
 
     // Step 3.0.1 Make diagnostic for
-    // let error = none;
+    let error = none;
 
     // Step 3.1 ?? Operator
     // let a = n ?? 13;

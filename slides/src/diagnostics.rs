@@ -304,6 +304,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_invalid_variable_type_none(&mut self, span: TextSpan) {
+        let message = "Variables cannot be assigned none, without type information. Try adding a : TypeDeclaration.".into();
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(
