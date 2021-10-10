@@ -791,16 +791,9 @@ fn bind_array_literal<'a, 'b>(
     let type_ = first_element.type_.clone();
     let mut children = vec![first_element];
     for child in array_literal.children {
-        let child_span = child.span;
         let child = bind_node(child, binder);
-        if child.type_.can_be_converted_to(&type_) {
-            children.push(child);
-        } else {
-            binder
-                .diagnostic_bag
-                .report_cannot_convert(child_span, &child.type_, &type_);
-            children.push(BoundNode::error(child_span));
-        }
+        let child = bind_conversion(child, &type_, binder);
+        children.push(child);
     }
     BoundNode::array_literal(span, children, Type::array(type_))
 }
@@ -844,13 +837,7 @@ fn bind_constructor_call<'a>(
         .zip(struct_type.fields.iter())
     {
         let argument = bind_node(argument, binder);
-        if !argument.type_.can_be_converted_to(parameter_type) {
-            binder.diagnostic_bag.report_cannot_convert(
-                argument.span,
-                &argument.type_,
-                parameter_type,
-            );
-        }
+        let argument = bind_conversion(argument, parameter_type, binder);
         arguments.push(argument);
     }
 
@@ -1118,13 +1105,8 @@ fn bind_array_index<'a, 'b>(
     array_index: ArrayIndexNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    let index_span = array_index.index.span;
     let index = bind_node(*array_index.index, binder);
-    if !index.type_.can_be_converted_to(&Type::Integer) {
-        binder
-            .diagnostic_bag
-            .report_cannot_convert(index_span, &index.type_, &Type::Integer);
-    }
+    let index = bind_conversion(index, &Type::Integer, binder);
     let base_span = array_index.base.span;
     let base = bind_node(*array_index.base, binder);
     let type_ = match base.type_.clone() {
@@ -1146,13 +1128,8 @@ fn bind_array_index_for_assignment<'a, 'b>(
     array_index: ArrayIndexNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    let index_span = array_index.index.span;
     let index = bind_node(*array_index.index, binder);
-    if !index.type_.can_be_converted_to(&Type::Integer) {
-        binder
-            .diagnostic_bag
-            .report_cannot_convert(index_span, &index.type_, &Type::Integer);
-    }
+    let index = bind_conversion(index, &Type::Integer, binder);
     let base_span = array_index.base.span;
     let base = bind_node_for_assignment(*array_index.base, binder);
     let type_ = match base.type_.clone() {
@@ -1376,18 +1353,14 @@ fn bind_arguments_for_function<'a, 'b>(
         .into_iter()
         .zip(function_type.parameter_types.iter())
     {
-        let argument = bind_node(argument, binder);
+        let mut argument = bind_node(argument, binder);
         if matches!(argument.type_, Type::Void) {
             binder
                 .diagnostic_bag
                 .report_invalid_void_expression(argument.span);
         }
-        if !argument.type_.can_be_converted_to(parameter_type) {
-            binder.diagnostic_bag.report_cannot_convert(
-                argument.span,
-                &argument.type_,
-                parameter_type,
-            );
+        if parameter_type != &Type::Any {
+            argument = bind_conversion(argument, parameter_type, binder);
         }
         if let Type::Function(_) = argument.type_ {
             if let Some(SystemCallKind::Print) = function_type.system_call_kind {
@@ -1491,13 +1464,7 @@ fn bind_if_statement<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let condition = bind_node(*if_statement.condition, binder);
-    if !matches!(condition.type_, Type::Boolean) {
-        binder.diagnostic_bag.report_cannot_convert(
-            condition.span,
-            &condition.type_,
-            &Type::Boolean,
-        );
-    }
+    let condition = bind_conversion(condition, &Type::Boolean, binder);
     let body = bind_node(*if_statement.body, binder);
     let else_body = if_statement.else_clause.map(|e| bind_node(*e.body, binder));
     BoundNode::if_statement(span, condition, body, else_body)
@@ -1515,14 +1482,11 @@ fn bind_variable_declaration<'a, 'b>(
             .report_invalid_void_expression(initializer.span);
     }
     let type_ = if let Some(type_declaration) = variable_declaration.optional_type_declaration {
-        let type_ = bind_type(type_declaration.type_, binder);
-        if !initializer.type_.can_be_converted_to(&type_) {
-            binder.diagnostic_bag.report_cannot_convert(initializer.span, &initializer.type_, &type_);
-        }
-        type_
+        bind_type(type_declaration.type_, binder)
     } else {
         initializer.type_.clone()
     };
+    let initializer = bind_conversion(initializer, &type_, binder);
     let variable_index = binder.register_variable(
         variable_declaration.identifier.lexeme,
         type_.clone(),
@@ -1550,20 +1514,18 @@ fn bind_return_statement<'a, 'b>(
     let expression = return_statement
         .optional_expression
         .map(|e| bind_node(*e, binder));
-    let function_return_type = &binder.function_return_type;
+    let function_return_type = binder.function_return_type.clone();
     if expression.is_none() && !function_return_type.can_be_converted_to(&Type::Void) {
         binder
             .diagnostic_bag
-            .report_missing_return_value(span, function_return_type);
-    } else if let Some(expression) = &expression {
-        if !expression.type_.can_be_converted_to(&function_return_type) {
-            binder.diagnostic_bag.report_cannot_convert(
-                expression.span,
-                &expression.type_,
-                function_return_type,
-            );
-        }
+            .report_missing_return_value(span, &function_return_type);
     }
+
+    let expression = if let Some(expression) = expression {
+        Some(bind_conversion(expression, &function_return_type, binder))
+    } else {
+        None
+    };
     // TODO: This works with implicit returns in main only. Because for main
     // restores_variables must be false. There needs to be a flag in the binder
     // not only knowing the return type of the current function but also if it
@@ -1577,13 +1539,7 @@ fn bind_while_statement<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let condition = bind_node(*while_statement.condition, binder);
-    if !matches!(condition.type_, Type::Boolean) {
-        binder.diagnostic_bag.report_cannot_convert(
-            condition.span,
-            &condition.type_,
-            &Type::Boolean,
-        );
-    }
+    let condition = bind_conversion(condition, &Type::Boolean, binder);
     let body = bind_node(*while_statement.body, binder);
     BoundNode::while_statement(span, condition, body)
 }
@@ -1601,11 +1557,7 @@ fn bind_assignment<'a, 'b>(
         }
     }
     let expression = bind_node(*assignment.expression, binder);
-    if !expression.type_.can_be_converted_to(&lhs.type_) {
-        binder
-            .diagnostic_bag
-            .report_cannot_convert(span, &expression.type_, &lhs.type_);
-    }
+    let expression = bind_conversion(expression, &lhs.type_, binder);
     BoundNode::assignment(span, lhs, expression)
 }
 

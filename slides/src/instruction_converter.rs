@@ -4,28 +4,7 @@ mod tests;
 
 mod label_replacer;
 
-use crate::{
-    binder::{
-        self,
-        bound_nodes::{
-            BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
-            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
-            BoundConstructorCallNodeKind, BoundExpressionStatementNodeKind,
-            BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind,
-            BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind,
-            BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind,
-            BoundVariableNodeKind,
-        },
-        operators::{BoundBinaryOperator, BoundUnaryOperator},
-        typing::{FunctionKind, SystemCallKind, Type},
-    },
-    debug::DebugFlags,
-    diagnostics::DiagnosticBag,
-    evaluator::{bytes_to_word, WORD_SIZE_IN_BYTES},
-    parser::syntax_nodes::LiteralNodeKind,
-    text::{SourceText, TextSpan},
-    value::Value,
-};
+use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind, BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::{bytes_to_word, WORD_SIZE_IN_BYTES}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
 
 use self::instruction::Instruction;
 use super::evaluator::stack::Stack;
@@ -667,35 +646,25 @@ fn convert_closure(
     result
 }
 
+fn convert_conversion(
+    span: TextSpan,
+    conversion: BoundConversionNodeKind,
+    converter: &mut InstructionConverter,
+) -> Vec<InstructionOrLabelReference> {
+    let needs_boxing = conversion.needs_boxing();
+    let mut result = convert_node(*conversion.base, converter);
+    if needs_boxing {
+        result.push(Instruction::write_to_heap(1).span(span).into());
+    }
+    result
+}
+
 fn convert_variable_declaration(
     span: TextSpan,
     variable_declaration: BoundVariableDeclarationNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let needs_boxing = if let Type::Noneable(_) = &variable_declaration.variable_type {
-        match &variable_declaration.initializer.type_ {
-            Type::Void |
-            Type::Noneable(_) |
-            Type::Error => unreachable!(),
-            Type::Any => todo!(),
-            Type::Integer |
-            Type::Boolean |
-            Type::SystemCall(_) |
-            Type::Function(_) => true,
-            Type::None |
-            Type::Array(_) |
-            Type::String |
-            Type::Closure(_) |
-            Type::Struct(_) |
-            Type::StructReference(_) => false
-        }
-    } else {
-        false
-    };
     let mut result = convert_node(*variable_declaration.initializer, converter);
-    if needs_boxing {
-        result.push(Instruction::write_to_heap(1).span(span).into());
-    }
     result.push(
         Instruction::store_in_register(variable_declaration.variable_index)
             .span(span)
@@ -705,34 +674,11 @@ fn convert_variable_declaration(
 }
 
 fn convert_assignment(
-    span: TextSpan,
+    _span: TextSpan,
     assignment: BoundAssignmentNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let needs_boxing = if let Type::Noneable(_) = &assignment.variable.type_ {
-        match &assignment.expression.type_ {
-            Type::Void |
-            Type::Noneable(_) |
-            Type::Error => unreachable!(),
-            Type::Any => todo!(),
-            Type::Integer |
-            Type::Boolean |
-            Type::SystemCall(_) |
-            Type::Function(_) => true,
-            Type::None |
-            Type::Array(_) |
-            Type::String |
-            Type::Closure(_) |
-            Type::Struct(_) |
-            Type::StructReference(_) => false
-        }
-    } else {
-        false
-    };
     let mut result = convert_node(*assignment.expression, converter);
-    if needs_boxing {
-        result.push(Instruction::write_to_heap(1).span(span).into());
-    }
     result.append(&mut convert_node_for_assignment(
         *assignment.variable,
         converter,
