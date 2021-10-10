@@ -126,6 +126,7 @@ pub enum SyntaxTokenKind {
     Comma,
     Period,
     QuestionMark,
+    QuestionMarkQuestionMark,
     Plus,
     Minus,
     Star,
@@ -160,15 +161,16 @@ pub enum SyntaxTokenKind {
 impl SyntaxTokenKind {
     pub fn unary_precedence(&self) -> u32 {
         match self {
-            Self::Plus | Self::Minus => 5,
+            Self::Plus | Self::Minus => 6,
             _ => 0,
         }
     }
 
     pub fn binary_precedence(&self) -> u32 {
         match self {
-            Self::Star | Self::Slash => 4,
-            Self::Plus | Self::Minus => 3,
+            Self::Star | Self::Slash => 5,
+            Self::Plus | Self::Minus => 4,
+            Self::QuestionMarkQuestionMark => 3,
             Self::EqualsEquals
             | Self::BangEquals
             | Self::LessThan
@@ -237,6 +239,7 @@ impl From<&str> for SyntaxTokenKind {
             "," => Self::Comma,
             "." => Self::Period,
             "?" => Self::QuestionMark,
+            "??" => Self::QuestionMarkQuestionMark,
             "==" => Self::EqualsEquals,
             "!=" => Self::BangEquals,
             "<=" => Self::LessThanEquals,
@@ -261,6 +264,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::Comma => write!(f, "CommaToken"),
             SyntaxTokenKind::Period => write!(f, "PeriodToken"),
             SyntaxTokenKind::QuestionMark => write!(f, "Question-Mark-Token"),
+            SyntaxTokenKind::QuestionMarkQuestionMark => write!(f, "Question-Mark-Question-Mark-Token"),
             SyntaxTokenKind::LParen => write!(f, "Open-Parenthesis-Token"),
             SyntaxTokenKind::RParen => write!(f, "Close-Parenthesis-Token"),
             SyntaxTokenKind::LBracket => write!(f, "Open-Bracket-Token"),
