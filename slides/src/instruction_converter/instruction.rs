@@ -101,6 +101,14 @@ impl Instruction {
         }
     }
 
+    pub const fn write_to_heap(word_count: u64) -> Self {
+        Self {
+            op_code: OpCode::WriteToHeap,
+            arg: word_count,
+            span: None,
+        }
+    }
+
     pub const fn read_word_with_offset(offset: u64) -> Self {
         Self {
             op_code: OpCode::ReadWordWithOffset,

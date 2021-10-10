@@ -12,6 +12,7 @@ pub enum OpCode {
     ArrayIndex = 7,
     StoreInMemory = 8,
     WriteToStack = 9,
+    WriteToHeap = 10,
     // WriteToStackWithOffset = 10,
     ReadWordWithOffset = 12,
     MemoryCopy = 13,

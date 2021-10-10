@@ -106,6 +106,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
+        OpCode::WriteToHeap => evaluate_write_to_heap(state, instruction),
         OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction),
         OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
@@ -247,6 +248,18 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
     if value.is_pointer {
         state.stack.set_pointer(address);
     }
+}
+
+fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) {
+    let size_in_bytes = instruction.arg * WORD_SIZE_IN_BYTES;
+    let address = state.heap.allocate(size_in_bytes);
+    let mut writing_pointer = address;
+    for _ in 0..instruction.arg {
+        let value = state.stack.pop();
+        state.heap.write_word(writing_pointer as _, value.value);
+        writing_pointer += WORD_SIZE_IN_BYTES;
+    }
+    state.stack.push_pointer(address);
 }
 
 fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instruction) {
