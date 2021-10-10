@@ -907,6 +907,7 @@ fn bind_binary_operator<'a, 'b>(
         SyntaxTokenKind::GreaterThan => BoundBinaryOperator::GreaterThan,
         SyntaxTokenKind::LessThanEquals => BoundBinaryOperator::LessThanEquals,
         SyntaxTokenKind::GreaterThanEquals => BoundBinaryOperator::GreaterThanEquals,
+        SyntaxTokenKind::QuestionMarkQuestionMark => BoundBinaryOperator::NoneableOrValue,
         _ => unreachable!(),
     };
     match (&lhs.type_, result, &rhs.type_) {
@@ -937,6 +938,19 @@ fn bind_binary_operator<'a, 'b>(
         (Type::String, BoundBinaryOperator::ArithmeticAddition, _)
         | (_, BoundBinaryOperator::ArithmeticAddition, Type::String) => {
             Some((BoundBinaryOperator::StringConcat, Type::String))
+        }
+        (Type::Noneable(lhs_type), BoundBinaryOperator::NoneableOrValue, rhs_type) => {
+            if rhs_type.can_be_converted_to(lhs_type) {
+                Some((BoundBinaryOperator::NoneableOrValue, *lhs_type.clone()))
+            } else {
+                binder.diagnostic_bag.report_cannot_convert(span, rhs_type, lhs_type);
+                None
+            }
+        }
+        // Special case, where none ?? value is used. This could be optimized
+        // away later.
+        (Type::None, BoundBinaryOperator::NoneableOrValue, rhs_type) => {
+            Some((BoundBinaryOperator::NoneableOrValue, rhs_type.clone()))
         }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {

@@ -32,6 +32,7 @@ pub enum BoundBinaryOperator {
     LessThanEquals,
     GreaterThanEquals,
     StringConcat,
+    NoneableOrValue,
 }
 
 impl fmt::Display for BoundBinaryOperator {
@@ -51,6 +52,7 @@ impl fmt::Display for BoundBinaryOperator {
                 BoundBinaryOperator::LessThanEquals => "<=",
                 BoundBinaryOperator::GreaterThanEquals => ">=",
                 BoundBinaryOperator::StringConcat => "+",
+                BoundBinaryOperator::NoneableOrValue => "??",
             }
         )
     }
