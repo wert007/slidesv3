@@ -292,7 +292,9 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn get_variable_name_by_id(&self, id: u64) -> Option<&str> {
-        self.variable_table.get(id as usize).map(|v|v.identifier.as_ref())
+        self.variable_table
+            .get(id as usize)
+            .map(|v| v.identifier.as_ref())
     }
 
     fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
@@ -418,8 +420,15 @@ pub fn bind<'a>(
         binder.register_struct(node.id, fields);
     }
 
-    let mut type_names = binder.type_table.iter().map(|b|b.identifier.as_ref().to_owned()).collect();
-    binder.diagnostic_bag.registered_types.append(&mut type_names);
+    let mut type_names = binder
+        .type_table
+        .iter()
+        .map(|b| b.identifier.as_ref().to_owned())
+        .collect();
+    binder
+        .diagnostic_bag
+        .registered_types
+        .append(&mut type_names);
 
     let fixed_variable_count = binder.variable_table.len();
     let mut label_count = binder.functions.len();
@@ -977,7 +986,9 @@ fn bind_binary_operator<'a, 'b>(
             if rhs_type.can_be_converted_to(lhs_type) {
                 Some((BoundBinaryOperator::NoneableOrValue, *lhs_type.clone()))
             } else {
-                binder.diagnostic_bag.report_cannot_convert(span, rhs_type, lhs_type);
+                binder
+                    .diagnostic_bag
+                    .report_cannot_convert(span, rhs_type, lhs_type);
                 None
             }
         }
@@ -1119,15 +1130,13 @@ fn bind_function_call<'a, 'b>(
         &Type::SystemCall(system_call) => {
             BoundNode::system_call(span, system_call, arguments, function_type.return_type)
         }
-        Type::Function(_) => {
-            BoundNode::function_call(
-                span,
-                function,
-                arguments,
-                function_type.this_type.is_some(),
-                function_type.return_type,
-            )
-        }
+        Type::Function(_) => BoundNode::function_call(
+            span,
+            function,
+            arguments,
+            function_type.this_type.is_some(),
+            function_type.return_type,
+        ),
         Type::Closure(closure) => {
             if let Some(system_call) = closure.base_function_type.system_call_kind {
                 if system_call == SystemCallKind::ArrayLength {
@@ -1143,7 +1152,7 @@ fn bind_function_call<'a, 'b>(
                     function_type.return_type,
                 )
             }
-        },
+        }
         _ => unreachable!(),
     }
 }
@@ -1422,7 +1431,7 @@ fn bind_arguments_for_function<'a, 'b>(
     result
 }
 
-fn bind_conversion<'a> (
+fn bind_conversion<'a>(
     base: BoundNode<'a>,
     type_: &Type,
     binder: &mut BindingState<'a, '_>,
@@ -1432,7 +1441,9 @@ fn bind_conversion<'a> (
     } else if base.type_.can_be_converted_to(type_) {
         BoundNode::conversion(base.span, base, type_.clone())
     } else {
-        binder.diagnostic_bag.report_cannot_convert(base.span, &base.type_, type_);
+        binder
+            .diagnostic_bag
+            .report_cannot_convert(base.span, &base.type_, type_);
         BoundNode::error(base.span)
     }
 }
@@ -1563,14 +1574,13 @@ fn bind_variable_declaration<'a, 'b>(
         initializer.type_.clone()
     };
     if type_ == Type::None {
-        binder.diagnostic_bag.report_invalid_variable_type_none(span);
+        binder
+            .diagnostic_bag
+            .report_invalid_variable_type_none(span);
     }
     let initializer = bind_conversion(initializer, &type_, binder);
-    let variable_index = binder.register_variable(
-        variable_declaration.identifier.lexeme,
-        type_.clone(),
-        false,
-    );
+    let variable_index =
+        binder.register_variable(variable_declaration.identifier.lexeme, type_.clone(), false);
     if let Some(variable_index) = variable_index {
         BoundNode::variable_declaration(span, variable_index, initializer, Some(type_))
     } else {
