@@ -339,7 +339,7 @@ impl std::fmt::Display for StructType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FunctionKind {
     FunctionId(u64),
     SystemCall(SystemCallKind),

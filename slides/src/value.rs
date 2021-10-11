@@ -1,6 +1,6 @@
 use crate::binder::typing::{SystemCallKind, Type};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     None,
     Integer(i64),

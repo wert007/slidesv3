@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundUnaryOperator {
     ArithmeticNegate,
     ArithmeticIdentity,
@@ -19,7 +19,7 @@ impl fmt::Display for BoundUnaryOperator {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundBinaryOperator {
     ArithmeticAddition,
     ArithmeticSubtraction,

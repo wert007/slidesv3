@@ -2,6 +2,8 @@ use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value}
 
 use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{FunctionKind, StructType, SystemCallKind, Type}};
 
+mod is_same_expression;
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct BoundConstant {
