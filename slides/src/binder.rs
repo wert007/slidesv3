@@ -9,7 +9,7 @@ mod lowerer;
 
 use crate::{
     binder::{
-        bound_nodes::BoundNodeKind,
+        bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::BoundUnaryOperator,
         typing::Type,
     },
@@ -128,6 +128,7 @@ struct BindingState<'a, 'b> {
     struct_table: Vec<BoundStructType<'a>>,
     functions: Vec<FunctionDeclarationBody<'a>>,
     structs: Vec<StructDeclarationBody<'a>>,
+    safe_nodes: Vec<Option<(BoundNode<'a>, Type)>>,
     print_variable_table: bool,
     max_used_variables: usize,
     function_return_type: Type,
@@ -239,6 +240,33 @@ impl<'a> BindingState<'a, '_> {
             });
             Some(index)
         }
+    }
+
+    fn register_safe_node(&mut self, node: BoundNode<'a>, safe_type: Type) -> usize {
+        if let Some(index) = self.safe_nodes.iter().position(|n| n.is_none()) {
+            self.safe_nodes[index] = Some((node, safe_type));
+            index
+        } else {
+            let index = self.safe_nodes.len();
+            self.safe_nodes.push(Some((node, safe_type)));
+            index
+        }
+    }
+
+    fn delete_safe_node(&mut self, index: usize) {
+        // NOTE: Maybe shrink the vector if there are many unused nodes? Maybe
+        // this would make allocating a new node faster. Or maybe actually don't
+        // refill "tombstones" (None values) with values but remove them, once
+        // they are many (all?) at the end.
+        self.safe_nodes[index] = None;
+    }
+
+    fn get_safe_node(&self, node: &BoundNode<'a>) -> Option<BoundNode<'a>> {
+        self.safe_nodes
+            .iter()
+            .filter_map(|n| n.as_ref())
+            .find(|(n, _)| n.is_same_expression(node))
+            .map(|(n, t)| BoundNode::conversion(n.span, n.clone(), t.clone()))
     }
 
     fn delete_variables_until(&mut self, index: usize) {
@@ -374,6 +402,7 @@ pub fn bind<'a>(
         struct_table: vec![],
         functions: vec![],
         structs: vec![],
+        safe_nodes: vec![],
         print_variable_table: debug_flags.print_variable_table(),
         max_used_variables: 0,
         function_return_type: Type::Error,
@@ -704,7 +733,7 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
 }
 
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
-    match node.kind {
+    let result = match node.kind {
         SyntaxNodeKind::Literal(literal) => bind_literal(node.span, literal, binder),
         SyntaxNodeKind::ArrayLiteral(array_literal) => {
             bind_array_literal(node.span, array_literal, binder)
@@ -748,6 +777,11 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
             bind_expression_statement(node.span, expression_statement, binder)
         }
         _ => unreachable!(),
+    };
+    if let Some(result) = binder.get_safe_node(&result) {
+        result
+    } else {
+        result
     }
 }
 
@@ -1403,6 +1437,31 @@ fn bind_conversion<'a> (
     }
 }
 
+fn bind_condition_conversion<'a>(
+    base: BoundNode<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> (BoundNode<'a>, Option<usize>) {
+    match &base.type_ {
+        Type::Error => (base, None),
+        Type::None => (base, None),
+        Type::Noneable(base_type) => {
+            let index = binder.register_safe_node(base.clone(), *base_type.clone());
+            (base, Some(index))
+        }
+        Type::Void
+        | Type::Any
+        | Type::Integer
+        | Type::Boolean
+        | Type::SystemCall(_)
+        | Type::Array(_)
+        | Type::String
+        | Type::Function(_)
+        | Type::Closure(_)
+        | Type::Struct(_)
+        | Type::StructReference(_) => (bind_conversion(base, &Type::Boolean, binder), None),
+    }
+}
+
 fn bind_for_statement<'a, 'b>(
     span: TextSpan,
     for_statement: ForStatementNodeKind<'a>,
@@ -1478,8 +1537,11 @@ fn bind_if_statement<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let condition = bind_node(*if_statement.condition, binder);
-    let condition = bind_conversion(condition, &Type::Boolean, binder);
+    let (condition, optional_index) = bind_condition_conversion(condition, binder);
     let body = bind_node(*if_statement.body, binder);
+    if let Some(index) = optional_index {
+        binder.delete_safe_node(index);
+    }
     let else_body = if_statement.else_clause.map(|e| bind_node(*e.body, binder));
     BoundNode::if_statement(span, condition, body, else_body)
 }
