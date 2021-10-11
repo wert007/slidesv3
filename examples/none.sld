@@ -30,11 +30,22 @@ func main() {
         print(m + 3);
     }
 
+
     // // Step 3.3 unary !
-    // if !n {
-    //     print('n has sadly no value :/')
-    // } else {
-    //     print(n)
+    if !n {
+        print('n has sadly no value :/');
+    } else {
+        print(n);
+    }
+    // let hui = !n;
+
+    // Step 3.4 binary operations
+    // if m == 99 {
+    //     print(m - 99);
+    // }
+
+    // if n == none {
+    //     n = 12;
     // }
 
     // // Step 4. ???
