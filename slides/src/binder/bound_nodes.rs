@@ -642,27 +642,38 @@ pub struct BoundConversionNodeKind<'a> {
     pub type_: Type,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ConversionKind {
+    None,
+    Boxing,
+    Deboxing,
+}
+
 impl BoundConversionNodeKind<'_> {
-    pub fn needs_boxing(&self) -> bool {
-        if let Type::Noneable(_) = self.type_ {
-            match &self.base.type_ {
-                Type::Error => unreachable!(),
-                Type::Void => unreachable!(),
-                Type::Noneable(_) => unreachable!(),
-                Type::Any => todo!(),
-                Type::Integer |
-                Type::Boolean |
-                Type::SystemCall(_) |
-                Type::Function(_) => true,
-                Type::None |
-                Type::Array(_) |
-                Type::String |
-                Type::Closure(_) |
-                Type::Struct(_) |
-                Type::StructReference(_) => false,
-            }
-        } else {
-            false
+    pub fn kind(&self) -> ConversionKind {
+        match (&self.type_, &self.base.type_) {
+            (Type::Void, _) |
+            (_, Type::Void) |
+            (_, Type::Error) |
+            (Type::Error, _) => unreachable!(),
+            (Type::Any, _) => todo!(),
+            (Type::Boolean, Type::None) |
+            (Type::Boolean, Type::Noneable(_)) |
+            (Type::SystemCall(_), Type::None) |
+            (Type::SystemCall(_), Type::Noneable(_)) |
+            (Type::Function(_), Type::None) |
+            (Type::Function(_), Type::Noneable(_)) |
+            (Type::Integer, Type::None) |
+            (Type::Integer, Type::Noneable(_)) => ConversionKind::Deboxing,
+            (Type::None, Type::Integer) |
+            (Type::None, Type::Boolean) |
+            (Type::None, Type::SystemCall(_)) |
+            (Type::None, Type::Function(_)) |
+            (Type::Noneable(_), Type::Integer) |
+            (Type::Noneable(_), Type::Boolean) |
+            (Type::Noneable(_), Type::SystemCall(_)) |
+            (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,
+            _ => ConversionKind::None,
         }
     }
 }

@@ -4,7 +4,7 @@ mod tests;
 
 mod label_replacer;
 
-use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind, BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::{bytes_to_word, WORD_SIZE_IN_BYTES}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
+use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind, BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::{bytes_to_word, WORD_SIZE_IN_BYTES}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
 
 use self::instruction::Instruction;
 use super::evaluator::stack::Stack;
@@ -652,10 +652,16 @@ fn convert_conversion(
     conversion: BoundConversionNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let needs_boxing = conversion.needs_boxing();
+    let conversion_kind = conversion.kind();
     let mut result = convert_node(*conversion.base, converter);
-    if needs_boxing {
-        result.push(Instruction::write_to_heap(1).span(span).into());
+    match conversion_kind {
+        ConversionKind::None => {},
+        ConversionKind::Boxing => {
+            result.push(Instruction::write_to_heap(1).span(span).into());
+        }
+        ConversionKind::Deboxing => {
+            result.push(Instruction::read_word_with_offset(0).span(span).into());
+        },
     }
     result
 }
