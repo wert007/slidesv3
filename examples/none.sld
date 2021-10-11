@@ -24,10 +24,11 @@ func main() {
     let a = n ?? 13;
     let foo = none ?? 12;
 
+
     // // Step 3.2 if
-    // if m {
-    //     print(m + 3)
-    // }
+    if m {
+        print(m + 3);
+    }
 
     // // Step 3.3 unary !
     // if !n {
