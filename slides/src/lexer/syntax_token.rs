@@ -161,7 +161,7 @@ pub enum SyntaxTokenKind {
 impl SyntaxTokenKind {
     pub fn unary_precedence(&self) -> u32 {
         match self {
-            Self::Plus | Self::Minus => 6,
+            Self::Plus | Self::Minus | Self::Bang => 6,
             _ => 0,
         }
     }

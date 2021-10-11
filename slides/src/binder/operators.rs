@@ -4,6 +4,7 @@ use std::fmt;
 pub enum BoundUnaryOperator {
     ArithmeticNegate,
     ArithmeticIdentity,
+    LogicalNegation,
 }
 
 impl fmt::Display for BoundUnaryOperator {
@@ -14,6 +15,7 @@ impl fmt::Display for BoundUnaryOperator {
             match self {
                 BoundUnaryOperator::ArithmeticNegate => "-",
                 BoundUnaryOperator::ArithmeticIdentity => "+",
+                BoundUnaryOperator::LogicalNegation => "!",
             }
         )
     }

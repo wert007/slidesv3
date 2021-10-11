@@ -357,6 +357,10 @@ fn convert_unary(
             result.push(Instruction::twos_complement().span(span).into())
         }
         BoundUnaryOperator::ArithmeticIdentity => {}
+        BoundUnaryOperator::LogicalNegation => {
+            result.push(Instruction::load_immediate(0).span(span).into());
+            result.push(Instruction::equals().span(span).into());
+        }
     }
     result
 }

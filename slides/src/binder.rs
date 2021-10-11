@@ -1031,11 +1031,12 @@ fn bind_unary_operator<'a, 'b>(
     let result = match &operator_token.kind {
         SyntaxTokenKind::Plus => BoundUnaryOperator::ArithmeticIdentity,
         SyntaxTokenKind::Minus => BoundUnaryOperator::ArithmeticNegate,
-        SyntaxTokenKind::Bang => todo!(),
+        SyntaxTokenKind::Bang => BoundUnaryOperator::LogicalNegation,
         _ => unreachable!(),
     };
     match operand.type_ {
         Type::Integer => Some((result, Type::Integer)),
+        Type::Boolean => Some((result, Type::Boolean)),
         Type::Error
         | Type::Void
         | Type::Any
@@ -1044,7 +1045,6 @@ fn bind_unary_operator<'a, 'b>(
         | Type::Closure(_)
         | Type::Struct(_)
         | Type::StructReference(_)
-        | Type::Boolean
         | Type::None
         | Type::String
         | Type::Array(_)
