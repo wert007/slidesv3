@@ -268,11 +268,11 @@ fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instr
     let offset = instruction.arg;
     let address = address + offset;
     let value = if is_heap_pointer(address) {
-        todo!();
-        // TypedU64 {
-        //     value: state.heap.read_word(address),
-        //     is_pointer: false,
-        // }
+        // FIXME: Store Flags on the heap as well.
+        TypedU64 {
+            value: state.heap.read_word(address as _),
+            is_pointer: false,
+        }
     } else {
         TypedU64 {
             value: state.stack.read_word(address as _),
