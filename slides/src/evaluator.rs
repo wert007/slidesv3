@@ -1,20 +1,13 @@
-mod memory;
+pub mod memory;
 mod sys_calls;
 
-use crate::{
-    binder::typing::{SystemCallKind, Type},
-    instruction_converter::{
+use crate::{DebugFlags, DiagnosticBag, binder::typing::{SystemCallKind, Type}, evaluator::memory::WORD_SIZE_IN_BYTES, instruction_converter::{
         instruction::{op_codes::OpCode, Instruction},
         Program,
-    },
-    value::Value,
-    DebugFlags, DiagnosticBag,
-};
+    }, value::Value};
 use num_enum::TryFromPrimitive;
 
 use self::memory::{allocator::Allocator, stack::Stack};
-
-pub use self::memory::stack;
 
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {
@@ -25,13 +18,6 @@ macro_rules! runtime_error {
 }
 
 type ResultType = Value;
-
-const HEAP_POINTER: u64 = 0x80_00_00_00_00_00_00_00;
-pub const WORD_SIZE_IN_BYTES: u64 = 8;
-
-pub const fn bytes_to_word(bytes: u64) -> u64 {
-    (bytes + WORD_SIZE_IN_BYTES - 1) / WORD_SIZE_IN_BYTES
-}
 
 pub struct EvaluatorState<'a> {
     stack: Stack,
@@ -50,7 +36,7 @@ impl EvaluatorState<'_> {
     }
 
     fn is_pointer(&mut self, address: usize) -> bool {
-        is_heap_pointer(address as _) || self.stack.is_pointer(address)
+        memory::is_heap_pointer(address as _) || self.stack.is_pointer(address)
     }
 }
 
@@ -149,10 +135,6 @@ fn evaluate_load_pointer(state: &mut EvaluatorState, instruction: Instruction) {
     state.stack.push_pointer(instruction.arg);
 }
 
-fn is_heap_pointer(address: u64) -> bool {
-    address & HEAP_POINTER > 0
-}
-
 fn evaluate_duplicate(state: &mut EvaluatorState, _: Instruction) {
     let value = state.stack.pop();
     if value.is_pointer {
@@ -197,7 +179,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
     } else {
         state.stack.read_word(array as _)
     };
-    let array_length_in_words = bytes_to_word(array_length_in_bytes);
+    let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
     if (index_in_words as i64) < 0 || index_in_words > array_length_in_words {
         runtime_error!(
             state,
@@ -297,7 +279,7 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
     // FIXME: Currently there are only complete words and no single bytes
     // supported!
     assert_eq!(size_in_bytes % WORD_SIZE_IN_BYTES, 0);
-    let size_in_words = bytes_to_word(size_in_bytes);
+    let size_in_words = memory::bytes_to_word(size_in_bytes);
     let dest = state.stack.pop();
     assert!(dest.is_pointer);
     let dest = dest.value;
@@ -401,14 +383,14 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     } else {
         state.stack.read_word(lhs_address as _)
     };
-    let lhs_length_in_words = bytes_to_word(lhs_length_in_bytes);
+    let lhs_length_in_words = memory::bytes_to_word(lhs_length_in_bytes);
     let rhs_address = rhs.value;
     let rhs_length_in_bytes = if is_heap_pointer(rhs_address) {
         state.heap.read_word(rhs_address as _)
     } else {
         state.stack.read_word(rhs_address as _)
     };
-    let _rhs_length_in_words = bytes_to_word(rhs_length_in_bytes);
+    let _rhs_length_in_words = memory::bytes_to_word(rhs_length_in_bytes);
     // If two arrays are not equal in length, we don't compare their elements.
     // But when we compare their elements we expect a true result and only
     // change it if its false.
@@ -455,7 +437,7 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
         false
     } else {
         let size_in_bytes = instruction.arg;
-        let size_in_words = bytes_to_word(size_in_bytes);
+        let size_in_words = memory::bytes_to_word(size_in_bytes);
         let mut result = true;
         for offset in 0..size_in_words {
             let rhs_address = rhs.value + offset;
@@ -531,7 +513,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             state,
             no_heap_memory_left(instruction.span, result_length + WORD_SIZE_IN_BYTES)
         );
-        pointer = HEAP_POINTER;
+        pointer = memory::HEAP_POINTER;
     } else {
         let mut writing_pointer = pointer;
         state.heap.write_word(writing_pointer as _, result_length);
@@ -784,7 +766,7 @@ fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruct
         state.stack.read_word(array as _)
     };
     if index - WORD_SIZE_IN_BYTES >= array_length_in_bytes {
-        let array_length_in_words = bytes_to_word(array_length_in_bytes);
+        let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
         let index = (index - WORD_SIZE_IN_BYTES) as _;
         runtime_error!(state, index_out_of_bounds(instruction.span, index, array_length_in_words));
     }

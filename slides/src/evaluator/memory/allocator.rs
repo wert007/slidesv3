@@ -1,7 +1,6 @@
-use crate::{
-    evaluator::{bytes_to_word, WORD_SIZE_IN_BYTES, HEAP_POINTER},
-    DebugFlags,
-};
+use crate::DebugFlags;
+
+use super::{bytes_to_word, HEAP_POINTER, WORD_SIZE_IN_BYTES};
 
 pub struct Allocator {
     pub data: Vec<u64>,

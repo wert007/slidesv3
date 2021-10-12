@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 use num_enum::TryFromPrimitive;
 
-use crate::evaluator::WORD_SIZE_IN_BYTES;
+use crate::evaluator::memory::WORD_SIZE_IN_BYTES;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Type {

@@ -1,6 +1,6 @@
 use crate::{
     binder::typing::Type,
-    evaluator::{bytes_to_word, is_heap_pointer},
+    evaluator::memory::{bytes_to_word, is_heap_pointer},
 };
 
 use super::{EvaluatorState, TypedU64, WORD_SIZE_IN_BYTES};
