@@ -48,7 +48,6 @@ pub fn output_basic_blocks_to_dot(
             result.push_str(&buffer.replace('\n', "\\l"));
             result.push_str("\"]");
         }
-        // TODO: Add code as label here!
         result.push_str(";\n");
     }
     let mut add_connection = |block_index, target, label: &str| {

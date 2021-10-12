@@ -219,7 +219,7 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
 }
 
 fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instruction) {
-    let address = state.stack.pop().unwrap_value();
+    let address = state.stack.pop().unwrap_pointer();
     let offset = instruction.arg;
     let address = address + offset;
     let value = state.read_pointer(address);
