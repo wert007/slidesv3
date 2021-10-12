@@ -10,7 +10,7 @@ mod lowerer;
 use crate::{
     binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
-        operators::BoundUnaryOperator,
+        operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
     },
     diagnostics::DiagnosticBag,
@@ -944,7 +944,11 @@ fn bind_binary<'a, 'b>(
     let lhs = bind_node(*binary.lhs, binder);
     let rhs = bind_node(*binary.rhs, binder);
     match bind_binary_operator(span, &lhs, binary.operator_token, &rhs, binder) {
-        Some((operator_token, type_)) => BoundNode::binary(span, lhs, operator_token, rhs, type_),
+        Some(bound_binary) => {
+            let lhs = bind_conversion(lhs, &bound_binary.lhs, binder);
+            let rhs = bind_conversion(rhs, &bound_binary.rhs, binder);
+            BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+        }
         None => BoundNode::error(span),
     }
 }
@@ -955,7 +959,7 @@ fn bind_binary_operator<'a, 'b>(
     operator_token: SyntaxToken,
     rhs: &BoundNode,
     binder: &mut BindingState<'a, 'b>,
-) -> Option<(BoundBinaryOperator, Type)> {
+) -> Option<BoundBinary> {
     let result = match operator_token.kind {
         SyntaxTokenKind::Plus => BoundBinaryOperator::ArithmeticAddition,
         SyntaxTokenKind::Minus => BoundBinaryOperator::ArithmeticSubtraction,
@@ -974,7 +978,7 @@ fn bind_binary_operator<'a, 'b>(
         (lhs, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, rhs)
             if lhs == rhs && lhs != &Type::Void =>
         {
-            Some((result, Type::Boolean))
+            Some(BoundBinary::same_input(lhs, result, Type::Boolean))
         }
         (
             Type::Noneable(inner),
@@ -985,7 +989,11 @@ fn bind_binary_operator<'a, 'b>(
             outer,
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
             Type::Noneable(inner),
-        ) if inner.as_ref() == outer && outer != &Type::Void => Some((result, Type::Boolean)),
+        ) if inner.as_ref() == outer && outer != &Type::Void => Some(BoundBinary::same_input(
+            &Type::Noneable(inner.clone()),
+            result,
+            Type::Boolean,
+        )),
         (
             Type::Noneable(inner),
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
@@ -995,7 +1003,11 @@ fn bind_binary_operator<'a, 'b>(
             Type::None,
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
             Type::Noneable(inner),
-        ) if inner.as_ref() != &Type::Void => Some((result, Type::Boolean)),
+        ) if inner.as_ref() != &Type::Void => Some(BoundBinary::same_input(
+            &Type::Noneable(inner.clone()),
+            result,
+            Type::Boolean,
+        )),
         (
             Type::Integer,
             BoundBinaryOperator::ArithmeticAddition
@@ -1003,7 +1015,7 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::ArithmeticMultiplication
             | BoundBinaryOperator::ArithmeticDivision,
             Type::Integer,
-        ) => Some((result, Type::Integer)),
+        ) => Some(BoundBinary::same_output(result, Type::Integer)),
         (
             Type::Integer,
             BoundBinaryOperator::LessThan
@@ -1011,17 +1023,34 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::LessThanEquals
             | BoundBinaryOperator::GreaterThanEquals,
             Type::Integer,
-        ) => Some((result, Type::Boolean)),
-        (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => {
-            Some((BoundBinaryOperator::StringConcat, Type::String))
-        }
-        (Type::String, BoundBinaryOperator::ArithmeticAddition, _)
-        | (_, BoundBinaryOperator::ArithmeticAddition, Type::String) => {
-            Some((BoundBinaryOperator::StringConcat, Type::String))
-        }
+        ) => Some(BoundBinary::same_input(
+            &Type::Integer,
+            result,
+            Type::Boolean,
+        )),
+        (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(
+            BoundBinary::same_output(BoundBinaryOperator::StringConcat, Type::String),
+        ),
+        (Type::String, BoundBinaryOperator::ArithmeticAddition, rhs) => Some(BoundBinary::new(
+            &Type::String,
+            BoundBinaryOperator::StringConcat,
+            rhs,
+            Type::String,
+        )),
+        (lhs, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(BoundBinary::new(
+            lhs,
+            BoundBinaryOperator::StringConcat,
+            &Type::String,
+            Type::String,
+        )),
         (Type::Noneable(lhs_type), BoundBinaryOperator::NoneableOrValue, rhs_type) => {
             if rhs_type.can_be_converted_to(lhs_type) {
-                Some((BoundBinaryOperator::NoneableOrValue, *lhs_type.clone()))
+                Some(BoundBinary::new(
+                    &Type::Noneable(lhs_type.clone()),
+                    result,
+                    rhs_type,
+                    *lhs_type.clone(),
+                ))
             } else {
                 binder
                     .diagnostic_bag
@@ -1031,9 +1060,12 @@ fn bind_binary_operator<'a, 'b>(
         }
         // Special case, where none ?? value is used. This could be optimized
         // away later.
-        (Type::None, BoundBinaryOperator::NoneableOrValue, rhs_type) => {
-            Some((BoundBinaryOperator::NoneableOrValue, rhs_type.clone()))
-        }
+        (Type::None, BoundBinaryOperator::NoneableOrValue, rhs_type) => Some(BoundBinary::new(
+            &Type::None,
+            result,
+            rhs_type,
+            rhs_type.clone(),
+        )),
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
             binder.diagnostic_bag.report_no_binary_operator(

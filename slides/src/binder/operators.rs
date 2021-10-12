@@ -1,5 +1,7 @@
 use std::fmt;
 
+use super::typing::Type;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundUnaryOperator {
     ArithmeticNegate,
@@ -18,6 +20,43 @@ impl fmt::Display for BoundUnaryOperator {
                 BoundUnaryOperator::LogicalNegation => "!",
             }
         )
+    }
+}
+
+pub struct BoundBinary {
+    pub lhs: Type,
+    pub op: BoundBinaryOperator,
+    pub rhs: Type,
+    pub result: Type,
+}
+
+
+impl BoundBinary {
+    pub fn same_input(input: &Type, op: BoundBinaryOperator, result: Type) -> BoundBinary {
+        Self {
+            lhs: input.clone(),
+            op,
+            rhs: input.clone(),
+            result,
+        }
+    }
+
+    pub fn same_output(op: BoundBinaryOperator, type_: Type) -> BoundBinary {
+        Self {
+            lhs: type_.clone(),
+            op,
+            rhs: type_.clone(),
+            result: type_,
+        }
+    }
+
+    pub fn new(lhs: &Type, op: BoundBinaryOperator, rhs: &Type, result: Type) -> BoundBinary {
+        Self {
+            lhs: lhs.clone(),
+            op,
+            rhs: rhs.clone(),
+            result,
+        }
     }
 }
 
