@@ -977,6 +977,26 @@ fn bind_binary_operator<'a, 'b>(
             Some((result, Type::Boolean))
         }
         (
+            Type::Noneable(inner),
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            outer,
+        )
+        | (
+            outer,
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            Type::Noneable(inner),
+        ) if inner.as_ref() == outer && outer != &Type::Void => Some((result, Type::Boolean)),
+        (
+            Type::Noneable(inner),
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            Type::None,
+        )
+        | (
+            Type::None,
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            Type::Noneable(inner),
+        ) if inner.as_ref() != &Type::Void => Some((result, Type::Boolean)),
+        (
             Type::Integer,
             BoundBinaryOperator::ArithmeticAddition
             | BoundBinaryOperator::ArithmeticSubtraction
