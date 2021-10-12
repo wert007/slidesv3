@@ -7,7 +7,7 @@ func main() {
     // let i : int = 42;
 
     // // Step 2. Optional Types
-    let m : int? = 0;
+    let m : int? = 99;
 
     // // Step 3. None Keyword
     let n : int? = none;
@@ -32,20 +32,23 @@ func main() {
 
 
     // // Step 3.3 unary !
-    if !n {
-        print('n has sadly no value :/');
+    if !!n {
+        print(n + 1);
     } else {
-        print(n);
+        print('n has sadly no value :/');
     }
-    // let hui = !n;
+    let hui = !n;
 
     // Step 3.4 binary operations
     // if m == 99 {
+    //     print('Shoud have gotten here?!');
     //     print(m - 99);
     // }
 
+    // if (n != none) == false {
     // if n == none {
     //     n = 12;
+    //     print('Shoud have gotten here as well?!');
     // }
 
     // // Step 4. ???
