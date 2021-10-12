@@ -1557,45 +1557,62 @@ fn register_contained_safe_nodes<'a>(base: &BoundNode<'a>) -> SafeNodeInConditio
             }
         }
         BoundNodeKind::BinaryExpression(binary)
-            if binary.operator_token == BoundBinaryOperator::Equals =>
+            if binary.operator_token == BoundBinaryOperator::Equals
+                && matches!(
+                    (&binary.lhs.type_, &binary.rhs.type_),
+                    (Type::Noneable(_), Type::Noneable(_))
+                ) =>
         {
-            match (&binary.lhs.type_, &binary.rhs.type_) {
-                (Type::None, Type::Noneable(lhs_type)) => {
-                    SafeNodeInCondition::ElseBody(*binary.rhs.clone(), *lhs_type.clone())
+            match (&binary.lhs.constant_value, &binary.rhs.constant_value) {
+                (None, Some(constant)) => {
+                    if constant.value == Value::None {
+                        register_contained_safe_nodes(&binary.lhs).negate()
+                    } else {
+                        register_contained_safe_nodes(&binary.lhs)
+                    }
                 }
-                (Type::Noneable(rhs_type), Type::None) => {
-                    SafeNodeInCondition::ElseBody(*binary.rhs.clone(), *rhs_type.clone())
-                }
-                (lhs_type, Type::Noneable(base_type)) if lhs_type == base_type.as_ref() => {
-                    SafeNodeInCondition::IfBody(*binary.rhs.clone(), lhs_type.clone())
-                }
-                (Type::Noneable(base_type), rhs_type) if rhs_type == base_type.as_ref() => {
-                    SafeNodeInCondition::IfBody(*binary.lhs.clone(), rhs_type.clone())
+                (Some(constant), None) => {
+                    if constant.value == Value::None {
+                        register_contained_safe_nodes(&binary.rhs).negate()
+                    } else {
+                        register_contained_safe_nodes(&binary.rhs)
+                    }
                 }
                 _ => SafeNodeInCondition::None,
             }
         }
         BoundNodeKind::BinaryExpression(binary)
-            if binary.operator_token == BoundBinaryOperator::NotEquals =>
+            if binary.operator_token == BoundBinaryOperator::NotEquals
+                && matches!(
+                    (&binary.lhs.type_, &binary.rhs.type_),
+                    (Type::Noneable(_), Type::Noneable(_))
+                ) =>
         {
-            match (&binary.lhs.type_, &binary.rhs.type_) {
-                (Type::None, Type::Noneable(base_type)) => {
-                    SafeNodeInCondition::ElseBody(*binary.rhs.clone(), *base_type.clone())
+            match (&binary.lhs.constant_value, &binary.rhs.constant_value) {
+                (None, Some(constant)) => {
+                    if constant.value == Value::None {
+                        register_contained_safe_nodes(&binary.lhs)
+                    } else {
+                        SafeNodeInCondition::None
+                    }
                 }
-                (Type::Noneable(base_type), Type::None) => {
-                    SafeNodeInCondition::ElseBody(*binary.lhs.clone(), *base_type.clone())
-                }
-                (lhs_type, Type::Noneable(base_type)) if lhs_type == base_type.as_ref() => {
-                    SafeNodeInCondition::None
-                }
-                (Type::Noneable(base_type), rhs_type) if rhs_type == base_type.as_ref() => {
-                    SafeNodeInCondition::None
+                (Some(constant), None) => {
+                    if constant.value == Value::None {
+                        register_contained_safe_nodes(&binary.rhs)
+                    } else {
+                        SafeNodeInCondition::None
+                    }
                 }
                 _ => SafeNodeInCondition::None,
             }
         }
-        BoundNodeKind::Conversion(_) => SafeNodeInCondition::None,
-        _ => SafeNodeInCondition::None,
+        _ => {
+            if let Type::Noneable(base_type) = &base.type_ {
+                SafeNodeInCondition::IfBody(base.clone(), *base_type.clone())
+            } else {
+                SafeNodeInCondition::None
+            }
+        }
     }
 }
 
