@@ -1,8 +1,8 @@
 func main() {
-    let m: int? = 1;
-    if m == 1 {
-        m = 99;
-        print(m);
+    // Noneable + Arrays:
+    let crazy : int?[] = [ 99, none, none, 1];
+
+    for c in crazy {
+        print(c);
     }
-    print(m);
 }

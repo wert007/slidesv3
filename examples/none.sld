@@ -54,15 +54,4 @@ func main() {
     // // Step 4. ???
 
     // // Step 5. Profit
-
-
-    // Noneable + Arrays:
-    // let crazy : int?[] = [ 1, 4];
-    // let crazy : int?[] = [ none, none];
-    // let crazy : int?[] = [ none, none, 1];
-    // let crazy : int?[] = [ 99, none, none, 1];
-
-    // for c in crazy {
-    //     print(c);
-    // }
 }
