@@ -35,32 +35,24 @@ impl EvaluatorState<'_> {
         self.registers[variable] = value;
     }
 
-    fn is_pointer(&mut self, address: usize) -> bool {
+    fn is_pointer(&mut self, address: u64) -> bool {
         memory::is_heap_pointer(address as _) || self.stack.is_pointer(address)
     }
 
     fn read_pointer(&self, address: u64) -> FlaggedWord {
         if memory::is_heap_pointer(address) {
-            self.heap.read_flagged_word(address as _)
-            // FlaggedWord {
-            //     value: self.heap.read_word(address as _),
-            //     is_pointer: false,
-            // }
+            self.heap.read_flagged_word(address)
         } else {
-            self.stack.read_flagged_word(address as _)
-            // FlaggedWord {
-            //     value: self.stack.read_word(address as _),
-            //     is_pointer: self.stack.is_pointer(address as _),
-            // }
+            self.stack.read_flagged_word(address)
         }
     }
 
     fn write_pointer(&mut self, address: u64, value: FlaggedWord) {
-        if memory::is_heap_pointer(address as _) {
-            self.heap.write_word(address as _, value.value);
+        if memory::is_heap_pointer(address) {
+            self.heap.write_word(address, value.value);
         } else {
-            self.stack.write_word(address as _, value.value);
-            self.stack.set_pointer(address as _);
+            self.stack.write_word(address, value.value);
+            self.stack.set_pointer(address);
         }
     }
 }

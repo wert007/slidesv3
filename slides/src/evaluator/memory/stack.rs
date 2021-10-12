@@ -51,66 +51,66 @@ impl Stack {
         self.print_maybe_stack();
     }
 
-    pub fn is_pointer(&self, address: usize) -> bool {
-        assert_eq!(address % WORD_SIZE_IN_BYTES as usize, 0);
-        let address = address / WORD_SIZE_IN_BYTES as usize;
-        self.flags[address].is_pointer
+    pub fn is_pointer(&self, address: u64) -> bool {
+        assert_eq!(address % WORD_SIZE_IN_BYTES, 0);
+        let address = address / WORD_SIZE_IN_BYTES;
+        self.flags[address as usize].is_pointer
     }
 
-    pub fn set_pointer(&mut self, address: usize) {
-        assert_eq!(address % WORD_SIZE_IN_BYTES as usize, 0);
-        let address = address / WORD_SIZE_IN_BYTES as usize;
-        self.flags[address].is_pointer = true;
+    pub fn set_pointer(&mut self, address: u64) {
+        assert_eq!(address % WORD_SIZE_IN_BYTES, 0);
+        let address = address / WORD_SIZE_IN_BYTES;
+        self.flags[address as usize].is_pointer = true;
     }
 
-    pub fn read_word(&self, address: usize) -> u64 {
-        if address % WORD_SIZE_IN_BYTES as usize == 0 {
-            self.read_word_aligned(address / WORD_SIZE_IN_BYTES as usize)
+    pub fn read_word(&self, address: u64) -> u64 {
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.read_word_aligned(address / WORD_SIZE_IN_BYTES)
         } else {
             unimplemented!("address = 0x{:x}", address)
         }
     }
 
-    pub fn read_flagged_word(&self, address: usize) -> FlaggedWord {
-        if address % WORD_SIZE_IN_BYTES as usize == 0 {
-            self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES as usize)
+    pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES)
         } else {
             unimplemented!("address = 0x{:x}", address)
         }
     }
 
-    fn read_word_aligned(&self, address: usize) -> u64 {
-        self.data[address]
+    fn read_word_aligned(&self, address: u64) -> u64 {
+        self.data[address as usize]
     }
 
-    fn read_flagged_word_aligned(&self, address: usize) -> FlaggedWord {
-        FlaggedWord::value(self.data[address]).flags(self.flags[address])
+    fn read_flagged_word_aligned(&self, address: u64) -> FlaggedWord {
+        FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
     }
 
-    pub fn write_word(&mut self, address: usize, value: u64) {
-        if address % WORD_SIZE_IN_BYTES as usize == 0 {
-            self.write_word_aligned(address / WORD_SIZE_IN_BYTES as usize, value);
+    pub fn write_word(&mut self, address: u64, value: u64) {
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.write_word_aligned(address / WORD_SIZE_IN_BYTES, value);
         } else {
             unimplemented!("address = 0x{:x}", address);
         }
     }
 
-    pub fn write_flagged_word(&mut self, address: usize, value: FlaggedWord) {
-        if address % WORD_SIZE_IN_BYTES as usize == 0 {
-            self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES as usize, value);
+    pub fn write_flagged_word(&mut self, address: u64, value: FlaggedWord) {
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, value);
         } else {
             unimplemented!("address = 0x{:x}", address);
         }
     }
 
-    fn write_word_aligned(&mut self, address: usize, value: u64) {
-        self.data[address] = value;
+    fn write_word_aligned(&mut self, address: u64, value: u64) {
+        self.data[address as usize] = value;
         self.print_maybe_stack();
     }
 
-    fn write_flagged_word_aligned(&mut self, address: usize, value: FlaggedWord) {
-        self.data[address] = value.value;
-        self.flags[address] = value.flags;
+    fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
+        self.data[address as usize] = value.value;
+        self.flags[address as usize] = value.flags;
         self.print_maybe_stack();
     }
 

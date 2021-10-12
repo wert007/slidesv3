@@ -73,9 +73,9 @@ impl Program {
     }
 }
 
-fn allocate(stack: &mut Stack, size_in_bytes: u64) -> usize {
+fn allocate(stack: &mut Stack, size_in_bytes: u64) -> u64 {
     let size_in_words = bytes_to_word(size_in_bytes);
-    let pointer = stack.len() * WORD_SIZE_IN_BYTES as usize;
+    let pointer = stack.len() as u64 * WORD_SIZE_IN_BYTES;
     for _ in 0..size_in_words {
         stack.push(0);
     }
@@ -238,7 +238,7 @@ fn convert_string_literal(
     let mut address = allocate(&mut converter.stack, length_in_bytes + WORD_SIZE_IN_BYTES);
     let pointer = address as _;
     converter.stack.write_word(address, length_in_bytes);
-    address += WORD_SIZE_IN_BYTES as usize;
+    address += WORD_SIZE_IN_BYTES;
     let byte_groups = value.as_bytes().chunks_exact(WORD_SIZE_IN_BYTES as _);
     let remainder = byte_groups.remainder();
     for word in byte_groups {
@@ -247,7 +247,7 @@ fn convert_string_literal(
         ];
         let word = u64::from_be_bytes(word);
         converter.stack.write_word(address, word);
-        address += WORD_SIZE_IN_BYTES as usize;
+        address += WORD_SIZE_IN_BYTES;
     }
     if !remainder.is_empty() {
         let word = [

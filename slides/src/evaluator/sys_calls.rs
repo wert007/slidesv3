@@ -62,11 +62,7 @@ fn array_to_string_native(
     state: &mut EvaluatorState,
 ) -> String {
     assert!(argument.is_pointer(), "argument = {:#?}", argument);
-    let array_length_in_bytes = if is_heap_pointer(argument.value) {
-        state.heap.read_word(argument.value as _)
-    } else {
-        state.stack.read_word(argument.value as usize)
-    };
+    let array_length_in_bytes = state.read_pointer(argument.value).value;
     let array_length_in_words = bytes_to_word(array_length_in_bytes);
     let array_start = argument.value + WORD_SIZE_IN_BYTES;
     let array_end = array_start + array_length_in_words * WORD_SIZE_IN_BYTES;
@@ -172,7 +168,7 @@ pub fn array_length(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
         state.heap.read_word(array_start as _)
     } else {
         is_heap_array = false;
-        state.stack.read_word(array_start as usize)
+        state.stack.read_word(array_start as _)
     };
 
     while state.is_pointer(array_start as _) && !is_heap_array {
@@ -182,7 +178,7 @@ pub fn array_length(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
             state.heap.read_word(pointer as _)
         } else {
             is_heap_array = false;
-            state.stack.read_word(pointer as usize)
+            state.stack.read_word(pointer as _)
         };
     }
 
