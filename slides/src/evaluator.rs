@@ -212,8 +212,10 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
     let mut writing_pointer = address;
     for _ in 0..instruction.arg {
         let value = state.stack.pop();
-        state.heap.write_word(writing_pointer as _, value.unwrap_value());
-        writing_pointer += WORD_SIZE_IN_BYTES;
+        if address != 0 {
+            state.heap.write_flagged_word(writing_pointer as _, value);
+            writing_pointer += WORD_SIZE_IN_BYTES;
+        }
     }
     state.stack.push_pointer(address);
 }
