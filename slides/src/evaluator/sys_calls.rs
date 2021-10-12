@@ -1,6 +1,6 @@
 use crate::{
     binder::typing::Type,
-    evaluator::memory::{bytes_to_word, is_heap_pointer},
+    evaluator::memory::bytes_to_word,
 };
 
 use super::{EvaluatorState, WORD_SIZE_IN_BYTES, memory::FlaggedWord};
@@ -145,26 +145,8 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
 }
 
 pub fn array_length(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
-    let mut is_heap_array;
-    let mut array_start = argument.value;
-    let mut pointer = if is_heap_pointer(array_start) {
-        is_heap_array = true;
-        state.heap.read_word(array_start)
-    } else {
-        is_heap_array = false;
-        state.stack.read_word(array_start)
-    };
-
-    while state.is_pointer(array_start) && !is_heap_array {
-        array_start = pointer;
-        pointer = if is_heap_pointer(pointer) {
-            is_heap_array = true;
-            state.heap.read_word(pointer)
-        } else {
-            is_heap_array = false;
-            state.stack.read_word(pointer)
-        };
-    }
+    let array_start = argument.value;
+    let pointer = state.read_pointer(array_start).value;
 
     let array_length = pointer / type_.array_element_size_in_bytes();
 

@@ -51,30 +51,12 @@ impl Stack {
         self.print_maybe_stack();
     }
 
-    pub fn is_pointer(&self, address: u64) -> bool {
-        assert_eq!(address % WORD_SIZE_IN_BYTES, 0);
-        let address = address / WORD_SIZE_IN_BYTES;
-        self.flags[address as usize].is_pointer
-    }
-
-    pub fn read_word(&self, address: u64) -> u64 {
-        if address % WORD_SIZE_IN_BYTES == 0 {
-            self.read_word_aligned(address / WORD_SIZE_IN_BYTES)
-        } else {
-            unimplemented!("address = 0x{:x}", address)
-        }
-    }
-
     pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
         if address % WORD_SIZE_IN_BYTES == 0 {
             self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES)
         } else {
             unimplemented!("address = 0x{:x}", address)
         }
-    }
-
-    fn read_word_aligned(&self, address: u64) -> u64 {
-        self.data[address as usize]
     }
 
     fn read_flagged_word_aligned(&self, address: u64) -> FlaggedWord {
