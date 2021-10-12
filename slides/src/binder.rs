@@ -64,6 +64,23 @@ impl AsRef<str> for SmartString<'_> {
     }
 }
 
+#[derive(Debug, Clone)]
+enum SafeNodeInCondition<'a> {
+    None,
+    IfBody(BoundNode<'a>, Type),
+    ElseBody(BoundNode<'a>, Type),
+}
+
+impl SafeNodeInCondition<'_> {
+    pub fn negate(self) -> Self {
+        match self {
+            SafeNodeInCondition::None => self,
+            SafeNodeInCondition::IfBody(node, safe_type) => Self::ElseBody(node, safe_type),
+            SafeNodeInCondition::ElseBody(node, safe_type) => Self::IfBody(node, safe_type),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct FunctionDeclarationBody<'a> {
     function_name: &'a str,
@@ -1451,25 +1468,88 @@ fn bind_conversion<'a>(
 fn bind_condition_conversion<'a>(
     base: BoundNode<'a>,
     binder: &mut BindingState<'a, '_>,
-) -> (BoundNode<'a>, Option<usize>) {
+) -> (BoundNode<'a>, SafeNodeInCondition<'a>) {
     match &base.type_ {
-        Type::Error => (base, None),
-        Type::None => (base, None),
+        Type::Error => (base, SafeNodeInCondition::None),
+        Type::None => (base, SafeNodeInCondition::None),
         Type::Noneable(base_type) => {
-            let index = binder.register_safe_node(base.clone(), *base_type.clone());
-            (base, Some(index))
+            let safe_type = *base_type.clone();
+            let node = base.clone();
+            (base, SafeNodeInCondition::IfBody(node, safe_type))
+        }
+        Type::Boolean => {
+            let safe_node = register_contained_safe_nodes(&base);
+            (base, safe_node)
         }
         Type::Void
         | Type::Any
         | Type::Integer
-        | Type::Boolean
         | Type::SystemCall(_)
         | Type::Array(_)
         | Type::String
         | Type::Function(_)
         | Type::Closure(_)
         | Type::Struct(_)
-        | Type::StructReference(_) => (bind_conversion(base, &Type::Boolean, binder), None),
+        | Type::StructReference(_) => (
+            bind_conversion(base, &Type::Boolean, binder),
+            SafeNodeInCondition::None,
+        ),
+    }
+}
+
+fn register_contained_safe_nodes<'a>(base: &BoundNode<'a>) -> SafeNodeInCondition<'a> {
+    match &base.kind {
+        BoundNodeKind::UnaryExpression(unary)
+            if unary.operator_token == BoundUnaryOperator::LogicalNegation =>
+        {
+            match &unary.operand.type_ {
+                Type::Boolean => register_contained_safe_nodes(&unary.operand).negate(),
+                Type::Noneable(base_type) => {
+                    SafeNodeInCondition::ElseBody(*unary.operand.clone(), *base_type.clone())
+                }
+                _ => SafeNodeInCondition::None,
+            }
+        }
+        BoundNodeKind::BinaryExpression(binary)
+            if binary.operator_token == BoundBinaryOperator::Equals =>
+        {
+            match (&binary.lhs.type_, &binary.rhs.type_) {
+                (Type::None, Type::Noneable(lhs_type)) => {
+                    SafeNodeInCondition::ElseBody(*binary.rhs.clone(), *lhs_type.clone())
+                }
+                (Type::Noneable(rhs_type), Type::None) => {
+                    SafeNodeInCondition::ElseBody(*binary.rhs.clone(), *rhs_type.clone())
+                }
+                (lhs_type, Type::Noneable(base_type)) if lhs_type == base_type.as_ref() => {
+                    SafeNodeInCondition::IfBody(*binary.rhs.clone(), lhs_type.clone())
+                }
+                (Type::Noneable(base_type), rhs_type) if rhs_type == base_type.as_ref() => {
+                    SafeNodeInCondition::IfBody(*binary.lhs.clone(), rhs_type.clone())
+                }
+                _ => SafeNodeInCondition::None,
+            }
+        }
+        BoundNodeKind::BinaryExpression(binary)
+            if binary.operator_token == BoundBinaryOperator::NotEquals =>
+        {
+            match (&binary.lhs.type_, &binary.rhs.type_) {
+                (Type::None, Type::Noneable(base_type)) => {
+                    SafeNodeInCondition::ElseBody(*binary.rhs.clone(), *base_type.clone())
+                }
+                (Type::Noneable(base_type), Type::None) => {
+                    SafeNodeInCondition::ElseBody(*binary.lhs.clone(), *base_type.clone())
+                }
+                (lhs_type, Type::Noneable(base_type)) if lhs_type == base_type.as_ref() => {
+                    SafeNodeInCondition::None
+                }
+                (Type::Noneable(base_type), rhs_type) if rhs_type == base_type.as_ref() => {
+                    SafeNodeInCondition::None
+                }
+                _ => SafeNodeInCondition::None,
+            }
+        }
+        BoundNodeKind::Conversion(_) => SafeNodeInCondition::None,
+        _ => SafeNodeInCondition::None,
     }
 }
 
@@ -1548,12 +1628,25 @@ fn bind_if_statement<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let condition = bind_node(*if_statement.condition, binder);
-    let (condition, optional_index) = bind_condition_conversion(condition, binder);
+    let (condition, safe_node) = bind_condition_conversion(condition, binder);
+    let optional_index = if let SafeNodeInCondition::IfBody(node, safe_type) = safe_node.clone() {
+        Some(binder.register_safe_node(node, safe_type))
+    } else {
+        None
+    };
     let body = bind_node(*if_statement.body, binder);
     if let Some(index) = optional_index {
         binder.delete_safe_node(index);
     }
+    let optional_index = if let SafeNodeInCondition::ElseBody(node, safe_type) = safe_node {
+        Some(binder.register_safe_node(node, safe_type))
+    } else {
+        None
+    };
     let else_body = if_statement.else_clause.map(|e| bind_node(*e.body, binder));
+    if let Some(index) = optional_index {
+        binder.delete_safe_node(index);
+    }
     BoundNode::if_statement(span, condition, body, else_body)
 }
 
