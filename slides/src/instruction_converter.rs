@@ -376,12 +376,22 @@ fn convert_binary(
         BoundBinaryOperator::ArithmeticMultiplication => Instruction::multiplication(),
         BoundBinaryOperator::ArithmeticDivision => Instruction::division(),
         BoundBinaryOperator::Equals => {
-            if matches!(binary.lhs.type_, Type::Array(_) | Type::String)
-                && matches!(binary.rhs.type_, Type::Array(_) | Type::String)
-            {
-                Instruction::array_equals()
-            } else {
-                Instruction::equals()
+            match (&binary.lhs.type_, &binary.rhs.type_) {
+                (Type::Array(_) | Type::String, Type::Array(_) | Type::String) => {
+                    Instruction::array_equals()
+                }
+                (Type::Noneable(base_type), Type::Noneable(_)) if !base_type.is_pointer() => {
+                    Instruction::noneable_equals(base_type.size_in_bytes())
+                }
+                (Type::Noneable(base_type), Type::Noneable(_)) if base_type.is_pointer() => {
+                    todo!("Not completely implemented. None must become an actual
+                    pointer, which points to invalid memory. And array_equals
+                    must return false if one of those is the none pointer,
+                    but not the other.
+                    ");
+                    // Instruction::array_equals()
+                }
+                _ => Instruction::equals(),
             }
         }
         BoundBinaryOperator::NotEquals => {
