@@ -121,6 +121,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::NotEquals => evaluate_not_equals(state, instruction),
         OpCode::ArrayEquals => evaluate_array_equals(state, instruction),
         OpCode::ArrayNotEquals => evaluate_array_not_equals(state, instruction),
+        OpCode::NoneableEquals => evaluate_noneable_equals(state, instruction),
         OpCode::LessThan => evaluate_less_than(state, instruction),
         OpCode::GreaterThan => evaluate_greater_than(state, instruction),
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
@@ -441,6 +442,40 @@ fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
 
 fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
     let result = !array_equals(state);
+    state.stack.push(result as _);
+}
+
+fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction) {
+    let rhs = state.stack.pop();
+    let lhs = state.stack.pop();
+    let result = if rhs.value == lhs.value {
+        true
+    } else if rhs.value == 0 || lhs.value == 0 {
+        false
+    } else {
+        let size_in_bytes = instruction.arg;
+        let size_in_words = bytes_to_word(size_in_bytes);
+        let mut result = true;
+        for offset in 0..size_in_words {
+            let rhs_address = rhs.value + offset;
+            let lhs_address = lhs.value + offset;
+            let rhs_value = if is_heap_pointer(rhs_address) {
+                state.heap.read_word(rhs_address as _)
+            } else {
+                state.stack.read_word(rhs_address as _)
+            };
+            let lhs_value = if is_heap_pointer(lhs_address) {
+                state.heap.read_word(lhs_address as _)
+            } else {
+                state.stack.read_word(lhs_address as _)
+            };
+            if rhs_value != lhs_value {
+                result = false;
+                break;
+            }
+        }
+        result
+    };
     state.stack.push(result as _);
 }
 

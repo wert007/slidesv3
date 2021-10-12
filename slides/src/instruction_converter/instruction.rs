@@ -230,6 +230,14 @@ impl Instruction {
         }
     }
 
+    pub const fn noneable_equals(size_in_bytes: u64) -> Self {
+        Self {
+            op_code: OpCode::NoneableEquals,
+            arg: size_in_bytes,
+            span: None,
+        }
+    }
+
     pub const fn less_than() -> Self {
         Self {
             op_code: OpCode::LessThan,
