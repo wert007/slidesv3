@@ -38,6 +38,29 @@ impl EvaluatorState<'_> {
     fn is_pointer(&mut self, address: usize) -> bool {
         memory::is_heap_pointer(address as _) || self.stack.is_pointer(address)
     }
+
+    fn read_pointer(&self, address: u64) -> TypedU64 {
+        if memory::is_heap_pointer(address) {
+            TypedU64 {
+                value: self.heap.read_word(address as _),
+                is_pointer: false,
+            }
+        } else {
+            TypedU64 {
+                value: self.stack.read_word(address as _),
+                is_pointer: self.stack.is_pointer(address as _),
+            }
+        }
+    }
+
+    fn write_pointer(&mut self, address: u64, value: TypedU64) {
+        if memory::is_heap_pointer(address as _) {
+            self.heap.write_word(address as _, value.value);
+        } else {
+            self.stack.write_word(address as _, value.value);
+            self.stack.set_pointer(address as _);
+        }
+    }
 }
 
 pub fn evaluate(
@@ -174,11 +197,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
     );
     let array = array.value;
 
-    let array_length_in_bytes = if is_heap_pointer(array) {
-        state.heap.read_word(array as _)
-    } else {
-        state.stack.read_word(array as _)
-    };
+    let array_length_in_bytes = state.read_pointer(array).value;
     let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
     if (index_in_words as i64) < 0 || index_in_words > array_length_in_words {
         runtime_error!(
@@ -192,18 +211,14 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
         state.stack.push(0);
         return;
     }
-    let index_in_bytes = array as usize
-        + index_in_words as usize * WORD_SIZE_IN_BYTES as usize
-        + WORD_SIZE_IN_BYTES as usize;
-    let value = if is_heap_pointer(array) {
-        state.heap.read_word(index_in_bytes)
+    let index_in_bytes = array
+        + index_in_words * WORD_SIZE_IN_BYTES
+        + WORD_SIZE_IN_BYTES;
+    let value = state.read_pointer(index_in_bytes);
+    if value.is_pointer {
+        state.stack.push_pointer(value.value);
     } else {
-        state.stack.read_word(index_in_bytes)
-    };
-    if state.is_pointer(index_in_bytes) {
-        state.stack.push_pointer(value);
-    } else {
-        state.stack.push(value);
+        state.stack.push(value.value);
     }
 }
 
@@ -216,22 +231,17 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
         array, state.stack.flags, state.stack.data
     );
     let array = array.value;
-    let value = state.stack.pop().value;
+    let value = state.stack.pop();
     let index = array + index;
-    let index = index as _;
-    if is_heap_pointer(array) {
-        state.heap.write_word(index, value);
-    } else {
-        state.stack.write_word(index, value);
-    }
+    state.write_pointer(index, value);
 }
 
 fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
-    let address = instruction.arg as _;
+    let address = instruction.arg;
     let value = state.stack.pop();
-    state.stack.write_word(address, value.value);
+    state.stack.write_word(address as _, value.value);
     if value.is_pointer {
-        state.stack.set_pointer(address);
+        state.stack.set_pointer(address as _);
     }
 }
 
@@ -251,18 +261,7 @@ fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instr
     let address = state.stack.pop().value;
     let offset = instruction.arg;
     let address = address + offset;
-    let value = if is_heap_pointer(address) {
-        // FIXME: Store Flags on the heap as well.
-        TypedU64 {
-            value: state.heap.read_word(address as _),
-            is_pointer: false,
-        }
-    } else {
-        TypedU64 {
-            value: state.stack.read_word(address as _),
-            is_pointer: state.stack.is_pointer(address as _),
-        }
-    };
+    let value = state.read_pointer(address);
     if value.is_pointer {
         state.stack.push_pointer(value.value);
     } else {
@@ -288,19 +287,9 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
     let src = src.value;
     for word_index in 0..size_in_words {
         let src = src + word_index * WORD_SIZE_IN_BYTES;
-        let src = src as usize;
         let dest = dest + word_index * WORD_SIZE_IN_BYTES;
-        let dest = dest as usize;
-        let buffer = if is_heap_pointer(src as _) {
-            state.heap.read_word(src)
-        } else {
-            state.stack.read_word(src)
-        };
-        if is_heap_pointer(dest as _) {
-            state.heap.write_word(dest, buffer);
-        } else {
-            state.stack.write_word(dest, buffer);
-        }
+        let buffer = state.read_pointer(src);
+        state.write_pointer(dest, buffer);
     }
 }
 
@@ -378,18 +367,10 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
         rhs, state.stack.data, state.stack.flags
     );
     let lhs_address = lhs.value;
-    let lhs_length_in_bytes = if is_heap_pointer(lhs_address) {
-        state.heap.read_word(lhs_address as _)
-    } else {
-        state.stack.read_word(lhs_address as _)
-    };
+    let lhs_length_in_bytes = state.read_pointer(lhs_address ).value;
     let lhs_length_in_words = memory::bytes_to_word(lhs_length_in_bytes);
     let rhs_address = rhs.value;
-    let rhs_length_in_bytes = if is_heap_pointer(rhs_address) {
-        state.heap.read_word(rhs_address as _)
-    } else {
-        state.stack.read_word(rhs_address as _)
-    };
+    let rhs_length_in_bytes = state.read_pointer(rhs_address ).value;
     let _rhs_length_in_words = memory::bytes_to_word(rhs_length_in_bytes);
     // If two arrays are not equal in length, we don't compare their elements.
     // But when we compare their elements we expect a true result and only
@@ -397,18 +378,10 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     let mut result = lhs_length_in_bytes == rhs_length_in_bytes;
     if lhs_address != rhs_address && lhs_length_in_bytes == rhs_length_in_bytes {
         for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
-            let lhs_index = lhs_address as usize + i as usize;
-            let rhs_index = rhs_address as usize + i as usize;
-            let lhs = if is_heap_pointer(lhs_address) {
-                state.heap.read_word(lhs_index)
-            } else {
-                state.stack.read_word(lhs_index)
-            };
-            let rhs = if is_heap_pointer(rhs_address) {
-                state.heap.read_word(rhs_index)
-            } else {
-                state.stack.read_word(rhs_index)
-            };
+            let lhs_index = lhs_address + i;
+            let rhs_index = rhs_address + i;
+            let lhs = state.read_pointer(lhs_index).value;
+            let rhs = state.read_pointer(rhs_index).value;
             if lhs != rhs {
                 result = false;
                 break;
@@ -442,16 +415,8 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
         for offset in 0..size_in_words {
             let rhs_address = rhs.value + offset;
             let lhs_address = lhs.value + offset;
-            let rhs_value = if is_heap_pointer(rhs_address) {
-                state.heap.read_word(rhs_address as _)
-            } else {
-                state.stack.read_word(rhs_address as _)
-            };
-            let lhs_value = if is_heap_pointer(lhs_address) {
-                state.heap.read_word(lhs_address as _)
-            } else {
-                state.stack.read_word(lhs_address as _)
-            };
+            let rhs_value = state.read_pointer(rhs_address).value;
+            let lhs_value = state.read_pointer(lhs_address).value;
             if rhs_value != lhs_value {
                 result = false;
                 break;
@@ -496,16 +461,8 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
         lhs, rhs, state.stack.data
     );
 
-    let lhs_length = if is_heap_pointer(lhs.value) {
-        state.heap.read_word(lhs.value as usize)
-    } else {
-        state.stack.read_word(lhs.value as usize)
-    };
-    let rhs_length = if is_heap_pointer(rhs.value) {
-        state.heap.read_word(rhs.value as usize)
-    } else {
-        state.stack.read_word(rhs.value as usize)
-    };
+    let lhs_length = state.read_pointer(lhs.value).value;
+    let rhs_length = state.read_pointer(rhs.value).value;
     let result_length = lhs_length + rhs_length;
     let mut pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
@@ -522,12 +479,9 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             let lhs_address = lhs.value;
             let address = lhs_address + i + WORD_SIZE_IN_BYTES;
             let address = address as usize;
-            let lhs_byte = if is_heap_pointer(address as _) {
-                state.heap.read_byte(address)
-            } else {
-                let word = state
-                    .stack
-                    .read_word(address & !(WORD_SIZE_IN_BYTES - 1) as usize);
+            let lhs_byte = {
+                let addr = address as u64 & !(WORD_SIZE_IN_BYTES - 1);
+                let word = state.read_pointer(addr).value;
                 let bytes = word.to_be_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
@@ -538,12 +492,9 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             let rhs_address = rhs.value;
             let address = rhs_address + i + WORD_SIZE_IN_BYTES;
             let address = address as usize;
-            let rhs_byte = if is_heap_pointer(address as _) {
-                state.heap.read_byte(address)
-            } else {
-                let word = state
-                    .stack
-                    .read_word(address & !(WORD_SIZE_IN_BYTES - 1) as usize);
+            let rhs_byte = {
+                let addr = address as u64 & !(WORD_SIZE_IN_BYTES - 1);
+                let word = state.read_pointer(addr).value;
                 let bytes = word.to_be_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
@@ -576,15 +527,7 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
         lhs
     };
     let result = if instruction.arg != 0 {
-        let value = if is_heap_pointer(result.value) {
-            state.heap.read_word(result.value as _)
-        } else {
-            state.stack.read_word(result.value as _)
-        };
-        TypedU64 {
-            value,
-            is_pointer: false, // Otherwise we would not need to dereference the pointer.
-        }
+        state.read_pointer(result.value)
     } else {
         result
     };
@@ -725,28 +668,16 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
     assert!(closure_pointer.is_pointer);
     let mut closure_pointer = closure_pointer.value;
 
-    let closure_length_in_bytes = if is_heap_pointer(closure_pointer) {
-        state.heap.read_word(closure_pointer as _)
-    } else {
-        state.stack.read_word(closure_pointer as _)
-    };
-    let argument_count = bytes_to_word(closure_length_in_bytes) - 1 + instruction.arg;
+    let closure_length_in_bytes = state.read_pointer(closure_pointer).value;
+    let argument_count = memory::bytes_to_word(closure_length_in_bytes) - 1 + instruction.arg;
     closure_pointer += WORD_SIZE_IN_BYTES;
     let end_address = closure_pointer + closure_length_in_bytes;
 
-    let function_pointer = if is_heap_pointer(closure_pointer) {
-        state.heap.read_word(closure_pointer as _)
-    } else {
-        state.stack.read_word(closure_pointer as _)
-    };
+    let function_pointer = state.read_pointer(closure_pointer).value;
     closure_pointer += WORD_SIZE_IN_BYTES;
 
     while closure_pointer < end_address {
-        let argument = if is_heap_pointer(closure_pointer) {
-            state.heap.read_word(closure_pointer as _)
-        } else {
-            state.stack.read_word(closure_pointer as _)
-        };
+        let argument = state.read_pointer(closure_pointer).value;
         state.stack.push(argument);
         closure_pointer += WORD_SIZE_IN_BYTES;
     }
@@ -760,11 +691,7 @@ fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruct
     let array = state.stack.pop();
     assert!(array.is_pointer);
     let array = array.value;
-    let array_length_in_bytes = if is_heap_pointer(array) {
-        state.heap.read_word(array as _)
-    } else {
-        state.stack.read_word(array as _)
-    };
+    let array_length_in_bytes = state.read_pointer(array).value;
     if index - WORD_SIZE_IN_BYTES >= array_length_in_bytes {
         let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
         let index = (index - WORD_SIZE_IN_BYTES) as _;

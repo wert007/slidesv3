@@ -94,15 +94,15 @@ impl Allocator {
         result
     }
 
-    pub fn read_byte(&self, address: usize) -> u8 {
-        let address = clear_address(address);
-        #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).is_used);
-        let word_address = address & !(WORD_SIZE_IN_BYTES as usize - 1);
-        let word = self.read_word_aligned(word_address / WORD_SIZE_IN_BYTES as usize);
-        let bytes = word.to_be_bytes();
-        bytes[address % WORD_SIZE_IN_BYTES as usize]
-    }
+    // pub fn read_byte(&self, address: usize) -> u8 {
+    //     let address = clear_address(address);
+    //     #[cfg(debug_assertions)]
+    //     assert!(self.find_bucket_from_address(address).is_used);
+    //     let word_address = address & !(WORD_SIZE_IN_BYTES as usize - 1);
+    //     let word = self.read_word_aligned(word_address / WORD_SIZE_IN_BYTES as usize);
+    //     let bytes = word.to_be_bytes();
+    //     bytes[address % WORD_SIZE_IN_BYTES as usize]
+    // }
 
     pub fn read_word(&self, address: usize) -> u64 {
         let address = clear_address(address) as u64;
