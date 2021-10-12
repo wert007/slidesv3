@@ -79,13 +79,13 @@ pub fn evaluate(
         state.pc += 1;
     }
     if state.stack.len() == 1 {
-        (state.stack.pop().value as i64).into()
+        (state.stack.pop().unwrap_value() as i64).into()
     } else {
         for (variable, &value) in state.registers.iter().enumerate() {
             if value.is_pointer() {
-                println!("{:00}: #{}", variable, value.value)
+                println!("{:00}: #{}", variable, value.unwrap_pointer())
             } else {
-                println!("{:00}: {}", variable, value.value as i64)
+                println!("{:00}: {}", variable, value.unwrap_value() as i64)
             }
         }
         Value::Integer(-1)
@@ -168,16 +168,10 @@ fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruct
 }
 
 fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
-    let index_in_words = state.stack.pop().value;
-    let array = state.stack.pop();
-    assert!(
-        array.is_pointer(),
-        "array = {:#?}, pointers = {:?}, stack = {:?}",
-        array, state.stack.flags, state.stack.data
-    );
-    let array = array.value;
+    let index_in_words = state.stack.pop().unwrap_value();
+    let array = state.stack.pop().unwrap_pointer();
 
-    let array_length_in_bytes = state.read_pointer(array).value;
+    let array_length_in_bytes = state.read_pointer(array).unwrap_value();
     let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
     if (index_in_words as i64) < 0 || index_in_words > array_length_in_words {
         runtime_error!(
@@ -199,14 +193,8 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
-    let index = state.stack.pop().value;
-    let array = state.stack.pop();
-    assert!(
-        array.is_pointer(),
-        "array = {:#?}, pointers = {:?}, stack = {:?}",
-        array, state.stack.flags, state.stack.data
-    );
-    let array = array.value;
+    let index = state.stack.pop().unwrap_value();
+    let array = state.stack.pop().unwrap_pointer();
     let value = state.stack.pop();
     let index = array + index;
     state.write_pointer(index, value);
@@ -224,14 +212,14 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
     let mut writing_pointer = address;
     for _ in 0..instruction.arg {
         let value = state.stack.pop();
-        state.heap.write_word(writing_pointer as _, value.value);
+        state.heap.write_word(writing_pointer as _, value.unwrap_value());
         writing_pointer += WORD_SIZE_IN_BYTES;
     }
     state.stack.push_pointer(address);
 }
 
 fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instruction) {
-    let address = state.stack.pop().value;
+    let address = state.stack.pop().unwrap_value();
     let offset = instruction.arg;
     let address = address + offset;
     let value = state.read_pointer(address);
@@ -240,7 +228,7 @@ fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instr
 
 fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
     let size_in_bytes = if instruction.arg == 0 {
-        state.stack.pop().value
+        state.stack.pop().unwrap_value()
     } else {
         instruction.arg
     };
@@ -248,12 +236,8 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
     // supported!
     assert_eq!(size_in_bytes % WORD_SIZE_IN_BYTES, 0);
     let size_in_words = memory::bytes_to_word(size_in_bytes);
-    let dest = state.stack.pop();
-    assert!(dest.is_pointer());
-    let dest = dest.value;
-    let src = state.stack.pop();
-    assert!(src.is_pointer());
-    let src = src.value;
+    let dest = state.stack.pop().unwrap_pointer();
+    let src = state.stack.pop().unwrap_pointer();
     for word_index in 0..size_in_words {
         let src = src + word_index * WORD_SIZE_IN_BYTES;
         let dest = dest + word_index * WORD_SIZE_IN_BYTES;
@@ -263,43 +247,43 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_bitwise_twos_complement(state: &mut EvaluatorState, _: Instruction) {
-    let value = state.stack.pop().value as i64;
+    let value = state.stack.pop().unwrap_value() as i64;
     state.stack.push((-value) as u64);
 }
 
 fn evaluate_bitwise_xor(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push(lhs ^ rhs);
 }
 
 fn evaluate_bitwise_nxor(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push(!(lhs ^ rhs));
 }
 
 fn evaluate_addition(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push(lhs.wrapping_add(rhs));
 }
 
 fn evaluate_subtraction(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push(lhs.wrapping_sub(rhs));
 }
 
 fn evaluate_multiplication(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push(lhs.wrapping_mul(rhs));
 }
 
 fn evaluate_division(state: &mut EvaluatorState, instruction: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     if rhs == 0 {
         runtime_error!(state, division_by_zero(instruction.span));
         state.stack.push(0);
@@ -309,48 +293,35 @@ fn evaluate_division(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push((lhs == rhs) as _);
 }
 
 fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push((lhs != rhs) as _);
 }
 
 fn array_equals(state: &mut EvaluatorState) -> bool {
-    // Pop lhs and rhs and eventual array to get the correct other side (lhs)
-    let rhs = state.stack.pop();
-    let lhs = state.stack.pop();
+    let rhs = state.stack.pop().unwrap_pointer();
+    let lhs = state.stack.pop().unwrap_pointer();
 
-    assert!(
-        lhs.is_pointer(),
-        "{:#?}, stack = {:?}, pointers = {:?}",
-        lhs, state.stack.data, state.stack.flags
-    );
-    assert!(
-        rhs.is_pointer(),
-        "{:#?}, stack = {:?}, pointers = {:?}",
-        rhs, state.stack.data, state.stack.flags
-    );
-    let lhs_address = lhs.value;
-    let lhs_length_in_bytes = state.read_pointer(lhs_address ).value;
+    let lhs_length_in_bytes = state.read_pointer(lhs).unwrap_value();
     let lhs_length_in_words = memory::bytes_to_word(lhs_length_in_bytes);
-    let rhs_address = rhs.value;
-    let rhs_length_in_bytes = state.read_pointer(rhs_address ).value;
+    let rhs_length_in_bytes = state.read_pointer(rhs).unwrap_value();
     let _rhs_length_in_words = memory::bytes_to_word(rhs_length_in_bytes);
     // If two arrays are not equal in length, we don't compare their elements.
     // But when we compare their elements we expect a true result and only
     // change it if its false.
     let mut result = lhs_length_in_bytes == rhs_length_in_bytes;
-    if lhs_address != rhs_address && lhs_length_in_bytes == rhs_length_in_bytes {
+    if lhs != rhs && lhs_length_in_bytes == rhs_length_in_bytes {
         for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
-            let lhs_index = lhs_address + i;
-            let rhs_index = rhs_address + i;
-            let lhs = state.read_pointer(lhs_index).value;
-            let rhs = state.read_pointer(rhs_index).value;
+            let lhs_index = lhs + i;
+            let rhs_index = rhs + i;
+            let lhs = state.read_pointer(lhs_index).unwrap_value();
+            let rhs = state.read_pointer(rhs_index).unwrap_value();
             if lhs != rhs {
                 result = false;
                 break;
@@ -373,19 +344,19 @@ fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
 fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let result = if rhs.value == lhs.value {
+    let result = if rhs.unwrap_value() == lhs.unwrap_value() {
         true
-    } else if rhs.value == 0 || lhs.value == 0 {
+    } else if rhs.unwrap_value() == 0 || lhs.unwrap_value() == 0 {
         false
     } else {
         let size_in_bytes = instruction.arg;
         let size_in_words = memory::bytes_to_word(size_in_bytes);
         let mut result = true;
         for offset in 0..size_in_words {
-            let rhs_address = rhs.value + offset;
-            let lhs_address = lhs.value + offset;
-            let rhs_value = state.read_pointer(rhs_address).value;
-            let lhs_value = state.read_pointer(lhs_address).value;
+            let rhs_address = rhs.unwrap_value() + offset;
+            let lhs_address = lhs.unwrap_value() + offset;
+            let rhs_value = state.read_pointer(rhs_address).unwrap_value();
+            let lhs_value = state.read_pointer(lhs_address).unwrap_value();
             if rhs_value != lhs_value {
                 result = false;
                 break;
@@ -397,41 +368,35 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
 }
 
 fn evaluate_less_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push((lhs < rhs) as _);
 }
 
 fn evaluate_greater_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push((lhs > rhs) as _);
 }
 
 fn evaluate_less_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push((lhs <= rhs) as _);
 }
 
 fn evaluate_greater_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().value;
-    let lhs = state.stack.pop().value;
+    let rhs = state.stack.pop().unwrap_value();
+    let lhs = state.stack.pop().unwrap_value();
     state.stack.push((lhs >= rhs) as _);
 }
 
 fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) {
-    let rhs = state.stack.pop();
-    assert!(rhs.is_pointer(), "{:#?}", rhs);
-    let lhs = state.stack.pop();
-    assert!(
-        lhs.is_pointer(),
-        "lhs = {:#?}, rhs = {:#?}, stack = {:x?}",
-        lhs, rhs, state.stack.data
-    );
+    let rhs = state.stack.pop().unwrap_pointer();
+    let lhs = state.stack.pop().unwrap_pointer();
 
-    let lhs_length = state.read_pointer(lhs.value).value;
-    let rhs_length = state.read_pointer(rhs.value).value;
+    let lhs_length = state.read_pointer(lhs).unwrap_value();
+    let rhs_length = state.read_pointer(rhs).unwrap_value();
     let result_length = lhs_length + rhs_length;
     let mut pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
@@ -445,12 +410,11 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
         state.heap.write_word(writing_pointer as _, result_length);
         writing_pointer += WORD_SIZE_IN_BYTES;
         for i in 0..lhs_length {
-            let lhs_address = lhs.value;
-            let address = lhs_address + i + WORD_SIZE_IN_BYTES;
+            let address = lhs + i + WORD_SIZE_IN_BYTES;
             let address = address as usize;
             let lhs_byte = {
                 let addr = address as u64 & !(WORD_SIZE_IN_BYTES - 1);
-                let word = state.read_pointer(addr).value;
+                let word = state.read_pointer(addr).unwrap_value();
                 let bytes = word.to_be_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
@@ -458,12 +422,11 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             writing_pointer += 1;
         }
         for i in 0..rhs_length {
-            let rhs_address = rhs.value;
-            let address = rhs_address + i + WORD_SIZE_IN_BYTES;
+            let address = rhs + i + WORD_SIZE_IN_BYTES;
             let address = address as usize;
             let rhs_byte = {
                 let addr = address as u64 & !(WORD_SIZE_IN_BYTES - 1);
-                let word = state.read_pointer(addr).value;
+                let word = state.read_pointer(addr).unwrap_value();
                 let bytes = word.to_be_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
@@ -475,9 +438,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
 }
 
 fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instruction) {
-    let lhs = state.stack.pop();
-    assert!(lhs.is_pointer());
-    let lhs = lhs.value;
+    let lhs = state.stack.pop().unwrap_pointer();
     let rhs = instruction.arg as i64;
     let result = if rhs < 0 {
         lhs - (-rhs) as u64
@@ -490,13 +451,13 @@ fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instructio
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let result = if lhs.value == 0 {
+    let result = if lhs.unwrap_value() == 0 {
         rhs
     } else {
         lhs
     };
     let result = if instruction.arg != 0 {
-        state.read_pointer(result.value)
+        state.read_pointer(result.unwrap_value())
     } else {
         result
     };
@@ -508,14 +469,14 @@ fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_jump_if_false(state: &mut EvaluatorState, instruction: Instruction) {
-    let condition = state.stack.pop().value;
+    let condition = state.stack.pop().unwrap_value();
     if condition == 0 {
         state.pc = instruction.arg as _;
     }
 }
 
 fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
-    let condition = state.stack.pop().value;
+    let condition = state.stack.pop().unwrap_value();
     if condition != 0 {
         state.pc = instruction.arg as _;
     }
@@ -523,13 +484,13 @@ fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
 
 fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     let sys_call_kind = SystemCallKind::try_from_primitive(instruction.arg as u8).unwrap();
-    let argument_count = state.stack.pop().value as usize;
+    let argument_count = state.stack.pop().unwrap_value() as usize;
     let argument_count = argument_count / 2;
     let mut arguments = Vec::with_capacity(argument_count);
     let mut types = Vec::with_capacity(argument_count);
 
     for _ in 0..argument_count {
-        let type_ = state.stack.pop().value;
+        let type_ = state.stack.pop().unwrap_value();
         let type_ = Type::from_type_identifier(type_)
             .unwrap_or_else(|| panic!("Invalid type identifier = {} | 0x{:x}", type_, type_));
         types.push(type_);
@@ -545,9 +506,8 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
-    let argument_count = state.stack.pop().value;
-    let base = state.stack.pop();
-    assert!(base.is_pointer());
+    let argument_count = state.stack.pop().unwrap_value();
+    let base = state.stack.pop().unwrap_pointer();
     let return_address = if state.is_main_call {
         state.is_main_call = false;
         usize::MAX - 1
@@ -567,7 +527,7 @@ fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
     for v in argument_values.into_iter().rev() {
         state.stack.push_flagged_word(v);
     }
-    state.pc = base.value as _;
+    state.pc = base as _;
 }
 
 fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
@@ -588,7 +548,7 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
             }
         }
 
-        let return_address = state.stack.pop().value;
+        let return_address = state.stack.pop().unwrap_value();
         state.pc = return_address as _;
         state.stack.push_flagged_word(result);
     } else {
@@ -605,22 +565,21 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
             }
         }
 
-        let return_address = state.stack.pop().value;
+        let return_address = state.stack.pop().unwrap_value();
         state.pc = return_address as _;
     }
 }
 
 fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction) {
-    let closure_pointer = state.stack.pop();
-    assert!(closure_pointer.is_pointer());
-    let mut closure_pointer = closure_pointer.value;
+    let argument_count = instruction.arg;
+    let mut closure_pointer = state.stack.pop().unwrap_pointer();
 
-    let closure_length_in_bytes = state.read_pointer(closure_pointer).value;
-    let argument_count = memory::bytes_to_word(closure_length_in_bytes) - 1 + instruction.arg;
+    let closure_length_in_bytes = state.read_pointer(closure_pointer).unwrap_value();
+    let argument_count = memory::bytes_to_word(closure_length_in_bytes) - 1 + argument_count;
     closure_pointer += WORD_SIZE_IN_BYTES;
     let end_address = closure_pointer + closure_length_in_bytes;
 
-    let function_pointer = state.read_pointer(closure_pointer).value;
+    let function_pointer = state.read_pointer(closure_pointer).unwrap_pointer();
     closure_pointer += WORD_SIZE_IN_BYTES;
 
     while closure_pointer < end_address {
@@ -634,11 +593,9 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
 }
 
 fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruction) {
-    let index = state.stack.pop().value;
-    let array = state.stack.pop();
-    assert!(array.is_pointer());
-    let array = array.value;
-    let array_length_in_bytes = state.read_pointer(array).value;
+    let index = state.stack.pop().unwrap_value();
+    let array = state.stack.pop().unwrap_pointer();
+    let array_length_in_bytes = state.read_pointer(array).unwrap_value();
     if index - WORD_SIZE_IN_BYTES >= array_length_in_bytes {
         let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
         let index = (index - WORD_SIZE_IN_BYTES) as _;
