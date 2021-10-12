@@ -571,7 +571,8 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction) {
-    let argument_count = instruction.arg;
+    let has_function_pointer = instruction.arg & 1 == 1;
+    let argument_count = instruction.arg >> 1;
     let mut closure_pointer = state.stack.pop().unwrap_pointer();
 
     let closure_length_in_bytes = state.read_pointer(closure_pointer).unwrap_value();
@@ -579,16 +580,25 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
     closure_pointer += WORD_SIZE_IN_BYTES;
     let end_address = closure_pointer + closure_length_in_bytes;
 
-    let function_pointer = state.read_pointer(closure_pointer).unwrap_pointer();
-    closure_pointer += WORD_SIZE_IN_BYTES;
+    let function_pointer = if has_function_pointer {
+        closure_pointer += WORD_SIZE_IN_BYTES;
+        Some(state.read_pointer(closure_pointer - WORD_SIZE_IN_BYTES).unwrap_pointer())
+    } else {
+        None
+    };
 
+    let mut arguments = vec![];
     while closure_pointer < end_address {
-        let argument = state.read_pointer(closure_pointer).value;
-        state.stack.push(argument);
+        let argument = state.read_pointer(closure_pointer);
+        arguments.push(argument);
         closure_pointer += WORD_SIZE_IN_BYTES;
     }
-
-    state.stack.push_pointer(function_pointer);
+    for argument in arguments.into_iter().rev() {
+        state.stack.push_flagged_word(argument);
+    }
+    if let Some(function_pointer) = function_pointer {
+        state.stack.push_pointer(function_pointer);
+    }
     state.stack.push(argument_count);
 }
 

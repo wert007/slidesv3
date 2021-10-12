@@ -466,7 +466,7 @@ fn convert_function_call(
     result.append(&mut convert_node(*function_call.base, converter));
     if is_closure {
         result.push(
-            Instruction::decode_closure(argument_count as _)
+            Instruction::decode_closure(argument_count as _, true)
                 .span(span)
                 .into(),
         );
@@ -556,7 +556,7 @@ fn convert_array_length_system_call(
     let type_identifier = base.type_.type_identifier();
     result.append(&mut convert_node(base, converter));
     if is_closure {
-        result.push(Instruction::decode_closure(2).span(span).into());
+        result.push(Instruction::decode_closure(2, false).span(span).into());
     } else {
         result.push(
             Instruction::type_identifier(type_identifier)
