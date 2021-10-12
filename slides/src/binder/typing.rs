@@ -107,7 +107,7 @@ impl Type {
                 if value & 1 == 1 {
                     let base_type = Self::from_type_identifier(value >> 8)?;
                     let mut result = Type::array(base_type);
-                    let array_count = (value >> 1) & 0xFF;
+                    let array_count = (value >> 2) & 0xFF;
                     for _ in 0..array_count {
                         result = Type::array(result);
                     }
