@@ -2,10 +2,9 @@ struct ListNode {
     value: int;
     next: ListNode?;
 
-    func add(value: int, depth: int) {
-        print('Depth: ' + depth);
+    func add(value: int) {
         if this.next {
-            this.next.add(value, depth + 1);
+            this.next.add(value);
         } else {
             this.next = new ListNode(value, none);
         }
@@ -31,10 +30,9 @@ struct ListNode {
 func main() {
     let i = 0;
     let list = new ListNode(i, none);
-    while i < 10 {
+    while i < 30000 {
         i = i + 1;
-        list.add(i, 0);
-        print(i);
+        list.add(i);
     }
     list.print();
 }
