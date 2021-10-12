@@ -586,14 +586,10 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
         None
     };
 
-    let mut arguments = vec![];
     while closure_pointer < end_address {
         let argument = state.read_pointer(closure_pointer);
-        arguments.push(argument);
-        closure_pointer += WORD_SIZE_IN_BYTES;
-    }
-    for argument in arguments.into_iter().rev() {
         state.stack.push_flagged_word(argument);
+        closure_pointer += WORD_SIZE_IN_BYTES;
     }
     if let Some(function_pointer) = function_pointer {
         state.stack.push_pointer(function_pointer);
