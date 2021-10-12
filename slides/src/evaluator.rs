@@ -7,7 +7,7 @@ use crate::{DebugFlags, DiagnosticBag, binder::typing::{SystemCallKind, Type}, e
     }, value::Value};
 use num_enum::TryFromPrimitive;
 
-use self::memory::{allocator::Allocator, stack::Stack};
+use self::memory::{FlaggedWord, allocator::Allocator, stack::Stack};
 
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {
@@ -22,7 +22,7 @@ type ResultType = Value;
 pub struct EvaluatorState<'a> {
     stack: Stack,
     heap: Allocator,
-    registers: Vec<TypedU64>,
+    registers: Vec<FlaggedWord>,
     protected_registers: usize,
     pc: usize,
     is_main_call: bool,
@@ -30,30 +30,32 @@ pub struct EvaluatorState<'a> {
 }
 
 impl EvaluatorState<'_> {
-    fn set_variable(&mut self, variable: u64, value: u64, is_pointer: bool) {
+    fn set_variable(&mut self, variable: u64, value: FlaggedWord) {
         let variable = variable as usize;
-        self.registers[variable] = TypedU64 { value, is_pointer };
+        self.registers[variable] = value;
     }
 
     fn is_pointer(&mut self, address: usize) -> bool {
         memory::is_heap_pointer(address as _) || self.stack.is_pointer(address)
     }
 
-    fn read_pointer(&self, address: u64) -> TypedU64 {
+    fn read_pointer(&self, address: u64) -> FlaggedWord {
         if memory::is_heap_pointer(address) {
-            TypedU64 {
-                value: self.heap.read_word(address as _),
-                is_pointer: false,
-            }
+            self.heap.read_flagged_word(address as _)
+            // FlaggedWord {
+            //     value: self.heap.read_word(address as _),
+            //     is_pointer: false,
+            // }
         } else {
-            TypedU64 {
-                value: self.stack.read_word(address as _),
-                is_pointer: self.stack.is_pointer(address as _),
-            }
+            self.stack.read_flagged_word(address as _)
+            // FlaggedWord {
+            //     value: self.stack.read_word(address as _),
+            //     is_pointer: self.stack.is_pointer(address as _),
+            // }
         }
     }
 
-    fn write_pointer(&mut self, address: u64, value: TypedU64) {
+    fn write_pointer(&mut self, address: u64, value: FlaggedWord) {
         if memory::is_heap_pointer(address as _) {
             self.heap.write_word(address as _, value.value);
         } else {
@@ -71,7 +73,7 @@ pub fn evaluate(
     let mut state = EvaluatorState {
         stack: program.stack,
         heap: Allocator::new(1024, debug_flags),
-        registers: vec![TypedU64::default(); program.max_used_variables],
+        registers: vec![FlaggedWord::default(); program.max_used_variables],
         protected_registers: program.protected_variables,
         pc: 0,
         is_main_call: true,
@@ -93,7 +95,7 @@ pub fn evaluate(
         (state.stack.pop().value as i64).into()
     } else {
         for (variable, &value) in state.registers.iter().enumerate() {
-            if value.is_pointer {
+            if value.is_pointer() {
                 println!("{:00}: #{}", variable, value.value)
             } else {
                 println!("{:00}: {}", variable, value.value as i64)
@@ -160,13 +162,8 @@ fn evaluate_load_pointer(state: &mut EvaluatorState, instruction: Instruction) {
 
 fn evaluate_duplicate(state: &mut EvaluatorState, _: Instruction) {
     let value = state.stack.pop();
-    if value.is_pointer {
-        state.stack.push_pointer(value.value);
-        state.stack.push_pointer(value.value);
-    } else {
-        state.stack.push(value.value);
-        state.stack.push(value.value);
-    }
+    state.stack.push_flagged_word(value);
+    state.stack.push_flagged_word(value);
 }
 
 fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
@@ -175,23 +172,19 @@ fn evaluate_pop(state: &mut EvaluatorState, _: Instruction) {
 
 fn evaluate_load_register(state: &mut EvaluatorState, instruction: Instruction) {
     let value = state.registers[instruction.arg as usize];
-    if value.is_pointer {
-        state.stack.push_pointer(value.value);
-    } else {
-        state.stack.push(value.value);
-    }
+    state.stack.push_flagged_word(value);
 }
 
 fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruction) {
-    let TypedU64 { value, is_pointer } = state.stack.pop();
-    state.set_variable(instruction.arg, value, is_pointer);
+    let value = state.stack.pop();
+    state.set_variable(instruction.arg, value);
 }
 
 fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
     let index_in_words = state.stack.pop().value;
     let array = state.stack.pop();
     assert!(
-        array.is_pointer,
+        array.is_pointer(),
         "array = {:#?}, pointers = {:?}, stack = {:?}",
         array, state.stack.flags, state.stack.data
     );
@@ -215,18 +208,14 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
         + index_in_words * WORD_SIZE_IN_BYTES
         + WORD_SIZE_IN_BYTES;
     let value = state.read_pointer(index_in_bytes);
-    if value.is_pointer {
-        state.stack.push_pointer(value.value);
-    } else {
-        state.stack.push(value.value);
-    }
+    state.stack.push_flagged_word(value);
 }
 
 fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
     let index = state.stack.pop().value;
     let array = state.stack.pop();
     assert!(
-        array.is_pointer,
+        array.is_pointer(),
         "array = {:#?}, pointers = {:?}, stack = {:?}",
         array, state.stack.flags, state.stack.data
     );
@@ -239,10 +228,7 @@ fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
 fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
     let address = instruction.arg;
     let value = state.stack.pop();
-    state.stack.write_word(address as _, value.value);
-    if value.is_pointer {
-        state.stack.set_pointer(address as _);
-    }
+    state.stack.write_flagged_word(address as _, value);
 }
 
 fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) {
@@ -262,11 +248,7 @@ fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instr
     let offset = instruction.arg;
     let address = address + offset;
     let value = state.read_pointer(address);
-    if value.is_pointer {
-        state.stack.push_pointer(value.value);
-    } else {
-        state.stack.push(value.value);
-    }
+    state.stack.push_flagged_word(value);
 }
 
 fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
@@ -280,10 +262,10 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
     assert_eq!(size_in_bytes % WORD_SIZE_IN_BYTES, 0);
     let size_in_words = memory::bytes_to_word(size_in_bytes);
     let dest = state.stack.pop();
-    assert!(dest.is_pointer);
+    assert!(dest.is_pointer());
     let dest = dest.value;
     let src = state.stack.pop();
-    assert!(src.is_pointer);
+    assert!(src.is_pointer());
     let src = src.value;
     for word_index in 0..size_in_words {
         let src = src + word_index * WORD_SIZE_IN_BYTES;
@@ -357,12 +339,12 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     let lhs = state.stack.pop();
 
     assert!(
-        lhs.is_pointer,
+        lhs.is_pointer(),
         "{:#?}, stack = {:?}, pointers = {:?}",
         lhs, state.stack.data, state.stack.flags
     );
     assert!(
-        rhs.is_pointer,
+        rhs.is_pointer(),
         "{:#?}, stack = {:?}, pointers = {:?}",
         rhs, state.stack.data, state.stack.flags
     );
@@ -453,10 +435,10 @@ fn evaluate_greater_than_equals(state: &mut EvaluatorState, _: Instruction) {
 
 fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
-    assert!(rhs.is_pointer, "{:#?}", rhs);
+    assert!(rhs.is_pointer(), "{:#?}", rhs);
     let lhs = state.stack.pop();
     assert!(
-        lhs.is_pointer,
+        lhs.is_pointer(),
         "lhs = {:#?}, rhs = {:#?}, stack = {:x?}",
         lhs, rhs, state.stack.data
     );
@@ -507,7 +489,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
 
 fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instruction) {
     let lhs = state.stack.pop();
-    assert!(lhs.is_pointer);
+    assert!(lhs.is_pointer());
     let lhs = lhs.value;
     let rhs = instruction.arg as i64;
     let result = if rhs < 0 {
@@ -531,11 +513,7 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
     } else {
         result
     };
-    if result.is_pointer {
-        state.stack.push_pointer(result.value);
-    } else {
-        state.stack.push(result.value);
-    }
+    state.stack.push_flagged_word(result);
 }
 
 fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {
@@ -554,12 +532,6 @@ fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
     if condition != 0 {
         state.pc = instruction.arg as _;
     }
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-pub struct TypedU64 {
-    value: u64,
-    is_pointer: bool,
 }
 
 fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
@@ -588,7 +560,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
 fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
     let argument_count = state.stack.pop().value;
     let base = state.stack.pop();
-    assert!(base.is_pointer);
+    assert!(base.is_pointer());
     let return_address = if state.is_main_call {
         state.is_main_call = false;
         usize::MAX - 1
@@ -601,20 +573,12 @@ fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
     }
     state.stack.push(return_address as _);
 
-    for register in state.registers.iter().skip(state.protected_registers) {
-        if register.is_pointer {
-            state.stack.push_pointer(register.value);
-        } else {
-            state.stack.push(register.value);
-        }
+    for &register in state.registers.iter().skip(state.protected_registers) {
+        state.stack.push_flagged_word(register);
     }
 
     for v in argument_values.into_iter().rev() {
-        if v.is_pointer {
-            state.stack.push_pointer(v.value);
-        } else {
-            state.stack.push(v.value);
-        }
+        state.stack.push_flagged_word(v);
     }
     state.pc = base.value as _;
 }
@@ -639,11 +603,7 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
 
         let return_address = state.stack.pop().value;
         state.pc = return_address as _;
-        if result.is_pointer {
-            state.stack.push_pointer(result.value);
-        } else {
-            state.stack.push(result.value);
-        }
+        state.stack.push_flagged_word(result);
     } else {
         for register in state
             .registers
@@ -665,7 +625,7 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
 
 fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction) {
     let closure_pointer = state.stack.pop();
-    assert!(closure_pointer.is_pointer);
+    assert!(closure_pointer.is_pointer());
     let mut closure_pointer = closure_pointer.value;
 
     let closure_length_in_bytes = state.read_pointer(closure_pointer).value;
@@ -689,7 +649,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
 fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruction) {
     let index = state.stack.pop().value;
     let array = state.stack.pop();
-    assert!(array.is_pointer);
+    assert!(array.is_pointer());
     let array = array.value;
     let array_length_in_bytes = state.read_pointer(array).value;
     if index - WORD_SIZE_IN_BYTES >= array_length_in_bytes {

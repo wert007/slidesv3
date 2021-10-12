@@ -3,13 +3,13 @@ use crate::{
     evaluator::memory::{bytes_to_word, is_heap_pointer},
 };
 
-use super::{EvaluatorState, TypedU64, WORD_SIZE_IN_BYTES};
+use super::{EvaluatorState, WORD_SIZE_IN_BYTES, memory::FlaggedWord};
 
-pub fn print(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
+pub fn print(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
     println!("{}", to_string_native(type_, argument, state));
 }
 
-pub fn to_string(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
+pub fn to_string(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
     let string = to_string_native(type_, argument, state);
     let string_length = string.len() as u64;
     let mut pointer = state.heap.allocate(WORD_SIZE_IN_BYTES + string_length);
@@ -23,7 +23,7 @@ pub fn to_string(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
     state.stack.push_pointer(result);
 }
 
-fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState) -> String {
+fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) -> String {
     match type_ {
         Type::Error => todo!(),
         Type::Void => todo!(),
@@ -33,13 +33,7 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
             if argument.value == 0 {
                 "none".into()
             } else {
-                let argument = if is_heap_pointer(argument.value) {
-                    state.heap.read_word(argument.value as _)
-                } else {
-                    state.stack.read_word(argument.value as _)
-                };
-                // TODO: This could actually be a pointer. Read it from memory!
-                let argument = TypedU64 { value: argument, is_pointer: false };
+                let argument = state.read_pointer(argument.value);
                 to_string_native(*base_type, argument, state)
             }
         },
@@ -64,10 +58,10 @@ fn to_string_native(type_: Type, argument: TypedU64, state: &mut EvaluatorState)
 
 fn array_to_string_native(
     base_type: Type,
-    argument: TypedU64,
+    argument: FlaggedWord,
     state: &mut EvaluatorState,
 ) -> String {
-    assert!(argument.is_pointer, "argument = {:#?}", argument);
+    assert!(argument.is_pointer(), "argument = {:#?}", argument);
     let array_length_in_bytes = if is_heap_pointer(argument.value) {
         state.heap.read_word(argument.value as _)
     } else {
@@ -124,30 +118,14 @@ fn array_to_string_native(
         }
         Type::Array(base_type) => {
             for pointer_index in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
-                let pointer = if is_heap_pointer(pointer_index) {
-                    state.heap.read_word(pointer_index as _)
-                } else {
-                    state.stack.read_word(pointer_index as _)
-                };
-                let argument = TypedU64 {
-                    value: pointer,
-                    is_pointer: true,
-                };
+                let argument = state.read_pointer(pointer_index);
                 result.push_str(&array_to_string_native(*base_type.clone(), argument, state));
                 result.push_str(", ");
             }
         }
         Type::String => {
             for pointer_index in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
-                let pointer = if is_heap_pointer(pointer_index) {
-                    state.heap.read_word(pointer_index as _)
-                } else {
-                    state.stack.read_word(pointer_index as _)
-                };
-                let argument = TypedU64 {
-                    value: pointer,
-                    is_pointer: true,
-                };
+                let argument = state.read_pointer(pointer_index);
                 result.push('\'');
                 result.push_str(&string_to_string_native(argument, state));
                 result.push_str("', ");
@@ -158,7 +136,7 @@ fn array_to_string_native(
     result
 }
 
-fn string_to_string_native(argument: TypedU64, state: &mut EvaluatorState) -> String {
+fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) -> String {
     let string_start = argument.value;
     let pointer = if is_heap_pointer(string_start) {
         state.heap.read_word(string_start as _)
@@ -186,7 +164,7 @@ fn string_to_string_native(argument: TypedU64, state: &mut EvaluatorState) -> St
     String::from_utf8_lossy(&string_buffer).into_owned()
 }
 
-pub fn array_length(type_: Type, argument: TypedU64, state: &mut EvaluatorState) {
+pub fn array_length(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
     let mut is_heap_array;
     let mut array_start = argument.value;
     let mut pointer = if is_heap_pointer(array_start) {

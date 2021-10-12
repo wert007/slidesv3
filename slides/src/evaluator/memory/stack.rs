@@ -1,4 +1,6 @@
-use crate::{DebugFlags, evaluator::{TypedU64, WORD_SIZE_IN_BYTES}};
+use crate::{DebugFlags, evaluator::WORD_SIZE_IN_BYTES};
+
+use super::{FlaggedWord, Flags};
 
 pub struct Stack {
     pub data: Vec<u64>,
@@ -20,14 +22,14 @@ impl Stack {
         self.data.len()
     }
 
-    pub fn pop(&mut self) -> TypedU64 {
+    pub fn pop(&mut self) -> FlaggedWord {
         debug_assert!(!self.data.is_empty());
         let value = self.data.pop().unwrap();
         let flags = self.flags.pop().unwrap();
         self.print_maybe_stack();
-        TypedU64 {
+        FlaggedWord {
             value,
-            is_pointer: flags.is_pointer,
+            flags,
         }
     }
 
@@ -40,6 +42,12 @@ impl Stack {
     pub fn push_pointer(&mut self, value: u64) {
         self.data.push(value);
         self.flags.push(Flags::default().pointer());
+        self.print_maybe_stack();
+    }
+
+    pub fn push_flagged_word(&mut self, value: FlaggedWord) {
+        self.data.push(value.value);
+        self.flags.push(value.flags);
         self.print_maybe_stack();
     }
 
@@ -63,8 +71,20 @@ impl Stack {
         }
     }
 
+    pub fn read_flagged_word(&self, address: usize) -> FlaggedWord {
+        if address % WORD_SIZE_IN_BYTES as usize == 0 {
+            self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES as usize)
+        } else {
+            unimplemented!("address = 0x{:x}", address)
+        }
+    }
+
     fn read_word_aligned(&self, address: usize) -> u64 {
         self.data[address]
+    }
+
+    fn read_flagged_word_aligned(&self, address: usize) -> FlaggedWord {
+        FlaggedWord::value(self.data[address]).flags(self.flags[address])
     }
 
     pub fn write_word(&mut self, address: usize, value: u64) {
@@ -75,8 +95,22 @@ impl Stack {
         }
     }
 
+    pub fn write_flagged_word(&mut self, address: usize, value: FlaggedWord) {
+        if address % WORD_SIZE_IN_BYTES as usize == 0 {
+            self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES as usize, value);
+        } else {
+            unimplemented!("address = 0x{:x}", address);
+        }
+    }
+
     fn write_word_aligned(&mut self, address: usize, value: u64) {
         self.data[address] = value;
+        self.print_maybe_stack();
+    }
+
+    fn write_flagged_word_aligned(&mut self, address: usize, value: FlaggedWord) {
+        self.data[address] = value.value;
+        self.flags[address] = value.flags;
         self.print_maybe_stack();
     }
 
@@ -85,17 +119,5 @@ impl Stack {
             return;
         }
         println!("stack = {:x?}", self.data);
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct Flags {
-    pub is_pointer: bool,
-}
-
-impl Flags {
-    pub fn pointer(mut self) -> Self {
-        self.is_pointer = true;
-        self
     }
 }

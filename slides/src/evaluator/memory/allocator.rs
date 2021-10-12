@@ -1,9 +1,10 @@
-use crate::DebugFlags;
+use crate::{DebugFlags, evaluator::memory::Flags};
 
-use super::{bytes_to_word, HEAP_POINTER, WORD_SIZE_IN_BYTES};
+use super::{FlaggedWord, HEAP_POINTER, WORD_SIZE_IN_BYTES, bytes_to_word};
 
 pub struct Allocator {
     pub data: Vec<u64>,
+    pub flags: Vec<Flags>,
     buckets: Vec<BucketEntry>,
     debug_heap_as_string: bool,
 }
@@ -15,6 +16,7 @@ impl Allocator {
         assert!(size_in_words.is_power_of_two());
         Self {
             data: vec![0; size_in_words],
+            flags: vec![Flags::default(); size_in_words],
             buckets: vec![BucketEntry::root(size_in_words)],
             debug_heap_as_string: debug_flags.print_heap_as_string,
         }
@@ -115,6 +117,17 @@ impl Allocator {
         }
     }
 
+    pub fn read_flagged_word(&self, address: usize) -> FlaggedWord {
+        let address = clear_address(address) as u64;
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address as _).is_used);
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.read_flagged_word_aligned((address / WORD_SIZE_IN_BYTES) as _)
+        } else {
+            todo!("address = {:x}", address)
+        }
+    }
+
     pub fn read_word_aligned(&self, address: usize) -> u64 {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
@@ -123,6 +136,16 @@ impl Allocator {
                 .is_used
         );
         self.data[address]
+    }
+
+    pub fn read_flagged_word_aligned(&self, address: usize) -> FlaggedWord {
+        let address = clear_address(address);
+        #[cfg(debug_assertions)]
+        assert!(
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES as usize)
+                .is_used
+        );
+        FlaggedWord::value(self.data[address]).flags(self.flags[address])
     }
 
     pub fn write_byte(&mut self, address: usize, value: u8) {
