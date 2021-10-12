@@ -173,6 +173,7 @@ impl Allocator {
             address
         );
         self.data[address as usize] = value;
+        self.flags[address as usize] = Flags::default();
 
         if self.debug_heap_as_string {
             print_heap_as_string(&self.data);

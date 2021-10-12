@@ -81,6 +81,7 @@ impl Stack {
 
     fn write_word_aligned(&mut self, address: u64, value: u64) {
         self.data[address as usize] = value;
+        self.flags[address as usize] = Flags::default();
         self.print_maybe_stack();
     }
 
