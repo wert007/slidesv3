@@ -1,5 +1,4 @@
-mod allocator;
-pub mod stack;
+mod memory;
 mod sys_calls;
 
 use crate::{
@@ -13,7 +12,9 @@ use crate::{
 };
 use num_enum::TryFromPrimitive;
 
-use self::{allocator::Allocator, stack::Stack};
+use self::memory::{allocator::Allocator, stack::Stack};
+
+pub use self::memory::stack;
 
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {

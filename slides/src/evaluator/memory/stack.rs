@@ -1,6 +1,4 @@
-use crate::DebugFlags;
-
-use super::{TypedU64, WORD_SIZE_IN_BYTES};
+use crate::{DebugFlags, evaluator::{TypedU64, WORD_SIZE_IN_BYTES}};
 
 pub struct Stack {
     pub data: Vec<u64>,
