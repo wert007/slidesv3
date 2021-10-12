@@ -95,6 +95,24 @@ impl Stack {
         if !self.print_stack {
             return;
         }
-        println!("stack = {:x?}", self.data);
+        println!("{:?}", self);
+    }
+}
+
+impl std::fmt::Debug for Stack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "stack = [")?;
+        let mut is_first = true;
+        for (value, flags) in self.data.iter().zip(&self.flags) {
+            if !is_first {
+                write!(f, ", ")?;
+            }
+            is_first = false;
+            if flags.is_pointer {
+                write!(f, "#")?;
+            }
+            write!(f, "{:x}", value)?;
+        }
+        write!(f, "]")
     }
 }
