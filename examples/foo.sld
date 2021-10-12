@@ -1,8 +1,5 @@
 func main() {
-    // Noneable + Arrays:
-    let crazy : int?[] = [ 99, none, none, 1];
-
-    for c in crazy {
-        print(c);
-    }
+    let a = [1, 2, 3,];
+    let l = a.length;
+    print(l());
 }
