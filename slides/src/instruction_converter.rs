@@ -4,7 +4,28 @@ mod tests;
 
 mod label_replacer;
 
-use crate::{binder::{self, bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind, BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind}, operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::memory::{WORD_SIZE_IN_BYTES, bytes_to_word, stack::Stack}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
+use crate::{
+    binder::{
+        self,
+        bound_nodes::{
+            BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
+            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
+            BoundConstructorCallNodeKind, BoundConversionNodeKind,
+            BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind,
+            BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
+            BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
+            BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind,
+        },
+        operators::{BoundBinaryOperator, BoundUnaryOperator},
+        typing::{FunctionKind, SystemCallKind, Type},
+    },
+    debug::DebugFlags,
+    diagnostics::DiagnosticBag,
+    evaluator::memory::{bytes_to_word, stack::Stack, WORD_SIZE_IN_BYTES},
+    parser::syntax_nodes::LiteralNodeKind,
+    text::{SourceText, TextSpan},
+    value::Value,
+};
 
 use self::instruction::Instruction;
 
@@ -151,7 +172,9 @@ fn convert_node(
             convert_field_access(node.span, field_access, converter)
         }
         BoundNodeKind::Closure(closure) => convert_closure(node.span, closure, converter),
-        BoundNodeKind::Conversion(conversion) => convert_conversion(node.span, conversion, converter),
+        BoundNodeKind::Conversion(conversion) => {
+            convert_conversion(node.span, conversion, converter)
+        }
         BoundNodeKind::BlockStatement(block_statement) => {
             convert_block_statement(node.span, block_statement, converter)
         }
@@ -224,7 +247,7 @@ fn convert_literal(
         }
         Value::SystemCall(kind) => kind as u64,
         Value::String(value) => return convert_string_literal(span, value, converter),
-        Value::None => 0,
+        Value::None => return vec![Instruction::load_pointer(0).span(span).into()],
     };
     vec![Instruction::load_immediate(value).span(span).into()]
 }
@@ -350,12 +373,17 @@ fn convert_unary(
     unary: BoundUnaryNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
+    let is_pointer = unary.operand.type_.is_pointer();
     let mut result = convert_node(*unary.operand, converter);
     match unary.operator_token {
         BoundUnaryOperator::ArithmeticNegate => {
             result.push(Instruction::twos_complement().span(span).into())
         }
         BoundUnaryOperator::ArithmeticIdentity => {}
+        BoundUnaryOperator::LogicalNegation if is_pointer => {
+            result.push(Instruction::load_pointer(0).span(span).into());
+            result.push(Instruction::noneable_equals(1).span(span).into());
+        }
         BoundUnaryOperator::LogicalNegation => {
             result.push(Instruction::load_immediate(0).span(span).into());
             result.push(Instruction::equals().span(span).into());
@@ -383,11 +411,13 @@ fn convert_binary(
                     Instruction::noneable_equals(base_type.size_in_bytes())
                 }
                 (Type::Noneable(base_type), Type::Noneable(_)) if base_type.is_pointer() => {
-                    todo!("Not completely implemented. None must become an actual
+                    todo!(
+                        "Not completely implemented. None must become an actual
                     pointer, which points to invalid memory. And array_equals
                     must return false if one of those is the none pointer,
                     but not the other.
-                    ");
+                    "
+                    );
                     // Instruction::array_equals()
                 }
                 _ => Instruction::equals(),
@@ -407,7 +437,9 @@ fn convert_binary(
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(),
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
         BoundBinaryOperator::StringConcat => Instruction::string_concat(),
-        BoundBinaryOperator::NoneableOrValue => Instruction::noneable_or_value(!binary.lhs.type_.is_pointer())
+        BoundBinaryOperator::NoneableOrValue => {
+            Instruction::noneable_or_value(!binary.lhs.type_.is_pointer())
+        }
     }
     .span(span);
     let mut result = vec![];
@@ -668,13 +700,13 @@ fn convert_conversion(
     let conversion_kind = conversion.kind();
     let mut result = convert_node(*conversion.base, converter);
     match conversion_kind {
-        ConversionKind::None => {},
+        ConversionKind::None => {}
         ConversionKind::Boxing => {
             result.push(Instruction::write_to_heap(1).span(span).into());
         }
         ConversionKind::Deboxing => {
             result.push(Instruction::read_word_with_offset(0).span(span).into());
-        },
+        }
     }
     result
 }

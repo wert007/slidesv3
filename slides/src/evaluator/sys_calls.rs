@@ -30,10 +30,10 @@ fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
         Type::Any => todo!(),
         Type::None => "none".into(),
         Type::Noneable(base_type) => {
-            if argument.unwrap_value() == 0 {
+            if argument.unwrap_pointer() == 0 {
                 "none".into()
             } else {
-                let argument = state.read_pointer(argument.unwrap_value());
+                let argument = state.read_pointer(argument.unwrap_pointer());
                 to_string_native(*base_type, argument, state)
             }
         },

@@ -344,19 +344,19 @@ fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
 fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let result = if rhs.unwrap_value() == lhs.unwrap_value() {
+    let result = if rhs.unwrap_pointer() == lhs.unwrap_pointer() {
         true
-    } else if rhs.unwrap_value() == 0 || lhs.unwrap_value() == 0 {
+    } else if rhs.unwrap_pointer() == 0 || lhs.unwrap_pointer() == 0 {
         false
     } else {
         let size_in_bytes = instruction.arg;
         let size_in_words = memory::bytes_to_word(size_in_bytes);
         let mut result = true;
         for offset in 0..size_in_words {
-            let rhs_address = rhs.unwrap_value() + offset;
-            let lhs_address = lhs.unwrap_value() + offset;
-            let rhs_value = state.read_pointer(rhs_address).unwrap_value();
-            let lhs_value = state.read_pointer(lhs_address).unwrap_value();
+            let rhs_address = rhs.unwrap_pointer() + offset;
+            let lhs_address = lhs.unwrap_pointer() + offset;
+            let rhs_value = state.read_pointer(rhs_address);
+            let lhs_value = state.read_pointer(lhs_address);
             if rhs_value != lhs_value {
                 result = false;
                 break;
@@ -451,13 +451,13 @@ fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instructio
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let result = if lhs.unwrap_value() == 0 {
+    let result = if lhs.unwrap_pointer() == 0 {
         rhs
     } else {
         lhs
     };
     let result = if instruction.arg != 0 {
-        state.read_pointer(result.unwrap_value())
+        state.read_pointer(result.unwrap_pointer())
     } else {
         result
     };
@@ -469,14 +469,14 @@ fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_jump_if_false(state: &mut EvaluatorState, instruction: Instruction) {
-    let condition = state.stack.pop().unwrap_value();
+    let condition = state.stack.pop().value;
     if condition == 0 {
         state.pc = instruction.arg as _;
     }
 }
 
 fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
-    let condition = state.stack.pop().unwrap_value();
+    let condition = state.stack.pop().value;
     if condition != 0 {
         state.pc = instruction.arg as _;
     }
