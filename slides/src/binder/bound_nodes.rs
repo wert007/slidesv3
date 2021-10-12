@@ -7,7 +7,7 @@ pub mod is_same_expression;
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct BoundConstant {
-    value: Value,
+    pub value: Value,
 }
 
 impl From<Value> for BoundConstant {
@@ -23,7 +23,7 @@ pub struct BoundNode<'a> {
     pub kind: BoundNodeKind<'a>,
     pub type_: Type,
     pub byte_width: u64,
-    constant_value: Option<BoundConstant>,
+    pub constant_value: Option<BoundConstant>,
 }
 
 impl<'a> BoundNode<'a> {
@@ -238,13 +238,13 @@ impl<'a> BoundNode<'a> {
     pub fn conversion(span: TextSpan, base: BoundNode<'a>, type_: Type) -> Self {
         Self {
             span,
+            constant_value: base.constant_value.clone(),
             kind: BoundNodeKind::Conversion(BoundConversionNodeKind {
                 base: Box::new(base),
                 type_: type_.clone(),
             }),
             type_,
             byte_width: 4,
-            constant_value: None,
         }
     }
 
