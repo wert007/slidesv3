@@ -1052,20 +1052,14 @@ fn bind_unary_operator<'a, 'b>(
         _ => unreachable!(),
     };
     match operand.type_ {
-        Type::Integer => Some((result, Type::Integer)),
-        Type::Boolean => Some((result, Type::Boolean)),
-        Type::Error
-        | Type::Void
-        | Type::Any
-        | Type::SystemCall(_)
-        | Type::Function(_)
-        | Type::Closure(_)
-        | Type::Struct(_)
-        | Type::StructReference(_)
-        | Type::None
-        | Type::String
-        | Type::Array(_)
-        | Type::Noneable(_) => {
+        Type::Integer if result != BoundUnaryOperator::LogicalNegation => {
+            Some((result, Type::Integer))
+        }
+        Type::Boolean | Type::Noneable(_) if result == BoundUnaryOperator::LogicalNegation => {
+            Some((result, Type::Boolean))
+        }
+        Type::Error => None,
+        _ => {
             binder.diagnostic_bag.report_no_unary_operator(
                 span,
                 operator_token.lexeme,
