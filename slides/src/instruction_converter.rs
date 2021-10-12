@@ -299,18 +299,11 @@ fn convert_array_literal(
     let mut result = vec![];
     let element_count = array_literal.children.len();
     let length_in_bytes = element_count as u64 * WORD_SIZE_IN_BYTES;
-    let mut address = allocate(&mut converter.stack, length_in_bytes + WORD_SIZE_IN_BYTES) as u64;
-    let pointer = address;
-    converter
-        .stack
-        .write_word(address as _, length_in_bytes as _);
-    address += WORD_SIZE_IN_BYTES;
-    for child in array_literal.children.into_iter() {
+    for child in array_literal.children.into_iter().rev() {
         result.append(&mut convert_node(child, converter));
-        result.push(Instruction::write_to_stack(address as _).span(span).into());
-        address += WORD_SIZE_IN_BYTES;
     }
-    result.push(Instruction::load_pointer(pointer).span(span).into());
+    result.push(Instruction::load_immediate(length_in_bytes).span(span).into());
+    result.push(Instruction::write_to_heap((element_count + 1) as _).span(span).into());
     result
 }
 
@@ -521,26 +514,11 @@ fn convert_constructor_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let pointer = allocate(
-        &mut converter.stack,
-        constructor_call.base_type.size_in_bytes(),
-    ) as _;
-    let mut writing_pointer = pointer;
-    for (argument, type_) in constructor_call
-        .arguments
-        .into_iter()
-        .zip(constructor_call.base_type.fields.iter())
-    {
-        let argument_span = argument.span;
+    let word_count = bytes_to_word(constructor_call.base_type.size_in_bytes());
+    for argument in constructor_call.arguments.into_iter().rev() {
         result.append(&mut convert_node(argument, converter));
-        result.push(
-            Instruction::write_to_stack(writing_pointer)
-                .span(argument_span)
-                .into(),
-        );
-        writing_pointer += type_.size_in_bytes();
     }
-    result.push(Instruction::load_pointer(pointer).span(span).into());
+    result.push(Instruction::write_to_heap(word_count).span(span).into());
     result
 }
 
@@ -655,42 +633,22 @@ fn convert_closure(
         1 + arguments.len()
     } as u64;
     let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
-    let pointer = allocate(&mut converter.stack, size_in_bytes + WORD_SIZE_IN_BYTES);
-    let mut writing_pointer = pointer as u64;
-    converter
-        .stack
-        .write_word(writing_pointer as _, size_in_bytes);
-    writing_pointer += WORD_SIZE_IN_BYTES;
+
+    for argument in arguments.into_iter().rev() {
+        if is_system_call {
+            let type_identifier = argument.type_.type_identifier();
+            result.push(Instruction::type_identifier(type_identifier).span(argument.span).into());
+        }
+        result.append(&mut convert_node(argument, converter));
+    }
     match closure.function {
         FunctionKind::FunctionId(id) => {
             result.push(Instruction::load_register(id).span(span).into());
-            result.push(
-                Instruction::write_to_stack(writing_pointer)
-                    .span(span)
-                    .into(),
-            );
-            writing_pointer += WORD_SIZE_IN_BYTES;
         }
         FunctionKind::SystemCall(_) => {}
     }
-
-    for argument in arguments {
-        if is_system_call {
-            let type_identifier = argument.type_.type_identifier();
-            converter
-                .stack
-                .write_word(writing_pointer as _, type_identifier);
-            writing_pointer += WORD_SIZE_IN_BYTES;
-        }
-        result.append(&mut convert_node(argument, converter));
-        result.push(
-            Instruction::write_to_stack(writing_pointer)
-                .span(span)
-                .into(),
-        );
-        writing_pointer += WORD_SIZE_IN_BYTES;
-    }
-    result.push(Instruction::load_pointer(pointer as _).span(span).into());
+    result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
+    result.push(Instruction::write_to_heap(size_in_words + 1).span(span).into());
     result
 }
 
