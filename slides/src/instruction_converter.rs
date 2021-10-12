@@ -117,6 +117,8 @@ pub fn convert<'a>(
         stack: Stack::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
     };
+    // Push Pointer to 0 with value 0
+    converter.stack.push(0);
     let instructions = convert_node(bound_node, &mut converter);
     if debug_flags.print_instructions_and_labels {
         for (i, instruction) in instructions.iter().enumerate() {

@@ -398,13 +398,12 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
     let lhs_length = state.read_pointer(lhs).unwrap_value();
     let rhs_length = state.read_pointer(rhs).unwrap_value();
     let result_length = lhs_length + rhs_length;
-    let mut pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
+    let pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
         runtime_error!(
             state,
             no_heap_memory_left(instruction.span, result_length + WORD_SIZE_IN_BYTES)
         );
-        pointer = memory::HEAP_POINTER;
     } else {
         let mut writing_pointer = pointer;
         state.heap.write_word(writing_pointer as _, result_length);
