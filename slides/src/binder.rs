@@ -919,7 +919,7 @@ fn bind_array_literal<'a, 'b>(
     let first_element = array_literal.children.remove(0);
     let first_element = bind_node(first_element, binder);
 
-    let type_ = expected_type.unwrap_or_else(||first_element.type_.clone());
+    let type_ = expected_type.unwrap_or_else(|| first_element.type_.clone());
     let first_element = bind_conversion(first_element, &type_, binder);
     let mut children = vec![first_element];
     for child in array_literal.children {
@@ -1575,10 +1575,12 @@ fn bind_conversion<'a>(
         base
     } else if base.type_.can_be_converted_to(type_) {
         BoundNode::conversion(base.span, base, type_.clone())
-    } else {
+    } else if type_ != &Type::Error && base.type_ != Type::Error {
         binder
             .diagnostic_bag
             .report_cannot_convert(base.span, &base.type_, type_);
+        BoundNode::error(base.span)
+    } else {
         BoundNode::error(base.span)
     }
 }
@@ -1790,14 +1792,19 @@ fn bind_variable_declaration<'a, 'b>(
     variable_declaration: VariableDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    binder.expected_type = variable_declaration.optional_type_declaration.map(|td| bind_type(td.type_, binder));
+    binder.expected_type = variable_declaration
+        .optional_type_declaration
+        .map(|td| bind_type(td.type_, binder));
     let initializer = bind_node(*variable_declaration.initializer, binder);
     if matches!(initializer.type_, Type::Void) {
         binder
             .diagnostic_bag
             .report_invalid_void_expression(initializer.span);
     }
-    let type_ = binder.expected_type.take().unwrap_or_else(|| initializer.type_.clone());
+    let type_ = binder
+        .expected_type
+        .take()
+        .unwrap_or_else(|| initializer.type_.clone());
     if type_ == Type::None {
         binder
             .diagnostic_bag
