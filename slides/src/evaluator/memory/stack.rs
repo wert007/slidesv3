@@ -57,12 +57,6 @@ impl Stack {
         self.flags[address as usize].is_pointer
     }
 
-    pub fn set_pointer(&mut self, address: u64) {
-        assert_eq!(address % WORD_SIZE_IN_BYTES, 0);
-        let address = address / WORD_SIZE_IN_BYTES;
-        self.flags[address as usize].is_pointer = true;
-    }
-
     pub fn read_word(&self, address: u64) -> u64 {
         if address % WORD_SIZE_IN_BYTES == 0 {
             self.read_word_aligned(address / WORD_SIZE_IN_BYTES)

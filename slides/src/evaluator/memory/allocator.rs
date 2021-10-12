@@ -172,6 +172,18 @@ impl Allocator {
         }
     }
 
+    pub fn write_flagged_word(&mut self, address: u64, value: FlaggedWord) {
+        let address = clear_address(address);
+
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address).is_used);
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, value)
+        } else {
+            todo!("address = {:x}", address)
+        }
+    }
+
     fn write_word_aligned(&mut self, address: u64, value: u64) {
         #[cfg(debug_assertions)]
         assert!(
@@ -182,6 +194,23 @@ impl Allocator {
             address
         );
         self.data[address as usize] = value;
+
+        if self.debug_heap_as_string {
+            print_heap_as_string(&self.data);
+        }
+    }
+
+    fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
+        #[cfg(debug_assertions)]
+        assert!(
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+                .is_used,
+            "bucket = {:#?}, address = 0x{:x}",
+            self.find_bucket_from_address(address),
+            address
+        );
+        self.data[address as usize] = value.value;
+        self.flags[address as usize] = value.flags;
 
         if self.debug_heap_as_string {
             print_heap_as_string(&self.data);

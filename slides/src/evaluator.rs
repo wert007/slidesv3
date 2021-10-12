@@ -49,10 +49,9 @@ impl EvaluatorState<'_> {
 
     fn write_pointer(&mut self, address: u64, value: FlaggedWord) {
         if memory::is_heap_pointer(address) {
-            self.heap.write_word(address, value.value);
+            self.heap.write_flagged_word(address, value);
         } else {
-            self.stack.write_word(address, value.value);
-            self.stack.set_pointer(address);
+            self.stack.write_flagged_word(address, value);
         }
     }
 }

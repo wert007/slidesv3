@@ -14,10 +14,10 @@ pub fn to_string(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState)
     let string_length = string.len() as u64;
     let mut pointer = state.heap.allocate(WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
-    state.heap.write_word(pointer as _, string_length);
+    state.heap.write_word(pointer, string_length);
     pointer += WORD_SIZE_IN_BYTES;
     for &byte in string.as_bytes() {
-        state.heap.write_byte(pointer as _, byte);
+        state.heap.write_byte(pointer, byte);
         pointer += 1;
     }
     state.stack.push_pointer(result);
@@ -75,21 +75,13 @@ fn array_to_string_native(
         Type::Struct(_) | Type::StructReference(_) => todo!(),
         Type::Integer => {
             for i in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
-                let value = if is_heap_pointer(i) {
-                    state.heap.read_word(i as _)
-                } else {
-                    state.stack.read_word(i as _)
-                };
+                let value = state.read_pointer(i).value;
                 result.push_str(&format!("{}, ", value as i64));
             }
         }
         Type::Boolean => {
             for i in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
-                let value = if is_heap_pointer(i) {
-                    state.heap.read_word(i as _)
-                } else {
-                    state.stack.read_word(i as _)
-                };
+                let value = state.read_pointer(i).value;
                 if value == 0 {
                     result.push_str("false, ");
                 } else {
@@ -134,11 +126,7 @@ fn array_to_string_native(
 
 fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) -> String {
     let string_start = argument.value;
-    let pointer = if is_heap_pointer(string_start) {
-        state.heap.read_word(string_start as _)
-    } else {
-        state.stack.read_word(string_start as _)
-    };
+    let pointer = state.read_pointer(string_start).value;
 
     let string_length_in_bytes = pointer;
     let string_length_in_words = bytes_to_word(string_length_in_bytes);
@@ -149,11 +137,7 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
         .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {
-        let word = if is_heap_pointer(i) {
-            state.heap.read_word(i as _)
-        } else {
-            state.stack.read_word(i as _)
-        };
+        let word = state.read_pointer(i).value;
         let bytes = word.to_be_bytes();
         string_buffer.extend_from_slice(&bytes);
     }
@@ -165,20 +149,20 @@ pub fn array_length(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
     let mut array_start = argument.value;
     let mut pointer = if is_heap_pointer(array_start) {
         is_heap_array = true;
-        state.heap.read_word(array_start as _)
+        state.heap.read_word(array_start)
     } else {
         is_heap_array = false;
-        state.stack.read_word(array_start as _)
+        state.stack.read_word(array_start)
     };
 
-    while state.is_pointer(array_start as _) && !is_heap_array {
+    while state.is_pointer(array_start) && !is_heap_array {
         array_start = pointer;
         pointer = if is_heap_pointer(pointer) {
             is_heap_array = true;
-            state.heap.read_word(pointer as _)
+            state.heap.read_word(pointer)
         } else {
             is_heap_array = false;
-            state.stack.read_word(pointer as _)
+            state.stack.read_word(pointer)
         };
     }
 
