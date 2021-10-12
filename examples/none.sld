@@ -40,16 +40,16 @@ func main() {
     let hui = !n;
 
     // Step 3.4 binary operations
-    // if m == 99 {
-    //     print('Shoud have gotten here?!');
-    //     print(m - 99);
-    // }
+    if m == 99 {
+        print('Shoud have gotten here?!');
+        print(m - 99);
+    }
 
     // if (n != none) == false {
-    // if n == none {
-    //     n = 12;
-    //     print('Shoud have gotten here as well?!');
-    // }
+    if n == none {
+        n = 12;
+        print('Shoud have gotten here as well?!');
+    }
 
     // // Step 4. ???
 

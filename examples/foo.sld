@@ -1,6 +1,6 @@
 func main() {
     let m: int? = 1;
-    if m {
+    if m == 1 {
         m = 99;
         print(m);
     }
