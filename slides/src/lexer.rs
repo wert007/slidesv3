@@ -15,14 +15,42 @@ use self::syntax_token::SyntaxTokenKind;
 
 #[derive(Clone, Copy)]
 enum State {
+    // Default state, this means that for the current token, there are no
+    // characters consumed and any token may follow.
     Default,
+    // This is a simple decimal integer number right now. It checks, that the
+    // value fits into an i64 and only consumes chars 0..9
     DecimalNumber(TextIndex),
+    // This is a simple string starting with ' and ending with the same
+    // character. StrintState stores the character which started the string and
+    // may in the future hold flags like formatted strings, math strings and
+    // similiar things.
     String(TextIndex, StringState),
+    // An Identifier is a single word, it might contain ascii letters, numbers
+    // and underscores, it cannot start with a number.
     Identifier(TextIndex),
+    // These are operators wich exist as a single char operator and as a multi
+    // char operator, but it might make sense to repeat them. Like unary
+    // operators e.g. So "!!" gets parsed as two tokens and "!=" as one token.
+    // char is the expected next character of the mutli char operator.
+    MaybeTwoCharOperator(TextIndex, char),
+    // This is a operator which may be multi char but actually does not have to
+    // be. It simply consumes as long as there are operator characters in the
+    // input. It currently also has a max length of 2 characters, since there
+    // are no operators, which are longer.
     MultiCharOperator(TextIndex),
+    // This is a single dash, which might be an operator, a single line comment
+    // or a multiline comment.
     MaybeComment(TextIndex),
+    // A single line comment starts with // and ends in a new line. Anything in
+    // between is ignored.
     SingleLineComment(TextIndex),
+    // A multi line comment starts with /* and ends with */. Anything in between
+    // is ignored, it allows for nested multi line comments.
     MultiLineComment(TextIndex),
+    // This is a single * inside a multi line comment. If the next char is a /
+    // the current multi line comment will be closed. Other wise the state will
+    // be set to multi line comment again.
     MaybeCloseMultiLineComment(TextIndex),
 }
 
@@ -78,6 +106,9 @@ pub fn lex<'a>(
                 (State::Default, ws) if ws.is_whitespace() => {}
                 (State::Default, o) if is_operator(o) => {
                     result.push_back(SyntaxToken::operator(char_index, &text[byte_index..][..1]));
+                }
+                (State::Default, '!') => {
+                    state = State::MaybeTwoCharOperator(index, '=');
                 }
                 (State::Default, o) if is_multi_char_operator(o) => {
                     state = State::MultiCharOperator(index);
@@ -160,6 +191,16 @@ pub fn lex<'a>(
                         continue 'start;
                     }
                 }
+                (State::MaybeTwoCharOperator(start, expected), actual) => {
+                    state = State::Default;
+                    if expected == actual {
+                        state = State::MultiCharOperator(start);
+                    } else {
+                        let lexeme = &text[start.byte_index..byte_index];
+                        result.push_back(SyntaxToken::operator(start.char_index, lexeme));
+                        continue 'start;
+                    }
+                }
                 (State::MultiCharOperator(start), o) => {
                     if !is_multi_char_operator(o) || char_index - start.char_index > 2 {
                         state = State::Default;
@@ -208,6 +249,10 @@ pub fn lex<'a>(
                 SyntaxToken::identifier(start.char_index, lexeme)
             });
         }
+        State::MaybeTwoCharOperator(start, _) => {
+            let lexeme = &text[start.byte_index..];
+            result.push_back(SyntaxToken::operator(start.char_index, lexeme));
+        }
         State::MultiCharOperator(start) => {
             let lexeme = &text[start.byte_index..];
             if !is_valid_operator(lexeme) {
@@ -245,12 +290,12 @@ fn is_operator(character: char) -> bool {
 }
 
 fn is_multi_char_operator(character: char) -> bool {
-    matches!(character, '=' | '!' | '<' | '>' | '-' | '?')
+    matches!(character, '=' | '<' | '>' | '-' | '?')
 }
 
 fn is_valid_operator(operator: &str) -> bool {
     matches!(
         operator,
-        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-" | "!" | "?" | "??"
+        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-" | "?" | "??"
     )
 }
