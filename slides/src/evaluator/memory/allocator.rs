@@ -2,6 +2,8 @@ use crate::{DebugFlags, evaluator::memory::Flags};
 
 use super::{FlaggedWord, HEAP_POINTER, WORD_SIZE_IN_BYTES, bytes_to_word};
 
+pub mod garbage_collector;
+
 pub struct Allocator {
     pub data: Vec<u64>,
     pub flags: Vec<Flags>,
