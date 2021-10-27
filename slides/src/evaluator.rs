@@ -7,7 +7,7 @@ use crate::{DebugFlags, DiagnosticBag, binder::typing::{SystemCallKind, Type}, e
     }, value::Value};
 use num_enum::TryFromPrimitive;
 
-use self::memory::{FlaggedWord, allocator::Allocator, stack::Stack};
+use self::memory::{FlaggedWord, allocator::{Allocator, garbage_collector::garbage_collect}, stack::Stack};
 
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {
@@ -49,6 +49,21 @@ impl EvaluatorState<'_> {
         } else {
             self.stack.write_flagged_word(address, value);
         }
+    }
+
+    fn garbage_collect(&mut self) {
+        let mut unchecked_pointers = vec![];
+        for (flags, &value) in self.stack.flags.iter().zip(&self.stack.data) {
+            if flags.is_pointer {
+                unchecked_pointers.push(value);
+            }
+        }
+        for value in &self.registers {
+            if value.is_pointer() {
+                unchecked_pointers.push(value.unwrap_pointer());
+            }
+        }
+        garbage_collect(unchecked_pointers, &mut self.heap);
     }
 }
 
@@ -570,6 +585,8 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         let return_address = state.stack.pop().unwrap_value();
         state.pc = return_address as _;
     }
+    // TODO: DEBUG
+    state.garbage_collect();
 }
 
 fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction) {
