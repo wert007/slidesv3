@@ -1,6 +1,6 @@
-use crate::{DebugFlags, evaluator::memory::Flags};
+use crate::{evaluator::memory::Flags, DebugFlags};
 
-use super::{FlaggedWord, HEAP_POINTER, WORD_SIZE_IN_BYTES, bytes_to_word};
+use super::{bytes_to_word, FlaggedWord, HEAP_POINTER, WORD_SIZE_IN_BYTES};
 
 pub mod garbage_collector;
 
@@ -29,8 +29,7 @@ impl Allocator {
         for bucket in &self.buckets {
             if let BucketEntry::Bucket(bucket) = bucket {
                 if bucket.address * WORD_SIZE_IN_BYTES <= address
-                    && (bucket.address + bucket.size_in_words) * WORD_SIZE_IN_BYTES
-                        > address
+                    && (bucket.address + bucket.size_in_words) * WORD_SIZE_IN_BYTES > address
                 {
                     return bucket;
                 }
@@ -55,6 +54,17 @@ impl Allocator {
             .collect();
         result.sort_by_key(|b| u64::MAX - b.size_in_words);
         result
+    }
+
+    fn used_buckets_mut(&mut self) -> impl Iterator<Item = &mut Bucket> {
+        self.buckets.iter_mut().filter_map(|b| match b {
+            BucketEntry::Bucket(b) if b.is_used => Some(b),
+            _ => None,
+        })
+    }
+
+    fn fold_free_buckets(&mut self) {
+        return;
     }
 
     pub fn allocate(&mut self, size_in_bytes: u64) -> u64 {
