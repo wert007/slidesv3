@@ -59,7 +59,8 @@ pub fn evaluate(
 ) -> ResultType {
     let mut state = EvaluatorState {
         stack: program.stack,
-        heap: Allocator::new(64 * 1024, debug_flags),
+        heap: Allocator::new(64, debug_flags),
+        // heap: Allocator::new(64 * 1024, debug_flags),
         registers: vec![FlaggedWord::default(); program.max_used_variables],
         protected_registers: program.protected_variables,
         pc: 0,
