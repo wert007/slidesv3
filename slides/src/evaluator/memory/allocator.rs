@@ -231,10 +231,11 @@ fn clear_address(address: u64) -> u64 {
     address & !HEAP_POINTER
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum BucketEntry {
     Bucket(Bucket),
     Parent(BucketParent),
+    Tombstone,
 }
 
 impl BucketEntry {
@@ -246,6 +247,7 @@ impl BucketEntry {
         match self {
             BucketEntry::Bucket(e) => e.buddy_index,
             BucketEntry::Parent(e) => e.buddy_index,
+            BucketEntry::Tombstone => panic!("Unchecked Tombstone found!"),
         }
     }
 
@@ -253,6 +255,7 @@ impl BucketEntry {
         match self {
             BucketEntry::Bucket(e) => e.size_in_words,
             BucketEntry::Parent(e) => e.size_in_words,
+            BucketEntry::Tombstone => panic!("Unchecked Tombstone found!"),
         }
     }
 
@@ -260,6 +263,7 @@ impl BucketEntry {
         match self {
             BucketEntry::Bucket(e) => e.buddy_index = buddy_index,
             BucketEntry::Parent(e) => e.buddy_index = buddy_index,
+            BucketEntry::Tombstone => panic!("Unchecked Tombstone found!"),
         }
     }
 
@@ -272,7 +276,7 @@ impl BucketEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct BucketParent {
     index: usize,
     buddy_index: Option<usize>,
@@ -283,7 +287,7 @@ struct BucketParent {
     child_indices: [usize; 2],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 struct Bucket {
     index: usize,
     buddy_index: Option<usize>,
