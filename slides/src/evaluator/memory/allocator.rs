@@ -109,6 +109,15 @@ impl Allocator {
         }
     }
 
+    pub fn read_flagged_word_unchecked(&self, address: u64) -> FlaggedWord {
+        let address = clear_address(address) as u64;
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.read_flagged_word_aligned_unchecked((address / WORD_SIZE_IN_BYTES) as _)
+        } else {
+            todo!("address = {:x}", address)
+        }
+    }
+
     fn read_word_aligned(&self, address: u64) -> u64 {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
@@ -126,6 +135,11 @@ impl Allocator {
             self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
                 .is_used
         );
+        FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
+    }
+
+    pub fn read_flagged_word_aligned_unchecked(&self, address: u64) -> FlaggedWord {
+        let address = clear_address(address);
         FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
     }
 
