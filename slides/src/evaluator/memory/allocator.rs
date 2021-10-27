@@ -101,7 +101,11 @@ impl Allocator {
     pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
         let address = clear_address(address) as u64;
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address as _).is_used);
+        assert!(
+            self.find_bucket_from_address(address as _).is_used,
+            "address = 0x{:x}",
+            address
+        );
         if address % WORD_SIZE_IN_BYTES == 0 {
             self.read_flagged_word_aligned((address / WORD_SIZE_IN_BYTES) as _)
         } else {
