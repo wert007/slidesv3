@@ -64,7 +64,30 @@ impl Allocator {
     }
 
     fn fold_free_buckets(&mut self) {
-        crate::debug::output_allocator_to_dot("heap", self);
+        // crate::debug::output_allocator_to_dot("old_heap", self);
+        for index in 0..self.buckets.len() {
+            if self.buckets[index].as_bucket().is_none() {
+                continue;
+            }
+            if self.buckets[index].as_bucket().unwrap().is_used {
+                continue;
+            }
+            if self.buckets[index].buddy_index().is_none() {
+                continue;
+            }
+            let buddy_index = self.buckets[index].buddy_index().unwrap();
+            if self.buckets[buddy_index].as_bucket().is_none() {
+                continue;
+            }
+            if self.buckets[buddy_index].as_bucket().unwrap().is_used {
+                continue;
+            }
+            let parent_index = self.buckets[index].parent_index().unwrap();
+            self.buckets[index] = BucketEntry::Tombstone;
+            self.buckets[buddy_index] = BucketEntry::Tombstone;
+            self.buckets[parent_index] = BucketEntry::Bucket(Bucket::combine(self.buckets[parent_index].as_parent().unwrap()));
+        }
+        // crate::debug::output_allocator_to_dot("cleaned_heap", self);
         return;
     }
 
