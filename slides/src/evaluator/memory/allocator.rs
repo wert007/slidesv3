@@ -262,6 +262,14 @@ impl BucketEntry {
         }
     }
 
+    pub fn parent_index(&self) -> Option<usize> {
+        match self {
+            BucketEntry::Bucket(e) => e.parent_index,
+            BucketEntry::Parent(e) => e.parent_index,
+            BucketEntry::Tombstone => panic!("Unchecked Tombstone found!"),
+        }
+    }
+
     pub fn size_in_words(&self) -> u64 {
         match self {
             BucketEntry::Bucket(e) => e.size_in_words,
@@ -280,6 +288,14 @@ impl BucketEntry {
 
     fn as_bucket_mut(&mut self) -> Option<&mut Bucket> {
         if let Self::Bucket(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    fn as_parent_mut(&mut self) -> Option<&mut BucketParent> {
+        if let Self::Parent(v) = self {
             Some(v)
         } else {
             None
