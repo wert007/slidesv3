@@ -30,7 +30,7 @@ struct ListNode {
 func main() {
     let i = 0;
     let list = new ListNode(i, none);
-    while i < 64 {
+    while i < 95 {
         i = i + 1;
         list.add(i);
     }
