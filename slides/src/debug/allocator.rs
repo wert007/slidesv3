@@ -35,10 +35,12 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
             BucketEntry::Tombstone => result.push_str("Tombstone"),
         }
         result.push_str("\" ");
-        if let Some(buddy_index) = bucket.buddy_index() {
-            result.push_str("fillcolor=\"#");
-            result.push_str(color_names[(index + buddy_index) % color_names.len()]);
-            result.push_str("\" ");
+        if !matches!(bucket, BucketEntry::Tombstone) {
+            if let Some(buddy_index) = bucket.buddy_index() {
+                result.push_str("fillcolor=\"#");
+                result.push_str(color_names[(index + buddy_index) % color_names.len()]);
+                result.push_str("\" ");
+            }
         }
         result.push_str("];\n");
     }
