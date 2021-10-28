@@ -295,8 +295,24 @@ impl BucketEntry {
         }
     }
 
+    fn as_bucket(&self) -> Option<&Bucket> {
+        if let Self::Bucket(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     fn as_bucket_mut(&mut self) -> Option<&mut Bucket> {
         if let Self::Bucket(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    fn as_parent(&self) -> Option<&BucketParent> {
+        if let Self::Parent(v) = self {
             Some(v)
         } else {
             None
@@ -378,5 +394,17 @@ impl Bucket {
         buddy.depth += 1;
 
         (result, parent)
+    }
+
+    pub fn combine(parent_bucket: &BucketParent) -> Bucket {
+        Self {
+            index: parent_bucket.index,
+            buddy_index: parent_bucket.buddy_index,
+            parent_index: parent_bucket.parent_index,
+            address: parent_bucket.address,
+            size_in_words: parent_bucket.size_in_words,
+            depth: parent_bucket.depth,
+            is_used: false,
+        }
     }
 }
