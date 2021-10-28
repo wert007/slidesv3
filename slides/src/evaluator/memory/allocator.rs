@@ -7,7 +7,7 @@ pub mod garbage_collector;
 pub struct Allocator {
     pub data: Vec<u64>,
     pub flags: Vec<Flags>,
-    buckets: Vec<BucketEntry>,
+    pub buckets: Vec<BucketEntry>,
     debug_heap_as_string: bool,
 }
 
@@ -64,6 +64,7 @@ impl Allocator {
     }
 
     fn fold_free_buckets(&mut self) {
+        crate::debug::output_allocator_to_dot("heap", self);
         return;
     }
 
@@ -242,7 +243,7 @@ fn clear_address(address: u64) -> u64 {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum BucketEntry {
+pub enum BucketEntry {
     Bucket(Bucket),
     Parent(BucketParent),
     Tombstone,
@@ -287,18 +288,18 @@ impl BucketEntry {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct BucketParent {
-    index: usize,
+pub struct BucketParent {
+    pub index: usize,
     buddy_index: Option<usize>,
     parent_index: Option<usize>,
     address: u64,
     size_in_words: u64,
     depth: usize,
-    child_indices: [usize; 2],
+    pub child_indices: [usize; 2],
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Bucket {
+pub struct Bucket {
     index: usize,
     buddy_index: Option<usize>,
     parent_index: Option<usize>,
