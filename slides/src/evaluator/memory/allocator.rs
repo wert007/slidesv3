@@ -83,6 +83,7 @@ impl Allocator {
 
             while self.buckets[bucket_index].size_in_words() / 2 >= expected_size {
                 let old_buddy_index = self.buckets[bucket_index].buddy_index();
+                let old_parent_index = self.buckets[bucket_index].parent_index();
                 let new_index = self.buckets.len();
                 let (tmp_bucket, parent) = Bucket::split(
                     self.buckets[bucket_index].as_bucket_mut().unwrap(),
@@ -91,6 +92,14 @@ impl Allocator {
 
                 if let Some(old_buddy) = old_buddy_index {
                     self.buckets[old_buddy].set_buddy_index(Some(parent.index));
+                }
+                if let Some(old_parent) = old_parent_index {
+                    if let Some(old_parent) = self.buckets.get_mut(old_parent).unwrap().as_parent_mut() {
+                        let index = old_parent.child_indices.iter().position(|&child_index| child_index == bucket_index).unwrap();
+                        old_parent.child_indices[index] = parent.index;
+                    } else {
+                        unreachable!("Bucket had a {:#?} as parent and not an actual parent.", self.buckets[old_parent]);
+                    }
                 }
                 let index = tmp_bucket.index;
                 self.buckets.push(BucketEntry::Bucket(tmp_bucket));
