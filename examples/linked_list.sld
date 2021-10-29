@@ -10,6 +10,28 @@ struct ListNode {
         }
     }
 
+    func delete_range(start: int, count: int) {
+        if start > 0 {
+            if this.next {
+                this.next.delete_range(start - 1, count);
+            }
+        } else {
+            this.next = this.node(count);
+        }
+    }
+
+    func node(index: int) -> ListNode? {
+        if index == 0 {
+            return this;
+        } else if index == 1 {
+            return this.next;
+        } else if this.next {
+            return this.next.node(index - 1);
+        } else {
+            return none;
+        }
+    }
+
     func print() {
         print('[ ' + this.to_string() + ' ]');
     }
@@ -27,6 +49,8 @@ struct ListNode {
     }
 }
 
+func gc() {}
+
 func main() {
     let i = 0;
     let list = new ListNode(i, none);
@@ -34,5 +58,7 @@ func main() {
         i = i + 1;
         list.add(i);
     }
+    list.delete_range(0, 100);
+    heapdump('heap_before_print');
     list.print();
 }
