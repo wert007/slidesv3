@@ -71,10 +71,7 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
-    pub fn struct_field(
-        field: ParameterNode<'a>,
-        semicolon_token: SyntaxToken<'a>,
-    ) -> Self {
+    pub fn struct_field(field: ParameterNode<'a>, semicolon_token: SyntaxToken<'a>) -> Self {
         let span = TextSpan::bounds(field.span, semicolon_token.span());
         Self {
             span,
@@ -462,7 +459,10 @@ pub enum SyntaxNodeKind<'a> {
 
 impl SyntaxNodeKind<'_> {
     pub fn is_assignable(&self) -> bool {
-        matches!(self, Self::Variable(_) | Self::ArrayIndex(_) | Self::FieldAccess(_))
+        matches!(
+            self,
+            Self::Variable(_) | Self::ArrayIndex(_) | Self::FieldAccess(_)
+        )
     }
 }
 
@@ -552,10 +552,7 @@ impl<'a> ParameterNode<'a> {
         type_: TypeNode<'a>,
     ) -> Self {
         let span = TextSpan::bounds(identifier.span(), type_.span());
-        let type_declaration = TypeDeclaration {
-            colon_token,
-            type_,
-        };
+        let type_declaration = TypeDeclaration { colon_token, type_ };
         Self {
             identifier,
             type_declaration,
@@ -584,7 +581,11 @@ pub struct TypeNode<'a> {
 }
 
 impl<'a> TypeNode<'a> {
-    pub fn new(identifier: SyntaxToken<'a>, optional_question_mark: Option<SyntaxToken<'a>>, brackets: Vec<SyntaxToken<'a>>) -> Self {
+    pub fn new(
+        identifier: SyntaxToken<'a>,
+        optional_question_mark: Option<SyntaxToken<'a>>,
+        brackets: Vec<SyntaxToken<'a>>,
+    ) -> Self {
         Self {
             identifier,
             optional_question_mark,

@@ -1,13 +1,23 @@
 pub mod memory;
 mod sys_calls;
 
-use crate::{DebugFlags, DiagnosticBag, binder::typing::{SystemCallKind, Type}, evaluator::memory::WORD_SIZE_IN_BYTES, instruction_converter::{
+use crate::{
+    binder::typing::{SystemCallKind, Type},
+    evaluator::memory::WORD_SIZE_IN_BYTES,
+    instruction_converter::{
         instruction::{op_codes::OpCode, Instruction},
         Program,
-    }, value::Value};
+    },
+    value::Value,
+    DebugFlags, DiagnosticBag,
+};
 use num_enum::TryFromPrimitive;
 
-use self::memory::{FlaggedWord, allocator::{Allocator, garbage_collector::garbage_collect}, stack::Stack};
+use self::memory::{
+    allocator::{garbage_collector::garbage_collect, Allocator},
+    stack::Stack,
+    FlaggedWord,
+};
 
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {
@@ -200,9 +210,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
         state.stack.push(0);
         return;
     }
-    let index_in_bytes = array
-        + index_in_words * WORD_SIZE_IN_BYTES
-        + WORD_SIZE_IN_BYTES;
+    let index_in_bytes = array + index_in_words * WORD_SIZE_IN_BYTES + WORD_SIZE_IN_BYTES;
     let value = state.read_pointer(index_in_bytes);
     state.stack.push_flagged_word(value);
 }
@@ -467,11 +475,7 @@ fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instructio
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let result = if lhs.unwrap_pointer() == 0 {
-        rhs
-    } else {
-        lhs
-    };
+    let result = if lhs.unwrap_pointer() == 0 { rhs } else { lhs };
     let result = if instruction.arg != 0 {
         state.read_pointer(result.unwrap_pointer())
     } else {
@@ -601,7 +605,11 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
 
     let function_pointer = if has_function_pointer {
         closure_pointer += WORD_SIZE_IN_BYTES;
-        Some(state.read_pointer(closure_pointer - WORD_SIZE_IN_BYTES).unwrap_pointer())
+        Some(
+            state
+                .read_pointer(closure_pointer - WORD_SIZE_IN_BYTES)
+                .unwrap_pointer(),
+        )
     } else {
         None
     };
@@ -624,7 +632,10 @@ fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruct
     if index - WORD_SIZE_IN_BYTES >= array_length_in_bytes {
         let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
         let index = (index - WORD_SIZE_IN_BYTES) as _;
-        runtime_error!(state, index_out_of_bounds(instruction.span, index, array_length_in_words));
+        runtime_error!(
+            state,
+            index_out_of_bounds(instruction.span, index, array_length_in_words)
+        );
     }
     state.stack.push_pointer(array);
     state.stack.push(index);

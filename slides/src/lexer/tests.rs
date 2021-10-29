@@ -240,7 +240,7 @@ fn lexer_successfull() {
     });
 }
 
-fn lex_helper_successfull(input: &str, callback: impl FnOnce(VecDeque<SyntaxToken>) -> ()) {
+fn lex_helper_successfull(input: &str, callback: impl FnOnce(VecDeque<SyntaxToken>)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = lex(&source_text, &mut diagnostic_bag, DebugFlags::default());
@@ -289,7 +289,7 @@ fn lexer_error() {
 
 fn lex_helper_errors(
     input: &str,
-    callback: impl FnOnce(VecDeque<SyntaxToken>, Vec<crate::diagnostics::Diagnostic>) -> (),
+    callback: impl FnOnce(VecDeque<SyntaxToken>, Vec<crate::diagnostics::Diagnostic>),
 ) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);

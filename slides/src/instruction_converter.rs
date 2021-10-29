@@ -302,8 +302,16 @@ fn convert_array_literal(
     for child in array_literal.children.into_iter().rev() {
         result.append(&mut convert_node(child, converter));
     }
-    result.push(Instruction::load_immediate(length_in_bytes).span(span).into());
-    result.push(Instruction::write_to_heap((element_count + 1) as _).span(span).into());
+    result.push(
+        Instruction::load_immediate(length_in_bytes)
+            .span(span)
+            .into(),
+    );
+    result.push(
+        Instruction::write_to_heap((element_count + 1) as _)
+            .span(span)
+            .into(),
+    );
     result
 }
 
@@ -531,7 +539,10 @@ fn convert_system_call(
         SystemCallKind::Print | SystemCallKind::ToString | SystemCallKind::DebugHeapDump => {
             let mut result = vec![];
             let argument_count = match system_call.base {
-                SystemCallKind::Print | SystemCallKind::ToString | SystemCallKind::ArrayLength | SystemCallKind::DebugHeapDump => 1,
+                SystemCallKind::Print
+                | SystemCallKind::ToString
+                | SystemCallKind::ArrayLength
+                | SystemCallKind::DebugHeapDump => 1,
             };
 
             for argument in system_call.arguments {
@@ -637,7 +648,11 @@ fn convert_closure(
     for argument in arguments.into_iter().rev() {
         if is_system_call {
             let type_identifier = argument.type_.type_identifier();
-            result.push(Instruction::type_identifier(type_identifier).span(argument.span).into());
+            result.push(
+                Instruction::type_identifier(type_identifier)
+                    .span(argument.span)
+                    .into(),
+            );
         }
         result.append(&mut convert_node(argument, converter));
     }
@@ -648,7 +663,11 @@ fn convert_closure(
         FunctionKind::SystemCall(_) => {}
     }
     result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
-    result.push(Instruction::write_to_heap(size_in_words + 1).span(span).into());
+    result.push(
+        Instruction::write_to_heap(size_in_words + 1)
+            .span(span)
+            .into(),
+    );
     result
 }
 

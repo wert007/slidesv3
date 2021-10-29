@@ -30,7 +30,6 @@ pub struct BoundBinary {
     pub result: Type,
 }
 
-
 impl BoundBinary {
     pub fn same_input(input: &Type, op: BoundBinaryOperator, result: Type) -> BoundBinary {
         Self {

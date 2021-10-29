@@ -1,9 +1,9 @@
+mod allocator;
 mod basic_blocks;
 mod bound_nodes;
-mod allocator;
 
-pub use basic_blocks::output_basic_blocks_to_dot;
 pub use allocator::output_allocator_to_dot;
+pub use basic_blocks::output_basic_blocks_to_dot;
 pub use bound_nodes::print_bound_node_as_code;
 
 #[derive(Debug, Clone, Copy, Default)]

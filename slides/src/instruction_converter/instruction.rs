@@ -382,7 +382,7 @@ impl Instruction {
     pub const fn decode_closure(argument_count: u64, has_function_pointer: bool) -> Self {
         Self {
             op_code: OpCode::DecodeClosure,
-            arg: argument_count << 1 + has_function_pointer as u64,
+            arg: (argument_count << 1) + has_function_pointer as u64,
             span: None,
         }
     }

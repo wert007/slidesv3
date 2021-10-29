@@ -1,4 +1,4 @@
-use crate::{DebugFlags, evaluator::WORD_SIZE_IN_BYTES};
+use crate::{evaluator::WORD_SIZE_IN_BYTES, DebugFlags};
 
 use super::{FlaggedWord, Flags};
 
@@ -27,10 +27,7 @@ impl Stack {
         let value = self.data.pop().unwrap();
         let flags = self.flags.pop().unwrap();
         self.print_maybe_stack();
-        FlaggedWord {
-            value,
-            flags,
-        }
+        FlaggedWord { value, flags }
     }
 
     pub fn push(&mut self, value: u64) {

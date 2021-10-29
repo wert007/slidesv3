@@ -1,9 +1,6 @@
-use crate::{
-    binder::typing::Type,
-    evaluator::memory::bytes_to_word,
-};
+use crate::{binder::typing::Type, evaluator::memory::bytes_to_word};
 
-use super::{EvaluatorState, WORD_SIZE_IN_BYTES, memory::FlaggedWord};
+use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 
 pub fn print(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
     println!("{}", to_string_native(type_, argument, state));
@@ -36,7 +33,7 @@ fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
                 let argument = state.read_pointer(argument.unwrap_pointer());
                 to_string_native(*base_type, argument, state)
             }
-        },
+        }
         Type::Struct(_) | Type::StructReference(_) => todo!(),
         Type::Integer => {
             format!("{}", argument.unwrap_value() as i64)

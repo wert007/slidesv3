@@ -98,7 +98,7 @@ fn parser_precedence() {
     });
 }
 
-fn parse_helper_expression(input: &str, callback: impl FnOnce(SyntaxNode) -> ()) {
+fn parse_helper_expression(input: &str, callback: impl FnOnce(SyntaxNode)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());
@@ -107,7 +107,7 @@ fn parse_helper_expression(input: &str, callback: impl FnOnce(SyntaxNode) -> ())
     callback(result)
 }
 
-fn parse_helper(input: &str, callback: impl FnOnce(SyntaxNode) -> ()) {
+fn parse_helper(input: &str, callback: impl FnOnce(SyntaxNode)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());
@@ -226,7 +226,7 @@ fn parser_error() {
     });
 }
 
-fn parse_helper_error(input: &str, callback: impl FnOnce(SyntaxNode, Vec<Diagnostic>) -> ()) {
+fn parse_helper_error(input: &str, callback: impl FnOnce(SyntaxNode, Vec<Diagnostic>)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());
@@ -234,10 +234,7 @@ fn parse_helper_error(input: &str, callback: impl FnOnce(SyntaxNode, Vec<Diagnos
     callback(result, diagnostic_bag.diagnostics)
 }
 
-fn parse_helper_error_expression(
-    input: &str,
-    callback: impl FnOnce(SyntaxNode, Vec<Diagnostic>) -> (),
-) {
+fn parse_helper_error_expression(input: &str, callback: impl FnOnce(SyntaxNode, Vec<Diagnostic>)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = parse(&source_text, &mut diagnostic_bag, DebugFlags::default());

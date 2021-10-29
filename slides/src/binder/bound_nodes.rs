@@ -1,6 +1,9 @@
 use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
 
-use super::{operators::{BoundBinaryOperator, BoundUnaryOperator}, typing::{FunctionKind, StructType, SystemCallKind, Type}};
+use super::{
+    operators::{BoundBinaryOperator, BoundUnaryOperator},
+    typing::{FunctionKind, StructType, SystemCallKind, Type},
+};
 
 pub mod is_same_expression;
 
@@ -222,7 +225,12 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn system_call_closure(span: TextSpan, base: BoundNode<'a>, system_call_kind: SystemCallKind, type_: Type) -> Self {
+    pub fn system_call_closure(
+        span: TextSpan,
+        base: BoundNode<'a>,
+        system_call_kind: SystemCallKind,
+        type_: Type,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
@@ -358,7 +366,7 @@ impl<'a> BoundNode<'a> {
             span,
             kind: BoundNodeKind::VariableDeclaration(BoundVariableDeclarationNodeKind {
                 variable_index,
-                variable_type: variable_type.unwrap_or(initializer.type_.clone()),
+                variable_type: variable_type.unwrap_or_else(|| initializer.type_.clone()),
                 initializer: Box::new(initializer),
             }),
             type_: Type::Void,
@@ -652,27 +660,26 @@ pub enum ConversionKind {
 impl BoundConversionNodeKind<'_> {
     pub fn kind(&self) -> ConversionKind {
         match (&self.type_, &self.base.type_) {
-            (Type::Void, _) |
-            (_, Type::Void) |
-            (_, Type::Error) |
-            (Type::Error, _) => unreachable!(),
+            (Type::Void, _) | (_, Type::Void) | (_, Type::Error) | (Type::Error, _) => {
+                unreachable!()
+            }
             (Type::Any, _) => todo!(),
-            (Type::Boolean, Type::None) |
-            (Type::Boolean, Type::Noneable(_)) |
-            (Type::SystemCall(_), Type::None) |
-            (Type::SystemCall(_), Type::Noneable(_)) |
-            (Type::Function(_), Type::None) |
-            (Type::Function(_), Type::Noneable(_)) |
-            (Type::Integer, Type::None) |
-            (Type::Integer, Type::Noneable(_)) => ConversionKind::Deboxing,
-            (Type::None, Type::Integer) |
-            (Type::None, Type::Boolean) |
-            (Type::None, Type::SystemCall(_)) |
-            (Type::None, Type::Function(_)) |
-            (Type::Noneable(_), Type::Integer) |
-            (Type::Noneable(_), Type::Boolean) |
-            (Type::Noneable(_), Type::SystemCall(_)) |
-            (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,
+            (Type::Boolean, Type::None)
+            | (Type::Boolean, Type::Noneable(_))
+            | (Type::SystemCall(_), Type::None)
+            | (Type::SystemCall(_), Type::Noneable(_))
+            | (Type::Function(_), Type::None)
+            | (Type::Function(_), Type::Noneable(_))
+            | (Type::Integer, Type::None)
+            | (Type::Integer, Type::Noneable(_)) => ConversionKind::Deboxing,
+            (Type::None, Type::Integer)
+            | (Type::None, Type::Boolean)
+            | (Type::None, Type::SystemCall(_))
+            | (Type::None, Type::Function(_))
+            | (Type::Noneable(_), Type::Integer)
+            | (Type::Noneable(_), Type::Boolean)
+            | (Type::Noneable(_), Type::SystemCall(_))
+            | (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,
             _ => ConversionKind::None,
         }
     }

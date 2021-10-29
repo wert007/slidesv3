@@ -5,10 +5,16 @@ mod tests;
 
 use std::collections::VecDeque;
 
-use crate::{DebugFlags, diagnostics::DiagnosticBag, lexer::{
+use crate::{
+    diagnostics::DiagnosticBag,
+    lexer::{
         self,
         syntax_token::{SyntaxToken, SyntaxTokenKind},
-    }, parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode, TypeDeclaration}, text::{SourceText, TextSpan}};
+    },
+    parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode, TypeDeclaration},
+    text::{SourceText, TextSpan},
+    DebugFlags,
+};
 
 use self::syntax_nodes::{ElseClause, ParameterNode, StructBodyNode, SyntaxNode, TypeNode};
 use crate::match_token;
@@ -129,9 +135,7 @@ fn parse_struct_body<'a>(
     while !matches!(&peek_token(tokens).kind, SyntaxTokenKind::RBrace) {
         let token_count = tokens.len();
         let statement = match &peek_token(tokens).kind {
-            SyntaxTokenKind::FuncKeyword => {
-                parse_function_statement(tokens, diagnostic_bag)
-            },
+            SyntaxTokenKind::FuncKeyword => parse_function_statement(tokens, diagnostic_bag),
             SyntaxTokenKind::Identifier => {
                 let field = parse_parameter(tokens, diagnostic_bag);
                 let semicolon_token = match_token!(tokens, diagnostic_bag, Semicolon);
@@ -139,9 +143,13 @@ fn parse_struct_body<'a>(
             }
             _ => {
                 let current = next_token(tokens);
-                diagnostic_bag.report_unexpected_token_kind(current.span(), &current.kind, &SyntaxTokenKind::Identifier);
+                diagnostic_bag.report_unexpected_token_kind(
+                    current.span(),
+                    &current.kind,
+                    &SyntaxTokenKind::Identifier,
+                );
                 SyntaxNode::error(current.start)
-            },
+            }
         };
         statements.push(statement);
         if token_count == tokens.len() {
@@ -168,11 +176,12 @@ fn parse_type<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> TypeNode<'a> {
     let identifier = match_token!(tokens, diagnostic_bag, Identifier);
-    let optional_question_mark = if matches!(&peek_token(tokens).kind, &SyntaxTokenKind::QuestionMark) {
-        Some(next_token(tokens))
-    } else {
-        None
-    };
+    let optional_question_mark =
+        if matches!(&peek_token(tokens).kind, &SyntaxTokenKind::QuestionMark) {
+            Some(next_token(tokens))
+        } else {
+            None
+        };
     let mut brackets = vec![];
     while matches!(&peek_token(tokens).kind, SyntaxTokenKind::LBracket) {
         let token_count = tokens.len();
@@ -311,10 +320,7 @@ fn parse_variable_declaration<'a>(
     let optional_type_declaration = if matches!(&peek_token(tokens).kind, &SyntaxTokenKind::Colon) {
         let colon_token = next_token(tokens);
         let type_ = parse_type(tokens, diagnostic_bag);
-        Some(TypeDeclaration {
-            colon_token,
-            type_,
-        })
+        Some(TypeDeclaration { colon_token, type_ })
     } else {
         None
     };
@@ -490,9 +496,7 @@ fn parse_primary<'a>(
         SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => {
             parse_boolean_literal(tokens, diagnostic_bag)
         }
-        SyntaxTokenKind::NoneKeyword => {
-            parse_none_literal(tokens, diagnostic_bag)
-        }
+        SyntaxTokenKind::NoneKeyword => parse_none_literal(tokens, diagnostic_bag),
         SyntaxTokenKind::NewKeyword => parse_constructor(tokens, diagnostic_bag),
         SyntaxTokenKind::Identifier => parse_identifier(tokens, diagnostic_bag),
         unexpected_token => {

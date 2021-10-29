@@ -419,7 +419,7 @@ impl<'a> BindingState<'a, '_> {
     }
 }
 
-fn print_variable_table(variable_table: &Vec<BoundVariableName>) {
+fn print_variable_table(variable_table: &[BoundVariableName]) {
     let mut variable_table: Vec<_> = variable_table.iter().enumerate().collect();
     variable_table.sort_unstable_by_key(|f| f.0);
     for (index, variable) in variable_table {
@@ -594,7 +594,11 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
         None,
     );
     let variable_index = binder
-        .register_variable("heapdump", Type::SystemCall(SystemCallKind::DebugHeapDump), true)
+        .register_variable(
+            "heapdump",
+            Type::SystemCall(SystemCallKind::DebugHeapDump),
+            true,
+        )
         .unwrap();
     let heapdump_statement = BoundNode::variable_declaration(
         span,
@@ -698,17 +702,16 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         struct_name, function_declaration.identifier.lexeme
     );
     let type_ = Type::Function(Box::new(function_type.clone()));
-    let function_id = if let Some(it) =
-        binder.register_generated_variable(function_name.clone(), type_.clone(), true)
-    {
-        it
-    } else {
-        binder.diagnostic_bag.report_cannot_declare_variable(
-            function_declaration.identifier.span(),
-            function_declaration.identifier.lexeme,
-        );
-        0
-    };
+    let function_id =
+        if let Some(it) = binder.register_generated_variable(function_name, type_.clone(), true) {
+            it
+        } else {
+            binder.diagnostic_bag.report_cannot_declare_variable(
+                function_declaration.identifier.span(),
+                function_declaration.identifier.lexeme,
+            );
+            0
+        };
     binder.functions.push(FunctionDeclarationBody {
         function_name: function_declaration.identifier.lexeme,
         body: *function_declaration.body,
@@ -778,7 +781,7 @@ fn bind_struct_body<'a>(
     struct_body: StructBodyNode<'a>,
     binder: &mut BindingState<'a, '_>,
 ) -> Vec<StructField<'a>> {
-    let mut result = vec![];
+    let mut result: Vec<StructField<'a>> = vec![];
     for statement in struct_body.statements {
         let span = statement.span;
         let field = match statement.kind {
@@ -795,11 +798,7 @@ fn bind_struct_body<'a>(
             }
             unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
         };
-        if result
-            .iter()
-            .find(|f: &&StructField| f.name == field.name)
-            .is_some()
-        {
+        if result.iter().any(|f| f.name == field.name) {
             binder
                 .diagnostic_bag
                 .report_parameter_already_declared(span, field.name);
@@ -1852,11 +1851,8 @@ fn bind_return_statement<'a, 'b>(
             .report_missing_return_value(span, &function_return_type);
     }
 
-    let expression = if let Some(expression) = expression {
-        Some(bind_conversion(expression, &function_return_type, binder))
-    } else {
-        None
-    };
+    let expression =
+        expression.map(|expression| bind_conversion(expression, &function_return_type, binder));
     // TODO: This works with implicit returns in main only. Because for main
     // restores_variables must be false. There needs to be a flag in the binder
     // not only knowing the return type of the current function but also if it

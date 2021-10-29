@@ -51,14 +51,6 @@ impl Type {
         }
     }
 
-    pub fn as_system_call(&self) -> Option<SystemCallKind> {
-        if let Self::SystemCall(v) = *self {
-            Some(v)
-        } else {
-            None
-        }
-    }
-
     pub fn array_base_type(&self) -> Option<&Type> {
         if let Self::Array(v) = self {
             Some(v)
@@ -86,7 +78,7 @@ impl Type {
             Type::Boolean => 4 << 2,
             Type::None => Type::noneable(Type::Any).type_identifier(),
             Type::String => 5 << 2,
-            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + 8 << 2,
+            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + (8 << 2),
             Type::Noneable(base) => base.type_identifier() + 2,
             Type::StructReference(_) | Type::Struct(_) | Type::Function(_) | Type::Closure(_) => {
                 eprintln!("Unimplented type_identifer for functions or structs expected..");
@@ -300,7 +292,7 @@ impl FunctionType {
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
-            }
+            },
         }
     }
 }

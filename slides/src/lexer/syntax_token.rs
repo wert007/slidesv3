@@ -264,7 +264,9 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::Comma => write!(f, "CommaToken"),
             SyntaxTokenKind::Period => write!(f, "PeriodToken"),
             SyntaxTokenKind::QuestionMark => write!(f, "Question-Mark-Token"),
-            SyntaxTokenKind::QuestionMarkQuestionMark => write!(f, "Question-Mark-Question-Mark-Token"),
+            SyntaxTokenKind::QuestionMarkQuestionMark => {
+                write!(f, "Question-Mark-Question-Mark-Token")
+            }
             SyntaxTokenKind::LParen => write!(f, "Open-Parenthesis-Token"),
             SyntaxTokenKind::RParen => write!(f, "Close-Parenthesis-Token"),
             SyntaxTokenKind::LBracket => write!(f, "Open-Bracket-Token"),

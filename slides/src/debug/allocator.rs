@@ -4,16 +4,8 @@ use crate::evaluator::memory::allocator::{Allocator, BucketEntry};
 
 pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
     let color_names = [
-        "7a8296",
-        "88b3a4",
-        "7eb2f2",
-        "aed6d6",
-        "88fcc2",
-        "0e86c2",
-        "12bddb",
-        "73ffe5",
-        "c1e8e5",
-        "62c49d"
+        "7a8296", "88b3a4", "7eb2f2", "aed6d6", "88fcc2", "0e86c2", "12bddb", "73ffe5", "c1e8e5",
+        "62c49d",
     ];
     let mut result = String::new();
     let mut node_ids = vec![];
@@ -30,8 +22,12 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
         result.push_str(&node_id);
         result.push_str(" [shape=box style=filled label = \"\\N\\n");
         match bucket {
-            BucketEntry::Bucket(bucket) => result.push_str(&format!("{:#?}\\l", bucket).replace('\n', "\\l")),
-            BucketEntry::Parent(parent) => result.push_str(&format!("{:#?}\\l", parent).replace('\n', "\\l")),
+            BucketEntry::Bucket(bucket) => {
+                result.push_str(&format!("{:#?}\\l", bucket).replace('\n', "\\l"))
+            }
+            BucketEntry::Parent(parent) => {
+                result.push_str(&format!("{:#?}\\l", parent).replace('\n', "\\l"))
+            }
             BucketEntry::Tombstone => result.push_str("Tombstone"),
         }
         result.push_str("\" ");
@@ -44,7 +40,7 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
         }
         result.push_str("];\n");
     }
-    let mut add_connection = |block_index : usize, target : usize, is_dashed: bool| {
+    let mut add_connection = |block_index: usize, target: usize, is_dashed: bool| {
         result.push_str("    ");
         result.push_str(&node_ids[block_index]);
         result.push_str(" -- ");
@@ -56,13 +52,12 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
     };
     for bucket in &heap.buckets {
         match bucket {
-            BucketEntry::Bucket(_bucket) => {
-            },
+            BucketEntry::Bucket(_bucket) => {}
             BucketEntry::Parent(parent) => {
                 add_connection(parent.index, parent.child_indices[0], false);
                 add_connection(parent.index, parent.child_indices[1], false);
-            },
-            BucketEntry::Tombstone => {},
+            }
+            BucketEntry::Tombstone => {}
         }
     }
     result.push_str("}\n");

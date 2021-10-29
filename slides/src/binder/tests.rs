@@ -87,7 +87,7 @@ fn successful_binding() {
     });
 }
 
-fn bind_helper_expression(input: &str, callback: impl FnOnce(BoundNode) -> ()) -> () {
+fn bind_helper_expression(input: &str, callback: impl FnOnce(BoundNode)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
@@ -99,7 +99,7 @@ fn bind_helper_expression(input: &str, callback: impl FnOnce(BoundNode) -> ()) -
     callback(result)
 }
 
-fn bind_helper(input: &str, callback: impl FnOnce(BoundNode) -> ()) -> () {
+fn bind_helper(input: &str, callback: impl FnOnce(BoundNode)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
@@ -143,7 +143,7 @@ fn failed_binding() {
     });
 }
 
-fn bind_helper_errors(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnostic>) -> ()) {
+fn bind_helper_errors(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnostic>)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
@@ -154,10 +154,7 @@ fn bind_helper_errors(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnost
     callback(result, diagnostic_bag.diagnostics)
 }
 
-fn bind_helper_errors_expression(
-    input: &str,
-    callback: impl FnOnce(BoundNode, Vec<Diagnostic>) -> (),
-) {
+fn bind_helper_errors_expression(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnostic>)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
