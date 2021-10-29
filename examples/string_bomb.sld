@@ -1,7 +1,7 @@
 func main() {
     let i = 0;
     let a = 'a';
-    while i < 70 {
+    while i < 4100 {
         a = a + '';
         i = i + 1;
     }
