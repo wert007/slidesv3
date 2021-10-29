@@ -1213,20 +1213,21 @@ fn bind_parenthesized<'a, 'b>(
 
 fn function_type(type_: &Type) -> FunctionType {
     match type_ {
-        Type::SystemCall(SystemCallKind::Print) => FunctionType {
-            parameter_types: vec![Type::Any],
-            this_type: None,
-            return_type: Type::Void,
-            system_call_kind: type_.as_system_call(),
-        },
-        Type::SystemCall(SystemCallKind::ArrayLength) => FunctionType {
-            parameter_types: vec![],
-            // Actually Array or String, but there is no way to call this system
-            // call directly, so that it is already checked somewhere else.
-            this_type: Some(Type::Any),
-            return_type: Type::Integer,
-            system_call_kind: type_.as_system_call(),
-        },
+        Type::SystemCall(kind) => FunctionType::system_call(*kind),
+        // Type::SystemCall(SystemCallKind::Print) => FunctionType {
+        //     parameter_types: vec![Type::Any],
+        //     this_type: None,
+        //     return_type: Type::Void,
+        //     system_call_kind: type_.as_system_call(),
+        // },
+        // Type::SystemCall(SystemCallKind::ArrayLength) => FunctionType {
+        //     parameter_types: vec![],
+        //     // Actually Array or String, but there is no way to call this system
+        //     // call directly, so that it is already checked somewhere else.
+        //     this_type: Some(Type::Any),
+        //     return_type: Type::Integer,
+        //     system_call_kind: type_.as_system_call(),
+        // },
         Type::Function(result) => *result.clone(),
         Type::Closure(closure) => closure.base_function_type.clone(),
         Type::Error => FunctionType::error(),
