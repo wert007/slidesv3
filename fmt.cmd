@@ -1,10 +1,12 @@
 @echo off
 pushd reaktor
-    cargo clippy
+    cargo fix
+    cargo +nightly clippy --fix -Z unstable-options
     cargo fmt
 popd
 
 pushd slides
-    cargo clippy
+    cargo fix
+    cargo +nightly clippy --fix -Z unstable-options
     cargo fmt
 popd
