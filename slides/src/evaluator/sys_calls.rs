@@ -152,3 +152,9 @@ pub fn array_length(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
 
     state.stack.push(array_length);
 }
+
+pub fn heap_dump(argument: FlaggedWord, state: &mut EvaluatorState) {
+    let argument = string_to_string_native(argument, state);
+    let argument = argument.replace('\0', "");
+    crate::debug::output_allocator_to_dot(&argument, &state.heap);
+}

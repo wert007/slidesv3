@@ -220,6 +220,7 @@ pub enum SystemCallKind {
     Print,
     ToString,
     ArrayLength,
+    DebugHeapDump,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -231,6 +232,7 @@ impl std::fmt::Display for SystemCallKind {
                 SystemCallKind::Print => "print",
                 SystemCallKind::ToString => "to$string",
                 SystemCallKind::ArrayLength => "array$length",
+                SystemCallKind::DebugHeapDump => "debug$heap$dump",
             }
         )
     }
@@ -293,6 +295,12 @@ impl FunctionType {
                 return_type: Type::Integer,
                 system_call_kind: Some(system_call_kind),
             },
+            SystemCallKind::DebugHeapDump => Self {
+                parameter_types: vec![Type::String],
+                this_type: None,
+                return_type: Type::Void,
+                system_call_kind: Some(system_call_kind),
+            }
         }
     }
 }

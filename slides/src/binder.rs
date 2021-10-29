@@ -593,7 +593,16 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
         BoundNode::literal_from_value(Value::SystemCall(SystemCallKind::Print)),
         None,
     );
-    vec![print_statement]
+    let variable_index = binder
+        .register_variable("heapdump", Type::SystemCall(SystemCallKind::DebugHeapDump), true)
+        .unwrap();
+    let heapdump_statement = BoundNode::variable_declaration(
+        span,
+        variable_index,
+        BoundNode::literal_from_value(Value::SystemCall(SystemCallKind::DebugHeapDump)),
+        None,
+    );
+    vec![print_statement, heapdump_statement]
 }
 
 fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {

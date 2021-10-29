@@ -518,6 +518,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
             sys_calls::array_length(types.remove(0), arguments[0], state)
         }
         SystemCallKind::ToString => sys_calls::to_string(types.remove(0), arguments[0], state),
+        SystemCallKind::DebugHeapDump => sys_calls::heap_dump(arguments[0], state),
     }
 }
 

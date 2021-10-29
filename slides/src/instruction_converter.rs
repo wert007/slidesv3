@@ -528,10 +528,10 @@ fn convert_system_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     match system_call.base {
-        SystemCallKind::Print | SystemCallKind::ToString => {
+        SystemCallKind::Print | SystemCallKind::ToString | SystemCallKind::DebugHeapDump => {
             let mut result = vec![];
             let argument_count = match system_call.base {
-                SystemCallKind::Print | SystemCallKind::ToString | SystemCallKind::ArrayLength => 1,
+                SystemCallKind::Print | SystemCallKind::ToString | SystemCallKind::ArrayLength | SystemCallKind::DebugHeapDump => 1,
             };
 
             for argument in system_call.arguments {
