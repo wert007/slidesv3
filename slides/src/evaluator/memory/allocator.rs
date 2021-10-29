@@ -91,6 +91,24 @@ impl Allocator {
         return;
     }
 
+    fn find_next_two_bucket_indices(&self) -> [usize; 2] {
+        let fallback = [self.buckets.len(), self.buckets.len() + 1];
+        let mut iter = self
+            .buckets
+            .iter()
+            .enumerate()
+            .filter_map(|(index, bucket)|
+                if matches!(bucket, BucketEntry::Tombstone) {
+                    Some(index)
+                } else {
+                    None
+                });
+        [
+            iter.next().unwrap_or(fallback[0]),
+            iter.next().unwrap_or(fallback[1]),
+        ]
+    }
+
     pub fn allocate(&mut self, size_in_bytes: u64) -> u64 {
         let result = {
             let size_in_words = bytes_to_word(size_in_bytes);
@@ -107,10 +125,10 @@ impl Allocator {
             while self.buckets[bucket_index].size_in_words() / 2 >= expected_size {
                 let old_buddy_index = self.buckets[bucket_index].buddy_index();
                 let old_parent_index = self.buckets[bucket_index].parent_index();
-                let new_index = self.buckets.len();
+                let [buddy_index, parent_index] = self.find_next_two_bucket_indices();
                 let (tmp_bucket, parent) = Bucket::split(
                     self.buckets[bucket_index].as_bucket_mut().unwrap(),
-                    new_index,
+                    buddy_index, parent_index,
                 );
 
                 if let Some(old_buddy) = old_buddy_index {
@@ -125,8 +143,11 @@ impl Allocator {
                     }
                 }
                 let index = tmp_bucket.index;
-                self.buckets.push(BucketEntry::Bucket(tmp_bucket));
-                self.buckets.push(BucketEntry::Parent(parent));
+                while self.buckets.len() <= parent_index {
+                    self.buckets.push(BucketEntry::Tombstone);
+                }
+                self.buckets[buddy_index] = BucketEntry::Bucket(tmp_bucket);
+                self.buckets[parent_index] = BucketEntry::Parent(parent);
                 bucket_index = self.buckets[index].as_bucket_mut().unwrap().index;
                 assert!(!self.buckets[bucket_index].as_bucket_mut().unwrap().is_used);
             }
@@ -399,10 +420,10 @@ impl Bucket {
         }
     }
 
-    pub fn split(buddy: &mut Self, new_index: usize) -> (Bucket, BucketParent) {
-        let result = Self::buddy(buddy, new_index, new_index + 1);
+    pub fn split(buddy: &mut Self, buddy_index: usize, parent_index: usize) -> (Bucket, BucketParent) {
+        let result = Self::buddy(buddy, buddy_index, parent_index);
         let parent = BucketParent {
-            index: new_index + 1,
+            index: parent_index,
             buddy_index: buddy.buddy_index,
             parent_index: buddy.parent_index,
             address: buddy.address,
