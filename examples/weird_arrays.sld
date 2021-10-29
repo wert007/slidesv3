@@ -42,6 +42,12 @@ func main() {
         d.div,
     ];
 
+    // let i = 0;
+    // while i < 4 {
+    //     print('closure(5) = ' + weird_closure_array[i](5));
+    //     i = i + 1;
+    // }
+
     for closure in weird_closure_array {
         print('closure(5) = ' + closure(5));
         // print(closure + '(5) = ' + closure(5));
