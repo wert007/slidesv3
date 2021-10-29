@@ -113,7 +113,7 @@ impl Allocator {
         let result = {
             let size_in_words = bytes_to_word(size_in_bytes);
             let expected_size = size_in_words.next_power_of_two();
-            let mut bucket_index = {
+            let bucket_index = {
                 let mut free_buckets = self.free_buckets(expected_size);
                 if free_buckets.is_empty() {
                     // eprintln!("No Memory left!!!!");
@@ -142,13 +142,13 @@ impl Allocator {
                         unreachable!("Bucket had a {:#?} as parent and not an actual parent.", self.buckets[old_parent]);
                     }
                 }
-                let index = tmp_bucket.index;
+                // let index = tmp_bucket.index;
                 while self.buckets.len() <= parent_index {
                     self.buckets.push(BucketEntry::Tombstone);
                 }
                 self.buckets[buddy_index] = BucketEntry::Bucket(tmp_bucket);
                 self.buckets[parent_index] = BucketEntry::Parent(parent);
-                bucket_index = self.buckets[index].as_bucket_mut().unwrap().index;
+                // bucket_index = self.buckets[index].as_bucket_mut().unwrap().index;
                 assert!(!self.buckets[bucket_index].as_bucket_mut().unwrap().is_used);
             }
             let result_bucket = self.buckets[bucket_index].as_bucket_mut().unwrap();
