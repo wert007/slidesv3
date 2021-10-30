@@ -242,10 +242,15 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
 fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) {
     let size_in_bytes = instruction.arg * WORD_SIZE_IN_BYTES;
     let address = state.allocate(size_in_bytes);
-    let mut writing_pointer = address;
-    for _ in 0..instruction.arg {
-        let value = state.stack.pop();
-        if address != 0 {
+    if address == 0 {
+        runtime_error!(
+            state,
+            no_heap_memory_left(instruction.span, size_in_bytes)
+        );
+    } else {
+        let mut writing_pointer = address;
+        for _ in 0..instruction.arg {
+            let value = state.stack.pop();
             state.heap.write_flagged_word(writing_pointer as _, value);
             writing_pointer += WORD_SIZE_IN_BYTES;
         }
