@@ -61,6 +61,16 @@ impl EvaluatorState<'_> {
         }
     }
 
+    fn allocate(&mut self, expected_size_in_bytes: u64) -> u64 {
+        let result = self.heap.allocate(expected_size_in_bytes);
+        if result == 0 {
+            self.garbage_collect();
+            self.heap.allocate(expected_size_in_bytes)
+        } else {
+            result
+        }
+    }
+
     fn garbage_collect(&mut self) {
         let mut unchecked_pointers = vec![];
         for (flags, &value) in self.stack.flags.iter().zip(&self.stack.data) {
@@ -231,7 +241,7 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
 
 fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) {
     let size_in_bytes = instruction.arg * WORD_SIZE_IN_BYTES;
-    let address = state.heap.allocate(size_in_bytes);
+    let address = state.allocate(size_in_bytes);
     let mut writing_pointer = address;
     for _ in 0..instruction.arg {
         let value = state.stack.pop();
@@ -423,7 +433,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
     let lhs_length = state.read_pointer(lhs).unwrap_value();
     let rhs_length = state.read_pointer(rhs).unwrap_value();
     let result_length = lhs_length + rhs_length;
-    let pointer = state.heap.allocate(result_length + WORD_SIZE_IN_BYTES);
+    let pointer = state.allocate(result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
         runtime_error!(
             state,
