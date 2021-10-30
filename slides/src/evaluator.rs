@@ -208,7 +208,7 @@ fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
 
     let array_length_in_bytes = state.read_pointer(array).unwrap_value();
     let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
-    if (index_in_words as i64) < 0 || index_in_words > array_length_in_words {
+    if (index_in_words as i64) < 0 || index_in_words >= array_length_in_words {
         runtime_error!(
             state,
             index_out_of_bounds(
