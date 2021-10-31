@@ -654,7 +654,7 @@ pub struct BoundConversionNodeKind<'a> {
 pub enum ConversionKind {
     None,
     Boxing,
-    Deboxing,
+    Unboxing,
     TypeBoxing,
 }
 
@@ -675,7 +675,7 @@ impl BoundConversionNodeKind<'_> {
             | (Type::Function(_), Type::None)
             | (Type::Function(_), Type::Noneable(_))
             | (Type::Integer, Type::None)
-            | (Type::Integer, Type::Noneable(_)) => ConversionKind::Deboxing,
+            | (Type::Integer, Type::Noneable(_)) => ConversionKind::Unboxing,
             (Type::None, Type::Integer)
             | (Type::None, Type::Boolean)
             | (Type::None, Type::SystemCall(_))

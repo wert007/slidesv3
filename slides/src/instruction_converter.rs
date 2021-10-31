@@ -654,7 +654,7 @@ fn convert_conversion(
         ConversionKind::Boxing => {
             result.push(Instruction::write_to_heap(1).span(span).into());
         }
-        ConversionKind::Deboxing => {
+        ConversionKind::Unboxing => {
             result.push(Instruction::read_word_with_offset(0).span(span).into());
         }
     }
