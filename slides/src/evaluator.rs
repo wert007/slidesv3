@@ -156,6 +156,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ArrayEquals => evaluate_array_equals(state, instruction),
         OpCode::ArrayNotEquals => evaluate_array_not_equals(state, instruction),
         OpCode::NoneableEquals => evaluate_noneable_equals(state, instruction),
+        OpCode::TypeIdentifierEquals => evaluate_type_identifier_equals(state, instruction),
         OpCode::LessThan => evaluate_less_than(state, instruction),
         OpCode::GreaterThan => evaluate_greater_than(state, instruction),
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
@@ -404,6 +405,39 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
         }
         result
     };
+    state.stack.push(result as _);
+}
+
+fn evaluate_type_identifier_equals(state: &mut EvaluatorState, _: Instruction) {
+    let rhs = state.stack.pop().unwrap_pointer();
+    let lhs = state.stack.pop().unwrap_pointer();
+    let lhs_size_in_bytes = state.read_pointer(lhs).unwrap_value();
+    let result = if lhs == rhs {
+        true
+    } else {
+        let rhs_size_in_bytes = state.read_pointer(rhs).unwrap_value();
+        if lhs_size_in_bytes != rhs_size_in_bytes {
+            false
+        } else {
+            let size_in_words = memory::bytes_to_word(lhs_size_in_bytes);
+            let mut result = true;
+            for offset in 1..=size_in_words {
+                let lhs = state.read_pointer(lhs + offset * memory::WORD_SIZE_IN_BYTES);
+                let rhs = state.read_pointer(rhs + offset * memory::WORD_SIZE_IN_BYTES);
+                if lhs.value != rhs.value {
+                    result = false;
+                    break;
+                }
+            }
+            result
+        }
+    };
+    if result {
+        let value = state.read_pointer(lhs + lhs_size_in_bytes + memory::WORD_SIZE_IN_BYTES);
+        state.stack.push_flagged_word(value);
+    } else {
+        state.stack.push_pointer(0);
+    }
     state.stack.push(result as _);
 }
 

@@ -238,6 +238,14 @@ impl Instruction {
         }
     }
 
+    pub const fn type_identifier_equals() -> Self {
+        Self {
+            op_code: OpCode::TypeIdentifierEquals,
+            arg: 0,
+            span: None,
+        }
+    }
+
     pub const fn less_than() -> Self {
         Self {
             op_code: OpCode::LessThan,
