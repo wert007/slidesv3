@@ -142,6 +142,25 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn cast_expression(
+        cast_keyword: SyntaxToken<'a>,
+        expression: SyntaxNode<'a>,
+        colon_token: SyntaxToken<'a>,
+        type_: TypeNode<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(cast_keyword.span(), type_.span());
+        Self {
+            span,
+            kind: SyntaxNodeKind::CastExpression(CastExpressionNodeKind {
+                cast_keyword,
+                expression: Box::new(expression),
+                colon_token,
+                type_,
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn constructor_call(
         new_keyword: SyntaxToken<'a>,
         type_name: SyntaxToken<'a>,
@@ -434,6 +453,7 @@ pub enum SyntaxNodeKind<'a> {
     // Expressions
     Literal(LiteralNodeKind<'a>),
     ArrayLiteral(ArrayLiteralNodeKind<'a>),
+    CastExpression(CastExpressionNodeKind<'a>),
     ConstructorCall(ConstructorCallNodeKind<'a>),
     Variable(VariableNodeKind<'a>),
     Binary(BinaryNodeKind<'a>),
@@ -613,6 +633,14 @@ pub struct ArrayLiteralNodeKind<'a> {
     pub children: Vec<SyntaxNode<'a>>,
     pub comma_tokens: Vec<SyntaxToken<'a>>,
     pub rbracket: SyntaxToken<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CastExpressionNodeKind<'a> {
+    pub cast_keyword: SyntaxToken<'a>,
+    pub expression: Box<SyntaxNode<'a>>,
+    pub colon_token: SyntaxToken<'a>,
+    pub type_: TypeNode<'a>,
 }
 
 #[derive(Debug, Clone)]

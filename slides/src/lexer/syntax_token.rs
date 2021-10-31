@@ -143,6 +143,7 @@ pub enum SyntaxTokenKind {
     Identifier,
 
     // Keywords
+    CastKeyword,
     ElseKeyword,
     FalseKeyword,
     ForKeyword,
@@ -201,6 +202,7 @@ impl SyntaxTokenKind {
 
     pub fn keyword(identifier: &str) -> Option<Self> {
         match identifier {
+            "cast" => Some(Self::CastKeyword),
             "else" => Some(Self::ElseKeyword),
             "false" => Some(Self::FalseKeyword),
             "for" => Some(Self::ForKeyword),
@@ -288,6 +290,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::EqualsEquals => write!(f, "Equals-Equals-Token"),
             SyntaxTokenKind::Arrow => write!(f, "Arrow-Token"),
             SyntaxTokenKind::Identifier => write!(f, "Identifier"),
+            SyntaxTokenKind::CastKeyword => write!(f, "cast"),
             SyntaxTokenKind::ElseKeyword => write!(f, "else"),
             SyntaxTokenKind::FalseKeyword => write!(f, "false"),
             SyntaxTokenKind::ForKeyword => write!(f, "for"),
