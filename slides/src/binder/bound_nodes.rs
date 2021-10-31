@@ -656,6 +656,7 @@ pub enum ConversionKind {
     Boxing,
     Unboxing,
     TypeBoxing,
+    TypeUnboxing,
 }
 
 impl BoundConversionNodeKind<'_> {
@@ -664,7 +665,9 @@ impl BoundConversionNodeKind<'_> {
             (Type::Void, _) | (_, Type::Void) | (_, Type::Error) | (Type::Error, _) => {
                 unreachable!()
             }
-            (_, Type::Any) => todo!(),
+            (_, Type::Any) => {
+                ConversionKind::TypeUnboxing
+            },
             (Type::Any, _) => {
                 ConversionKind::TypeBoxing
             },

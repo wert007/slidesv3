@@ -660,6 +660,19 @@ fn convert_conversion(
             let type_word_count = convert_type_identifier(base_type, &mut result);
             result.push(Instruction::write_to_heap(type_word_count + 1).span(span).into());
         }
+        ConversionKind::TypeUnboxing => {
+            let type_word_count = convert_type_identifier(conversion.type_.noneable_base_type().unwrap().clone(), &mut result);
+            // Write to heap to keep code simpler. This can be optimized later!
+            result.push(Instruction::write_to_heap(type_word_count).span(span).into());
+            result.push(Instruction::type_identifier_equals().span(span).into());
+            let label = converter.generate_label();
+            result.push(Instruction::jump_to_label_conditionally(label, false).span(span).into());
+            // If types are equal, the value of the type needs to be converted into a noneable
+            if !base_type.is_pointer() {
+                result.push(Instruction::write_to_heap(1).span(span).into());
+            }
+            result.push(Instruction::label(label).span(span).into());
+        }
         ConversionKind::Boxing => {
             result.push(Instruction::write_to_heap(1).span(span).into());
         }
