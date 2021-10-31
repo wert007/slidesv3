@@ -48,6 +48,13 @@ impl FlaggedWord {
         }
     }
 
+    pub fn pointer(value: u64) -> Self {
+        Self {
+            value,
+            flags: Flags::default().pointer(),
+        }
+    }
+
     pub fn flags(mut self, flags: Flags) -> Self {
         self.flags = flags;
         self
