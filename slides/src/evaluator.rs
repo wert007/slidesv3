@@ -632,8 +632,6 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         let return_address = state.stack.pop().unwrap_value();
         state.pc = return_address as _;
     }
-    // TODO: DEBUG
-    state.garbage_collect();
 }
 
 fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction) {
