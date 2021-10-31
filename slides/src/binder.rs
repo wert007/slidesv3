@@ -466,6 +466,11 @@ fn type_table() -> Vec<BoundVariableName<'static>> {
             type_: Type::String,
             is_read_only: true,
         },
+        BoundVariableName {
+            identifier: "any".into(),
+            type_: Type::Any,
+            is_read_only: true,
+        },
     ]
 }
 
