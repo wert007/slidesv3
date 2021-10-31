@@ -13,21 +13,29 @@ func fib(n: int) -> int {
     }
 }
 
+func printLog(obj: any) {
+    print('Log: ' + obj);
+}
+
 func main() {
-    print(42);
-    print(true);
-    print(none);
+    let log = printLog;
+    // let fs = [
+    //     print,
+    //     printLog
+    // ];
+    log(42);
+    log(true);
+    log(none);
     let n : int? = 13;
-    print(n);
+    log(n);
     n = none;
-    print(n);
-    print([1, 2, 3,]);
-    print([[1], [2], [3],]);
-    print(print);
-    print('Hello World!');
-    print(fib);
+    log(n);
+    log([1, 2, 3,]);
+    log([[1], [2], [3],]);
+    log(print);
+    log('Hello World!');
+    log(fib);
     let s : string? = 'Noneable strings work just fine';
-    print(s);
-    // TODO
-    print(new Person('John Doe', 32));
+    log(s);
+    log(new Person('John Doe', 32));
 }
