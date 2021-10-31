@@ -61,6 +61,14 @@ impl Type {
         }
     }
 
+    pub fn noneable_base_type(&self) -> Option<&Type> {
+        if let Self::Noneable(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     pub fn type_identifier_size_in_words(&self) -> u64 {
         match self {
             Type::Error => 1,
