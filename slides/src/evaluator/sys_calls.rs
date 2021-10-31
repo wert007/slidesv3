@@ -20,33 +20,33 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
     state.stack.push_pointer(result);
 }
 
-fn decode_type_boxing(argument: FlaggedWord, state: &mut EvaluatorState) -> (Type, FlaggedWord) {
-    let address = argument.unwrap_pointer();
+fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64) {
+    let address = address.unwrap_pointer();
     let _type_identifier_size_in_bytes = state.read_pointer(address).unwrap_value();
     let address = address + WORD_SIZE_IN_BYTES;
     let type_identifier_kind = state.read_pointer(address).unwrap_value();
     let address = address + WORD_SIZE_IN_BYTES;
     if let Some(type_) = Type::simple_type_from_type_identifier(type_identifier_kind) {
-        return (type_, state.read_pointer(address));
+        return (type_, address);
     }
     match type_identifier_kind {
         Type::TYPE_IDENTIFIER_ARRAY => {
             let array_count = state.read_pointer(address).unwrap_value();
             let address = address + WORD_SIZE_IN_BYTES;
-            let (mut base_type, result) = decode_type_boxing(FlaggedWord::pointer(address), state);
+            let (mut base_type, address) = decode_type(FlaggedWord::pointer(address), state);
             for _ in 0..=array_count {
                 base_type = Type::array(base_type);
             }
-            (base_type, result)
+            (base_type, address)
         }
         Type::TYPE_IDENTIFIER_NONEABLE => {
-            let (base_type, result) = decode_type_boxing(FlaggedWord::pointer(address), state);
-            (Type::noneable(base_type), result)
+            let (base_type, address) = decode_type(FlaggedWord::pointer(address), state);
+            (Type::noneable(base_type), address)
         }
         Type::TYPE_IDENTIFIER_STRUCT | Type::TYPE_IDENTIFIER_STRUCT_REFERENCE => {
             let struct_id = state.read_pointer(address).unwrap_value();
             let address = address + WORD_SIZE_IN_BYTES;
-            (Type::StructReference(struct_id), state.read_pointer(address))
+            (Type::StructReference(struct_id), address)
         }
         _ => unreachable!(),
     }
@@ -57,7 +57,8 @@ fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
-            let (type_, argument) = decode_type_boxing(argument, state);
+            let (type_, address) = decode_type(argument, state);
+            let argument = state.read_pointer(address);
             to_string_native(type_, argument, state)
         },
         Type::None => "none".into(),
@@ -177,7 +178,8 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
 }
 
 pub fn array_length(argument: FlaggedWord, state: &mut EvaluatorState) {
-    let (type_, argument) = decode_type_boxing(argument, state);
+    let (type_, address) = decode_type(argument, state);
+    let argument = state.read_pointer(address);
     let array_start = argument.unwrap_pointer();
     let pointer = state.read_pointer(array_start).unwrap_value();
 
