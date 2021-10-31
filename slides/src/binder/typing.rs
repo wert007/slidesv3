@@ -79,8 +79,24 @@ impl Type {
                 base_type.type_identifier_size_in_words() + 2
             },
             Type::Noneable(base_type) => base_type.type_identifier_size_in_words() + 1,
-            Type::Function(_) => todo!(),
-            Type::Closure(_) => todo!(),
+            Type::Function(function_type) => {
+                let mut result = 2;
+                result += &function_type.this_type.as_ref().unwrap_or(&Type::Void).type_identifier_size_in_words();
+                result += function_type.return_type.type_identifier_size_in_words();
+                for parameter in &function_type.parameter_types {
+                    result += parameter.type_identifier_size_in_words();
+                }
+                result
+            },
+            Type::Closure(closure_type) => {
+                let mut result = 2;
+                result += closure_type.base_function_type.this_type.as_ref().unwrap_or(&Type::Void).type_identifier_size_in_words();
+                result += closure_type.base_function_type.return_type.type_identifier_size_in_words();
+                for parameter in &closure_type.base_function_type.parameter_types {
+                    result += parameter.type_identifier_size_in_words();
+                }
+                result
+            }
             Type::Struct(_) => 1,
             Type::StructReference(_) => 1,
         }

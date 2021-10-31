@@ -680,8 +680,36 @@ fn convert_type_identifier(base_type: Type, result: &mut Vec<InstructionOrLabelR
         Type::Noneable(base_type) => {
             convert_type_identifier(*base_type, result) + 2
         },
-        Type::Function(_) => todo!(),
-        Type::Closure(_) => todo!(),
+        Type::Function(function_type) => {
+            let mut type_word_count = 3;
+            let parameter_count = function_type.parameter_types.len() as u64;
+            // ParameterTypes
+            for parameter in function_type.parameter_types.into_iter().rev() {
+                type_word_count += convert_type_identifier(parameter, result);
+            }
+            // ReturnType
+            type_word_count += convert_type_identifier(function_type.return_type, result);
+            // ThisType or Void
+            type_word_count += convert_type_identifier(function_type.this_type.unwrap_or(Type::Void), result);
+            // ParameterCount + 2
+            result.push(Instruction::load_immediate(parameter_count + 2).into());
+            type_word_count
+        },
+        Type::Closure(closure_type) => {
+            let mut type_word_count = 3;
+            let parameter_count = closure_type.base_function_type.parameter_types.len() as u64;
+            // ParameterTypes
+            for parameter in closure_type.base_function_type.parameter_types.into_iter().rev() {
+                type_word_count += convert_type_identifier(parameter, result);
+            }
+            // ReturnType
+            type_word_count += convert_type_identifier(closure_type.base_function_type.return_type, result);
+            // ThisType or Void
+            type_word_count += convert_type_identifier(closure_type.base_function_type.this_type.unwrap_or(Type::Void), result);
+            // ParameterCount + 2
+            result.push(Instruction::load_immediate(parameter_count + 2).into());
+            type_word_count
+        },
         Type::Struct(struct_type) => {
             result.push(Instruction::load_immediate(struct_type.id).into());
             3
