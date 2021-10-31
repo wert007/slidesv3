@@ -57,11 +57,10 @@ fn parse_top_level_statement<'a>(
         _ => {
             let token = next_token(tokens);
             let span = token.span();
-            let actual_token_kind = &token.kind;
             diagnostic_bag.report_unexpected_token_kind(
                 span,
-                actual_token_kind,
-                &SyntaxTokenKind::FuncKeyword,
+                token.kind,
+                SyntaxTokenKind::FuncKeyword,
             );
             SyntaxNode::error(span.start())
         }
@@ -145,8 +144,8 @@ fn parse_struct_body<'a>(
                 let current = next_token(tokens);
                 diagnostic_bag.report_unexpected_token_kind(
                     current.span(),
-                    &current.kind,
-                    &SyntaxTokenKind::Identifier,
+                    current.kind,
+                    SyntaxTokenKind::Identifier,
                 );
                 SyntaxNode::error(current.start)
             }
@@ -483,7 +482,7 @@ fn parse_primary<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
 ) -> SyntaxNode<'a> {
     let span = peek_token(tokens).span();
-    match &peek_token(tokens).kind {
+    match peek_token(tokens).kind {
         SyntaxTokenKind::LParen => {
             let lparen = next_token(tokens);
             let expression = parse_expression(tokens, diagnostic_bag);
@@ -504,7 +503,7 @@ fn parse_primary<'a>(
             diagnostic_bag.report_unexpected_token_kind(
                 span,
                 unexpected_token,
-                &SyntaxTokenKind::default_number_literal(),
+                SyntaxTokenKind::default_number_literal(),
             );
             // next_token(tokens);
             SyntaxNode::error(span.start())

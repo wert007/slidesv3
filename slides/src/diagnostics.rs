@@ -89,8 +89,8 @@ impl<'a> DiagnosticBag<'a> {
     pub fn report_unexpected_token_kind(
         &mut self,
         span: TextSpan,
-        actual_token_kind: &SyntaxTokenKind,
-        expected_token_kind: &SyntaxTokenKind,
+        actual_token_kind: SyntaxTokenKind,
+        expected_token_kind: SyntaxTokenKind,
     ) {
         let message = format!(
             "Expected token kind {:?} but actually found {:?}.",

@@ -88,7 +88,7 @@ impl<'a> SyntaxToken<'a> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SyntaxTokenKind {
     Eoi,
     NumberLiteral,
