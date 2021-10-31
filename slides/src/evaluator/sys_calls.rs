@@ -90,7 +90,12 @@ fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
                 to_string_native(*base_type, argument, state)
             }
         }
-        Type::Struct(_) | Type::StructReference(_) => todo!(),
+        Type::Struct(struct_type) => {
+            format!("type struct id#{}", struct_type.id)
+        }
+        Type::StructReference(id) => {
+            format!("type struct id#{}", id)
+        },
         Type::Integer => {
             format!("{}", argument.unwrap_value() as i64)
         }
