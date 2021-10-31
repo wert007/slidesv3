@@ -1,5 +1,13 @@
+import lib('mylib') as mylib;
+
 func main() {
-    let d = [5;999]; // Array with 999 elements, each being 5
-    print(d.length());
-    print(d[998]);
+    mylib.sayHello('World!');
 }
+// func main() {
+//     let array : int[] = 5..9;
+//     let range : Range = 5..9;
+
+//     for i in 1..5 {
+//         print(i);
+//     }
+// }
