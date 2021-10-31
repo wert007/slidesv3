@@ -83,6 +83,8 @@ fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
         Type::Noneable(base_type) => {
             if argument.unwrap_pointer() == 0 {
                 "none".into()
+            } else if base_type.is_pointer() {
+                to_string_native(*base_type, argument, state)
             } else {
                 let argument = state.read_pointer(argument.unwrap_pointer());
                 to_string_native(*base_type, argument, state)
