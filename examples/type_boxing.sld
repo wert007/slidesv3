@@ -29,5 +29,5 @@ func main() {
     let s : string? = 'Noneable strings work just fine';
     print(s);
     // TODO
-    // print(new Person('John Doe', 32));
+    print(new Person('John Doe', 32));
 }
