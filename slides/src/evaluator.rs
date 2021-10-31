@@ -24,6 +24,7 @@ macro_rules! runtime_error {
         $evaluator.runtime_diagnostics.$($fn_call)*;
         $evaluator.runtime_diagnostics.clone().flush_to_console();
         $evaluator.runtime_diagnostics.diagnostics.clear();
+        $evaluator.runtime_error_happened = true;
     };
 }
 
@@ -37,6 +38,7 @@ pub struct EvaluatorState<'a> {
     pc: usize,
     is_main_call: bool,
     runtime_diagnostics: DiagnosticBag<'a>,
+    runtime_error_happened: bool,
 }
 
 impl EvaluatorState<'_> {
@@ -100,6 +102,7 @@ pub fn evaluate(
         pc: 0,
         is_main_call: true,
         runtime_diagnostics: DiagnosticBag::new(source_text),
+        runtime_error_happened: false,
     };
     let instructions = program.instructions;
     while state.pc < instructions.len() {
@@ -111,6 +114,10 @@ pub fn evaluate(
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
         execute_instruction(&mut state, instructions[pc]);
+        if state.runtime_error_happened {
+            println!("Unusual termination.");
+            break;
+        }
         state.pc += 1;
     }
     if state.stack.len() == 1 {
