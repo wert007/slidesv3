@@ -26,7 +26,7 @@ func main() {
     print(print);
     print('Hello World!');
     // TODO
-    // print(fib);
+    print(fib);
     // let s : string? = 'This would always fail i think?';
     // print(s);
     // print(new Person('John Doe', 32));
