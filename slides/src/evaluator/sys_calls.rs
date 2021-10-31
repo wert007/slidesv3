@@ -1,4 +1,4 @@
-use crate::{binder::typing::Type, evaluator::memory::bytes_to_word};
+use crate::{binder::typing::{FunctionType, Type}, evaluator::memory::bytes_to_word};
 
 use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 
@@ -47,6 +47,24 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64) 
             let struct_id = state.read_pointer(address).unwrap_value();
             let address = address + WORD_SIZE_IN_BYTES;
             (Type::StructReference(struct_id), address)
+        }
+        Type::TYPE_IDENTIFIER_FUNCTION | Type::TYPE_IDENTIFIER_CLOSURE => {
+            let type_count = state.read_pointer(address).unwrap_value();
+            let address = address + WORD_SIZE_IN_BYTES;
+            let (this_type, address) = decode_type(FlaggedWord::pointer(address), state);
+            let (return_type, mut address) = decode_type(FlaggedWord::pointer(address), state);
+            let mut parameter_types = Vec::with_capacity(type_count as usize - 2);
+            for _ in 2..type_count {
+                let (parameter_type, new_address) = decode_type(FlaggedWord::pointer(address), state);
+                address = new_address;
+                parameter_types.push(parameter_type);
+            }
+            let this_type = if matches!(this_type, Type::Void) {
+                None
+            } else {
+                Some(this_type)
+            };
+            (Type::function(FunctionType::function(parameter_types, this_type, return_type)), address)
         }
         _ => unreachable!(),
     }
