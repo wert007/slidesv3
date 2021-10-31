@@ -34,13 +34,13 @@ func main() {
     print('c.length()');
     print(c.length());
 
-    // let d = [5;999] // Array with 999 elements, each being 5
-    // print(d.length());
-    // print(d[998]);
+    let d = [5;120]; // Array with 120 elements, each being 5
+    print(d.length());
+    print(d[119]);
 
-    // let e = [7, 3;5, 1] // [7, 3, 3, 3, 3, 3, 1]
-    // print(e);
-    // print(e == [7, 3, 3, 3, 3, 3, 1])
+    let e = [7, 3;5, 1]; // [7, 3, 3, 3, 3, 3, 1]
+    print(e);
+    print(e == [7, 3, 3, 3, 3, 3, 1]);
 
     let f = [ [ 1 ], [ 2, 3 ], [ 4, 5, 6, ], ];
     print(f[2]);
