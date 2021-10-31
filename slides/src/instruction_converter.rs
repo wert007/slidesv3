@@ -658,15 +658,30 @@ fn convert_conversion(
         ConversionKind::None => {}
         ConversionKind::TypeBoxing => {
             let type_word_count = convert_type_identifier(base_type, &mut result);
-            result.push(Instruction::write_to_heap(type_word_count + 1).span(span).into());
+            result.push(
+                Instruction::write_to_heap(type_word_count + 1)
+                    .span(span)
+                    .into(),
+            );
         }
         ConversionKind::TypeUnboxing => {
-            let type_word_count = convert_type_identifier(conversion.type_.noneable_base_type().unwrap().clone(), &mut result);
+            let type_word_count = convert_type_identifier(
+                conversion.type_.noneable_base_type().unwrap().clone(),
+                &mut result,
+            );
             // Write to heap to keep code simpler. This can be optimized later!
-            result.push(Instruction::write_to_heap(type_word_count).span(span).into());
+            result.push(
+                Instruction::write_to_heap(type_word_count)
+                    .span(span)
+                    .into(),
+            );
             result.push(Instruction::type_identifier_equals().span(span).into());
             let label = converter.generate_label();
-            result.push(Instruction::jump_to_label_conditionally(label, false).span(span).into());
+            result.push(
+                Instruction::jump_to_label_conditionally(label, false)
+                    .span(span)
+                    .into(),
+            );
             // If types are equal, the value of the type needs to be converted into a noneable
             if !base_type.is_pointer() {
                 result.push(Instruction::write_to_heap(1).span(span).into());
@@ -698,10 +713,8 @@ fn convert_type_identifier(base_type: Type, result: &mut Vec<InstructionOrLabelR
             let type_word_count = convert_type_identifier(base_type, result) + 3;
             result.push(Instruction::load_immediate(dimension_count).into());
             type_word_count
-        },
-        Type::Noneable(base_type) => {
-            convert_type_identifier(*base_type, result) + 2
-        },
+        }
+        Type::Noneable(base_type) => convert_type_identifier(*base_type, result) + 2,
         Type::Function(function_type) => {
             let mut type_word_count = 3;
             let parameter_count = function_type.parameter_types.len() as u64;
@@ -712,26 +725,39 @@ fn convert_type_identifier(base_type: Type, result: &mut Vec<InstructionOrLabelR
             // ReturnType
             type_word_count += convert_type_identifier(function_type.return_type, result);
             // ThisType or Void
-            type_word_count += convert_type_identifier(function_type.this_type.unwrap_or(Type::Void), result);
+            type_word_count +=
+                convert_type_identifier(function_type.this_type.unwrap_or(Type::Void), result);
             // ParameterCount + 2
             result.push(Instruction::load_immediate(parameter_count + 2).into());
             type_word_count
-        },
+        }
         Type::Closure(closure_type) => {
             let mut type_word_count = 3;
             let parameter_count = closure_type.base_function_type.parameter_types.len() as u64;
             // ParameterTypes
-            for parameter in closure_type.base_function_type.parameter_types.into_iter().rev() {
+            for parameter in closure_type
+                .base_function_type
+                .parameter_types
+                .into_iter()
+                .rev()
+            {
                 type_word_count += convert_type_identifier(parameter, result);
             }
             // ReturnType
-            type_word_count += convert_type_identifier(closure_type.base_function_type.return_type, result);
+            type_word_count +=
+                convert_type_identifier(closure_type.base_function_type.return_type, result);
             // ThisType or Void
-            type_word_count += convert_type_identifier(closure_type.base_function_type.this_type.unwrap_or(Type::Void), result);
+            type_word_count += convert_type_identifier(
+                closure_type
+                    .base_function_type
+                    .this_type
+                    .unwrap_or(Type::Void),
+                result,
+            );
             // ParameterCount + 2
             result.push(Instruction::load_immediate(parameter_count + 2).into());
             type_word_count
-        },
+        }
         Type::Struct(struct_type) => {
             result.push(Instruction::load_immediate(struct_type.id).into());
             3

@@ -244,10 +244,7 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
     let size_in_bytes = instruction.arg * WORD_SIZE_IN_BYTES;
     let address = state.allocate(size_in_bytes);
     if address == 0 {
-        runtime_error!(
-            state,
-            no_heap_memory_left(instruction.span, size_in_bytes)
-        );
+        runtime_error!(state, no_heap_memory_left(instruction.span, size_in_bytes));
     } else {
         let mut writing_pointer = address;
         for _ in 0..instruction.arg {
@@ -561,9 +558,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     }
     match sys_call_kind {
         SystemCallKind::Print => sys_calls::print(arguments[0], state),
-        SystemCallKind::ArrayLength => {
-            sys_calls::array_length(arguments[0], state)
-        }
+        SystemCallKind::ArrayLength => sys_calls::array_length(arguments[0], state),
         SystemCallKind::ToString => sys_calls::to_string(arguments[0], state),
         SystemCallKind::DebugHeapDump => sys_calls::heap_dump(arguments[0], state),
     }

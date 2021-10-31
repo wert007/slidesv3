@@ -1,9 +1,6 @@
 use assert_matches::assert_matches;
 
-use crate::{
-    lexer::syntax_token::SyntaxTokenKind,
-    text::SourceText,
-};
+use crate::{lexer::syntax_token::SyntaxTokenKind, text::SourceText};
 
 use super::*;
 

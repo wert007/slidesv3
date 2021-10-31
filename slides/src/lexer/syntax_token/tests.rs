@@ -4,13 +4,16 @@ use assert_matches::assert_matches;
 #[test]
 fn number_literal() {
     let number_literal = SyntaxToken::number_literal(0, "4312");
-    assert!(matches!(number_literal.kind, SyntaxTokenKind::NumberLiteral));
+    assert!(matches!(
+        number_literal.kind,
+        SyntaxTokenKind::NumberLiteral
+    ));
 
-    let number_literal = SyntaxToken::number_literal(
-        0,
-        "431243124312431243124312431243124312",
-    );
-    assert!(matches!(number_literal.kind, SyntaxTokenKind::NumberLiteral));
+    let number_literal = SyntaxToken::number_literal(0, "431243124312431243124312431243124312");
+    assert!(matches!(
+        number_literal.kind,
+        SyntaxTokenKind::NumberLiteral
+    ));
 }
 
 #[test]

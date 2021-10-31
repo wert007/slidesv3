@@ -7,11 +7,31 @@ pub mod typing;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use crate::{DebugFlags, binder::{
+use crate::{
+    binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    }, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, CastExpressionNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+    },
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    parser::{
+        self,
+        syntax_nodes::{
+            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
+            BlockStatementNodeKind, CastExpressionNodeKind, ConstructorCallNodeKind,
+            ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind,
+            FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode,
+            IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind,
+            ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode,
+            SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind,
+            WhileStatementNodeKind,
+        },
+    },
+    text::{SourceText, TextSpan},
+    value::Value,
+    DebugFlags,
+};
 
 use self::{
     bound_nodes::BoundNode,
@@ -827,7 +847,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::ArrayLiteral(array_literal) => {
             bind_array_literal(node.span, array_literal, binder)
         }
-        SyntaxNodeKind::CastExpression(cast_expression) => bind_cast_expression(node.span, cast_expression, binder),
+        SyntaxNodeKind::CastExpression(cast_expression) => {
+            bind_cast_expression(node.span, cast_expression, binder)
+        }
         SyntaxNodeKind::ConstructorCall(constructor_call) => {
             bind_constructor_call(node.span, constructor_call, binder)
         }
@@ -938,16 +960,24 @@ fn bind_cast_expression<'a>(
     let type_ = bind_type(cast_expression.type_, binder);
     // Cast unnecessary and will always return a valid value.
     if expression.type_.can_be_converted_to(&type_) {
-        binder.diagnostic_bag.report_unnecessary_cast(span, &expression.type_, &type_);
+        binder
+            .diagnostic_bag
+            .report_unnecessary_cast(span, &expression.type_, &type_);
         return bind_conversion(expression, &type_, binder);
     }
     if !expression.type_.can_be_casted_to(&type_) {
-        binder.diagnostic_bag.report_impossible_cast(span, &expression.type_, &type_);
+        binder
+            .diagnostic_bag
+            .report_impossible_cast(span, &expression.type_, &type_);
         return BoundNode::error(span);
     }
     let type_ = Type::noneable(type_);
     if expression.type_.can_be_converted_to(&type_) {
-        binder.diagnostic_bag.report_unnecessary_cast(span, &expression.type_, type_.noneable_base_type().unwrap());
+        binder.diagnostic_bag.report_unnecessary_cast(
+            span,
+            &expression.type_,
+            type_.noneable_base_type().unwrap(),
+        );
         return bind_conversion(expression, &type_, binder);
     }
     BoundNode::conversion(span, expression, type_)

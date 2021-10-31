@@ -301,11 +301,11 @@ impl<'a> BoundNode<'a> {
             BoundNode::system_call(
                 span,
                 SystemCallKind::ArrayLength,
-                vec![BoundNode::conversion(span, BoundNode::variable(
+                vec![BoundNode::conversion(
                     span,
-                    collection_variable,
-                    collection.type_.clone(),
-                ), Type::Any)],
+                    BoundNode::variable(span, collection_variable, collection.type_.clone()),
+                    Type::Any,
+                )],
                 Type::Integer,
             ),
             Type::Boolean,
@@ -665,12 +665,8 @@ impl BoundConversionNodeKind<'_> {
             (Type::Void, _) | (_, Type::Void) | (_, Type::Error) | (Type::Error, _) => {
                 unreachable!()
             }
-            (_, Type::Any) => {
-                ConversionKind::TypeUnboxing
-            },
-            (Type::Any, _) => {
-                ConversionKind::TypeBoxing
-            },
+            (_, Type::Any) => ConversionKind::TypeUnboxing,
+            (Type::Any, _) => ConversionKind::TypeBoxing,
             (Type::Boolean, Type::None)
             | (Type::Boolean, Type::Noneable(_))
             | (Type::SystemCall(_), Type::None)

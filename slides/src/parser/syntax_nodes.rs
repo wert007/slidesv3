@@ -1,4 +1,9 @@
-use crate::{diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, text::TextSpan, value::Value};
+use crate::{
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    text::TextSpan,
+    value::Value,
+};
 
 #[derive(Debug, Clone)]
 pub struct SyntaxNode<'a> {
@@ -26,7 +31,8 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn error(start: usize) -> Self {
-        let mut result = Self::none_literal(SyntaxToken::error(start, SyntaxTokenKind::NoneKeyword));
+        let mut result =
+            Self::none_literal(SyntaxToken::error(start, SyntaxTokenKind::NoneKeyword));
         result.is_inserted = true;
         result
     }

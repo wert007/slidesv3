@@ -29,7 +29,7 @@ impl Type {
     }
 
     pub fn function(function_type: FunctionType) -> Self {
-        Self::Function(Box::new(function_type.into()))
+        Self::Function(Box::new(function_type))
     }
 
     pub fn closure(base_function_type: FunctionType) -> Self {
@@ -94,21 +94,33 @@ impl Type {
                     base_type = inner;
                 }
                 base_type.type_identifier_size_in_words() + 2
-            },
+            }
             Type::Noneable(base_type) => base_type.type_identifier_size_in_words() + 1,
             Type::Function(function_type) => {
                 let mut result = 2;
-                result += &function_type.this_type.as_ref().unwrap_or(&Type::Void).type_identifier_size_in_words();
+                result += &function_type
+                    .this_type
+                    .as_ref()
+                    .unwrap_or(&Type::Void)
+                    .type_identifier_size_in_words();
                 result += function_type.return_type.type_identifier_size_in_words();
                 for parameter in &function_type.parameter_types {
                     result += parameter.type_identifier_size_in_words();
                 }
                 result
-            },
+            }
             Type::Closure(closure_type) => {
                 let mut result = 2;
-                result += closure_type.base_function_type.this_type.as_ref().unwrap_or(&Type::Void).type_identifier_size_in_words();
-                result += closure_type.base_function_type.return_type.type_identifier_size_in_words();
+                result += closure_type
+                    .base_function_type
+                    .this_type
+                    .as_ref()
+                    .unwrap_or(&Type::Void)
+                    .type_identifier_size_in_words();
+                result += closure_type
+                    .base_function_type
+                    .return_type
+                    .type_identifier_size_in_words();
                 for parameter in &closure_type.base_function_type.parameter_types {
                     result += parameter.type_identifier_size_in_words();
                 }
@@ -119,23 +131,27 @@ impl Type {
         }
     }
 
-    pub const TYPE_IDENTIFIER_ERROR : u64            = 0;
-    pub const TYPE_IDENTIFIER_VOID : u64             = 1;
-    pub const TYPE_IDENTIFIER_ANY : u64              = 2;
-    pub const TYPE_IDENTIFIER_INTEGER : u64          = 3;
-    pub const TYPE_IDENTIFIER_BOOLEAN : u64          = 4;
-    pub const TYPE_IDENTIFIER_NONE : u64             = 5;
-    pub const TYPE_IDENTIFIER_ARRAY : u64            = 6;
-    pub const TYPE_IDENTIFIER_NONEABLE : u64         = 7;
-    pub const TYPE_IDENTIFIER_STRING : u64           = 8;
-    pub const TYPE_IDENTIFIER_FUNCTION : u64         = 9;
-    pub const TYPE_IDENTIFIER_CLOSURE : u64          = 10;
-    pub const TYPE_IDENTIFIER_STRUCT : u64           = 11;
-    pub const TYPE_IDENTIFIER_STRUCT_REFERENCE : u64 = 12;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_PRINT : u64           = (1 + SystemCallKind::Print as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING : u64       = (1 + SystemCallKind::ToString as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH : u64    = (1 + SystemCallKind::ArrayLength as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP : u64 = (1 + SystemCallKind::DebugHeapDump as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_ERROR: u64 = 0;
+    pub const TYPE_IDENTIFIER_VOID: u64 = 1;
+    pub const TYPE_IDENTIFIER_ANY: u64 = 2;
+    pub const TYPE_IDENTIFIER_INTEGER: u64 = 3;
+    pub const TYPE_IDENTIFIER_BOOLEAN: u64 = 4;
+    pub const TYPE_IDENTIFIER_NONE: u64 = 5;
+    pub const TYPE_IDENTIFIER_ARRAY: u64 = 6;
+    pub const TYPE_IDENTIFIER_NONEABLE: u64 = 7;
+    pub const TYPE_IDENTIFIER_STRING: u64 = 8;
+    pub const TYPE_IDENTIFIER_FUNCTION: u64 = 9;
+    pub const TYPE_IDENTIFIER_CLOSURE: u64 = 10;
+    pub const TYPE_IDENTIFIER_STRUCT: u64 = 11;
+    pub const TYPE_IDENTIFIER_STRUCT_REFERENCE: u64 = 12;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_PRINT: u64 =
+        (1 + SystemCallKind::Print as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING: u64 =
+        (1 + SystemCallKind::ToString as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH: u64 =
+        (1 + SystemCallKind::ArrayLength as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP: u64 =
+        (1 + SystemCallKind::DebugHeapDump as u8 as u64) << 8;
 
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
@@ -153,9 +169,15 @@ impl Type {
             Type::Struct(_) => Self::TYPE_IDENTIFIER_STRUCT,
             Type::StructReference(_) => Self::TYPE_IDENTIFIER_STRUCT_REFERENCE,
             Type::SystemCall(SystemCallKind::Print) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT,
-            Type::SystemCall(SystemCallKind::ToString) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING,
-            Type::SystemCall(SystemCallKind::ArrayLength) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH,
-            Type::SystemCall(SystemCallKind::DebugHeapDump) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP,
+            Type::SystemCall(SystemCallKind::ToString) => {
+                Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING
+            }
+            Type::SystemCall(SystemCallKind::ArrayLength) => {
+                Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH
+            }
+            Type::SystemCall(SystemCallKind::DebugHeapDump) => {
+                Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP
+            }
         }
     }
 
@@ -174,10 +196,18 @@ impl Type {
             Self::TYPE_IDENTIFIER_CLOSURE => None,
             Self::TYPE_IDENTIFIER_STRUCT => None,
             Self::TYPE_IDENTIFIER_STRUCT_REFERENCE => None,
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT => Some(Type::SystemCall(SystemCallKind::Print)),
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING => Some(Type::SystemCall(SystemCallKind::ToString)),
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH => Some(Type::SystemCall(SystemCallKind::ArrayLength)),
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP => Some(Type::SystemCall(SystemCallKind::DebugHeapDump)),
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT => {
+                Some(Type::SystemCall(SystemCallKind::Print))
+            }
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING => {
+                Some(Type::SystemCall(SystemCallKind::ToString))
+            }
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH => {
+                Some(Type::SystemCall(SystemCallKind::ArrayLength))
+            }
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP => {
+                Some(Type::SystemCall(SystemCallKind::DebugHeapDump))
+            }
             _ => None,
         }
     }
@@ -360,7 +390,11 @@ impl FunctionType {
         }
     }
 
-    pub fn function(parameter_types: Vec<Type>, this_type: Option<Type>, return_type: Type) -> Self {
+    pub fn function(
+        parameter_types: Vec<Type>,
+        this_type: Option<Type>,
+        return_type: Type,
+    ) -> Self {
         Self {
             parameter_types,
             this_type,

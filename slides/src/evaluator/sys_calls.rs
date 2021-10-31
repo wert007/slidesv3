@@ -1,4 +1,7 @@
-use crate::{binder::typing::{FunctionType, Type}, evaluator::memory::bytes_to_word};
+use crate::{
+    binder::typing::{FunctionType, Type},
+    evaluator::memory::bytes_to_word,
+};
 
 use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 
@@ -55,7 +58,8 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64) 
             let (return_type, mut address) = decode_type(FlaggedWord::pointer(address), state);
             let mut parameter_types = Vec::with_capacity(type_count as usize - 2);
             for _ in 2..type_count {
-                let (parameter_type, new_address) = decode_type(FlaggedWord::pointer(address), state);
+                let (parameter_type, new_address) =
+                    decode_type(FlaggedWord::pointer(address), state);
                 address = new_address;
                 parameter_types.push(parameter_type);
             }
@@ -64,7 +68,14 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64) 
             } else {
                 Some(this_type)
             };
-            (Type::function(FunctionType::function(parameter_types, this_type, return_type)), address)
+            (
+                Type::function(FunctionType::function(
+                    parameter_types,
+                    this_type,
+                    return_type,
+                )),
+                address,
+            )
         }
         error => unreachable!("Found Type Identifier Kind {}", error),
     }
@@ -78,7 +89,7 @@ fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
             let (type_, address) = decode_type(argument, state);
             let argument = state.read_pointer(address);
             to_string_native(type_, argument, state)
-        },
+        }
         Type::None => "none".into(),
         Type::Noneable(base_type) => {
             if argument.unwrap_pointer() == 0 {
@@ -95,7 +106,7 @@ fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorSta
         }
         Type::StructReference(id) => {
             format!("type struct id#{}", id)
-        },
+        }
         Type::Integer => {
             format!("{}", argument.unwrap_value() as i64)
         }

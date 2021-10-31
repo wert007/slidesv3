@@ -321,7 +321,10 @@ impl<'a> DiagnosticBag<'a> {
         let from_type = self.type_to_name(from_type);
         let cast_return_type = self.type_to_name(&Type::noneable(to_type.clone()));
         let to_type = self.type_to_name(to_type);
-        let message = format!("No cast possible between types {} and {}. Note, that cast will return {}.", from_type, to_type, cast_return_type);
+        let message = format!(
+            "No cast possible between types {} and {}. Note, that cast will return {}.",
+            from_type, to_type, cast_return_type
+        );
         self.report(message, span);
     }
 
