@@ -937,18 +937,51 @@ fn bind_array_literal<'a, 'b>(
     } else {
         None
     };
-    let first_element = array_literal.children.remove(0);
-    let first_element = bind_node(first_element, binder);
-
-    let type_ = expected_type.unwrap_or_else(|| first_element.type_.clone());
-    let first_element = bind_conversion(first_element, &type_, binder);
-    let mut children = vec![first_element];
+    let first_child = array_literal.children.remove(0);
+    let (type_, mut children) = bind_array_literal_first_child(first_child, expected_type, binder);
     for child in array_literal.children {
-        let child = bind_node(child, binder);
+        let (child, repetition) = if let SyntaxNodeKind::RepetitionNode(repetition_node) = child.kind {
+            let base_expression = bind_node(*repetition_node.base_expression, binder);
+            let repetition = bind_node(*repetition_node.repetition, binder);
+            let repetition = bind_conversion(repetition, &Type::Integer, binder);
+            let repetition = match repetition.constant_value {
+                Some(value) => value.value.as_integer().unwrap(),
+                None => {
+                    binder.diagnostic_bag.report_expected_constant(repetition.span);
+                    1
+                },
+            } as usize;
+            (base_expression, repetition)
+        } else {
+            (bind_node(child, binder), 1)
+        };
         let child = bind_conversion(child, &type_, binder);
-        children.push(child);
+        for _ in 0..repetition {
+            children.push(child.clone());
+        }
     }
     BoundNode::array_literal(span, children, Type::array(type_.clone()))
+}
+
+fn bind_array_literal_first_child<'a>(first_child: SyntaxNode<'a>, expected_type: Option<Type>, binder: &mut BindingState<'a, '_>) -> (Type, Vec<BoundNode<'a>>) {
+    let children = if let SyntaxNodeKind::RepetitionNode(repetition_node) = first_child.kind {
+        let base_expression = bind_node(*repetition_node.base_expression, binder);
+        let repetition = bind_node(*repetition_node.repetition, binder);
+        let repetition = bind_conversion(repetition, &Type::Integer, binder);
+        let repetition = match repetition.constant_value {
+            Some(value) => value.value.as_integer().unwrap(),
+            None => {
+                binder.diagnostic_bag.report_expected_constant(repetition.span);
+                1
+            },
+        } as usize;
+        vec![base_expression;repetition]
+    } else {
+        vec![bind_node(first_child, binder)]
+    };
+    let type_ = expected_type.unwrap_or(children[0].type_.clone());
+    let children = children.into_iter().map(|c| bind_conversion(c, &type_, binder)).collect();
+    (type_, children)
 }
 
 fn bind_cast_expression<'a>(
