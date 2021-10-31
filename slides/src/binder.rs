@@ -826,6 +826,7 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
         SyntaxNodeKind::ArrayLiteral(array_literal) => {
             bind_array_literal(node.span, array_literal, binder)
         }
+        SyntaxNodeKind::CastExpression(cast_expression) => bind_cast_expression(node.span, cast_expression, binder),
         SyntaxNodeKind::ConstructorCall(constructor_call) => {
             bind_constructor_call(node.span, constructor_call, binder)
         }
@@ -925,6 +926,19 @@ fn bind_array_literal<'a, 'b>(
         children.push(child);
     }
     BoundNode::array_literal(span, children, Type::array(type_.clone()))
+}
+
+fn bind_cast_expression<'a>(
+    span: TextSpan,
+    cast_expression: CastExpressionNodeKind<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> BoundNode<'a> {
+    let expression = bind_node(*cast_expression.expression, binder);
+    let type_ = bind_type(cast_expression.type_, binder);
+    // TODO: Check if expression.type_ can be casted to type_ and throw error if
+    // not!
+    let type_ = Type::noneable(type_);
+    BoundNode::conversion(span, expression, type_)
 }
 
 fn bind_constructor_call<'a>(
