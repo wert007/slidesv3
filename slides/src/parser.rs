@@ -135,11 +135,11 @@ fn parse_function_type<'a>(
     let lparen = parser.match_token(SyntaxTokenKind::LParen);
     let mut parameters = vec![];
     let mut comma_tokens = vec![];
-    while !matches!(parser.peek_token().kind, SyntaxTokenKind::RParen) {
+    while parser.peek_token().kind != SyntaxTokenKind::RParen {
         let token_count = parser.token_count();
         let parameter = parse_parameter(parser);
         parameters.push(parameter);
-        if !matches!(parser.peek_token().kind, SyntaxTokenKind::RParen) {
+        if parser.peek_token().kind != SyntaxTokenKind::RParen {
             let comma = parser.match_token(SyntaxTokenKind::Comma);
             comma_tokens.push(comma);
         }
@@ -149,7 +149,7 @@ fn parse_function_type<'a>(
     }
     let rparen = parser.match_token(SyntaxTokenKind::RParen);
 
-    let return_type = if matches!(parser.peek_token().kind, SyntaxTokenKind::Arrow) {
+    let return_type = if parser.peek_token().kind == SyntaxTokenKind::Arrow {
         let arrow_token = parser.next_token();
         let return_type = parse_type(parser);
         Some(ReturnTypeNode {
@@ -168,7 +168,7 @@ fn parse_struct_body<'a>(
 ) -> StructBodyNode<'a> {
     let lbrace = parser.match_token(SyntaxTokenKind::LBrace);
     let mut statements = vec![];
-    while !matches!(parser.peek_token().kind, SyntaxTokenKind::RBrace) {
+    while parser.peek_token().kind != SyntaxTokenKind::RBrace {
         let token_count = parser.token_count();
         let statement = match parser.peek_token().kind {
             SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
@@ -217,7 +217,7 @@ fn parse_type<'a>(
             None
         };
     let mut brackets = vec![];
-    while matches!(parser.peek_token().kind, SyntaxTokenKind::LBracket) {
+    while parser.peek_token().kind == SyntaxTokenKind::LBracket {
         let token_count = parser.token_count();
         let lbracket = parser.match_token(SyntaxTokenKind::LBracket);
         let rbracket = parser.match_token(SyntaxTokenKind::RBracket);
@@ -351,7 +351,7 @@ fn parse_return_statement<'a>(
     parser: &mut Parser<'a, '_>
 ) -> SyntaxNode<'a> {
     let return_keyword = parser.match_token(SyntaxTokenKind::ReturnKeyword);
-    let optional_expression = if matches!(parser.peek_token().kind, SyntaxTokenKind::Semicolon) {
+    let optional_expression = if parser.peek_token().kind == SyntaxTokenKind::Semicolon {
         None
     } else {
         Some(parse_expression(parser))
@@ -374,7 +374,7 @@ fn parse_assignment_statement<'a>(
     parser: &mut Parser<'a, '_>
 ) -> SyntaxNode<'a> {
     let lhs = parse_binary_with_parent_precedence(parser, 1);
-    if matches!(parser.peek_token().kind, SyntaxTokenKind::Equals) {
+    if parser.peek_token().kind == SyntaxTokenKind::Equals {
         if !lhs.kind.is_assignable() && !lhs.is_inserted {
             parser.diagnostic_bag.report_cannot_assign_to(lhs.span);
         }
@@ -421,7 +421,7 @@ fn parse_binary_with_parent_precedence<'a>(
         }
 
         let operator_token = parser.next_token();
-        if matches!(operator_token.kind, SyntaxTokenKind::Equals) {
+        if operator_token.kind == SyntaxTokenKind::Equals {
             parser.diagnostic_bag.report_cannot_assign_to(lhs.span);
         }
         let rhs = parse_binary_with_parent_precedence(parser, precedence);
@@ -448,7 +448,7 @@ fn parse_function_call<'a>(
                 ) {
                     let token_count = parser.token_count();
                     arguments.push(parse_expression(parser));
-                    if !matches!(parser.peek_token().kind, SyntaxTokenKind::RParen) {
+                    if parser.peek_token().kind != SyntaxTokenKind::RParen {
                         comma_tokens.push(parser.match_token(SyntaxTokenKind::Comma));
                     }
                     if token_count == parser.token_count() {
@@ -527,7 +527,7 @@ fn parse_array_literal<'a>(
         let token_count = parser.token_count();
         let expression = parse_expression(parser);
         children.push(expression);
-        if !matches!(parser.peek_token().kind, SyntaxTokenKind::RBracket) {
+        if parser.peek_token().kind != SyntaxTokenKind::RBracket {
             let comma_token = parser.match_token(SyntaxTokenKind::Comma);
             comma_tokens.push(comma_token);
         }
@@ -605,7 +605,7 @@ fn parse_constructor<'a>(
     ) {
         let token_count = parser.token_count();
         arguments.push(parse_expression(parser));
-        if !matches!(parser.peek_token().kind, SyntaxTokenKind::RParen) {
+        if parser.peek_token().kind != SyntaxTokenKind::RParen {
             comma_tokens.push(parser.match_token(SyntaxTokenKind::Comma));
         }
         if token_count == parser.token_count() {
