@@ -155,6 +155,23 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
+    pub fn repetition_node(
+        base_expression: SyntaxNode<'a>,
+        semicolon_token: SyntaxToken<'a>,
+        repetition: SyntaxNode<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(base_expression.span(), repetition.span());
+        Self {
+            span,
+            kind: SyntaxNodeKind::RepetitionNode(RepetitionNodeNodeKind {
+                base_expression: Box::new(base_expression),
+                semicolon_token,
+                repetition: Box::new(repetition),
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn cast_expression(
         cast_keyword: SyntaxToken<'a>,
         expression: SyntaxNode<'a>,
@@ -466,6 +483,7 @@ pub enum SyntaxNodeKind<'a> {
     // Expressions
     Literal(LiteralNodeKind<'a>),
     ArrayLiteral(ArrayLiteralNodeKind<'a>),
+    RepetitionNode(RepetitionNodeNodeKind<'a>),
     CastExpression(CastExpressionNodeKind<'a>),
     ConstructorCall(ConstructorCallNodeKind<'a>),
     Variable(VariableNodeKind<'a>),
@@ -646,6 +664,13 @@ pub struct ArrayLiteralNodeKind<'a> {
     pub children: Vec<SyntaxNode<'a>>,
     pub comma_tokens: Vec<SyntaxToken<'a>>,
     pub rbracket: SyntaxToken<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RepetitionNodeNodeKind<'a> {
+    pub base_expression: Box<SyntaxNode<'a>>,
+    pub semicolon_token: SyntaxToken<'a>,
+    pub repetition: Box<SyntaxNode<'a>>,
 }
 
 #[derive(Debug, Clone)]

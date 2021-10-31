@@ -486,7 +486,12 @@ fn parse_array_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
         SyntaxTokenKind::RBracket | SyntaxTokenKind::Eoi
     ) {
         let token_count = parser.token_count();
-        let expression = parse_expression(parser);
+        let mut expression = parse_expression(parser);
+        if parser.peek_token().kind == SyntaxTokenKind::Semicolon {
+            let semicolon_token = parser.match_token(SyntaxTokenKind::Semicolon);
+            let repetition = parse_expression(parser);
+            expression = SyntaxNode::repetition_node(expression, semicolon_token, repetition);
+        }
         children.push(expression);
         if parser.peek_token().kind != SyntaxTokenKind::RBracket {
             let comma_token = parser.match_token(SyntaxTokenKind::Comma);
