@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests;
 
-use std::ops::Deref;
-
 use num_enum::TryFromPrimitive;
 
 use crate::evaluator::memory::WORD_SIZE_IN_BYTES;
@@ -59,62 +57,91 @@ impl Type {
         }
     }
 
-    pub fn type_identifier(&self) -> u64 {
+    pub fn type_identifier_size_in_words(&self) -> u64 {
         match self {
-            Type::Array(base_type) => {
-                let mut array_count = 0u8;
-                let mut base_type = base_type;
-                while let Type::Array(child) = base_type.deref() {
-                    base_type = &child;
-                    array_count += 1;
+            Type::Error => 1,
+            Type::Void => 1,
+            Type::Any => 1,
+            Type::Integer => 1,
+            Type::Boolean => 1,
+            Type::None => 1,
+            Type::String => 1,
+            Type::SystemCall(_) => 1,
+            Type::Array(inner) => {
+                let mut base_type = inner;
+                while let Type::Array(inner) = base_type.as_ref() {
+                    base_type = inner;
                 }
-                let base_type: u64 = base_type.type_identifier();
-                (base_type << 8) + (array_count << 2) as u64 + 1
-            }
-            Type::Error => 0 << 2,
-            Type::Any => 1 << 2,
-            Type::Void => 2 << 2,
-            Type::Integer => 3 << 2,
-            Type::Boolean => 4 << 2,
-            Type::None => Type::noneable(Type::Any).type_identifier(),
-            Type::String => 5 << 2,
-            Type::SystemCall(kind) => (((*kind as u8) as u64) << 5) + (8 << 2),
-            Type::Noneable(base) => base.type_identifier() + 2,
-            Type::StructReference(_) | Type::Struct(_) | Type::Function(_) | Type::Closure(_) => {
-                eprintln!("Unimplented type_identifer for functions or structs expected..");
-                u64::MAX
-            }
+                base_type.type_identifier_size_in_words() + 2
+            },
+            Type::Noneable(base_type) => base_type.type_identifier_size_in_words() + 1,
+            Type::Function(_) => todo!(),
+            Type::Closure(_) => todo!(),
+            Type::Struct(_) => 1,
+            Type::StructReference(_) => 1,
         }
     }
 
-    pub fn from_type_identifier(value: u64) -> Option<Self> {
-        match value {
-            0 => Some(Self::Error),
-            4 => Some(Self::Any),
-            8 => Some(Self::Void),
-            12 => Some(Self::Integer),
-            16 => Some(Self::Boolean),
-            20 => Some(Self::String),
-            _ => {
-                if value & 1 == 1 {
-                    let base_type = Self::from_type_identifier(value >> 8)?;
-                    let mut result = Type::array(base_type);
-                    let array_count = (value >> 2) & 0xFF;
-                    for _ in 0..array_count {
-                        result = Type::array(result);
-                    }
-                    Some(result)
-                } else if value & 63 == 32 {
-                    let kind =
-                        SystemCallKind::try_from_primitive(((value >> 5) & 0xFF) as u8).ok()?;
-                    Some(Self::SystemCall(kind))
-                } else if value & 2 == 2 {
-                    let base_type = Self::from_type_identifier(value & !2)?;
-                    Some(Type::noneable(base_type))
-                } else {
-                    None
-                }
-            }
+    pub const TYPE_IDENTIFIER_ERROR : u64            = 0;
+    pub const TYPE_IDENTIFIER_VOID : u64             = 1;
+    pub const TYPE_IDENTIFIER_ANY : u64              = 2;
+    pub const TYPE_IDENTIFIER_INTEGER : u64          = 3;
+    pub const TYPE_IDENTIFIER_BOOLEAN : u64          = 4;
+    pub const TYPE_IDENTIFIER_NONE : u64             = 5;
+    pub const TYPE_IDENTIFIER_ARRAY : u64            = 6;
+    pub const TYPE_IDENTIFIER_NONEABLE : u64         = 7;
+    pub const TYPE_IDENTIFIER_STRING : u64           = 8;
+    pub const TYPE_IDENTIFIER_FUNCTION : u64         = 9;
+    pub const TYPE_IDENTIFIER_CLOSURE : u64          = 10;
+    pub const TYPE_IDENTIFIER_STRUCT : u64           = 11;
+    pub const TYPE_IDENTIFIER_STRUCT_REFERENCE : u64 = 12;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_PRINT : u64           = (1 + SystemCallKind::Print as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING : u64       = (1 + SystemCallKind::ToString as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH : u64    = (1 + SystemCallKind::ArrayLength as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP : u64 = (1 + SystemCallKind::DebugHeapDump as u8 as u64) << 8;
+
+    pub fn type_identifier_kind(&self) -> u64 {
+        match self {
+            Type::Error => Self::TYPE_IDENTIFIER_ERROR,
+            Type::Void => Self::TYPE_IDENTIFIER_VOID,
+            Type::Any => Self::TYPE_IDENTIFIER_ANY,
+            Type::Integer => Self::TYPE_IDENTIFIER_INTEGER,
+            Type::Boolean => Self::TYPE_IDENTIFIER_BOOLEAN,
+            Type::None => Self::TYPE_IDENTIFIER_NONE,
+            Type::Array(_) => Self::TYPE_IDENTIFIER_ARRAY,
+            Type::Noneable(_) => Self::TYPE_IDENTIFIER_NONEABLE,
+            Type::String => Self::TYPE_IDENTIFIER_STRING,
+            Type::Function(_) => Self::TYPE_IDENTIFIER_FUNCTION,
+            Type::Closure(_) => Self::TYPE_IDENTIFIER_CLOSURE,
+            Type::Struct(_) => Self::TYPE_IDENTIFIER_STRUCT,
+            Type::StructReference(_) => Self::TYPE_IDENTIFIER_STRUCT_REFERENCE,
+            Type::SystemCall(SystemCallKind::Print) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT,
+            Type::SystemCall(SystemCallKind::ToString) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING,
+            Type::SystemCall(SystemCallKind::ArrayLength) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH,
+            Type::SystemCall(SystemCallKind::DebugHeapDump) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP,
+        }
+    }
+
+    pub fn simple_type_from_type_identifier(type_identifier_kind: u64) -> Option<Self> {
+        match type_identifier_kind {
+            Self::TYPE_IDENTIFIER_ERROR => Some(Type::Error),
+            Self::TYPE_IDENTIFIER_VOID => Some(Type::Void),
+            Self::TYPE_IDENTIFIER_ANY => Some(Type::Any),
+            Self::TYPE_IDENTIFIER_INTEGER => Some(Type::Integer),
+            Self::TYPE_IDENTIFIER_BOOLEAN => Some(Type::Boolean),
+            Self::TYPE_IDENTIFIER_NONE => Some(Type::None),
+            Self::TYPE_IDENTIFIER_ARRAY => None,
+            Self::TYPE_IDENTIFIER_NONEABLE => None,
+            Self::TYPE_IDENTIFIER_STRING => Some(Type::String),
+            Self::TYPE_IDENTIFIER_FUNCTION => None,
+            Self::TYPE_IDENTIFIER_CLOSURE => None,
+            Self::TYPE_IDENTIFIER_STRUCT => None,
+            Self::TYPE_IDENTIFIER_STRUCT_REFERENCE => None,
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT => Some(Type::SystemCall(SystemCallKind::Print)),
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING => Some(Type::SystemCall(SystemCallKind::ToString)),
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH => Some(Type::SystemCall(SystemCallKind::ArrayLength)),
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP => Some(Type::SystemCall(SystemCallKind::DebugHeapDump)),
+            _ => None,
         }
     }
 
