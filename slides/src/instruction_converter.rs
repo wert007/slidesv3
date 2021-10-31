@@ -74,6 +74,14 @@ impl From<LabelReference> for InstructionOrLabelReference {
 struct InstructionConverter {
     pub stack: Stack,
     pub fixed_variable_count: usize,
+    next_label_index: usize,
+}
+
+impl InstructionConverter {
+    pub fn generate_label(&mut self) -> usize {
+        self.next_label_index += 1;
+        self.next_label_index
+    }
 }
 
 pub struct Program {
@@ -116,6 +124,7 @@ pub fn convert<'a>(
     let mut converter = InstructionConverter {
         stack: Stack::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
+        next_label_index: bound_program.label_count,
     };
     // Push Pointer to 0 with value 0
     converter.stack.push(0);

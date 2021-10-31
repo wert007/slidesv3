@@ -7,30 +7,11 @@ pub mod typing;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use crate::{
-    binder::{
+use crate::{DebugFlags, binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    },
-    diagnostics::DiagnosticBag,
-    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    parser::{
-        self,
-        syntax_nodes::{
-            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
-            BlockStatementNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind,
-            FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind,
-            FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind,
-            ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode,
-            StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
-            VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
-        },
-    },
-    text::{SourceText, TextSpan},
-    value::Value,
-    DebugFlags,
-};
+    }, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{self, syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, CastExpressionNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
 use self::{
     bound_nodes::BoundNode,
@@ -437,6 +418,7 @@ pub struct BoundProgram<'a> {
     pub program: BoundNode<'a>,
     pub fixed_variable_count: usize,
     pub max_used_variables: usize,
+    pub label_count: usize,
 }
 
 impl BoundProgram<'_> {
@@ -445,6 +427,7 @@ impl BoundProgram<'_> {
             program: BoundNode::error(TextSpan::zero()),
             fixed_variable_count: 0,
             max_used_variables: 0,
+            label_count: 0,
         }
     }
 }
@@ -584,6 +567,7 @@ pub fn bind<'a>(
         program,
         fixed_variable_count,
         max_used_variables: binder.max_used_variables,
+        label_count,
     }
 }
 
