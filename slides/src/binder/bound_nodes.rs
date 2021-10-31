@@ -655,6 +655,7 @@ pub enum ConversionKind {
     None,
     Boxing,
     Deboxing,
+    TypeBoxing,
 }
 
 impl BoundConversionNodeKind<'_> {
@@ -663,7 +664,10 @@ impl BoundConversionNodeKind<'_> {
             (Type::Void, _) | (_, Type::Void) | (_, Type::Error) | (Type::Error, _) => {
                 unreachable!()
             }
-            (Type::Any, _) => todo!(),
+            (_, Type::Any) => todo!(),
+            (Type::Any, _) => {
+                ConversionKind::TypeBoxing
+            },
             (Type::Boolean, Type::None)
             | (Type::Boolean, Type::Noneable(_))
             | (Type::SystemCall(_), Type::None)
