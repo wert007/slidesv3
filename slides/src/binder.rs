@@ -1461,6 +1461,7 @@ fn bind_field_access<'a, 'b>(
         }
         Type::Array(_) | Type::String => {
             if field_access.field.lexeme == "length" {
+                let base = bind_conversion(base, &Type::Any, binder);
                 let function_type = FunctionType::system_call(SystemCallKind::ArrayLength);
                 BoundNode::system_call_closure(
                     span,

@@ -301,11 +301,11 @@ impl<'a> BoundNode<'a> {
             BoundNode::system_call(
                 span,
                 SystemCallKind::ArrayLength,
-                vec![BoundNode::variable(
+                vec![BoundNode::conversion(span, BoundNode::variable(
                     span,
                     collection_variable,
                     collection.type_.clone(),
-                )],
+                ), Type::Any)],
                 Type::Integer,
             ),
             Type::Boolean,
