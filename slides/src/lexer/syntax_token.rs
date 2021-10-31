@@ -22,6 +22,17 @@ macro_rules! const_number_literal_syntax_token {
 }
 
 impl<'a> SyntaxToken<'a> {
+    pub fn error(
+        start: usize,
+        kind: SyntaxTokenKind,
+    ) -> Self {
+        Self {
+            start,
+            lexeme: "error",
+            kind,
+        }
+    }
+
     pub fn number_literal(
         start: usize,
         lexeme: &'a str,
