@@ -374,9 +374,10 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn get_struct_type_by_id(&self, id: u64) -> Option<&BoundStructType<'a>> {
-        // FIXME: The 3 are the three primary types in the type table (int,
-        // bool, and string), this could be moved to a better place i think.
-        self.struct_table.get(id as usize - 3)
+        // FIXME: The 4 represents the four primary types in the type table
+        // (int, bool, string, and any), this could be moved to a better place I
+        // think.
+        self.struct_table.get(id as usize - 4)
     }
 
     fn get_struct_by_id(&self, id: u64) -> Option<StructType> {
