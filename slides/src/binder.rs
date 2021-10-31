@@ -1560,9 +1560,7 @@ fn bind_arguments_for_function<'a, 'b>(
                 .diagnostic_bag
                 .report_invalid_void_expression(argument.span);
         }
-        if parameter_type != &Type::Any {
-            argument = bind_conversion(argument, parameter_type, binder);
-        }
+        argument = bind_conversion(argument, parameter_type, binder);
         if let Type::Function(_) = argument.type_ {
             if let Some(SystemCallKind::Print) = function_type.system_call_kind {
                 binder
