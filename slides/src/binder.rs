@@ -1109,18 +1109,24 @@ fn bind_binary_operator<'a, 'b>(
             Type::Boolean,
         )),
         (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(
-            BoundBinary::same_output(BoundBinaryOperator::StringConcat, Type::String),
+            // Currently a call to to$string will be emitted. And for that call
+            // both sides need to be of type any. There is an optimization here,
+            // where there might be two versions of StringConcat and only one of
+            // those works with to$string.
+            //
+            // BoundBinary::same_output(BoundBinaryOperator::StringConcat, Type::String),
+            BoundBinary::same_input(&Type::Any, BoundBinaryOperator::StringConcat, Type::String),
         ),
-        (Type::String, BoundBinaryOperator::ArithmeticAddition, rhs) => Some(BoundBinary::new(
-            &Type::String,
+        (Type::String, BoundBinaryOperator::ArithmeticAddition, _) => Some(BoundBinary::new(
+            &Type::Any,
             BoundBinaryOperator::StringConcat,
-            rhs,
+            &Type::Any,
             Type::String,
         )),
-        (lhs, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(BoundBinary::new(
-            lhs,
+        (_, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(BoundBinary::new(
+            &Type::Any,
             BoundBinaryOperator::StringConcat,
-            &Type::String,
+            &Type::Any,
             Type::String,
         )),
         (Type::Noneable(lhs_type), BoundBinaryOperator::NoneableOrValue, rhs_type) => {
