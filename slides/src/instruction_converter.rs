@@ -643,9 +643,14 @@ fn convert_conversion(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let conversion_kind = conversion.kind();
+    let base_type = conversion.base.type_.clone();
     let mut result = convert_node(*conversion.base, converter);
     match conversion_kind {
         ConversionKind::None => {}
+        ConversionKind::TypeBoxing => {
+            let type_word_count = convert_type_identifier(base_type, &mut result);
+            result.push(Instruction::write_to_heap(type_word_count + 1).span(span).into());
+        }
         ConversionKind::Boxing => {
             result.push(Instruction::write_to_heap(1).span(span).into());
         }
@@ -654,6 +659,42 @@ fn convert_conversion(
         }
     }
     result
+}
+
+fn convert_type_identifier(base_type: Type, result: &mut Vec<InstructionOrLabelReference>) -> u64 {
+    let size_in_words = base_type.type_identifier_size_in_words();
+    let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
+    let type_identifier_kind = base_type.type_identifier_kind();
+    let type_word_count = match base_type {
+        Type::Array(base_type) => {
+            let mut base_type = *base_type;
+            let mut dimension_count = 0;
+            while let Type::Array(inner) = base_type {
+                base_type = *inner;
+                dimension_count += 1;
+            }
+            let type_word_count = convert_type_identifier(base_type, result) + 3;
+            result.push(Instruction::load_immediate(dimension_count).into());
+            type_word_count
+        },
+        Type::Noneable(base_type) => {
+            convert_type_identifier(*base_type, result) + 2
+        },
+        Type::Function(_) => todo!(),
+        Type::Closure(_) => todo!(),
+        Type::Struct(struct_type) => {
+            result.push(Instruction::load_immediate(struct_type.id).into());
+            3
+        }
+        Type::StructReference(id) => {
+            result.push(Instruction::load_immediate(id).into());
+            3
+        }
+        _ => 2,
+    };
+    result.push(Instruction::load_immediate(type_identifier_kind).into());
+    result.push(Instruction::load_immediate(size_in_bytes).into());
+    type_word_count
 }
 
 fn convert_variable_declaration(
