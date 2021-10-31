@@ -1,8 +1,4 @@
-use crate::{
-    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    text::TextSpan,
-    value::Value,
-};
+use crate::{diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, text::TextSpan, value::Value};
 
 #[derive(Debug, Clone)]
 pub struct SyntaxNode<'a> {
@@ -30,7 +26,7 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn error(start: usize) -> Self {
-        let mut result = Self::literal(SyntaxToken::number_literal_no_diagnostics(start, "0"));
+        let mut result = Self::none_literal(SyntaxToken::eoi(start));
         result.is_inserted = true;
         result
     }
@@ -83,10 +79,21 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
-    pub fn literal(token: SyntaxToken<'a>) -> Self {
+    pub fn literal(token: SyntaxToken<'a>, diagnostic_bag: &mut DiagnosticBag) -> Self {
         let value = match &token.kind {
-            SyntaxTokenKind::NumberLiteral(n) => (n.value as i64).into(),
-            SyntaxTokenKind::StringLiteral(s) => s.value.clone().into(),
+            SyntaxTokenKind::NumberLiteral => {
+                match token.lexeme.parse::<u64>() {
+                    Ok(value) => (value as i64).into(),
+                    // TODO: Someday ParseIntError::kind() might allow to differentiate more
+                    Err(_) => {
+                        diagnostic_bag.report_bad_integer(token.start, token.lexeme);
+                        Value::None
+                    }
+                }
+            }
+            SyntaxTokenKind::StringLiteral => {
+                token.lexeme[1..token.lexeme.len() - 1].to_owned().into()
+            }
             error => unreachable!("Unexpected Literal SyntaxToken {:#?}!", error),
         };
         Self {

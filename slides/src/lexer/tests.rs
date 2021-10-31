@@ -1,7 +1,7 @@
 use assert_matches::assert_matches;
 
 use crate::{
-    lexer::syntax_token::{NumberLiteralKind, SyntaxTokenKind},
+    lexer::syntax_token::SyntaxTokenKind,
     text::SourceText,
 };
 
@@ -110,7 +110,7 @@ fn lexer_successfull() {
         assert_matches!(
             token[0],
             SyntaxToken {
-                kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 1 }),
+                kind: SyntaxTokenKind::NumberLiteral,
                 lexeme: "1",
                 start: 0
             }
@@ -126,7 +126,7 @@ fn lexer_successfull() {
         assert_matches!(
             token[2],
             SyntaxToken {
-                kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 1 }),
+                kind: SyntaxTokenKind::NumberLiteral,
                 lexeme: "1",
                 start: 2
             }
@@ -146,7 +146,7 @@ fn lexer_successfull() {
         assert_matches!(
             token[0],
             SyntaxToken {
-                kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 1 }),
+                kind: SyntaxTokenKind::NumberLiteral,
                 lexeme: "1",
                 start: 0
             }
@@ -162,7 +162,7 @@ fn lexer_successfull() {
         assert_matches!(
             token[2],
             SyntaxToken {
-                kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 1 }),
+                kind: SyntaxTokenKind::NumberLiteral,
                 lexeme: "1",
                 start: 4
             }
@@ -190,7 +190,7 @@ fn lexer_successfull() {
         assert_matches!(
             token[1],
             SyntaxToken {
-                kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 1 }),
+                kind: SyntaxTokenKind::NumberLiteral,
                 lexeme: "1",
                 start: 1
             }

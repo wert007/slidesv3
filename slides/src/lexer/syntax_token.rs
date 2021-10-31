@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::{diagnostics::DiagnosticBag, text::TextSpan};
+use crate::text::TextSpan;
 
 #[derive(Debug, Clone)]
 pub struct SyntaxToken<'a> {
@@ -16,9 +16,7 @@ macro_rules! const_number_literal_syntax_token {
         SyntaxToken {
             start: $start,
             lexeme: stringify!($value),
-            kind: SyntaxTokenKind::NumberLiteral(crate::lexer::syntax_token::NumberLiteralKind {
-                value: $value,
-            }),
+            kind: SyntaxTokenKind::NumberLiteral,
         }
     };
 }
@@ -27,38 +25,19 @@ impl<'a> SyntaxToken<'a> {
     pub fn number_literal(
         start: usize,
         lexeme: &'a str,
-        diagnostic_bag: &mut DiagnosticBag<'a>,
     ) -> Self {
-        let value = match lexeme.parse::<u64>() {
-            Ok(value) => value,
-            Err(_) => {
-                // TODO: Someday ParseIntError::kind() might allow to differentiate more
-                diagnostic_bag.report_bad_integer(start, lexeme);
-                0
-            }
-        };
         Self {
             start,
             lexeme,
-            kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value }),
-        }
-    }
-
-    pub fn number_literal_no_diagnostics(start: usize, lexeme: &'a str) -> Self {
-        let value = lexeme.parse::<u64>().unwrap();
-        Self {
-            start,
-            lexeme,
-            kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value }),
+            kind: SyntaxTokenKind::NumberLiteral,
         }
     }
 
     pub fn string_literal(start: usize, lexeme: &'a str) -> Self {
-        let value = lexeme[1..lexeme.len() - 1].to_owned();
         Self {
             start,
             lexeme,
-            kind: SyntaxTokenKind::StringLiteral(StringLiteralKind { value }),
+            kind: SyntaxTokenKind::StringLiteral,
         }
     }
 
@@ -112,8 +91,8 @@ impl<'a> SyntaxToken<'a> {
 #[derive(Clone)]
 pub enum SyntaxTokenKind {
     Eoi,
-    NumberLiteral(NumberLiteralKind),
-    StringLiteral(StringLiteralKind),
+    NumberLiteral,
+    StringLiteral,
     LParen,
     RParen,
     LBracket,
@@ -191,13 +170,11 @@ impl SyntaxTokenKind {
     }
 
     pub fn default_number_literal() -> Self {
-        SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 0 })
+        SyntaxTokenKind::NumberLiteral
     }
 
     pub fn default_string_literal() -> Self {
-        SyntaxTokenKind::StringLiteral(StringLiteralKind {
-            value: String::default(),
-        })
+        SyntaxTokenKind::StringLiteral
     }
 
     pub fn keyword(identifier: &str) -> Option<Self> {
@@ -258,8 +235,8 @@ impl From<&str> for SyntaxTokenKind {
 impl std::fmt::Debug for SyntaxTokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SyntaxTokenKind::NumberLiteral(v) => write!(f, "{:?}", v),
-            SyntaxTokenKind::StringLiteral(v) => write!(f, "{:?}", v),
+            SyntaxTokenKind::NumberLiteral => write!(f, "Number-Literal-Token"),
+            SyntaxTokenKind::StringLiteral => write!(f, "String-Literal-Token"),
             SyntaxTokenKind::Eoi => write!(f, "End-of-Input-Token"),
             SyntaxTokenKind::Semicolon => write!(f, "SemicolonToken"),
             SyntaxTokenKind::Colon => write!(f, "ColonToken"),

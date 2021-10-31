@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! match_token {
     ($tokens:expr, $diagnostic_bag:expr, NumberLiteral) => {
-        if matches!(peek_token($tokens).kind, SyntaxTokenKind::NumberLiteral(_)) {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::NumberLiteral) {
             next_token($tokens)
         } else {
             let current = peek_token($tokens);
@@ -10,11 +10,11 @@ macro_rules! match_token {
                 &current.kind,
                 &SyntaxTokenKind::default_number_literal(),
             );
-            SyntaxToken::number_literal_no_diagnostics(current.span().start(), "0")
+            SyntaxToken::number_literal(current.span().start(), "0")
         }
     };
     ($tokens:expr, $diagnostic_bag:expr, StringLiteral) => {
-        if matches!(peek_token($tokens).kind, SyntaxTokenKind::StringLiteral(_)) {
+        if matches!(peek_token($tokens).kind, SyntaxTokenKind::StringLiteral) {
             next_token($tokens)
         } else {
             let current = peek_token($tokens);

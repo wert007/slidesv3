@@ -1,7 +1,6 @@
 use super::{syntax_nodes::SyntaxNodeKind, *};
 use crate::const_number_literal_syntax_token;
 use crate::diagnostics::Diagnostic;
-use crate::lexer::syntax_token::NumberLiteralKind;
 use crate::parser::syntax_nodes::LiteralNodeKind;
 use crate::parser::syntax_nodes::VariableNodeKind;
 use crate::text::SourceText;
@@ -208,13 +207,13 @@ fn parser_error() {
             assert_matches!(if_statement.condition.kind, SyntaxNodeKind::Binary(binary) => {
                 assert_matches!(binary.lhs.kind, SyntaxNodeKind::Variable(VariableNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::Identifier, lexeme: "a", start:3 } }));
                 assert_matches!(binary.operator_token, SyntaxToken { kind: SyntaxTokenKind::Equals, lexeme: "=", start:5 });
-                assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 4 }), lexeme: "4", start:7 }, value: Value::Integer(4) }));
+                assert_matches!(binary.rhs.kind, SyntaxNodeKind::Literal(LiteralNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::NumberLiteral, lexeme: "4", start:7 }, value: Value::Integer(4) }));
             });
             assert_matches!(if_statement.body.kind, SyntaxNodeKind::BlockStatement(block_statement) => {
                 assert_eq!(block_statement.statements.len(), 1);
                 assert_matches!(&block_statement.statements[0].kind, SyntaxNodeKind::Assignment(assignment) => {
                     assert_matches!(assignment.lhs.kind, SyntaxNodeKind::Variable(VariableNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::Identifier, lexeme: "a", start: 11 } }));
-                    assert_matches!(assignment.expression.kind, SyntaxNodeKind::Literal(LiteralNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::NumberLiteral(NumberLiteralKind { value: 0 }), lexeme: "0", start: 15 }, value: Value::Integer(0) }));
+                    assert_matches!(assignment.expression.kind, SyntaxNodeKind::Literal(LiteralNodeKind { token: SyntaxToken { kind: SyntaxTokenKind::NumberLiteral, lexeme: "0", start: 15 }, value: Value::Integer(0) }));
                 })
             })
         });

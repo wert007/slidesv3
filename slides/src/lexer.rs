@@ -159,7 +159,6 @@ pub fn lex<'a>(
                         result.push_back(SyntaxToken::number_literal(
                             start.char_index,
                             &text[start.byte_index..byte_index],
-                            diagnostic_bag,
                         ));
                         continue 'start;
                     }
@@ -230,7 +229,6 @@ pub fn lex<'a>(
             result.push_back(SyntaxToken::number_literal(
                 start.char_index,
                 &text[start.byte_index..],
-                diagnostic_bag,
             ));
         }
         State::String(start, string_state) => {
