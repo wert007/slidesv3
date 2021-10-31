@@ -309,6 +309,22 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_unnecessary_cast(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
+        let from_type = self.type_to_name(from_type);
+        let cast_return_type = self.type_to_name(&Type::noneable(to_type.clone()));
+        let to_type = self.type_to_name(to_type);
+        let message = format!("No cast necessary between types {} and {}. Remove the unnecessary cast. Note, that cast will return {}.", from_type, to_type, cast_return_type);
+        self.report(message, span);
+    }
+
+    pub fn report_impossible_cast(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
+        let from_type = self.type_to_name(from_type);
+        let cast_return_type = self.type_to_name(&Type::noneable(to_type.clone()));
+        let to_type = self.type_to_name(to_type);
+        let message = format!("No cast possible between types {} and {}. Note, that cast will return {}.", from_type, to_type, cast_return_type);
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(

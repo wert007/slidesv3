@@ -53,6 +53,15 @@ impl Type {
         }
     }
 
+    pub fn can_be_casted_to(&self, other: &Type) -> bool {
+        match (self, other) {
+            (a, b) if a == b => false,
+            (Type::Any, _) => true,
+            (Type::Noneable(base_type), other) => base_type.can_be_converted_to(other),
+            _ => false,
+        }
+    }
+
     pub fn array_base_type(&self) -> Option<&Type> {
         if let Self::Array(v) = self {
             Some(v)

@@ -936,9 +936,20 @@ fn bind_cast_expression<'a>(
 ) -> BoundNode<'a> {
     let expression = bind_node(*cast_expression.expression, binder);
     let type_ = bind_type(cast_expression.type_, binder);
-    // TODO: Check if expression.type_ can be casted to type_ and throw error if
-    // not!
+    // Cast unnecessary and will always return a valid value.
+    if expression.type_.can_be_converted_to(&type_) {
+        binder.diagnostic_bag.report_unnecessary_cast(span, &expression.type_, &type_);
+        return bind_conversion(expression, &type_, binder);
+    }
+    if !expression.type_.can_be_casted_to(&type_) {
+        binder.diagnostic_bag.report_impossible_cast(span, &expression.type_, &type_);
+        return BoundNode::error(span);
+    }
     let type_ = Type::noneable(type_);
+    if expression.type_.can_be_converted_to(&type_) {
+        binder.diagnostic_bag.report_unnecessary_cast(span, &expression.type_, type_.noneable_base_type().unwrap());
+        return bind_conversion(expression, &type_, binder);
+    }
     BoundNode::conversion(span, expression, type_)
 }
 
