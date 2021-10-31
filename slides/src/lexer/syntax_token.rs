@@ -180,14 +180,6 @@ impl SyntaxTokenKind {
         )
     }
 
-    pub fn default_number_literal() -> Self {
-        SyntaxTokenKind::NumberLiteral
-    }
-
-    pub fn default_string_literal() -> Self {
-        SyntaxTokenKind::StringLiteral
-    }
-
     pub fn keyword(identifier: &str) -> Option<Self> {
         match identifier {
             "cast" => Some(Self::CastKeyword),

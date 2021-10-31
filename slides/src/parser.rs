@@ -503,7 +503,7 @@ fn parse_primary<'a>(
             diagnostic_bag.report_unexpected_token_kind(
                 span,
                 unexpected_token,
-                SyntaxTokenKind::default_number_literal(),
+                SyntaxTokenKind::NumberLiteral,
             );
             // next_token(tokens);
             SyntaxNode::error(span.start())
