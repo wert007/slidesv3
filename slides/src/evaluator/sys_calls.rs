@@ -66,7 +66,7 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64) 
             };
             (Type::function(FunctionType::function(parameter_types, this_type, return_type)), address)
         }
-        _ => unreachable!(),
+        error => unreachable!("Found Type Identifier Kind {}", error),
     }
 }
 
