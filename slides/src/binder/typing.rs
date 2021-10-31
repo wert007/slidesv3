@@ -28,6 +28,10 @@ impl Type {
         Self::Array(Box::new(base_type))
     }
 
+    pub fn function(function_type: FunctionType) -> Self {
+        Self::Function(Box::new(function_type.into()))
+    }
+
     pub fn closure(base_function_type: FunctionType) -> Self {
         Self::Closure(Box::new(base_function_type.into()))
     }
@@ -320,6 +324,15 @@ impl FunctionType {
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
             },
+        }
+    }
+
+    pub fn function(parameter_types: Vec<Type>, this_type: Option<Type>, return_type: Type) -> Self {
+        Self {
+            parameter_types,
+            this_type,
+            return_type,
+            system_call_kind: None,
         }
     }
 }
