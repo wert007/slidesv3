@@ -23,6 +23,7 @@ impl fmt::Display for BoundUnaryOperator {
     }
 }
 
+#[derive(Debug)]
 pub struct BoundBinary {
     pub lhs: Type,
     pub op: BoundBinaryOperator,
