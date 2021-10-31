@@ -25,9 +25,9 @@ func main() {
     print([[1], [2], [3],]);
     print(print);
     print('Hello World!');
-    // TODO
     print(fib);
-    // let s : string? = 'This would always fail i think?';
-    // print(s);
+    let s : string? = 'Noneable strings work just fine';
+    print(s);
+    // TODO
     // print(new Person('John Doe', 32));
 }
