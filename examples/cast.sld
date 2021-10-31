@@ -14,8 +14,14 @@ func fuzzyAdd(value: int, add: any) -> int {
 
 func main() {
     let a : any = 42;
-    // print(a);
     print(cast a : int);
     print(cast a : bool);
     print(fuzzyAdd(23, a));
+    let b = 13;
+    // These are errors
+    // print(cast b : int);
+    // print(cast b : bool);
+    // let c : int? = none;
+    // This could have a better error message
+    // let d : int = cast c : int;
 }
