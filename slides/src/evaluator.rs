@@ -2,7 +2,7 @@ pub mod memory;
 mod sys_calls;
 
 use crate::{
-    binder::typing::{SystemCallKind, Type},
+    binder::typing::SystemCallKind,
     evaluator::memory::WORD_SIZE_IN_BYTES,
     instruction_converter::{
         instruction::{op_codes::OpCode, Instruction},
@@ -520,23 +520,17 @@ fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
 fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     let sys_call_kind = SystemCallKind::try_from_primitive(instruction.arg as u8).unwrap();
     let argument_count = state.stack.pop().unwrap_value() as usize;
-    let argument_count = argument_count / 2;
     let mut arguments = Vec::with_capacity(argument_count);
-    let mut types = Vec::with_capacity(argument_count);
 
     for _ in 0..argument_count {
-        let type_ = state.stack.pop().unwrap_value();
-        let type_ = Type::from_type_identifier(type_)
-            .unwrap_or_else(|| panic!("Invalid type identifier = {} | 0x{:x}", type_, type_));
-        types.push(type_);
         arguments.push(state.stack.pop());
     }
     match sys_call_kind {
-        SystemCallKind::Print => sys_calls::print(types.remove(0), arguments[0], state),
+        SystemCallKind::Print => sys_calls::print(arguments[0], state),
         SystemCallKind::ArrayLength => {
-            sys_calls::array_length(types.remove(0), arguments[0], state)
+            sys_calls::array_length(arguments[0], state)
         }
-        SystemCallKind::ToString => sys_calls::to_string(types.remove(0), arguments[0], state),
+        SystemCallKind::ToString => sys_calls::to_string(arguments[0], state),
         SystemCallKind::DebugHeapDump => sys_calls::heap_dump(arguments[0], state),
     }
 }

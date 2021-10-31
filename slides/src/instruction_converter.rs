@@ -446,32 +446,18 @@ fn convert_binary(
     }
     .span(span);
     let mut result = vec![];
-    let lhs_is_string = matches!(binary.lhs.type_, Type::String);
-    let lhs_type_identifier = binary.lhs.type_.type_identifier();
     result.append(&mut convert_node(*binary.lhs, converter));
-    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !lhs_is_string {
-        result.push(
-            Instruction::type_identifier(lhs_type_identifier)
-                .span(span)
-                .into(),
-        );
-        result.push(Instruction::load_immediate(2).span(span).into());
+    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) {
+        result.push(Instruction::load_immediate(1).span(span).into());
         result.push(
             Instruction::system_call(SystemCallKind::ToString)
                 .span(span)
                 .into(),
         );
     }
-    let rhs_is_string = matches!(binary.rhs.type_, Type::String);
-    let rhs_type_identifier = binary.rhs.type_.type_identifier();
     result.append(&mut convert_node(*binary.rhs, converter));
-    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) && !rhs_is_string {
-        result.push(
-            Instruction::type_identifier(rhs_type_identifier)
-                .span(span)
-                .into(),
-        );
-        result.push(Instruction::load_immediate(2).span(span).into());
+    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) {
+        result.push(Instruction::load_immediate(1).span(span).into());
         result.push(
             Instruction::system_call(SystemCallKind::ToString)
                 .span(span)
@@ -546,16 +532,10 @@ fn convert_system_call(
             };
 
             for argument in system_call.arguments {
-                let type_identifier = argument.type_.type_identifier();
                 result.append(&mut convert_node(argument, converter));
-                result.push(
-                    Instruction::type_identifier(type_identifier)
-                        .span(span)
-                        .into(),
-                );
             }
             result.push(
-                Instruction::load_immediate(argument_count * 2)
+                Instruction::load_immediate(argument_count)
                     .span(span)
                     .into(),
             );
@@ -576,17 +556,11 @@ fn convert_array_length_system_call(
     let mut result = vec![];
     let base = system_call.arguments.pop().unwrap();
     let is_closure = matches!(base.type_, Type::Closure(_));
-    let type_identifier = base.type_.type_identifier();
     result.append(&mut convert_node(base, converter));
     if is_closure {
-        result.push(Instruction::decode_closure(2, false).span(span).into());
+        result.push(Instruction::decode_closure(1, false).span(span).into());
     } else {
-        result.push(
-            Instruction::type_identifier(type_identifier)
-                .span(span)
-                .into(),
-        );
-        result.push(Instruction::load_immediate(2).span(span).into());
+        result.push(Instruction::load_immediate(1).span(span).into());
     }
 
     result.push(Instruction::system_call(system_call.base).span(span).into());
@@ -639,21 +613,13 @@ fn convert_closure(
     let arguments = closure.arguments();
     let is_system_call = matches!(closure.function, FunctionKind::SystemCall(_));
     let size_in_words = if is_system_call {
-        arguments.len() * 2
+        arguments.len()
     } else {
         1 + arguments.len()
     } as u64;
     let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
 
     for argument in arguments.into_iter().rev() {
-        if is_system_call {
-            let type_identifier = argument.type_.type_identifier();
-            result.push(
-                Instruction::type_identifier(type_identifier)
-                    .span(argument.span)
-                    .into(),
-            );
-        }
         result.append(&mut convert_node(argument, converter));
     }
     match closure.function {

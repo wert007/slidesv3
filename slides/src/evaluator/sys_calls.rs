@@ -2,12 +2,12 @@ use crate::{binder::typing::Type, evaluator::memory::bytes_to_word};
 
 use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 
-pub fn print(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
-    println!("{}", to_string_native(type_, argument, state));
+pub fn print(argument: FlaggedWord, state: &mut EvaluatorState) {
+    println!("{}", to_string_native(Type::Any, argument, state));
 }
 
-pub fn to_string(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
-    let string = to_string_native(type_, argument, state);
+pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
+    let string = to_string_native(Type::Any, argument, state);
     let string_length = string.len() as u64;
     let mut pointer = state.heap.allocate(WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
@@ -141,7 +141,8 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
     String::from_utf8_lossy(&string_buffer).into_owned()
 }
 
-pub fn array_length(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) {
+pub fn array_length(argument: FlaggedWord, state: &mut EvaluatorState) {
+    let type_ = Type::Any;
     let array_start = argument.unwrap_pointer();
     let pointer = state.read_pointer(array_start).unwrap_value();
 
