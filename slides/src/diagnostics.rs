@@ -333,6 +333,16 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn _report_only_function_call_in_import_statement(&mut self, span: TextSpan) {
+        let message = "Only function calls like lib('path/to/lib.sld') are valid in import statements.".into();
+        self.report(message, span);
+    }
+
+    pub fn _report_unknown_import_function(&mut self, span: TextSpan, function_name: &str) {
+        let message = format!("No function named {} found for imports. Use lib('path/to/lib.sld') instead.", function_name);
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(
