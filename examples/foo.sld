@@ -1,7 +1,8 @@
 import lib('mylib') as mylib;
 
 func main() {
-    mylib.sayHello('World!');
+    // mylib.sayHello('World!');
+    print(mylib);
 }
 // func main() {
 //     let array : int[] = 5..9;

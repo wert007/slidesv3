@@ -1,4 +1,4 @@
-use crate::{DebugFlags, diagnostics::DiagnosticBag, parser::{self, syntax_nodes::{CompilationUnitNodeKind, ImportStatementNodeKind, SyntaxNode, SyntaxNodeKind}}, text::SourceText};
+use crate::{DebugFlags, diagnostics::DiagnosticBag, parser::{self, syntax_nodes::{CompilationUnitNodeKind, FunctionCallNodeKind, ImportStatementNodeKind, SyntaxNode, SyntaxNodeKind}}, text::{SourceText, TextSpan}};
 
 pub fn resolve<'a>(source_text: &'a SourceText<'a>, diagnostic_bag: &mut DiagnosticBag<'a>, debug_flags: DebugFlags) -> SyntaxNode<'a> {
     let compilation_unit = parser::parse(source_text, diagnostic_bag, debug_flags);
@@ -20,14 +20,44 @@ fn resolve_compilation_unit<'a>(compilation_unit: CompilationUnitNodeKind<'a>, d
 
 fn resolve_node<'a>(statement: SyntaxNode<'a>, diagnostic_bag: &mut DiagnosticBag) -> SyntaxNode<'a> {
     match statement.kind {
-        SyntaxNodeKind::ImportStatement(import_statement) => resolve_import_statement(import_statement, diagnostic_bag),
+        SyntaxNodeKind::ImportStatement(import_statement) => resolve_import_statement(statement.span, import_statement, diagnostic_bag),
         _ => statement,
     }
 }
 
-fn resolve_import_statement<'a>(_import_statement: ImportStatementNodeKind<'a>, _diagnostic_bag: &mut DiagnosticBag) -> SyntaxNode<'a> {
+fn resolve_import_statement<'a>(span: TextSpan, import_statement: ImportStatementNodeKind<'a>, diagnostic_bag: &mut DiagnosticBag) -> SyntaxNode<'a> {
     // Collect library name and also resolve that library.
-    todo!()
+    let initializer = if let SyntaxNodeKind::FunctionCall(function_call) = import_statement.function.kind {
+        evaluate_import_function(import_statement.function.span, function_call, diagnostic_bag)
+    } else {
+        diagnostic_bag._report_only_function_call_in_import_statement(import_statement.function.span);
+        SyntaxNode::error(import_statement.function.span.start())
+    };
+    SyntaxNode::generated_const_declaration(span, import_statement.identifier, initializer)
+}
+
+fn evaluate_import_function<'a>(span: TextSpan, mut function_call: FunctionCallNodeKind<'a>, diagnostic_bag: &mut DiagnosticBag) -> SyntaxNode<'a> {
+    let argument_span = function_call.argument_span();
+    let function_name = if let SyntaxNodeKind::Variable(variable) = function_call.base.kind {
+        variable.token.lexeme
+    } else {
+        diagnostic_bag.report_expected_constant(function_call.base.span);
+        return SyntaxNode::error(function_call.base.span.start());
+    };
+    match function_name {
+        "lib" => {
+            if function_call.arguments.len() != 1 {
+                diagnostic_bag.report_unexpected_argument_count(argument_span, function_call.arguments.len(), 1);
+                SyntaxNode::error(span.start())
+            } else {
+                function_call.arguments.pop().unwrap()
+            }
+        }
+        unknown => {
+            diagnostic_bag._report_unknown_import_function(span, unknown);
+            SyntaxNode::error(span.start())
+        }
+    }
 }
 
 
