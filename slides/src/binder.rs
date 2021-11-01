@@ -168,6 +168,8 @@ struct BindingState<'a, 'b> {
     /// This collects all the structs, which fields still need to be bound by the
     /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody<'a>>,
+    /// This is a simple hack to bring constants into the binder.
+    constants: Vec<Value>,
     /// These safe nodes are the nodes which are normally of a noneable type, but
     /// are currently be known to have an actual value and not be none. Next to
     /// the actual safe node is its safe type stored, which it should be
@@ -302,6 +304,13 @@ impl<'a> BindingState<'a, '_> {
             });
             Some(index)
         }
+    }
+
+    fn register_constant(&mut self, variable_index: u64, value: Value) {
+        while self.constants.len() <= variable_index as _ {
+            self.constants.push(Value::None);
+        }
+        self.constants[variable_index as usize] = value;
     }
 
     fn register_safe_node(&mut self, node: BoundNode<'a>, safe_type: Type) -> usize {
@@ -474,6 +483,7 @@ pub fn bind<'a>(
         struct_table: vec![],
         functions: vec![],
         structs: vec![],
+        constants: vec![],
         safe_nodes: vec![],
         print_variable_table: debug_flags.print_variable_table(),
         max_used_variables: 0,
@@ -484,6 +494,9 @@ pub fn bind<'a>(
     let span = node.span();
     let mut statements = default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
+    for (index, constant) in binder.constants.iter().enumerate() {
+        statements.push(BoundNode::assignment(TextSpan::zero(), BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()), BoundNode::literal_from_value(constant.clone())));
+    }
     statements.push(call_main(&mut binder));
 
     for node in binder.structs.clone() {
@@ -622,6 +635,9 @@ fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingS
 
 fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
     match node.kind {
+        SyntaxNodeKind::ConstDeclaration(const_declaration) => {
+            bind_const_declaration(const_declaration, binder)
+        }
         SyntaxNodeKind::ImportStatement(_) => {
             unreachable!("Imports should be resolved by dependency_resolver!");
         }
@@ -637,6 +653,26 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
                 .report_invalid_top_level_statement(node.span(), node.kind);
         }
     }
+}
+
+fn bind_const_declaration<'a>(
+    const_declaration: ConstDeclarationNodeKind<'a>,
+    binder: &mut BindingState<'a, '_>,
+) {
+    let initializer = bind_node(*const_declaration.initializer, binder);
+    let index = binder.register_variable(const_declaration.identifier.lexeme, initializer.type_.clone(), true);
+    let index = if let Some(it) = index {
+        it
+    } else {
+        binder.diagnostic_bag.report_cannot_declare_variable(const_declaration.identifier.span(), const_declaration.identifier.lexeme);
+        return;
+    };
+    if let Some(constant_value) = initializer.constant_value {
+        binder.register_constant(index, constant_value.value);
+    } else {
+        binder.diagnostic_bag.report_expected_constant(initializer.span);
+    }
+
 }
 
 fn bind_function_declaration<'a, 'b>(
