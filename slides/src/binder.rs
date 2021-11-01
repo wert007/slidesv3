@@ -7,31 +7,11 @@ pub mod typing;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use crate::{
-    binder::{
+use crate::{DebugFlags, binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    },
-    diagnostics::DiagnosticBag,
-    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    parser::{
-        self,
-        syntax_nodes::{
-            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
-            BlockStatementNodeKind, CastExpressionNodeKind, ConstructorCallNodeKind,
-            ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind,
-            FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode,
-            IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind,
-            ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode,
-            SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind,
-            WhileStatementNodeKind,
-        },
-    },
-    text::{SourceText, TextSpan},
-    value::Value,
-    DebugFlags,
-};
+    }, dependency_resolver, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, CastExpressionNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
 use self::{
     bound_nodes::BoundNode,
@@ -483,7 +463,7 @@ pub fn bind<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundProgram<'a> {
-    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
+    let node = dependency_resolver::resolve(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return BoundProgram::error();
     }
@@ -636,20 +616,15 @@ fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingS
                 bind_top_level_statement(statement, binder);
             }
         }
-        SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
-            bind_function_declaration(*function_declaration, binder)
-        }
-        SyntaxNodeKind::StructDeclaration(struct_declaration) => {
-            bind_struct_declaration(struct_declaration, binder)
-        }
-        _ => binder
-            .diagnostic_bag
-            .report_invalid_top_level_statement(node.span(), node.kind),
+        _ => unreachable!(),
     }
 }
 
 fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
     match node.kind {
+        SyntaxNodeKind::ImportStatement(_) => {
+            unreachable!("Imports should be resolved by dependency_resolver!");
+        }
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(*function_declaration, binder)
         }
