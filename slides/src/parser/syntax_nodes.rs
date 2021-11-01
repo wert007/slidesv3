@@ -37,6 +37,27 @@ impl<'a> SyntaxNode<'a> {
         result
     }
 
+    pub fn import_statement(
+        import_keyword: SyntaxToken<'a>,
+        expression: SyntaxNode<'a>,
+        as_keyword: SyntaxToken<'a>,
+        identifier: SyntaxToken<'a>,
+        semicolon_token: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(import_keyword.span(), semicolon_token.span());
+        Self {
+            span,
+            kind: SyntaxNodeKind::ImportStatement(ImportStatementNodeKind {
+                import_keyword,
+                function: Box::new(expression),
+                as_keyword,
+                identifier,
+                semicolon_token,
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn function_declaration(
         func_keyword: SyntaxToken<'a>,
         identifier: SyntaxToken<'a>,
@@ -477,6 +498,7 @@ impl<'a> SyntaxNode<'a> {
 pub enum SyntaxNodeKind<'a> {
     // Top Level Statements
     CompilationUnit(CompilationUnitNodeKind<'a>),
+    ImportStatement(ImportStatementNodeKind<'a>),
     FunctionDeclaration(Box<FunctionDeclarationNodeKind<'a>>),
     StructDeclaration(StructDeclarationNodeKind<'a>),
 
@@ -521,6 +543,15 @@ impl SyntaxNodeKind<'_> {
 pub struct CompilationUnitNodeKind<'a> {
     pub statements: Vec<SyntaxNode<'a>>,
     pub eoi: SyntaxToken<'a>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportStatementNodeKind<'a> {
+    pub import_keyword: SyntaxToken<'a>,
+    pub function: Box<SyntaxNode<'a>>,
+    pub as_keyword: SyntaxToken<'a>,
+    pub identifier: SyntaxToken<'a>,
+    pub semicolon_token: SyntaxToken<'a>,
 }
 
 #[derive(Debug, Clone)]

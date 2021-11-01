@@ -93,6 +93,7 @@ fn parse_compilation_unit<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
 
 fn parse_top_level_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     match parser.peek_token().kind {
+        SyntaxTokenKind::ImportKeyword => parse_import_statement(parser),
         SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
         SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
         _ => {
@@ -106,6 +107,17 @@ fn parse_top_level_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> 
             SyntaxNode::error(span.start())
         }
     }
+}
+
+fn parse_import_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+    let import_keyword = parser.match_token(SyntaxTokenKind::ImportKeyword);
+    // This currently, and probably always, can only be a function call.
+    let expression = parse_function_call(parser);
+    let as_keyword = parser.match_token(SyntaxTokenKind::AsKeyword);
+    let identifier = parser.match_token(SyntaxTokenKind::Identifier);
+    let semicolon_token = parser.match_token(SyntaxTokenKind::Semicolon);
+
+    SyntaxNode::import_statement(import_keyword, expression, as_keyword, identifier, semicolon_token)
 }
 
 fn parse_function_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
