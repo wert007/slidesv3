@@ -11,7 +11,7 @@ use crate::{DebugFlags, binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    }, dependency_resolver, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, CastExpressionNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+    }, dependency_resolver, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, CastExpressionNodeKind, ConstDeclarationNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
 
 use self::{
     bound_nodes::BoundNode,
@@ -120,80 +120,80 @@ impl<'a> BoundStructType<'a> {
 }
 
 struct BindingState<'a, 'b> {
-    // The diagnostic bag collects all errors the user supplied code has. They
-    // will be outputted after the stage they first occurred. So if there are
-    // type conversion errors, the compiler will not try to turn the bound
-    // program into instructions.
+    /// The diagnostic bag collects all errors the user supplied code has. They
+    /// will be outputted after the stage they first occurred. So if there are
+    /// type conversion errors, the compiler will not try to turn the bound
+    /// program into instructions.
     diagnostic_bag: &'b mut DiagnosticBag<'a>,
-    // Every variable is turned into an variable index by the binder, since
-    // variables are turned into registers and those are accessed by indices.
-    // The table stores the index as index of the vector, the name of the
-    // variable, the type it has and if it is read only, which means it cannot
-    // be on the left side of an assignment.
+    /// Every variable is turned into an variable index by the binder, since
+    /// variables are turned into registers and those are accessed by indices.
+    /// The table stores the index as index of the vector, the name of the
+    /// variable, the type it has and if it is read only, which means it cannot
+    /// be on the left side of an assignment.
     variable_table: Vec<BoundVariableName<'a>>,
-    // Every (struct) type is also turned into a type index by the binder. This
-    // allows for binding recursive structs, since they only held references to
-    // other structs, the type of the field should also be only a reference to
-    // the other type of the struct. Also contains primitive types, since the
-    // type table is used to look up a type by its name. The type table is also
-    // used by the diagnostic bag to pretty print the type names, since the Type
-    // enum can/should not contain strings. Is read only is always set to true,
-    // but is actually not really read from, since trying to assign to a type
-    // would already be a whole lot of other errors in the user supplied
-    // program.
+    /// Every (struct) type is also turned into a type index by the binder. This
+    /// allows for binding recursive structs, since they only held references to
+    /// other structs, the type of the field should also be only a reference to
+    /// the other type of the struct. Also contains primitive types, since the
+    /// type table is used to look up a type by its name. The type table is also
+    /// used by the diagnostic bag to pretty print the type names, since the Type
+    /// enum can/should not contain strings. Is read only is always set to true,
+    /// but is actually not really read from, since trying to assign to a type
+    /// would already be a whole lot of other errors in the user supplied
+    /// program.
     type_table: Vec<BoundVariableName<'a>>,
-    // When registering a type for the type table, it is also registered in the
-    // struct table if it is a struct. The struct table is used to access field
-    // information on a struct. Since the type of a struct only has the types of
-    // the fields and their offset into the struct it cannot be used to check if
-    // a struct has a field with a certain name. This is what this is used for.
-    // So this is used by constructors or field accesses. Fields can also be
-    // read only, even though this is currently (12.10.2021) only used for
-    // functions on structs since they are also fields in some way. But
-    // functions on structs are still registered in the functions table.
+    /// When registering a type for the type table, it is also registered in the
+    /// struct table if it is a struct. The struct table is used to access field
+    /// information on a struct. Since the type of a struct only has the types of
+    /// the fields and their offset into the struct it cannot be used to check if
+    /// a struct has a field with a certain name. This is what this is used for.
+    /// So this is used by constructors or field accesses. Fields can also be
+    /// read only, even though this is currently (12.10.2021) only used for
+    /// functions on structs since they are also fields in some way. But
+    /// functions on structs are still registered in the functions table.
     struct_table: Vec<BoundStructType<'a>>,
-    // This contains all function declarations the binder found while walking
-    // the top level statements and after that the struct fields. The function
-    // declaration body contains the necessary information for the function
-    // signature, like the name, the paremeters (but the name of a paremeter is
-    // not part of the signature) and the return type (but also not really part
-    // of the signature, it is only needed to bind a function call, before the
-    // binder knows, what the function does and returns.). The body is needed to
-    // later bind the function, if all types and functions are known. The
-    // function id is equal to the variable index of the function, since all
-    // functions are just stored in variables, and the function type is the type
-    // of the variable. Is struct and is main is used in some places to
-    // differentiate them.
+    /// This contains all function declarations the binder found while walking
+    /// the top level statements and after that the struct fields. The function
+    /// declaration body contains the necessary information for the function
+    /// signature, like the name, the paremeters (but the name of a paremeter is
+    /// not part of the signature) and the return type (but also not really part
+    /// of the signature, it is only needed to bind a function call, before the
+    /// binder knows, what the function does and returns.). The body is needed to
+    /// later bind the function, if all types and functions are known. The
+    /// function id is equal to the variable index of the function, since all
+    /// functions are just stored in variables, and the function type is the type
+    /// of the variable. Is struct and is main is used in some places to
+    /// differentiate them.
     functions: Vec<FunctionDeclarationBody<'a>>,
-    // This collects all the structs, which fields still need to be bound by the
-    // binder. This should be empty, before starting to bind the functions.
+    /// This collects all the structs, which fields still need to be bound by the
+    /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody<'a>>,
-    // These safe nodes are the nodes which are normally of a noneable type, but
-    // are currently be known to have an actual value and not be none. Next to
-    // the actual safe node is its safe type stored, which it should be
-    // converted to, when found in the program. This is a vector of option,
-    // since they are accessed by an index, but also can be unsafe, in a
-    // different order, then they went safe. So if you would remove a unsafe
-    // node in the middle of the vector, the indices of all following nodes
-    // would be wrong now. So this is why this is used in a vector. This may
-    // also be done in a HashMap, but finding the next index would be harder
-    // then, I think.
+    /// These safe nodes are the nodes which are normally of a noneable type, but
+    /// are currently be known to have an actual value and not be none. Next to
+    /// the actual safe node is its safe type stored, which it should be
+    /// converted to, when found in the program. This is a vector of option,
+    /// since they are accessed by an index, but also can be unsafe, in a
+    /// different order, then they went safe. So if you would remove a unsafe
+    /// node in the middle of the vector, the indices of all following nodes
+    /// would be wrong now. So this is why this is used in a vector. This may
+    /// also be done in a HashMap, but finding the next index would be harder
+    /// then, I think.
     safe_nodes: Vec<Option<(BoundNode<'a>, Type)>>,
-    // This is the debug flag. This will print all variable names and their
-    // indices, when ever some go out of scope. (Self::delete_variables_until())
+    /// This is the debug flag. This will print all variable names and their
+    /// indices, when ever some go out of scope. (Self::delete_variables_until())
     print_variable_table: bool,
-    // This is used to preallocate the registers.
+    /// This is used to preallocate the registers.
     max_used_variables: usize,
-    // The return type of the current function. Is Type::Error if not in a
-    // function. This is needed by return statements to ensure they return the
-    // correct value.
+    /// The return type of the current function. Is Type::Error if not in a
+    /// function. This is needed by return statements to ensure they return the
+    /// correct value.
     function_return_type: Type,
-    // This is used to reserve a this variable inside the function.
+    /// This is used to reserve a this variable inside the function.
     is_struct_function: bool,
-    // The type the current expression is expected to have. This is only used in
-    // bind_array_literal, to convert each expression inside the array literal
-    // to the right type. Everywhere else the expression is converted
-    // afterwards.
+    /// The type the current expression is expected to have. This is only used in
+    /// bind_array_literal, to convert each expression inside the array literal
+    /// to the right type. Everywhere else the expression is converted
+    /// afterwards.
     expected_type: Option<Type>,
 }
 
