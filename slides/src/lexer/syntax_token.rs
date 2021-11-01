@@ -129,6 +129,7 @@ pub enum SyntaxTokenKind {
     // Keywords
     AsKeyword,
     CastKeyword,
+    ConstKeyword,
     ElseKeyword,
     FalseKeyword,
     ForKeyword,
@@ -180,6 +181,7 @@ impl SyntaxTokenKind {
         match identifier {
             "as" => Some(Self::AsKeyword),
             "cast" => Some(Self::CastKeyword),
+            "const" => Some(Self::ConstKeyword),
             "else" => Some(Self::ElseKeyword),
             "false" => Some(Self::FalseKeyword),
             "for" => Some(Self::ForKeyword),
@@ -270,6 +272,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::Identifier => write!(f, "Identifier"),
             SyntaxTokenKind::AsKeyword => write!(f, "as"),
             SyntaxTokenKind::CastKeyword => write!(f, "cast"),
+            SyntaxTokenKind::ConstKeyword => write!(f, "const"),
             SyntaxTokenKind::ElseKeyword => write!(f, "else"),
             SyntaxTokenKind::FalseKeyword => write!(f, "false"),
             SyntaxTokenKind::ForKeyword => write!(f, "for"),
