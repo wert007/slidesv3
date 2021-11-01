@@ -27,6 +27,14 @@ impl Value {
         }
     }
 
+    pub fn as_string(&self) -> Option<&str> {
+        if let Self::String(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     pub fn infer_type(&self) -> Type {
         match self {
             Value::Integer(_) => Type::Integer,
