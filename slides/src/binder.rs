@@ -168,6 +168,12 @@ struct BindingState<'a, 'b> {
     /// This collects all the structs, which fields still need to be bound by the
     /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody<'a>>,
+    /// This collects all imports, which are not executed yet. This should be
+    /// emptyy, before starting to bind structs or functions.
+    ///
+    /// This is going to need more information, like the constant in which the
+    /// resolved value should be written. This will come later.
+    imports: Vec<ImportFunction>,
     /// This is a simple hack to bring constants into the binder.
     constants: Vec<Value>,
     /// These safe nodes are the nodes which are normally of a noneable type, but
@@ -483,6 +489,7 @@ pub fn bind<'a>(
         struct_table: vec![],
         functions: vec![],
         structs: vec![],
+        imports: vec![],
         constants: vec![],
         safe_nodes: vec![],
         print_variable_table: debug_flags.print_variable_table(),
@@ -498,6 +505,10 @@ pub fn bind<'a>(
         statements.push(BoundNode::assignment(TextSpan::zero(), BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()), BoundNode::literal_from_value(constant.clone())));
     }
     statements.push(call_main(&mut binder));
+
+    for import in binder.imports.clone() {
+        execute_import_function(import, &mut binder);
+    }
 
     for node in binder.structs.clone() {
         let fields = bind_struct_body(node.name, node.body, &mut binder);
@@ -585,6 +596,15 @@ pub fn bind<'a>(
     }
 }
 
+fn execute_import_function(import: ImportFunction, binder: &mut BindingState) {
+    match import {
+        ImportFunction::Library(library) => {
+            let directory = PathBuf::from(binder.directory);
+            crate::load_library_from_path(directory.join(library.path).with_extension("sld"));
+        },
+    }
+}
+
 fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {
     let span = TextSpan::zero();
     let variable_index = binder
@@ -638,11 +658,11 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
         SyntaxNodeKind::ConstDeclaration(const_declaration) => {
             bind_const_declaration(const_declaration, binder)
         }
-        SyntaxNodeKind::ImportStatement(_) => {
-            unreachable!("Imports should be resolved by dependency_resolver!");
-        }
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(*function_declaration, binder)
+        }
+        SyntaxNodeKind::ImportStatement(import_statement) => {
+            bind_import_statement(import_statement, binder)
         }
         SyntaxNodeKind::StructDeclaration(struct_declaration) => {
             bind_struct_declaration(struct_declaration, binder)
@@ -747,6 +767,69 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         name: function_declaration.identifier.lexeme,
         type_,
         is_read_only: true,
+    }
+}
+
+fn bind_import_statement<'a>(
+    import_statement: ImportStatementNodeKind<'a>,
+    binder: &mut BindingState<'a, '_>,
+) {
+    let import_function = if let Some(it) = bind_import_function(*import_statement.function, binder)
+    {
+        it
+    } else {
+        return;
+    };
+    binder.imports.push(import_function);
+}
+
+fn bind_import_function<'a>(
+    function: SyntaxNode<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> Option<ImportFunction> {
+    let function_span = function.span;
+    if let SyntaxNodeKind::FunctionCall(mut function) = function.kind {
+        if let SyntaxNodeKind::Variable(base) = function.base.kind {
+            match base.token.lexeme {
+                "lib" => {
+                    let path = function.arguments.pop();
+                    if path.is_none() {
+                        binder.diagnostic_bag.report_unexpected_argument_count(function_span, 0, 1);
+                        return None;
+                    }
+                    let path = path.unwrap();
+                    let argument_span = path.span;
+                    let path = bind_node(path, binder);
+                    if path.constant_value.is_none() {
+                        binder.diagnostic_bag.report_expected_constant(path.span);
+                        return None;
+                    }
+                    let path = path.constant_value.unwrap().value;
+                    if path.as_string().is_none() {
+                        binder.diagnostic_bag.report_cannot_convert(argument_span, &path.infer_type(), &Type::String);
+                        return None;
+                    }
+                    let path = path.as_string()?.into();
+                    Some(ImportFunction::Library(ImportLibraryFunction { path }))
+                }
+                function_name => {
+                    binder
+                        .diagnostic_bag
+                        ._report_unknown_import_function(base.token.span(), function_name);
+                    None
+                }
+            }
+        } else {
+            binder
+                .diagnostic_bag
+                ._report_only_function_call_in_import_statement(function.base.span);
+            None
+        }
+    } else {
+        binder
+            .diagnostic_bag
+            ._report_only_function_call_in_import_statement(function.span);
+        None
     }
 }
 
