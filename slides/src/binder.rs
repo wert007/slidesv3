@@ -7,11 +7,34 @@ pub mod typing;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use crate::{DebugFlags, binder::{
+use std::path::PathBuf;
+
+use crate::{
+    binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    }, dependency_resolver, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{syntax_nodes::{ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind, BlockStatementNodeKind, CastExpressionNodeKind, ConstDeclarationNodeKind, ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind, ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind, FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode, StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind, VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind}}, text::{SourceText, TextSpan}, value::Value};
+    },
+    dependency_resolver::{ImportFunction, ImportLibraryFunction},
+    diagnostics::DiagnosticBag,
+    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    parser::{
+        self,
+        syntax_nodes::{
+            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
+            BlockStatementNodeKind, CastExpressionNodeKind, ConstDeclarationNodeKind,
+            ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
+            ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
+            FunctionTypeNode, IfStatementNodeKind, ImportStatementNodeKind, LiteralNodeKind,
+            ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode,
+            StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
+            VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
+        },
+    },
+    text::{SourceText, TextSpan},
+    value::Value,
+    DebugFlags,
+};
 
 use self::{
     bound_nodes::BoundNode,
@@ -507,7 +530,11 @@ pub fn bind<'a>(
     let mut statements = default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     for (index, constant) in binder.constants.iter().enumerate() {
-        statements.push(BoundNode::assignment(TextSpan::zero(), BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()), BoundNode::literal_from_value(constant.clone())));
+        statements.push(BoundNode::assignment(
+            TextSpan::zero(),
+            BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()),
+            BoundNode::literal_from_value(constant.clone()),
+        ));
     }
     if !is_library {
         statements.push(call_main(&mut binder));
@@ -687,19 +714,27 @@ fn bind_const_declaration<'a>(
     binder: &mut BindingState<'a, '_>,
 ) {
     let initializer = bind_node(*const_declaration.initializer, binder);
-    let index = binder.register_variable(const_declaration.identifier.lexeme, initializer.type_.clone(), true);
+    let index = binder.register_variable(
+        const_declaration.identifier.lexeme,
+        initializer.type_.clone(),
+        true,
+    );
     let index = if let Some(it) = index {
         it
     } else {
-        binder.diagnostic_bag.report_cannot_declare_variable(const_declaration.identifier.span(), const_declaration.identifier.lexeme);
+        binder.diagnostic_bag.report_cannot_declare_variable(
+            const_declaration.identifier.span(),
+            const_declaration.identifier.lexeme,
+        );
         return;
     };
     if let Some(constant_value) = initializer.constant_value {
         binder.register_constant(index, constant_value.value);
     } else {
-        binder.diagnostic_bag.report_expected_constant(initializer.span);
+        binder
+            .diagnostic_bag
+            .report_expected_constant(initializer.span);
     }
-
 }
 
 fn bind_function_declaration<'a, 'b>(
@@ -1041,21 +1076,24 @@ fn bind_array_literal<'a, 'b>(
     let first_child = array_literal.children.remove(0);
     let (type_, mut children) = bind_array_literal_first_child(first_child, expected_type, binder);
     for child in array_literal.children {
-        let (child, repetition) = if let SyntaxNodeKind::RepetitionNode(repetition_node) = child.kind {
-            let base_expression = bind_node(*repetition_node.base_expression, binder);
-            let repetition = bind_node(*repetition_node.repetition, binder);
-            let repetition = bind_conversion(repetition, &Type::Integer, binder);
-            let repetition = match repetition.constant_value {
-                Some(value) => value.value.as_integer().unwrap(),
-                None => {
-                    binder.diagnostic_bag.report_expected_constant(repetition.span);
-                    1
-                },
-            } as usize;
-            (base_expression, repetition)
-        } else {
-            (bind_node(child, binder), 1)
-        };
+        let (child, repetition) =
+            if let SyntaxNodeKind::RepetitionNode(repetition_node) = child.kind {
+                let base_expression = bind_node(*repetition_node.base_expression, binder);
+                let repetition = bind_node(*repetition_node.repetition, binder);
+                let repetition = bind_conversion(repetition, &Type::Integer, binder);
+                let repetition = match repetition.constant_value {
+                    Some(value) => value.value.as_integer().unwrap(),
+                    None => {
+                        binder
+                            .diagnostic_bag
+                            .report_expected_constant(repetition.span);
+                        1
+                    }
+                } as usize;
+                (base_expression, repetition)
+            } else {
+                (bind_node(child, binder), 1)
+            };
         let child = bind_conversion(child, &type_, binder);
         for _ in 0..repetition {
             children.push(child.clone());
@@ -1064,7 +1102,11 @@ fn bind_array_literal<'a, 'b>(
     BoundNode::array_literal(span, children, Type::array(type_.clone()))
 }
 
-fn bind_array_literal_first_child<'a>(first_child: SyntaxNode<'a>, expected_type: Option<Type>, binder: &mut BindingState<'a, '_>) -> (Type, Vec<BoundNode<'a>>) {
+fn bind_array_literal_first_child<'a>(
+    first_child: SyntaxNode<'a>,
+    expected_type: Option<Type>,
+    binder: &mut BindingState<'a, '_>,
+) -> (Type, Vec<BoundNode<'a>>) {
     let children = if let SyntaxNodeKind::RepetitionNode(repetition_node) = first_child.kind {
         let base_expression = bind_node(*repetition_node.base_expression, binder);
         let repetition = bind_node(*repetition_node.repetition, binder);
@@ -1072,16 +1114,21 @@ fn bind_array_literal_first_child<'a>(first_child: SyntaxNode<'a>, expected_type
         let repetition = match repetition.constant_value {
             Some(value) => value.value.as_integer().unwrap(),
             None => {
-                binder.diagnostic_bag.report_expected_constant(repetition.span);
+                binder
+                    .diagnostic_bag
+                    .report_expected_constant(repetition.span);
                 1
-            },
+            }
         } as usize;
-        vec![base_expression;repetition]
+        vec![base_expression; repetition]
     } else {
         vec![bind_node(first_child, binder)]
     };
     let type_ = expected_type.unwrap_or(children[0].type_.clone());
-    let children = children.into_iter().map(|c| bind_conversion(c, &type_, binder)).collect();
+    let children = children
+        .into_iter()
+        .map(|c| bind_conversion(c, &type_, binder))
+        .collect();
     (type_, children)
 }
 
