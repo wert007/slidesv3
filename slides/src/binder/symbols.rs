@@ -1,9 +1,10 @@
-use crate::instruction_converter::Program;
+use crate::instruction_converter::{InstructionOrLabelReference, Program};
 
 use super::{FunctionDeclarationBody, typing::FunctionType};
 
 #[derive(Debug)]
 pub struct Library {
+    pub instructions: Vec<InstructionOrLabelReference>,
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
 }
@@ -11,6 +12,7 @@ pub struct Library {
 impl Library {
     pub fn error() -> Self {
         Self {
+            instructions: vec![],
             program: Program::error(),
             functions: vec![],
         }

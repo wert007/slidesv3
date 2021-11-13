@@ -171,6 +171,7 @@ pub fn convert_library<'a>(
         }
     }
     Library {
+        instructions,
         program: Program {
             instructions: vec![],
             stack: converter.stack,
