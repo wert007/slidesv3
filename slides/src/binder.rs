@@ -472,10 +472,10 @@ pub fn bind<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundProgram<'a> {
-    let node = dependency_resolver::resolve(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return BoundProgram::error();
     }
+    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     let mut binder = BindingState {
         diagnostic_bag,
         variable_table: vec![],
