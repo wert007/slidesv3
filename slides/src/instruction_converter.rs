@@ -17,13 +17,13 @@ use crate::{binder::{self, bound_nodes::{
 use self::instruction::Instruction;
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct LabelReference {
+pub struct LabelReference {
     label_reference: usize,
     span: TextSpan,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum InstructionOrLabelReference {
+pub enum InstructionOrLabelReference {
     Instruction(Instruction),
     LabelReference(LabelReference),
 }
@@ -71,6 +71,7 @@ impl InstructionConverter {
     }
 }
 
+#[derive(Debug)]
 pub struct Program {
     pub stack: Stack,
     pub instructions: Vec<Instruction>,
@@ -162,7 +163,7 @@ pub fn convert_library<'a>(
         }
     }
 
-    let instructions = label_replacer::replace_labels(instructions, debug_flags);
+    // let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.print_instructions() {
         for (i, instruction) in instructions.iter().enumerate() {
             println!("  {:000}: {:?}", i, instruction);
@@ -170,7 +171,7 @@ pub fn convert_library<'a>(
     }
     Library {
         program: Program {
-            instructions,
+            instructions: vec![],
             stack: converter.stack,
             max_used_variables: bound_program.max_used_variables,
             protected_variables: converter.fixed_variable_count,
