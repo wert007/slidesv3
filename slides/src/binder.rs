@@ -120,6 +120,9 @@ impl<'a> BoundStructType<'a> {
 }
 
 struct BindingState<'a, 'b> {
+    /// The directory, in which the current file relative or absolute to the
+    /// current executing program was.
+    directory: &'a str,
     /// The diagnostic bag collects all errors the user supplied code has. They
     /// will be outputted after the stage they first occurred. So if there are
     /// type conversion errors, the compiler will not try to turn the bound
@@ -483,6 +486,7 @@ pub fn bind<'a>(
     }
     let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     let mut binder = BindingState {
+        directory: source_text.directory(),
         diagnostic_bag,
         variable_table: vec![],
         type_table: type_table(),
