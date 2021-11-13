@@ -116,7 +116,46 @@ pub fn convert<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> Program {
-    let bound_program = binder::bind(source_text, diagnostic_bag, debug_flags);
+    let bound_program = binder::bind(source_text, diagnostic_bag, debug_flags, false);
+    if diagnostic_bag.has_errors() {
+        return Program::error();
+    }
+    let bound_node = bound_program.program;
+    let mut converter = InstructionConverter {
+        stack: Stack::new(debug_flags),
+        fixed_variable_count: bound_program.fixed_variable_count,
+        next_label_index: bound_program.label_count,
+    };
+    // Push Pointer to 0 with value 0
+    converter.stack.push(0);
+    let instructions = convert_node(bound_node, &mut converter);
+    if debug_flags.print_instructions_and_labels {
+        for (i, instruction) in instructions.iter().enumerate() {
+            println!("  {:000}: {}", i, instruction);
+        }
+    }
+
+    let instructions = label_replacer::replace_labels(instructions, debug_flags);
+    if debug_flags.print_instructions() {
+        for (i, instruction) in instructions.iter().enumerate() {
+            println!("  {:000}: {:?}", i, instruction);
+        }
+    }
+    Program {
+        instructions,
+        stack: converter.stack,
+        max_used_variables: bound_program.max_used_variables,
+        protected_variables: converter.fixed_variable_count,
+    }
+}
+
+
+pub fn convert_library<'a>(
+    source_text: &'a SourceText<'a>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+    debug_flags: DebugFlags,
+) -> Program {
+    let bound_program = binder::bind(source_text, diagnostic_bag, debug_flags, true);
     if diagnostic_bag.has_errors() {
         return Program::error();
     }

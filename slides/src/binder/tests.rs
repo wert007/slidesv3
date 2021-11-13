@@ -90,7 +90,7 @@ fn successful_binding() {
 fn bind_helper_expression(input: &str, callback: impl FnOnce(BoundNode)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
+    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default(), true);
     assert!(!diagnostic_bag.has_errors());
     let result = result.program;
     let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
@@ -102,7 +102,7 @@ fn bind_helper_expression(input: &str, callback: impl FnOnce(BoundNode)) {
 fn bind_helper(input: &str, callback: impl FnOnce(BoundNode)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
+    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default(), true);
     let result = result.program;
     let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
     let result = result[1].to_owned();
@@ -146,7 +146,7 @@ fn failed_binding() {
 fn bind_helper_errors(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnostic>)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
+    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default(), true);
     let result = result.program;
     let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
     let result = result[1].to_owned();
@@ -157,7 +157,7 @@ fn bind_helper_errors(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnost
 fn bind_helper_errors_expression(input: &str, callback: impl FnOnce(BoundNode, Vec<Diagnostic>)) {
     let source_text = SourceText::new(input, "");
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default());
+    let result = bind(&source_text, &mut diagnostic_bag, DebugFlags::default(), true);
     let result = result.program;
     let result = assert_matches!(result.kind, BoundNodeKind::BlockStatement(block_statement) => block_statement.statements);
     let result = result[1].to_owned();

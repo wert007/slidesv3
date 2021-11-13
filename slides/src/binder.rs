@@ -480,6 +480,7 @@ pub fn bind<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
+    is_library: bool,
 ) -> BoundProgram<'a> {
     if diagnostic_bag.has_errors() {
         return BoundProgram::error();
@@ -508,7 +509,9 @@ pub fn bind<'a>(
     for (index, constant) in binder.constants.iter().enumerate() {
         statements.push(BoundNode::assignment(TextSpan::zero(), BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()), BoundNode::literal_from_value(constant.clone())));
     }
-    statements.push(call_main(&mut binder));
+    if !is_library {
+        statements.push(call_main(&mut binder));
+    }
 
     for import in binder.imports.clone() {
         execute_import_function(import, &mut binder);
