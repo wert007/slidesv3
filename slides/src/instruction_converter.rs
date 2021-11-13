@@ -147,6 +147,7 @@ pub fn convert_library<'a>(
     if diagnostic_bag.has_errors() {
         return Library::error();
     }
+    let exported_functions = bound_program.exported_functions;
     let bound_program = bound_program.program;
     let bound_node = bound_program.program;
     let mut converter = InstructionConverter {
@@ -175,7 +176,8 @@ pub fn convert_library<'a>(
             stack: converter.stack,
             max_used_variables: bound_program.max_used_variables,
             protected_variables: converter.fixed_variable_count,
-        }
+        },
+        functions: exported_functions,
     }
 }
 

@@ -37,11 +37,7 @@ use crate::{
     DebugFlags,
 };
 
-use self::{
-    bound_nodes::BoundNode,
-    operators::BoundBinaryOperator,
-    typing::{FunctionType, StructType, SystemCallKind},
-};
+use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator, symbols::FunctionSymbol, typing::{FunctionType, StructType, SystemCallKind}};
 
 enum SmartString<'a> {
     Heap(String),
@@ -476,12 +472,14 @@ impl BoundProgram<'_> {
 
 pub struct BoundLibrary<'a> {
     pub program: BoundProgram<'a>,
+    pub exported_functions: Vec<FunctionSymbol>,
 }
 
 impl BoundLibrary<'_> {
     pub fn error() -> Self {
         Self {
             program: BoundProgram::error(),
+            exported_functions: vec![],
         }
     }
 }
@@ -764,7 +762,8 @@ pub fn bind_library<'a>(
                     fixed_variable_count,
                     max_used_variables: binder.max_used_variables,
                     label_count,
-                }
+                },
+        exported_functions: binder.functions.into_iter().map(Into::into).collect(),
     }
 }
 
