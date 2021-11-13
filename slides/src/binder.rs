@@ -3,6 +3,7 @@ pub mod operators;
 #[cfg(test)]
 mod tests;
 pub mod typing;
+pub mod symbols;
 
 pub mod control_flow_analyzer;
 mod lowerer;
@@ -474,6 +475,18 @@ impl BoundProgram<'_> {
     }
 }
 
+pub struct BoundLibrary<'a> {
+    pub program: BoundProgram<'a>,
+}
+
+impl BoundLibrary<'_> {
+    pub fn error() -> Self {
+        Self {
+            program: BoundProgram::error(),
+        }
+    }
+}
+
 fn type_table() -> Vec<BoundVariableName<'static>> {
     vec![
         BoundVariableName {
@@ -499,11 +512,10 @@ fn type_table() -> Vec<BoundVariableName<'static>> {
     ]
 }
 
-pub fn bind<'a>(
+pub fn bind_program<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
-    is_library: bool,
 ) -> BoundProgram<'a> {
     if diagnostic_bag.has_errors() {
         return BoundProgram::error();
@@ -536,9 +548,7 @@ pub fn bind<'a>(
             BoundNode::literal_from_value(constant.clone()),
         ));
     }
-    if !is_library {
-        statements.push(call_main(&mut binder));
-    }
+    statements.push(call_main(&mut binder));
 
     for import in binder.imports.clone() {
         execute_import_function(import, &mut binder);
@@ -629,6 +639,136 @@ pub fn bind<'a>(
         label_count,
     }
 }
+
+pub fn bind_library<'a>(
+    source_text: &'a SourceText<'a>,
+    diagnostic_bag: &mut DiagnosticBag<'a>,
+    debug_flags: DebugFlags,
+) -> BoundLibrary<'a> {
+    if diagnostic_bag.has_errors() {
+        return BoundLibrary::error();
+    }
+    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
+    let mut binder = BindingState {
+        directory: source_text.directory(),
+        diagnostic_bag,
+        variable_table: vec![],
+        type_table: type_table(),
+        struct_table: vec![],
+        functions: vec![],
+        structs: vec![],
+        imports: vec![],
+        constants: vec![],
+        safe_nodes: vec![],
+        print_variable_table: debug_flags.print_variable_table(),
+        max_used_variables: 0,
+        function_return_type: Type::Error,
+        is_struct_function: false,
+        expected_type: None,
+    };
+    let span = node.span();
+    let mut statements = default_statements(&mut binder);
+    bind_top_level_statements(node, &mut binder);
+    for (index, constant) in binder.constants.iter().enumerate() {
+        statements.push(BoundNode::assignment(
+            TextSpan::zero(),
+            BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()),
+            BoundNode::literal_from_value(constant.clone()),
+        ));
+    }
+
+    for import in binder.imports.clone() {
+        execute_import_function(import, &mut binder);
+    }
+
+    for node in binder.structs.clone() {
+        let fields = bind_struct_body(node.name, node.body, &mut binder);
+        binder.register_struct(node.id, fields);
+    }
+
+    let mut type_names = binder
+        .type_table
+        .iter()
+        .map(|b| b.identifier.as_ref().to_owned())
+        .collect();
+    binder
+        .diagnostic_bag
+        .registered_types
+        .append(&mut type_names);
+
+    let fixed_variable_count = binder.variable_table.len();
+    let mut label_count = binder.functions.len();
+    for (index, node) in binder.functions.clone().into_iter().enumerate() {
+        let mut parameters = Vec::with_capacity(node.parameters.len());
+        for (variable_name, variable_type) in node.parameters {
+            if let Some(it) = binder.register_variable(variable_name, variable_type, false) {
+                parameters.push(it);
+            } else {
+                // binder.diagnostic_bag.report_cannot_declare_variable(span, variable_name)
+                panic!("Could not declare a parameter! This sounds like an error in the binder!");
+            }
+        }
+        binder.function_return_type = node.return_type;
+        binder.is_struct_function = node.is_struct_function;
+        let mut body = bind_node(node.body, &mut binder);
+        if matches!(&binder.function_return_type, Type::Void) {
+            body = BoundNode::block_statement(
+                body.span,
+                vec![
+                    body,
+                    BoundNode::return_statement(TextSpan::zero(), None, !node.is_main),
+                ],
+            );
+        }
+        let body_statements = lowerer::flatten(body, &mut label_count);
+        if !matches!(&binder.function_return_type, Type::Void)
+            && !control_flow_analyzer::check_if_all_paths_return(
+                node.function_name,
+                &body_statements,
+                debug_flags,
+            )
+        {
+            binder
+                .diagnostic_bag
+                .report_missing_return_statement(span, &binder.function_return_type);
+        }
+        let body = BoundNode::block_statement(span, body_statements);
+        statements.insert(
+            0,
+            BoundNode::assignment(
+                TextSpan::zero(),
+                BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
+                BoundNode::label_reference(index),
+            ),
+        );
+        statements.push(BoundNode::function_declaration(
+            index,
+            node.is_main,
+            body,
+            parameters,
+        ));
+        binder.delete_variables_until(fixed_variable_count);
+    }
+
+    let program = BoundNode::block_statement(span, statements);
+    if debug_flags.print_bound_program {
+        crate::debug::print_bound_node_as_code(&program);
+    }
+    if debug_flags.print_struct_table {
+        for (id, entry) in binder.struct_table.iter().enumerate() {
+            println!("  {}: {:#?}", id, entry);
+        }
+    }
+    BoundLibrary {
+        program: BoundProgram {
+                    program,
+                    fixed_variable_count,
+                    max_used_variables: binder.max_used_variables,
+                    label_count,
+                }
+    }
+}
+
 
 fn execute_import_function(import: ImportFunction, binder: &mut BindingState) {
     match import {

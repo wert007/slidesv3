@@ -4,10 +4,7 @@ mod tests;
 
 mod label_replacer;
 
-use crate::{
-    binder::{
-        self,
-        bound_nodes::{
+use crate::{binder::{self, bound_nodes::{
             BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
             BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
             BoundConstructorCallNodeKind, BoundConversionNodeKind,
@@ -15,17 +12,7 @@ use crate::{
             BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
             BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
             BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind,
-        },
-        operators::{BoundBinaryOperator, BoundUnaryOperator},
-        typing::{FunctionKind, SystemCallKind, Type},
-    },
-    debug::DebugFlags,
-    diagnostics::DiagnosticBag,
-    evaluator::memory::{bytes_to_word, stack::Stack, WORD_SIZE_IN_BYTES},
-    parser::syntax_nodes::LiteralNodeKind,
-    text::{SourceText, TextSpan},
-    value::Value,
-};
+        }, operators::{BoundBinaryOperator, BoundUnaryOperator}, symbols::Library, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::memory::{bytes_to_word, stack::Stack, WORD_SIZE_IN_BYTES}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
 
 use self::instruction::Instruction;
 
@@ -116,7 +103,7 @@ pub fn convert<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> Program {
-    let bound_program = binder::bind(source_text, diagnostic_bag, debug_flags, false);
+    let bound_program = binder::bind_program(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return Program::error();
     }
@@ -154,11 +141,12 @@ pub fn convert_library<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
-) -> Program {
-    let bound_program = binder::bind(source_text, diagnostic_bag, debug_flags, true);
+) -> Library {
+    let bound_program = binder::bind_library(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
-        return Program::error();
+        return Library::error();
     }
+    let bound_program = bound_program.program;
     let bound_node = bound_program.program;
     let mut converter = InstructionConverter {
         stack: Stack::new(debug_flags),
@@ -180,11 +168,13 @@ pub fn convert_library<'a>(
             println!("  {:000}: {:?}", i, instruction);
         }
     }
-    Program {
-        instructions,
-        stack: converter.stack,
-        max_used_variables: bound_program.max_used_variables,
-        protected_variables: converter.fixed_variable_count,
+    Library {
+        program: Program {
+            instructions,
+            stack: converter.stack,
+            max_used_variables: bound_program.max_used_variables,
+            protected_variables: converter.fixed_variable_count,
+        }
     }
 }
 
