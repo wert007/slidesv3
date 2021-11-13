@@ -772,7 +772,8 @@ fn execute_import_function(import: ImportFunction, binder: &mut BindingState) {
     match import {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
-            crate::load_library_from_path(directory.join(library.path).with_extension("sld"));
+            let lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"));
+            dbg!(lib);
         },
     }
 }
