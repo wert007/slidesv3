@@ -93,8 +93,7 @@ struct FunctionDeclarationBody<'a> {
     parameters: Vec<(&'a str, Type)>,
     is_main: bool,
     function_id: u64,
-    function_type: Type,
-    return_type: Type,
+    function_type: FunctionType,
     is_struct_function: bool,
 }
 
@@ -581,7 +580,7 @@ pub fn bind_program<'a>(
                 panic!("Could not declare a parameter! This sounds like an error in the binder!");
             }
         }
-        binder.function_return_type = node.return_type;
+        binder.function_return_type = node.function_type.return_type.clone();
         binder.is_struct_function = node.is_struct_function;
         let mut body = bind_node(node.body, &mut binder);
         if matches!(&binder.function_return_type, Type::Void) {
@@ -610,7 +609,7 @@ pub fn bind_program<'a>(
             0,
             BoundNode::assignment(
                 TextSpan::zero(),
-                BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
+                BoundNode::variable(TextSpan::zero(), node.function_id, Type::function(node.function_type)),
                 BoundNode::label_reference(index),
             ),
         );
@@ -708,7 +707,7 @@ pub fn bind_library<'a>(
                 panic!("Could not declare a parameter! This sounds like an error in the binder!");
             }
         }
-        binder.function_return_type = node.return_type;
+        binder.function_return_type = node.function_type.return_type.clone();
         binder.is_struct_function = node.is_struct_function;
         let mut body = bind_node(node.body, &mut binder);
         if matches!(&binder.function_return_type, Type::Void) {
@@ -737,7 +736,7 @@ pub fn bind_library<'a>(
             0,
             BoundNode::assignment(
                 TextSpan::zero(),
-                BoundNode::variable(TextSpan::zero(), node.function_id, node.function_type),
+                BoundNode::variable(TextSpan::zero(), node.function_id, Type::function(node.function_type)),
                 BoundNode::label_reference(index),
             ),
         );
@@ -902,8 +901,7 @@ fn bind_function_declaration<'a, 'b>(
         parameters: variables,
         is_main,
         function_id,
-        function_type: type_,
-        return_type: function_type.return_type,
+        function_type,
         is_struct_function: false,
     });
 }
@@ -941,8 +939,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         parameters: variables,
         is_main: false,
         function_id,
-        function_type: type_.clone(),
-        return_type: function_type.return_type,
+        function_type,
         is_struct_function: true,
     });
     StructField {
