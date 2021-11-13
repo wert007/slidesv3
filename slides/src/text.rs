@@ -33,6 +33,10 @@ impl<'a> SourceText<'a> {
     pub fn column_index(&self, position: usize) -> usize {
         position - self.lines[self.line_index(position)].start
     }
+
+    pub fn directory(&self) -> &str {
+        std::path::Path::new(self.file_name).parent().unwrap().to_str().unwrap()
+    }
 }
 
 fn parse_text_lines(text: &str) -> Vec<TextLine> {
