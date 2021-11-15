@@ -514,10 +514,10 @@ pub fn bind_program<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundProgram<'a> {
+    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return BoundProgram::error();
     }
-    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     let mut binder = BindingState {
         directory: source_text.directory(),
         diagnostic_bag,
@@ -642,10 +642,10 @@ pub fn bind_library<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundLibrary<'a> {
+    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return BoundLibrary::error();
     }
-    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     let mut binder = BindingState {
         directory: source_text.directory(),
         diagnostic_bag,
