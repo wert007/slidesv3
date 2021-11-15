@@ -184,11 +184,8 @@ struct BindingState<'a, 'b> {
     /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody<'a>>,
     /// This collects all imports, which are not executed yet. This should be
-    /// emptyy, before starting to bind structs or functions.
-    ///
-    /// This is going to need more information, like the constant in which the
-    /// resolved value should be written. This will come later.
-    imports: Vec<ImportFunction>,
+    /// empty, before starting to bind structs or functions.
+    imports: Vec<BoundImportStatement<'a>>,
     /// This is a simple hack to bring constants into the binder.
     constants: Vec<Value>,
     /// These safe nodes are the nodes which are normally of a noneable type, but
@@ -764,11 +761,15 @@ pub fn bind_library<'a>(
 }
 
 
-    match import {
+fn execute_import_function<'a>(import: BoundImportStatement<'a>, binder: &mut BindingState<'a, '_>) {
+    match import.function {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
             let lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"), binder.debug_flags);
-            dbg!(lib);
+            let index = binder.libraries.len();
+            binder.libraries.push(lib);
+            binder.register_variable(import.name, Type::Library(index), true).unwrap();
+            // dbg!(lib);
         },
     }
 }
@@ -957,7 +958,12 @@ fn bind_import_statement<'a>(
     } else {
         return;
     };
-    binder.imports.push(import_function);
+    let name = import_statement.identifier.lexeme;
+    let import_statement = BoundImportStatement {
+        function: import_function,
+        name,
+    };
+    binder.imports.push(import_statement);
 }
 
 fn bind_import_function<'a>(
