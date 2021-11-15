@@ -10,16 +10,11 @@ mod lowerer;
 
 use std::path::PathBuf;
 
-use crate::{
-    binder::{
+use crate::{DebugFlags, binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    },
-    dependency_resolver::{ImportFunction, ImportLibraryFunction},
-    diagnostics::DiagnosticBag,
-    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    parser::{
+    }, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
         self,
         syntax_nodes::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
@@ -31,13 +26,9 @@ use crate::{
             StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
             VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
         },
-    },
-    text::{SourceText, TextSpan},
-    value::Value,
-    DebugFlags,
-};
+    }, text::{SourceText, TextSpan}, value::Value};
 
-use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator, symbols::FunctionSymbol, typing::{FunctionType, StructType, SystemCallKind}};
+use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator, symbols::{FunctionSymbol, Library}, typing::{FunctionType, StructType, SystemCallKind}};
 
 enum SmartString<'a> {
     Heap(String),
