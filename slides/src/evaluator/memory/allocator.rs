@@ -24,7 +24,7 @@ impl Allocator {
         }
     }
 
-    #[cfg(debug_assertions)]
+    // #[cfg(debug_assertions)]
     fn find_bucket_from_address(&self, address: u64) -> &Bucket {
         for bucket in &self.buckets {
             if let BucketEntry::Bucket(bucket) = bucket {

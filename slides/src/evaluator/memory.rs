@@ -32,11 +32,13 @@ pub struct FlaggedWord {
 
 impl FlaggedWord {
     pub fn unwrap_value(self) -> u64 {
+        #[cfg(debug_assertions)]
         assert!(!self.flags.is_pointer, "{:#?}", self);
         self.value
     }
 
     pub fn unwrap_pointer(self) -> u64 {
+        #[cfg(debug_assertions)]
         assert!(self.flags.is_pointer, "{:#?}", self);
         self.value
     }
