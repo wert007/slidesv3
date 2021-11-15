@@ -186,6 +186,9 @@ struct BindingState<'a, 'b> {
     /// This collects all imports, which are not executed yet. This should be
     /// empty, before starting to bind structs or functions.
     imports: Vec<BoundImportStatement<'a>>,
+    /// This has all libraries which where loaded by imports. They can be
+    /// referenced for name lookups.
+    libraries: Vec<Library>,
     /// This is a simple hack to bring constants into the binder.
     constants: Vec<Value>,
     /// These safe nodes are the nodes which are normally of a noneable type, but
@@ -447,6 +450,7 @@ pub struct BoundProgram<'a> {
     pub fixed_variable_count: usize,
     pub max_used_variables: usize,
     pub label_count: usize,
+    pub referenced_libraries: Vec<Library>,
 }
 
 impl BoundProgram<'_> {
@@ -456,6 +460,7 @@ impl BoundProgram<'_> {
             fixed_variable_count: 0,
             max_used_variables: 0,
             label_count: 0,
+            referenced_libraries: vec![],
         }
     }
 }
@@ -518,6 +523,7 @@ pub fn bind_program<'a>(
         functions: vec![],
         structs: vec![],
         imports: vec![],
+        libraries: vec![],
         constants: vec![],
         safe_nodes: vec![],
         print_variable_table: debug_flags.print_variable_table(),
@@ -625,6 +631,7 @@ pub fn bind_program<'a>(
         fixed_variable_count,
         max_used_variables: binder.max_used_variables,
         label_count,
+        referenced_libraries: binder.libraries,
     }
 }
 
@@ -647,6 +654,7 @@ pub fn bind_library<'a>(
         functions: vec![],
         structs: vec![],
         imports: vec![],
+        libraries: vec![],
         constants: vec![],
         safe_nodes: vec![],
         print_variable_table: debug_flags.print_variable_table(),
@@ -1798,8 +1806,17 @@ fn bind_field_access<'a, 'b>(
                 BoundNode::error(span)
             }
         }
-        Type::Library(_) => {
-            unimplemented!()
+        Type::Library(index) => {
+            let library = &binder.libraries[*index];
+            let function_name = field_access.field.lexeme;
+            if let Some(function) = library.look_up_function_by_name(function_name) {
+                // FIXME: Currently the label index is not fixed for the needed
+                // relocation of the instructions!
+                BoundNode::label_reference(function.label_index as _, Type::function(function.function_type.clone()))
+            } else {
+                binder.diagnostic_bag.report_no_field_named_on_type(span, function_name, &Type::Library(*index));
+                BoundNode::error(span)
+            }
         }
         Type::Void
         | Type::Integer
