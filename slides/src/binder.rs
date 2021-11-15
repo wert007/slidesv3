@@ -139,6 +139,7 @@ impl<'a> BoundStructType<'a> {
 }
 
 struct BindingState<'a, 'b> {
+    debug_flags: DebugFlags,
     /// The directory, in which the current file relative or absolute to the
     /// current executing program was.
     directory: &'a str,
@@ -519,6 +520,7 @@ pub fn bind_program<'a>(
         return BoundProgram::error();
     }
     let mut binder = BindingState {
+        debug_flags,
         directory: source_text.directory(),
         diagnostic_bag,
         variable_table: vec![],
@@ -647,6 +649,7 @@ pub fn bind_library<'a>(
         return BoundLibrary::error();
     }
     let mut binder = BindingState {
+        debug_flags,
         directory: source_text.directory(),
         diagnostic_bag,
         variable_table: vec![],
@@ -762,17 +765,17 @@ pub fn bind_library<'a>(
                     fixed_variable_count,
                     max_used_variables: binder.max_used_variables,
                     label_count,
+                    referenced_libraries: binder.libraries,
                 },
         exported_functions: binder.functions.into_iter().map(Into::into).collect(),
     }
 }
 
 
-fn execute_import_function(import: ImportFunction, binder: &mut BindingState) {
     match import {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
-            let lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"));
+            let lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"), binder.debug_flags);
             dbg!(lib);
         },
     }
