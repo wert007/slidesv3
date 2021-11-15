@@ -17,6 +17,10 @@ impl Library {
             functions: vec![],
         }
     }
+
+    pub fn look_up_function_by_name(&self, name: &str) -> Option<&FunctionSymbol> {
+        self.functions.iter().find(|f|f.name == name)
+    }
 }
 
 #[derive(Debug)]
