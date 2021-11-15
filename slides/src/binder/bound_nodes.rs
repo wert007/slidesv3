@@ -449,11 +449,11 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn label_reference(index: usize) -> Self {
+    pub fn label_reference(index: usize, type_: Type) -> Self {
         Self {
             span: TextSpan::zero(),
             kind: BoundNodeKind::LabelReference(index),
-            type_: Type::Integer, // FIXME: Type::Pointer
+            type_,
             byte_width: 4,
             constant_value: None,
         }
