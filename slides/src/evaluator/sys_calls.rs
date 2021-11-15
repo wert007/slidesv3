@@ -83,6 +83,7 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64) 
 
 fn to_string_native(type_: Type, argument: FlaggedWord, state: &mut EvaluatorState) -> String {
     match type_ {
+        Type::Library(_) => unreachable!(),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
@@ -137,6 +138,7 @@ fn array_to_string_native(
     let array_end = array_start + array_length_in_words * WORD_SIZE_IN_BYTES;
     let mut result: String = "[ ".into();
     match base_type {
+        Type::Library(_) => unreachable!(),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => todo!(),

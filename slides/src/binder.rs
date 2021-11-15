@@ -1801,6 +1801,9 @@ fn bind_field_access<'a, 'b>(
                 BoundNode::error(span)
             }
         }
+        Type::Library(_) => {
+            unimplemented!()
+        }
         Type::Void
         | Type::Integer
         | Type::Boolean
@@ -1858,7 +1861,7 @@ fn bind_field_access_for_assignment<'a>(
                 .report_no_fields_on_type(base.span, &base.type_);
             BoundNode::error(span)
         }
-        Type::Array(_) | Type::String => {
+        Type::Array(_) | Type::String | Type::Library(_) => {
             binder.diagnostic_bag.report_cannot_assign_to(span);
             BoundNode::error(span)
         }
@@ -1998,6 +2001,7 @@ fn bind_condition_conversion<'a>(
             bind_conversion(base, &Type::Boolean, binder),
             SafeNodeInCondition::None,
         ),
+        Type::Library(_) => unimplemented!(),
     }
 }
 

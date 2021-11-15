@@ -21,6 +21,7 @@ pub enum Type {
     Closure(Box<ClosureType>),
     Struct(Box<StructType>),
     StructReference(u64),
+    Library(usize),
 }
 
 impl Type {
@@ -42,6 +43,7 @@ impl Type {
 
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         match (self, other) {
+            (Type::Library(_), _) | (_, Type::Library(_)) => false,
             _ if self == other => true,
             (_, Type::Any) => true,
             (Type::None, Type::Noneable(_)) => true,
@@ -80,6 +82,7 @@ impl Type {
 
     pub fn type_identifier_size_in_words(&self) -> u64 {
         match self {
+            Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Error => 1,
             Type::Void => 1,
             Type::Any => 1,
@@ -155,6 +158,7 @@ impl Type {
 
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
+            Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Error => Self::TYPE_IDENTIFIER_ERROR,
             Type::Void => Self::TYPE_IDENTIFIER_VOID,
             Type::Any => Self::TYPE_IDENTIFIER_ANY,
@@ -214,6 +218,7 @@ impl Type {
 
     pub fn size_in_bytes(&self) -> u64 {
         match self {
+            Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
@@ -233,6 +238,7 @@ impl Type {
 
     pub fn array_element_size_in_bytes(&self) -> u64 {
         match self {
+            Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Void | Type::Any | Type::Error => unreachable!(),
             Type::String => 1,
             Type::Integer
@@ -250,6 +256,7 @@ impl Type {
 
     pub fn is_pointer(&self) -> bool {
         match self {
+            Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Error
             | Type::Void
             | Type::Any
@@ -274,6 +281,7 @@ impl Type {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Type::Library(_) => write!(f, "library"),
             Type::Error => write!(f, "error"),
             Type::Void => write!(f, "void"),
             Type::Any => write!(f, "any"),
