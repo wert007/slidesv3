@@ -89,6 +89,7 @@ struct FunctionDeclarationBody<'a> {
     parameters: Vec<(&'a str, Type)>,
     is_main: bool,
     function_id: u64,
+    variable_id: u64,
     function_type: FunctionType,
     is_struct_function: bool,
 }
@@ -609,8 +610,8 @@ pub fn bind_program<'a>(
             0,
             BoundNode::assignment(
                 TextSpan::zero(),
-                BoundNode::variable(TextSpan::zero(), node.function_id, Type::function(node.function_type)),
-                BoundNode::label_reference(index),
+                BoundNode::variable(TextSpan::zero(), node.variable_id, Type::function(node.function_type.clone())),
+                BoundNode::label_reference(index, Type::function(node.function_type)),
             ),
         );
         statements.push(BoundNode::function_declaration(
@@ -737,8 +738,8 @@ pub fn bind_library<'a>(
             0,
             BoundNode::assignment(
                 TextSpan::zero(),
-                BoundNode::variable(TextSpan::zero(), node.function_id, Type::function(node.function_type)),
-                BoundNode::label_reference(index),
+                BoundNode::variable(TextSpan::zero(), node.variable_id, Type::function(node.function_type.clone())),
+                BoundNode::label_reference(index, Type::function(node.function_type)),
             ),
         );
         statements.push(BoundNode::function_declaration(
@@ -887,8 +888,8 @@ fn bind_function_declaration<'a, 'b>(
         bind_function_type(None, function_declaration.function_type, binder);
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
-    let function_id = if let Some(it) =
-        binder.register_variable(function_declaration.identifier.lexeme, type_.clone(), false)
+    let function_id = binder.functions.len() as u64;
+    let variable_id = if let Some(it) = binder.register_variable(function_declaration.identifier.lexeme, type_.clone(), false)
     {
         it
     } else {
@@ -904,6 +905,7 @@ fn bind_function_declaration<'a, 'b>(
         parameters: variables,
         is_main,
         function_id,
+        variable_id,
         function_type,
         is_struct_function: false,
     });
@@ -926,7 +928,8 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         struct_name, function_declaration.identifier.lexeme
     );
     let type_ = Type::Function(Box::new(function_type.clone()));
-    let function_id =
+    let function_id = binder.functions.len() as _;
+    let variable_id =
         if let Some(it) = binder.register_generated_variable(function_name, type_.clone(), true) {
             it
         } else {
@@ -942,6 +945,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         parameters: variables,
         is_main: false,
         function_id,
+        variable_id,
         function_type,
         is_struct_function: true,
     });
@@ -1739,7 +1743,7 @@ fn bind_field_access<'a, 'b>(
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
                 if let Type::Function(function_type) = &field.type_ {
-                    let function_id = binder
+                    let variable_id = binder
                         .look_up_variable_by_name(&format!(
                             "{}::{}",
                             bound_struct_type.name, field_name
@@ -1748,7 +1752,7 @@ fn bind_field_access<'a, 'b>(
                     BoundNode::closure(
                         span,
                         base,
-                        function_id.id,
+                        variable_id.id,
                         Type::closure(*function_type.clone()),
                     )
                 } else {
@@ -1773,7 +1777,7 @@ fn bind_field_access<'a, 'b>(
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
                 if let Type::Function(function_type) = &field.type_ {
-                    let function_id = binder
+                    let variable_id = binder
                         .look_up_variable_by_name(&format!(
                             "{}::{}",
                             bound_struct_type.name, field_name
@@ -1782,7 +1786,7 @@ fn bind_field_access<'a, 'b>(
                     BoundNode::closure(
                         span,
                         base,
-                        function_id.id,
+                        variable_id.id,
                         Type::closure(*function_type.clone()),
                     )
                 } else {
