@@ -1,4 +1,5 @@
 import lib('mylib') as mylib;
+import lib('math') as math;
 
 func main() {
     print('Hello from the main :)');
@@ -10,7 +11,7 @@ func main() {
     // pt = new BadPoint(-12, -34);
     mylib.printPoint(pt);
 
-    let foo = new pt.HasNoType();
+    let vel = new math.Vec2(1, 1);
 }
 
 struct AnyTypeThatIsDeclaredHere {
