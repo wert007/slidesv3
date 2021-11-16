@@ -1,6 +1,6 @@
 use crate::{evaluator::WORD_SIZE_IN_BYTES, DebugFlags};
 
-use super::{FlaggedWord, Flags};
+use super::{FlaggedWord, Flags, static_memory::StaticMemory};
 
 pub struct Stack {
     pub data: Vec<u64>,
@@ -48,6 +48,14 @@ impl Stack {
         self.print_maybe_stack();
     }
 
+    pub fn push_static_memory(&mut self, static_memory: StaticMemory) {
+        for word in static_memory.data {
+            self.data.push(word);
+            self.flags.push(Flags::default())
+        }
+        self.print_maybe_stack();
+    }
+
     pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
         if address % WORD_SIZE_IN_BYTES == 0 {
             self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES)
@@ -60,26 +68,12 @@ impl Stack {
         FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
     }
 
-    pub fn write_word(&mut self, address: u64, value: u64) {
-        if address % WORD_SIZE_IN_BYTES == 0 {
-            self.write_word_aligned(address / WORD_SIZE_IN_BYTES, value);
-        } else {
-            unimplemented!("address = 0x{:x}", address);
-        }
-    }
-
     pub fn write_flagged_word(&mut self, address: u64, value: FlaggedWord) {
         if address % WORD_SIZE_IN_BYTES == 0 {
             self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, value);
         } else {
             unimplemented!("address = 0x{:x}", address);
         }
-    }
-
-    fn write_word_aligned(&mut self, address: u64, value: u64) {
-        self.data[address as usize] = value;
-        self.flags[address as usize] = Flags::default();
-        self.print_maybe_stack();
     }
 
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {

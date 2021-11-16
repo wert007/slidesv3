@@ -1,5 +1,6 @@
 pub mod allocator;
 pub mod stack;
+pub mod static_memory;
 
 pub const HEAP_POINTER: u64 = 0x80_00_00_00_00_00_00_00;
 pub const WORD_SIZE_IN_BYTES: u64 = 8;

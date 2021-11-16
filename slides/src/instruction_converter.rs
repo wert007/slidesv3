@@ -59,7 +59,7 @@ impl From<LabelReference> for InstructionOrLabelReference {
 }
 
 struct InstructionConverter {
-    pub stack: Stack,
+    pub static_memory: StaticMemory,
     pub fixed_variable_count: usize,
     next_label_index: usize,
 }
@@ -73,32 +73,25 @@ impl InstructionConverter {
 
 #[derive(Debug)]
 pub struct Program {
-    pub stack: Stack,
+    pub static_memory: StaticMemory,
     pub instructions: Vec<Instruction>,
     pub max_used_variables: usize,
     pub protected_variables: usize,
+    pub label_count: usize,
     pub entry_point: usize,
 }
 
 impl Program {
     pub fn error() -> Self {
         Self {
-            stack: Stack::new(DebugFlags::default()),
+            static_memory: StaticMemory::new(DebugFlags::default()),
             instructions: vec![],
             max_used_variables: 0,
             protected_variables: 0,
+            label_count: 0,
             entry_point: 0,
         }
     }
-}
-
-fn allocate(stack: &mut Stack, size_in_bytes: u64) -> u64 {
-    let size_in_words = bytes_to_word(size_in_bytes);
-    let pointer = stack.len() as u64 * WORD_SIZE_IN_BYTES;
-    for _ in 0..size_in_words {
-        stack.push(0);
-    }
-    pointer
 }
 
 pub fn convert<'a>(
@@ -106,18 +99,26 @@ pub fn convert<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> Program {
-    let bound_program = binder::bind_program(source_text, diagnostic_bag, debug_flags);
+    let mut bound_program = binder::bind_program(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return Program::error();
     }
     let bound_node = bound_program.program;
     let mut converter = InstructionConverter {
-        stack: Stack::new(debug_flags),
+        static_memory: StaticMemory::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count,
     };
-    // Push Pointer to 0 with value 0
-    converter.stack.push(0);
+    converter.static_memory.allocate_null();
+    for lib in bound_program.referenced_libraries.iter_mut() {
+        let static_memory_size = converter.static_memory.size_in_bytes();
+        for inst in lib.instructions.iter_mut() {
+            if let InstructionOrLabelReference::Instruction(Instruction { arg, op_code: OpCode::LoadPointer, ..}) = inst {
+                arg += static_memory_size;
+            }
+        }
+        converter.static_memory.insert(&mut lib.program.static_memory);
+    }
     let mut instructions : Vec<_> = bound_program.referenced_libraries.into_iter().map(|l| l.instructions).flatten().collect();
     let entry_point = instructions.len();
     instructions.append(&mut convert_node(bound_node, &mut converter));
@@ -135,7 +136,7 @@ pub fn convert<'a>(
     }
     Program {
         instructions,
-        stack: converter.stack,
+        static_memory: converter.static_memory,
         max_used_variables: bound_program.max_used_variables,
         protected_variables: converter.fixed_variable_count,
         label_count: converter.next_label_index,
@@ -154,15 +155,22 @@ pub fn convert_library<'a>(
         return Library::error();
     }
     let exported_functions = bound_program.exported_functions;
-    let bound_program = bound_program.program;
+    let mut bound_program = bound_program.program;
     let bound_node = bound_program.program;
     let mut converter = InstructionConverter {
-        stack: Stack::new(debug_flags),
+        static_memory: StaticMemory::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count,
     };
-    // Push Pointer to 0 with value 0
-    converter.stack.push(0);
+    for lib in bound_program.referenced_libraries.iter_mut() {
+        let static_memory_size = converter.static_memory.size_in_bytes();
+        for inst in lib.instructions.iter_mut() {
+            if let InstructionOrLabelReference::Instruction(Instruction { arg, op_code: OpCode::LoadPointer, ..}) = inst {
+                arg += static_memory_size;
+            }
+        }
+        converter.static_memory.insert(&mut lib.program.static_memory);
+    }
     let instructions = convert_node(bound_node, &mut converter);
     if debug_flags.print_instructions_and_labels {
         for (i, instruction) in instructions.iter().enumerate() {
@@ -180,7 +188,7 @@ pub fn convert_library<'a>(
         instructions,
         program: Program {
             instructions: vec![],
-            stack: converter.stack,
+            static_memory: converter.static_memory,
             max_used_variables: bound_program.max_used_variables,
             protected_variables: converter.fixed_variable_count,
             label_count: converter.next_label_index,
@@ -309,35 +317,7 @@ fn convert_string_literal(
     value: String,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let length_in_bytes = value.len() as u64;
-    let mut address = allocate(&mut converter.stack, length_in_bytes + WORD_SIZE_IN_BYTES);
-    let pointer = address as _;
-    converter.stack.write_word(address, length_in_bytes);
-    address += WORD_SIZE_IN_BYTES;
-    let byte_groups = value.as_bytes().chunks_exact(WORD_SIZE_IN_BYTES as _);
-    let remainder = byte_groups.remainder();
-    for word in byte_groups {
-        let word = [
-            word[0], word[1], word[2], word[3], word[4], word[5], word[6], word[7],
-        ];
-        let word = u64::from_be_bytes(word);
-        converter.stack.write_word(address, word);
-        address += WORD_SIZE_IN_BYTES;
-    }
-    if !remainder.is_empty() {
-        let word = [
-            *remainder.get(0).unwrap_or(&0),
-            *remainder.get(1).unwrap_or(&0),
-            *remainder.get(2).unwrap_or(&0),
-            *remainder.get(3).unwrap_or(&0),
-            *remainder.get(4).unwrap_or(&0),
-            *remainder.get(5).unwrap_or(&0),
-            *remainder.get(6).unwrap_or(&0),
-            *remainder.get(7).unwrap_or(&0),
-        ];
-        let word = u64::from_be_bytes(word);
-        converter.stack.write_word(address, word);
-    }
+    let pointer = converter.static_memory.allocate_string(value);
     vec![Instruction::load_pointer(pointer).span(span).into()]
 }
 

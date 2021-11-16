@@ -94,8 +94,10 @@ pub fn evaluate(
     source_text: &crate::text::SourceText<'_>,
     debug_flags: DebugFlags,
 ) -> ResultType {
+    let mut stack = Stack::new(debug_flags);
+    stack.push_static_memory(program.static_memory);
     let mut state = EvaluatorState {
-        stack: program.stack,
+        stack,
         heap: Allocator::new(64 * 1024, debug_flags),
         registers: vec![FlaggedWord::default(); program.max_used_variables],
         protected_registers: program.protected_variables,
