@@ -247,6 +247,7 @@ impl<'a> SyntaxNode<'a> {
 
     pub fn constructor_call(
         new_keyword: SyntaxToken<'a>,
+        library_name: Option<SyntaxToken<'a>>,
         type_name: SyntaxToken<'a>,
         open_parenthesis_token: SyntaxToken<'a>,
         arguments: Vec<SyntaxNode<'a>>,
@@ -258,6 +259,7 @@ impl<'a> SyntaxNode<'a> {
             span,
             kind: SyntaxNodeKind::ConstructorCall(ConstructorCallNodeKind {
                 new_keyword,
+                library_name,
                 type_name,
                 open_parenthesis_token,
                 arguments,
@@ -758,6 +760,7 @@ pub struct CastExpressionNodeKind<'a> {
 #[derive(Debug, Clone)]
 pub struct ConstructorCallNodeKind<'a> {
     pub new_keyword: SyntaxToken<'a>,
+    pub library_name: Option<SyntaxToken<'a>>,
     pub type_name: SyntaxToken<'a>,
     pub open_parenthesis_token: SyntaxToken<'a>,
     pub arguments: Vec<SyntaxNode<'a>>,

@@ -564,7 +564,13 @@ fn parse_cast_expression<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
 fn parse_constructor<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     let new_keyword = parser.match_token(SyntaxTokenKind::NewKeyword);
     let type_name = parser.match_token(SyntaxTokenKind::Identifier);
-
+    let (library_name, type_name) = if parser.peek_token().kind == SyntaxTokenKind::Period {
+        // FIXME: It would be nice to keep the period token around.
+        parser.next_token();
+        (Some(type_name), parser.match_token(SyntaxTokenKind::Identifier))
+    } else {
+        (None, type_name)
+    };
     // FIXME: Copy-Paste from function call.
     let open_parenthesis_token = parser.next_token();
     let mut arguments = vec![];
@@ -588,6 +594,7 @@ fn parse_constructor<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
 
     SyntaxNode::constructor_call(
         new_keyword,
+        library_name,
         type_name,
         open_parenthesis_token,
         arguments,
