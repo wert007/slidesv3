@@ -19,7 +19,11 @@ pub use debug::DebugFlags;
 
 pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags) -> Library where P: AsRef<Path>{
     let path = path.as_ref().to_owned();
-    let source_code = std::fs::read_to_string(&path).unwrap();
+    let source_code = std::fs::read_to_string(&path);
+    if source_code.is_err() {
+        return Library::error();
+    }
+    let source_code = source_code.unwrap();
     let file_name = path.file_name().unwrap().to_string_lossy();
     load_library(&source_code, &file_name, debug_flags)
 }
