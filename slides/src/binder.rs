@@ -261,6 +261,11 @@ impl<'a> BindingState<'a, '_> {
         self.register_type(name, Type::StructReference(id))
     }
 
+    fn register_generated_struct_name(&mut self, name: String) -> Option<u64> {
+        let id = self.type_table.len() as u64;
+        self.register_generated_type(name, Type::StructReference(id))
+    }
+
     fn register_struct(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>) -> u64 {
         let struct_type = StructType {
             id,
@@ -286,6 +291,24 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn register_type(&mut self, name: &'a str, type_: Type) -> Option<u64> {
+        let index = self.type_table.len() as u64;
+        let type_name_already_registered = self
+            .type_table
+            .iter()
+            .any(|type_| type_.identifier.as_ref() == name);
+        if type_name_already_registered {
+            None
+        } else {
+            self.type_table.push(BoundVariableName {
+                identifier: name.into(),
+                type_,
+                is_read_only: true,
+            });
+            Some(index)
+        }
+    }
+
+    fn register_generated_type(&mut self, name: String, type_: Type) -> Option<u64> {
         let index = self.type_table.len() as u64;
         let type_name_already_registered = self
             .type_table
@@ -366,6 +389,20 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
+        self.type_table
+            .iter()
+            .find(|v| v.identifier.as_ref() == name)
+            .map(|v| v.type_.clone())
+            .map(|t| {
+                if let Type::Struct(struct_type) = t {
+                    Type::StructReference(struct_type.id)
+                } else {
+                    t
+                }
+            })
+    }
+
+    fn look_up_type_by_generated_name(&self, name: String) -> Option<Type> {
         self.type_table
             .iter()
             .find(|v| v.identifier.as_ref() == name)
@@ -757,14 +794,27 @@ fn execute_import_function<'a>(import: BoundImportStatement<'a>, binder: &mut Bi
     match import.function {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
-            let mut lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"), binder.debug_flags);
-            lib.relocate(binder.label_offset);
-            binder.label_offset += lib.program.label_count;
-            let index = binder.libraries.len();
-            binder.libraries.push(lib);
-            binder.register_variable(import.name, Type::Library(index), true).unwrap();
+            let lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"), binder.debug_flags);
+            load_library_into_binder(import.span, import.name, lib, binder);
         },
     }
+}
+
+fn load_library_into_binder<'a>(span: TextSpan, name: &'a str, mut lib: Library, binder: &mut BindingState<'a, '_>) {
+    let index = binder.libraries.len();
+    let variable = binder.register_variable(name, Type::Library(index), true);
+    if variable.is_none() {
+        binder.diagnostic_bag.report_cannot_declare_variable(span, name);
+        return;
+    }
+    lib.relocate_static_memory(binder.label_offset);
+    lib.relocate_structs(binder.structs.len());
+    binder.label_offset += lib.program.label_count;
+    for strct in &lib.structs {
+        let struct_id = binder.register_generated_struct_name(format!("{}.{}", name, strct.name)).unwrap();
+        binder.register_struct(struct_id, strct.fields.iter().map(ToOwned::to_owned).map(Into::into).collect());
+    }
+    binder.libraries.push(lib);
 }
 
 fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {
@@ -1315,14 +1365,35 @@ fn bind_constructor_call<'a>(
 ) -> BoundNode<'a> {
     let type_name = constructor_call.type_name.lexeme;
     let type_name_span = constructor_call.type_name.span();
-    let type_ = bind_type(
-        TypeNode {
-            identifier: constructor_call.type_name,
-            optional_question_mark: None,
-            brackets: vec![],
-        },
-        binder,
-    );
+    let type_ = if let Some(library) = constructor_call.library_name {
+        let library_name = library.lexeme;
+        let library_variable = binder.look_up_variable_by_name(library_name);
+        if library_variable.is_none() {
+            binder.diagnostic_bag.report_unknown_library(library.span(), library_name);
+            return BoundNode::error(span);
+        }
+        let library_variable = library_variable.unwrap();
+        if !matches!(library_variable.type_, Type::Library(_)) {
+            binder.diagnostic_bag.report_cannot_convert(library.span(), &library_variable.type_, &Type::Library(0));
+            return BoundNode::error(span);
+        }
+        match binder.look_up_type_by_generated_name(format!("{}.{}", library_name, type_name)) {
+            Some(it) => it,
+            None => {
+                binder.diagnostic_bag.report_unknown_type(type_name_span, type_name);
+                return BoundNode::error(span);
+            },
+        }
+    } else {
+        bind_type(
+            TypeNode {
+                identifier: constructor_call.type_name,
+                optional_question_mark: None,
+                brackets: vec![],
+            },
+            binder,
+        )
+    };
     let struct_type = match type_ {
         Type::Struct(it) => *it,
         Type::StructReference(id) => binder.get_struct_by_id(id).unwrap(),

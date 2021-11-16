@@ -338,6 +338,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub(crate) fn report_unknown_library(&mut self, span: TextSpan, library_name: &str) {
+        let message = format!("No library named {} found. Did you misspell it? Or are you missing an import?", library_name);
+        self.report(message, span);
+    }
+
     pub fn report_no_main_function_found(&mut self) {
         let message = "No main() function found in file. Did you forget it? Or maybe this is a library.".into();
         self.report(message, TextSpan::zero());

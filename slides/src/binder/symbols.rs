@@ -24,7 +24,7 @@ impl Library {
         self.functions.iter().find(|f| f.name == name)
     }
 
-    pub fn relocate(&mut self, label_offset: usize) {
+    pub fn relocate_static_memory(&mut self, label_offset: usize) {
         for inst in self.instructions.iter_mut() {
             match inst {
                 InstructionOrLabelReference::Instruction(Instruction {
@@ -38,6 +38,23 @@ impl Library {
                     *label_reference += label_offset;
                 }
                 _ => {}
+            }
+        }
+    }
+
+    pub fn relocate_structs(&mut self, struct_offset: usize) {
+        for function in self.functions.iter_mut() {
+            for parameter in function.function_type.parameter_types.iter_mut() {
+                if let Type::StructReference(index) = parameter {
+                    *index += struct_offset as u64;
+                }
+            }
+        }
+        for strct in self.structs.iter_mut() {
+            for field in strct.fields.iter_mut() {
+                if let Type::StructReference(index) = &mut field.type_ {
+                    *index += struct_offset as u64;
+                }
             }
         }
     }
