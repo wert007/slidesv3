@@ -1,4 +1,4 @@
-use crate::instruction_converter::{InstructionOrLabelReference, Program, instruction::{Instruction, op_codes::OpCode}};
+use crate::instruction_converter::{InstructionOrLabelReference, LabelReference, Program, instruction::{Instruction, op_codes::OpCode}};
 
 use super::{typing::FunctionType, FunctionDeclarationBody};
 
@@ -30,11 +30,12 @@ impl Library {
                     op_code: OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Label,
                     ..
                 }) => {
-                    arg += label_offset as u64;
+                    *arg += label_offset as u64;
                 }
                 InstructionOrLabelReference::LabelReference(LabelReference {label_reference, .. }) => {
-                    label_reference += label_offset;
+                    *label_reference += label_offset;
                 }
+                _ => {}
             }
         }
     }

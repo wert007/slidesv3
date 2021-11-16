@@ -114,7 +114,7 @@ pub fn convert<'a>(
         let static_memory_size = converter.static_memory.size_in_bytes();
         for inst in lib.instructions.iter_mut() {
             if let InstructionOrLabelReference::Instruction(Instruction { arg, op_code: OpCode::LoadPointer, ..}) = inst {
-                arg += static_memory_size;
+                *arg += static_memory_size;
             }
         }
         converter.static_memory.insert(&mut lib.program.static_memory);
@@ -166,7 +166,7 @@ pub fn convert_library<'a>(
         let static_memory_size = converter.static_memory.size_in_bytes();
         for inst in lib.instructions.iter_mut() {
             if let InstructionOrLabelReference::Instruction(Instruction { arg, op_code: OpCode::LoadPointer, ..}) = inst {
-                arg += static_memory_size;
+                *arg += static_memory_size;
             }
         }
         converter.static_memory.insert(&mut lib.program.static_memory);
