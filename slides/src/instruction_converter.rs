@@ -12,13 +12,13 @@ use crate::{binder::{self, bound_nodes::{
             BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
             BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
             BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind,
-        }, operators::{BoundBinaryOperator, BoundUnaryOperator}, symbols::Library, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::memory::{bytes_to_word, stack::Stack, WORD_SIZE_IN_BYTES}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
+        }, operators::{BoundBinaryOperator, BoundUnaryOperator}, symbols::Library, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::memory::{WORD_SIZE_IN_BYTES, bytes_to_word, static_memory::StaticMemory}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
 
-use self::instruction::Instruction;
+use self::instruction::{Instruction, op_codes::OpCode};
 
 #[derive(Debug, Clone, Copy)]
 pub struct LabelReference {
-    label_reference: usize,
+    pub label_reference: usize,
     span: TextSpan,
 }
 
@@ -138,6 +138,7 @@ pub fn convert<'a>(
         stack: converter.stack,
         max_used_variables: bound_program.max_used_variables,
         protected_variables: converter.fixed_variable_count,
+        label_count: converter.next_label_index,
         entry_point,
     }
 }
@@ -182,6 +183,7 @@ pub fn convert_library<'a>(
             stack: converter.stack,
             max_used_variables: bound_program.max_used_variables,
             protected_variables: converter.fixed_variable_count,
+            label_count: converter.next_label_index,
             entry_point: !0,
         },
         functions: exported_functions,

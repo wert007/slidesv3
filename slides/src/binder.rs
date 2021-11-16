@@ -180,6 +180,9 @@ struct BindingState<'a, 'b> {
     /// of the variable. Is struct and is main is used in some places to
     /// differentiate them.
     functions: Vec<FunctionDeclarationBody<'a>>,
+    /// This is equal to the amount of labels used by the referenced libraries
+    /// and will ensure, that all labels will be unique per bound program.
+    label_offset: usize,
     /// This collects all the structs, which fields still need to be bound by the
     /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody<'a>>,
@@ -521,6 +524,7 @@ pub fn bind_program<'a>(
         type_table: type_table(),
         struct_table: vec![],
         functions: vec![],
+        label_offset: 0,
         structs: vec![],
         imports: vec![],
         libraries: vec![],
@@ -566,6 +570,7 @@ pub fn bind_program<'a>(
     let fixed_variable_count = binder.variable_table.len();
     let mut label_count = binder.functions.len();
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
+        let index = index + binder.label_offset;
         let mut parameters = Vec::with_capacity(node.parameters.len());
         for (variable_name, variable_type) in node.parameters {
             if let Some(it) = binder.register_variable(variable_name, variable_type, false) {
@@ -652,6 +657,7 @@ pub fn bind_library<'a>(
         type_table: type_table(),
         struct_table: vec![],
         functions: vec![],
+        label_offset: 0,
         structs: vec![],
         imports: vec![],
         libraries: vec![],
@@ -694,8 +700,9 @@ pub fn bind_library<'a>(
         .append(&mut type_names);
 
     let fixed_variable_count = binder.variable_table.len();
-    let mut label_count = binder.functions.len();
+    let mut label_count = binder.functions.len() + binder.label_offset;
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
+        let index = index + binder.label_offset;
         let mut parameters = Vec::with_capacity(node.parameters.len());
         for (variable_name, variable_type) in node.parameters {
             if let Some(it) = binder.register_variable(variable_name, variable_type, false) {
@@ -773,7 +780,9 @@ fn execute_import_function<'a>(import: BoundImportStatement<'a>, binder: &mut Bi
     match import.function {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
-            let lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"), binder.debug_flags);
+            let mut lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"), binder.debug_flags);
+            lib.relocate(binder.label_offset);
+            binder.label_offset += lib.program.label_count;
             let index = binder.libraries.len();
             binder.libraries.push(lib);
             binder.register_variable(import.name, Type::Library(index), true).unwrap();

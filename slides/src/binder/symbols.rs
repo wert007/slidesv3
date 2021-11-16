@@ -1,6 +1,6 @@
-use crate::instruction_converter::{InstructionOrLabelReference, Program};
+use crate::instruction_converter::{InstructionOrLabelReference, Program, instruction::{Instruction, op_codes::OpCode}};
 
-use super::{FunctionDeclarationBody, typing::FunctionType};
+use super::{typing::FunctionType, FunctionDeclarationBody};
 
 #[derive(Debug)]
 pub struct Library {
@@ -19,7 +19,24 @@ impl Library {
     }
 
     pub fn look_up_function_by_name(&self, name: &str) -> Option<&FunctionSymbol> {
-        self.functions.iter().find(|f|f.name == name)
+        self.functions.iter().find(|f| f.name == name)
+    }
+
+    pub fn relocate(&mut self, label_offset: usize) {
+        for inst in self.instructions.iter_mut() {
+            match inst {
+                InstructionOrLabelReference::Instruction(Instruction {
+                    arg,
+                    op_code: OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Label,
+                    ..
+                }) => {
+                    arg += label_offset as u64;
+                }
+                InstructionOrLabelReference::LabelReference(LabelReference {label_reference, .. }) => {
+                    label_reference += label_offset;
+                }
+            }
+        }
     }
 }
 
