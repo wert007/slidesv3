@@ -77,6 +77,7 @@ pub struct Program {
     pub instructions: Vec<Instruction>,
     pub max_used_variables: usize,
     pub protected_variables: usize,
+    pub entry_point: usize,
 }
 
 impl Program {
@@ -86,6 +87,7 @@ impl Program {
             instructions: vec![],
             max_used_variables: 0,
             protected_variables: 0,
+            entry_point: 0,
         }
     }
 }
@@ -116,7 +118,9 @@ pub fn convert<'a>(
     };
     // Push Pointer to 0 with value 0
     converter.stack.push(0);
-    let instructions = convert_node(bound_node, &mut converter);
+    let mut instructions : Vec<_> = bound_program.referenced_libraries.into_iter().map(|l| l.instructions).flatten().collect();
+    let entry_point = instructions.len();
+    instructions.append(&mut convert_node(bound_node, &mut converter));
     if debug_flags.print_instructions_and_labels {
         for (i, instruction) in instructions.iter().enumerate() {
             println!("  {:000}: {}", i, instruction);
@@ -134,6 +138,7 @@ pub fn convert<'a>(
         stack: converter.stack,
         max_used_variables: bound_program.max_used_variables,
         protected_variables: converter.fixed_variable_count,
+        entry_point,
     }
 }
 
@@ -177,6 +182,7 @@ pub fn convert_library<'a>(
             stack: converter.stack,
             max_used_variables: bound_program.max_used_variables,
             protected_variables: converter.fixed_variable_count,
+            entry_point: !0,
         },
         functions: exported_functions,
     }

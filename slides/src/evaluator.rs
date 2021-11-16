@@ -105,6 +105,7 @@ pub fn evaluate(
         runtime_error_happened: false,
     };
     let instructions = program.instructions;
+    state.pc = program.entry_point;
     while state.pc < instructions.len() {
         let pc = state.pc;
         if debug_flags.print_current_instruction() {
