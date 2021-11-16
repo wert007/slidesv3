@@ -1876,8 +1876,6 @@ fn bind_field_access<'a, 'b>(
             let library = &binder.libraries[*index];
             let function_name = field_access.field.lexeme;
             if let Some(function) = library.look_up_function_by_name(function_name) {
-                // FIXME: Currently the label index is not fixed for the needed
-                // relocation of the instructions!
                 BoundNode::label_reference(function.label_index as _, Type::function(function.function_type.clone()))
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(span, function_name, &Type::Library(*index));
