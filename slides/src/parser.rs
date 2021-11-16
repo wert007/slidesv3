@@ -141,7 +141,7 @@ fn parse_function_type<'a>(parser: &mut Parser<'a, '_>) -> FunctionTypeNode<'a> 
     let lparen = parser.match_token(SyntaxTokenKind::LParen);
     let mut parameters = vec![];
     let mut comma_tokens = vec![];
-    while parser.peek_token().kind != SyntaxTokenKind::RParen {
+    while !matches!(parser.peek_token().kind, SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi) {
         let token_count = parser.token_count();
         let parameter = parse_parameter(parser);
         parameters.push(parameter);
@@ -172,7 +172,7 @@ fn parse_function_type<'a>(parser: &mut Parser<'a, '_>) -> FunctionTypeNode<'a> 
 fn parse_struct_body<'a>(parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
     let lbrace = parser.match_token(SyntaxTokenKind::LBrace);
     let mut statements = vec![];
-    while parser.peek_token().kind != SyntaxTokenKind::RBrace {
+    while !matches!(parser.peek_token().kind, SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi) {
         let token_count = parser.token_count();
         let statement = match parser.peek_token().kind {
             SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
