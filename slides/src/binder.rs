@@ -631,10 +631,11 @@ pub fn bind_program<'a>(
             println!("  {}: {:#?}", id, entry);
         }
     }
+    let max_used_variables = binder.max_used_variables.max(binder.libraries.iter().map(|l|l.program.max_used_variables).max().unwrap_or(0));
     BoundProgram {
         program,
         fixed_variable_count,
-        max_used_variables: binder.max_used_variables,
+        max_used_variables,
         label_count,
         referenced_libraries: binder.libraries,
     }
