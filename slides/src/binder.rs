@@ -1019,20 +1019,20 @@ fn bind_import_function<'a>(
                 function_name => {
                     binder
                         .diagnostic_bag
-                        ._report_unknown_import_function(base.token.span(), function_name);
+                        .report_unknown_import_function(base.token.span(), function_name);
                     None
                 }
             }
         } else {
             binder
                 .diagnostic_bag
-                ._report_only_function_call_in_import_statement(function.base.span);
+                .report_only_function_call_in_import_statement(function.base.span);
             None
         }
     } else {
         binder
             .diagnostic_bag
-            ._report_only_function_call_in_import_statement(function.span);
+            .report_only_function_call_in_import_statement(function.span);
         None
     }
 }
