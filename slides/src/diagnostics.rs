@@ -1,9 +1,4 @@
-use crate::{
-    binder::{typing::Type, BoundStructType},
-    lexer::syntax_token::SyntaxTokenKind,
-    parser::syntax_nodes::SyntaxNodeKind,
-    text::{SourceText, TextLocation, TextSpan},
-};
+use crate::{binder::{BoundStructSymbol, typing::Type}, lexer::syntax_token::SyntaxTokenKind, parser::syntax_nodes::SyntaxNodeKind, text::{SourceText, TextLocation, TextSpan}};
 
 #[derive(Debug, Clone)]
 pub struct Diagnostic<'a> {
@@ -246,7 +241,7 @@ impl<'a> DiagnosticBag<'a> {
         &mut self,
         span: TextSpan,
         field_name: &str,
-        bound_struct_type: BoundStructType,
+        bound_struct_type: BoundStructSymbol<'_>,
     ) {
         let mut message = format!(
             "There is no field named {} on struct {}.",
@@ -258,7 +253,7 @@ impl<'a> DiagnosticBag<'a> {
             message.push_str("\n  Available fields are:\n");
             for field in &bound_struct_type.fields {
                 message.push_str("    ");
-                message.push_str(field.name);
+                message.push_str(&field.name);
                 message.push_str(": ");
                 message.push_str(&field.type_.to_string());
                 message.push_str(";\n");

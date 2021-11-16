@@ -8,7 +8,7 @@ pub mod symbols;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 
 use crate::{DebugFlags, binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
@@ -28,33 +28,8 @@ use crate::{DebugFlags, binder::{
         },
     }, text::{SourceText, TextSpan}, value::Value};
 
-use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator, symbols::{FunctionSymbol, Library}, typing::{FunctionType, StructType, SystemCallKind}};
+use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator, symbols::{FunctionSymbol, Library, StructFieldSymbol, StructSymbol}, typing::{FunctionType, StructType, SystemCallKind}};
 
-enum SmartString<'a> {
-    Heap(String),
-    Reference(&'a str),
-}
-
-impl From<String> for SmartString<'_> {
-    fn from(value: String) -> Self {
-        Self::Heap(value)
-    }
-}
-
-impl<'a> From<&'a str> for SmartString<'a> {
-    fn from(value: &'a str) -> Self {
-        Self::Reference(value)
-    }
-}
-
-impl AsRef<str> for SmartString<'_> {
-    fn as_ref(&self) -> &str {
-        match self {
-            SmartString::Heap(str) => &str,
-            SmartString::Reference(str) => str,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 enum SafeNodeInCondition<'a> {
@@ -98,35 +73,33 @@ struct VariableEntry {
     is_read_only: bool,
 }
 
-struct StructField<'a> {
-    name: &'a str,
-    type_: Type,
-    is_read_only: bool,
-}
-
+#[derive(Debug)]
 struct BoundVariableName<'a> {
-    pub identifier: SmartString<'a>,
+    pub identifier: Cow<'a, str>,
     pub type_: Type,
     pub is_read_only: bool,
 }
 
 #[derive(Debug, Clone)]
-pub struct BoundField<'a> {
-    pub name: &'a str,
+pub struct BoundStructSymbol<'a> {
+    pub name: Cow<'a, str>,
+    pub fields: Vec<BoundStructFieldSymbol<'a>>,
+}
+
+impl BoundStructSymbol<'_> {
+    pub fn field(&self, name: &str) -> Option<&BoundStructFieldSymbol> {
+        self.fields.iter().find(|f|f.name == name)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundStructFieldSymbol<'a> {
+    pub name: Cow<'a, str>,
+    pub type_: Type,
     pub offset: u64,
-    pub type_: Type,
     pub is_read_only: bool,
 }
 
-#[derive(Debug, Clone)]
-pub struct BoundStructType<'a> {
-    pub name: &'a str,
-    pub fields: Vec<BoundField<'a>>,
-}
-
-impl<'a> BoundStructType<'a> {
-    pub fn field(&self, name: &'a str) -> Option<&BoundField> {
-        self.fields.iter().find(|f| f.name == name)
     }
 }
 
@@ -166,7 +139,7 @@ struct BindingState<'a, 'b> {
     /// read only, even though this is currently (12.10.2021) only used for
     /// functions on structs since they are also fields in some way. But
     /// functions on structs are still registered in the functions table.
-    struct_table: Vec<BoundStructType<'a>>,
+    struct_table: Vec<BoundStructSymbol<'a>>,
     /// This contains all function declarations the binder found while walking
     /// the top level statements and after that the struct fields. The function
     /// declaration body contains the necessary information for the function
@@ -272,7 +245,7 @@ impl<'a> BindingState<'a, '_> {
         self.register_type(name, Type::StructReference(id))
     }
 
-    fn register_struct(&mut self, id: u64, fields: Vec<StructField<'a>>) -> u64 {
+    fn register_struct(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>) -> u64 {
         let struct_type = StructType {
             id,
             fields: fields
@@ -287,26 +260,10 @@ impl<'a> BindingState<'a, '_> {
                 .collect(),
         };
         self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
-        let name = if let SmartString::Reference(it) = self.type_table[id as usize].identifier {
-            it
-        } else {
-            unreachable!("There should be no generated Struct Names!");
-        };
-        let mut offset = 0;
-        let bound_struct_type = BoundStructType {
+        let name = self.type_table[id as usize].identifier.clone();
+        let bound_struct_type = BoundStructSymbol {
             name,
-            fields: fields
-                .into_iter()
-                .map(|field| {
-                    offset += field.type_.size_in_bytes();
-                    BoundField {
-                        name: field.name,
-                        offset: offset - field.type_.size_in_bytes(),
-                        type_: field.type_,
-                        is_read_only: field.is_read_only,
-                    }
-                })
-                .collect(),
+            fields: fields.into_iter().map(Into::into).collect(),
         };
         self.struct_table.push(bound_struct_type);
         id
@@ -406,7 +363,7 @@ impl<'a> BindingState<'a, '_> {
             })
     }
 
-    fn get_struct_type_by_id(&self, id: u64) -> Option<&BoundStructType<'a>> {
+    fn get_struct_type_by_id(&self, id: u64) -> Option<&BoundStructSymbol<'a>> {
         // FIXME: The 4 represents the four primary types in the type table
         // (int, bool, string, and any), this could be moved to a better place I
         // think.
@@ -928,7 +885,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     struct_name: &'a str,
     function_declaration: FunctionDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> StructField<'a> {
+) -> BoundStructFieldSymbol<'a> {
     let struct_type = binder.look_up_type_by_name(struct_name).unwrap();
     let (function_type, mut variables) = bind_function_type(
         Some(struct_type.clone()),
@@ -1091,8 +1048,9 @@ fn bind_struct_body<'a>(
     struct_name: &'a str,
     struct_body: StructBodyNode<'a>,
     binder: &mut BindingState<'a, '_>,
-) -> Vec<StructField<'a>> {
-    let mut result: Vec<StructField<'a>> = vec![];
+) -> Vec<BoundStructFieldSymbol<'a>> {
+    let mut result: Vec<BoundStructFieldSymbol<'a>> = vec![];
+    let mut offset = 0;
     for statement in struct_body.statements {
         let span = statement.span;
         let field = match statement.kind {
@@ -1101,18 +1059,20 @@ fn bind_struct_body<'a>(
             }
             SyntaxNodeKind::StructField(struct_field) => {
                 let (name, type_) = bind_parameter(struct_field.field, binder);
-                StructField {
-                    name,
+                offset += type_.size_in_bytes();
+                BoundStructFieldSymbol {
+                    name: name.into(),
+                    offset: offset - type_.size_in_bytes(),
                     type_,
                     is_read_only: false,
                 }
             }
             unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
         };
-        if result.iter().any(|f| f.name == field.name) {
+        if result.iter().any(|f| &f.name == &field.name) {
             binder
                 .diagnostic_bag
-                .report_parameter_already_declared(span, field.name);
+                .report_parameter_already_declared(span, &field.name);
         }
         result.push(field);
     }
