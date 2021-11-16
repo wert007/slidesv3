@@ -1373,9 +1373,13 @@ fn bind_constructor_call<'a>(
             return BoundNode::error(span);
         }
         let library_variable = library_variable.unwrap();
-        if !matches!(library_variable.type_, Type::Library(_)) {
-            binder.diagnostic_bag.report_cannot_convert(library.span(), &library_variable.type_, &Type::Library(0));
-            return BoundNode::error(span);
+        match library_variable.type_ {
+            Type::Error => return BoundNode::error(span),
+            Type::Library(_) => {},
+            wrong_type => {
+                binder.diagnostic_bag.report_cannot_convert(library.span(), &wrong_type, &Type::Library(0));
+                return BoundNode::error(span);
+            }
         }
         match binder.look_up_type_by_generated_name(format!("{}.{}", library_name, type_name)) {
             Some(it) => it,
