@@ -1165,11 +1165,31 @@ fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -
 }
 
 fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
-    let type_name = type_.identifier.lexeme;
-    let mut result = binder.look_up_type_by_name(type_name).unwrap_or_else(|| {
+    let type_name = type_.type_name.lexeme;
+    let type_span = type_.span();
+    let mut result = if let Some(library_token) = type_.library_name {
+        let library_name = library_token.lexeme;
+        let library_variable = if let Some(it) = binder.look_up_variable_by_name(library_name) {
+            it
+        } else {
+            binder.diagnostic_bag.report_unknown_library(library_token.span(), library_name);
+            return Type::Error;
+        };
+        match &library_variable.type_ {
+            Type::Error => return Type::Error,
+            Type::Library(_) => {},
+            wrong_type => {
+                binder.diagnostic_bag.report_cannot_convert(library_token.span(), wrong_type, &Type::Library(0));
+                return Type::Error;
+            }
+        }
+        binder.look_up_type_by_generated_name(format!("{}.{}", library_name, type_name))
+    } else {
+        binder.look_up_type_by_name(type_name)
+    }.unwrap_or_else(|| {
         binder
             .diagnostic_bag
-            .report_unknown_type(type_.span(), type_name);
+            .report_unknown_type(type_span, type_name);
         Type::Error
     });
     if type_.optional_question_mark.is_some() {
@@ -1375,42 +1395,19 @@ fn bind_constructor_call<'a>(
 ) -> BoundNode<'a> {
     let type_name = constructor_call.type_name.lexeme;
     let type_name_span = constructor_call.type_name.span();
-    let type_ = if let Some(library) = constructor_call.library_name {
-        let library_name = library.lexeme;
-        let library_variable = binder.look_up_variable_by_name(library_name);
-        if library_variable.is_none() {
-            binder.diagnostic_bag.report_unknown_library(library.span(), library_name);
-            return BoundNode::error(span);
-        }
-        let library_variable = library_variable.unwrap();
-        match library_variable.type_ {
-            Type::Error => return BoundNode::error(span),
-            Type::Library(_) => {},
-            wrong_type => {
-                binder.diagnostic_bag.report_cannot_convert(library.span(), &wrong_type, &Type::Library(0));
-                return BoundNode::error(span);
-            }
-        }
-        match binder.look_up_type_by_generated_name(format!("{}.{}", library_name, type_name)) {
-            Some(it) => it,
-            None => {
-                binder.diagnostic_bag.report_unknown_type(type_name_span, type_name);
-                return BoundNode::error(span);
-            },
-        }
-    } else {
-        bind_type(
+    let type_ = bind_type(
             TypeNode {
-                identifier: constructor_call.type_name,
+                library_name: constructor_call.library_name,
+                type_name: constructor_call.type_name,
                 optional_question_mark: None,
                 brackets: vec![],
             },
             binder,
-        )
-    };
+        );
     let struct_type = match type_ {
         Type::Struct(it) => *it,
         Type::StructReference(id) => binder.get_struct_by_id(id).unwrap(),
+        Type::Error => return BoundNode::error(span),
         _ => {
             binder
                 .diagnostic_bag

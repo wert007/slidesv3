@@ -702,19 +702,22 @@ pub struct TypeDeclaration<'a> {
 
 #[derive(Debug, Clone)]
 pub struct TypeNode<'a> {
-    pub identifier: SyntaxToken<'a>,
+    pub library_name: Option<SyntaxToken<'a>>,
+    pub type_name: SyntaxToken<'a>,
     pub optional_question_mark: Option<SyntaxToken<'a>>,
     pub brackets: Vec<SyntaxToken<'a>>,
 }
 
 impl<'a> TypeNode<'a> {
     pub fn new(
-        identifier: SyntaxToken<'a>,
+        library_name: Option<SyntaxToken<'a>>,
+        type_name: SyntaxToken<'a>,
         optional_question_mark: Option<SyntaxToken<'a>>,
         brackets: Vec<SyntaxToken<'a>>,
     ) -> Self {
         Self {
-            identifier,
+            library_name,
+            type_name,
             optional_question_mark,
             brackets,
         }
@@ -722,8 +725,8 @@ impl<'a> TypeNode<'a> {
 
     pub fn span(&self) -> TextSpan {
         TextSpan::bounds(
-            self.identifier.span(),
-            self.brackets.last().unwrap_or(&self.identifier).span(),
+            self.type_name.span(),
+            self.brackets.last().unwrap_or(&self.type_name).span(),
         )
     }
 }

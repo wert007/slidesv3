@@ -210,6 +210,13 @@ fn parse_parameter<'a>(parser: &mut Parser<'a, '_>) -> ParameterNode<'a> {
 
 fn parse_type<'a>(parser: &mut Parser<'a, '_>) -> TypeNode<'a> {
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
+    let (library_name, type_name) = if parser.peek_token().kind == SyntaxTokenKind::Period {
+        parser.next_token();
+        let type_name = parser.match_token(SyntaxTokenKind::Identifier);
+        (Some(identifier), type_name)
+    } else {
+        (None, identifier)
+    };
     let optional_question_mark = if parser.peek_token().kind == SyntaxTokenKind::QuestionMark {
         Some(parser.next_token())
     } else {
@@ -226,7 +233,7 @@ fn parse_type<'a>(parser: &mut Parser<'a, '_>) -> TypeNode<'a> {
         brackets.push(SyntaxToken::bracket_pair(lbracket, rbracket));
     }
 
-    TypeNode::new(identifier, optional_question_mark, brackets)
+    TypeNode::new(library_name, type_name, optional_question_mark, brackets)
 }
 
 fn parse_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
