@@ -852,7 +852,7 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
             bind_function_declaration(*function_declaration, binder)
         }
         SyntaxNodeKind::ImportStatement(import_statement) => {
-            bind_import_statement(import_statement, binder)
+            bind_import_statement(node.span, import_statement, binder)
         }
         SyntaxNodeKind::StructDeclaration(struct_declaration) => {
             bind_struct_declaration(struct_declaration, binder)
@@ -962,14 +962,16 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         function_type,
         is_struct_function: true,
     });
-    StructField {
-        name: function_declaration.identifier.lexeme,
+    BoundStructFieldSymbol {
+        name: function_declaration.identifier.lexeme.into(),
         type_,
         is_read_only: true,
+        offset: 0,
     }
 }
 
 fn bind_import_statement<'a>(
+    span: TextSpan,
     import_statement: ImportStatementNodeKind<'a>,
     binder: &mut BindingState<'a, '_>,
 ) {
@@ -983,6 +985,7 @@ fn bind_import_statement<'a>(
     let import_statement = BoundImportStatement {
         function: import_function,
         name,
+        span,
     };
     binder.imports.push(import_statement);
 }
