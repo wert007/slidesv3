@@ -1708,6 +1708,9 @@ fn bind_function_call<'a, 'b>(
     } else {
         function
     };
+    if matches!(function.type_, Type::Error) {
+        return BoundNode::error(span);
+    }
     let function_type = function_type(&function.type_);
     arguments.append(&mut bind_arguments_for_function(
         argument_span,
