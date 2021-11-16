@@ -786,7 +786,6 @@ fn execute_import_function<'a>(import: BoundImportStatement<'a>, binder: &mut Bi
             let index = binder.libraries.len();
             binder.libraries.push(lib);
             binder.register_variable(import.name, Type::Library(index), true).unwrap();
-            // dbg!(lib);
         },
     }
 }
