@@ -1,12 +1,13 @@
 use crate::instruction_converter::{InstructionOrLabelReference, LabelReference, Program, instruction::{Instruction, op_codes::OpCode}};
 
-use super::{typing::FunctionType, FunctionDeclarationBody};
+use super::{BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, typing::{FunctionType, Type}};
 
 #[derive(Debug)]
 pub struct Library {
     pub instructions: Vec<InstructionOrLabelReference>,
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
+    pub structs: Vec<StructSymbol>,
 }
 
 impl Library {
@@ -15,6 +16,7 @@ impl Library {
             instructions: vec![],
             program: Program::error(),
             functions: vec![],
+            structs: vec![],
         }
     }
 
@@ -54,6 +56,46 @@ impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
             name: it.function_name.into(),
             function_type: it.function_type,
             label_index: it.function_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StructSymbol {
+    pub name: String,
+    pub fields: Vec<StructFieldSymbol>,
+}
+
+impl StructSymbol {
+    pub fn field(&self, name: &str) -> Option<&StructFieldSymbol> {
+        self.fields.iter().find(|f|f.name == name)
+    }
+}
+
+impl From<BoundStructSymbol<'_>> for StructSymbol {
+    fn from(it: BoundStructSymbol<'_>) -> Self {
+        Self {
+            name: it.name.into(),
+            fields: it.fields.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StructFieldSymbol {
+    pub name: String,
+    pub type_: Type,
+    pub offset: u64,
+    pub is_read_only: bool,
+}
+
+impl From<BoundStructFieldSymbol<'_>> for StructFieldSymbol {
+    fn from(it: BoundStructFieldSymbol<'_>) -> Self {
+        Self {
+            name: it.name.into(),
+            type_: it.type_,
+            offset: it.offset,
+            is_read_only: it.is_read_only,
         }
     }
 }

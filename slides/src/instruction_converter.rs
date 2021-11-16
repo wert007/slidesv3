@@ -155,6 +155,7 @@ pub fn convert_library<'a>(
         return Library::error();
     }
     let exported_functions = bound_program.exported_functions;
+    let exported_structs = bound_program.exported_structs;
     let mut bound_program = bound_program.program;
     let bound_node = bound_program.program;
     let mut converter = InstructionConverter {
@@ -195,6 +196,7 @@ pub fn convert_library<'a>(
             entry_point: !0,
         },
         functions: exported_functions,
+        structs: exported_structs,
     }
 }
 

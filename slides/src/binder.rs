@@ -80,6 +80,10 @@ struct BoundVariableName<'a> {
     pub is_read_only: bool,
 }
 
+/// This is quite similiar to symbols::StructSymbol, the only difference being,
+/// that this version does not need an allocation. They can be easily converted
+/// into each other. This version is only used during binding, while the other
+/// version is exported in the symbols::Library type.
 #[derive(Debug, Clone)]
 pub struct BoundStructSymbol<'a> {
     pub name: Cow<'a, str>,
@@ -92,6 +96,10 @@ impl BoundStructSymbol<'_> {
     }
 }
 
+/// This is quite similiar to symbols::StructFieldSymbol, the only difference
+/// being, that this version does not need an allocation. They can be easily
+/// converted into each other. This version is only used during binding, while
+/// the other version is exported in the symbols::Library type.
 #[derive(Debug, Clone)]
 pub struct BoundStructFieldSymbol<'a> {
     pub name: Cow<'a, str>,
@@ -100,6 +108,14 @@ pub struct BoundStructFieldSymbol<'a> {
     pub is_read_only: bool,
 }
 
+impl From<StructFieldSymbol> for BoundStructFieldSymbol<'_> {
+    fn from(it: StructFieldSymbol) -> Self {
+        Self {
+            name: it.name.into(),
+            type_: it.type_,
+            offset: it.offset,
+            is_read_only: it.is_read_only,
+        }
     }
 }
 
@@ -428,6 +444,7 @@ impl BoundProgram<'_> {
 pub struct BoundLibrary<'a> {
     pub program: BoundProgram<'a>,
     pub exported_functions: Vec<FunctionSymbol>,
+    pub exported_structs: Vec<StructSymbol>,
 }
 
 impl BoundLibrary<'_> {
@@ -435,6 +452,7 @@ impl BoundLibrary<'_> {
         Self {
             program: BoundProgram::error(),
             exported_functions: vec![],
+            exported_structs: vec![],
         }
     }
 }
@@ -730,6 +748,7 @@ pub fn bind_library<'a>(
                     referenced_libraries: binder.libraries,
                 },
         exported_functions: binder.functions.into_iter().map(Into::into).collect(),
+        exported_structs: binder.struct_table.into_iter().map(Into::into).collect(),
     }
 }
 
