@@ -802,9 +802,19 @@ fn execute_import_function<'a>(import: BoundImportStatement<'a>, binder: &mut Bi
 
 fn load_library_into_binder<'a>(span: TextSpan, name: &'a str, mut lib: Library, binder: &mut BindingState<'a, '_>) {
     let index = binder.libraries.len();
-    let variable = binder.register_variable(name, Type::Library(index), true);
+    let mut should_load_library = true;
+    let variable = if lib.has_errors {
+        binder.diagnostic_bag.report_errors_in_referenced_library(span, name);
+        should_load_library = false;
+        binder.register_variable(name, Type::Error, true)
+    } else {
+        binder.register_variable(name, Type::Library(index), true)
+    };
     if variable.is_none() {
         binder.diagnostic_bag.report_cannot_declare_variable(span, name);
+        should_load_library = false;
+    }
+    if !should_load_library {
         return;
     }
     lib.relocate_static_memory(binder.label_offset);

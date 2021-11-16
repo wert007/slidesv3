@@ -197,6 +197,7 @@ pub fn convert_library<'a>(
         },
         functions: exported_functions,
         structs: exported_structs,
+        has_errors: false,
     }
 }
 

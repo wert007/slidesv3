@@ -8,6 +8,7 @@ pub struct Library {
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
     pub structs: Vec<StructSymbol>,
+    pub has_errors: bool,
 }
 
 impl Library {
@@ -17,6 +18,7 @@ impl Library {
             program: Program::error(),
             functions: vec![],
             structs: vec![],
+            has_errors: true,
         }
     }
 

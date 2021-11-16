@@ -343,6 +343,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_errors_in_referenced_library(&mut self, span: TextSpan, library_name: &str) {
+        let message = format!("Errors in {} found. Fix them and recompile.", library_name);
+        self.report(message, span);
+    }
+
     pub fn report_no_main_function_found(&mut self) {
         let message = "No main() function found in file. Did you forget it? Or maybe this is a library.".into();
         self.report(message, TextSpan::zero());
