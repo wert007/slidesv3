@@ -821,8 +821,12 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
 fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
     let span = TextSpan::zero();
     let base = binder
-        .look_up_variable_by_name("main")
-        .expect("No main function found..");
+        .look_up_variable_by_name("main");
+    if base.is_none() {
+        binder.diagnostic_bag.report_no_main_function_found();
+        return BoundNode::error(span);
+    }
+    let base = base.unwrap();
     let base = BoundNode::variable(span, base.id, base.type_);
     let call_main = BoundNode::function_call(span, base, vec![], false, Type::Void);
     BoundNode::expression_statement(span, call_main)

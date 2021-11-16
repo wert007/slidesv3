@@ -343,6 +343,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_no_main_function_found(&mut self) {
+        let message = "No main() function found in file. Did you forget it? Or maybe this is a library.".into();
+        self.report(message, TextSpan::zero());
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(
