@@ -1863,7 +1863,12 @@ fn bind_field_access<'a, 'b>(
                             "{}::{}",
                             bound_struct_type.name, field_name
                         ))
-                        .unwrap();
+                        .unwrap_or_else(||
+                            panic!(
+                                "{}::{}",
+                                bound_struct_type.name, field_name
+                            )
+                        );
                     BoundNode::closure(
                         span,
                         base,
