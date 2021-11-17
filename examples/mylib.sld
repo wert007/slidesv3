@@ -1,11 +1,12 @@
 import lib('math') as math;
+
 // library mylib {
 //     use func;
 // }
 
-func sayHello(name: string) {
-    print('Hello, ' + name + '!');
-}
+// func sayHello(name: string) {
+//     print('Hello, ' + name + '!');
+// }
 
 struct Point {
     x : int;
@@ -16,6 +17,6 @@ struct Point {
     }
 }
 
-func printPoint(pt: Point) {
-    print('Point(' + pt.x + ', ' + pt.y + ')');
-}
+// func printPoint(pt: Point) {
+//     print('Point(' + pt.x + ', ' + pt.y + ')');
+// }
