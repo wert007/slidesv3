@@ -824,6 +824,11 @@ fn load_library_into_binder<'a>(span: TextSpan, name: &'a str, mut lib: Library,
         let struct_id = binder.register_generated_struct_name(format!("{}.{}", name, strct.name)).unwrap();
         binder.register_struct(struct_id, strct.fields.iter().map(ToOwned::to_owned).map(Into::into).collect());
     }
+    for function in &lib.functions {
+        if function.is_member_function {
+            binder.register_generated_variable(format!("{}.{}", name, function.name), Type::function(function.function_type.clone()), true);
+        }
+    }
     binder.libraries.push(lib);
 }
 
