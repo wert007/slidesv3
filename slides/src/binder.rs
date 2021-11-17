@@ -94,6 +94,13 @@ impl BoundStructSymbol<'_> {
     pub fn field(&self, name: &str) -> Option<&BoundStructFieldSymbol> {
         self.fields.iter().find(|f|f.name == name)
     }
+
+    pub fn empty() -> Self {
+        Self {
+            name: String::new().into(),
+            fields: vec![],
+        }
+    }
 }
 
 /// This is quite similiar to symbols::StructFieldSymbol, the only difference
@@ -281,13 +288,22 @@ impl<'a> BindingState<'a, '_> {
                 .collect(),
         };
         self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
+        self.insert_into_struct_table(id, fields.into_iter().map(Into::into).collect());
+        id
+    }
+
+    pub fn insert_into_struct_table(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>) {
         let name = self.type_table[id as usize].identifier.clone();
         let bound_struct_type = BoundStructSymbol {
             name,
-            fields: fields.into_iter().map(Into::into).collect(),
+            fields,
         };
-        self.struct_table.push(bound_struct_type);
-        id
+        let struct_id = id as usize - type_table().len();
+        while struct_id >= self.struct_table.len() {
+            self.struct_table.push(BoundStructSymbol::empty());
+        }
+        assert!(self.struct_table[struct_id].name.is_empty());
+        self.struct_table[struct_id] = bound_struct_type;
     }
 
     fn register_type(&mut self, name: &'a str, type_: Type) -> Option<u64> {
@@ -818,7 +834,7 @@ fn load_library_into_binder<'a>(span: TextSpan, name: &'a str, mut lib: Library,
         return;
     }
     lib.relocate_static_memory(binder.label_offset);
-    lib.relocate_structs(binder.structs.len());
+    lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
     binder.label_offset += lib.program.label_count;
     for strct in &lib.structs {
         let struct_id = binder.register_generated_struct_name(format!("{}.{}", name, strct.name)).unwrap();
