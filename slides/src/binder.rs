@@ -50,7 +50,7 @@ impl SafeNodeInCondition<'_> {
 
 #[derive(Clone, Debug)]
 struct FunctionDeclarationBody<'a> {
-    function_name: &'a str,
+    function_name: Cow<'a, str>,
     body: SyntaxNode<'a>,
     parameters: Vec<(&'a str, Type)>,
     is_main: bool,
@@ -607,7 +607,7 @@ pub fn bind_program<'a>(
         let body_statements = lowerer::flatten(body, &mut label_count);
         if !matches!(&binder.function_return_type, Type::Void)
             && !control_flow_analyzer::check_if_all_paths_return(
-                node.function_name,
+                &node.function_name,
                 &body_statements,
                 debug_flags,
             )
@@ -740,7 +740,7 @@ pub fn bind_library<'a>(
         let body_statements = lowerer::flatten(body, &mut label_count);
         if !matches!(&binder.function_return_type, Type::Void)
             && !control_flow_analyzer::check_if_all_paths_return(
-                node.function_name,
+                &node.function_name,
                 &body_statements,
                 debug_flags,
             )
@@ -949,7 +949,7 @@ fn bind_function_declaration<'a, 'b>(
         0
     };
     binder.functions.push(FunctionDeclarationBody {
-        function_name: function_declaration.identifier.lexeme,
+        function_name: function_declaration.identifier.lexeme.into(),
         body: *function_declaration.body,
         parameters: variables,
         is_main,
@@ -979,7 +979,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     let type_ = Type::Function(Box::new(function_type.clone()));
     let function_id = binder.functions.len() as _;
     let variable_id =
-        if let Some(it) = binder.register_generated_variable(function_name, type_.clone(), true) {
+        if let Some(it) = binder.register_generated_variable(function_name.clone(), type_.clone(), true) {
             it
         } else {
             binder.diagnostic_bag.report_cannot_declare_variable(
@@ -989,7 +989,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
             0
         };
     binder.functions.push(FunctionDeclarationBody {
-        function_name: function_declaration.identifier.lexeme,
+        function_name: function_name.into(),
         body: *function_declaration.body,
         parameters: variables,
         is_main: false,
