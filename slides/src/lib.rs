@@ -24,7 +24,7 @@ pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags) -> Library wh
         return Library::error();
     }
     let source_code = source_code.unwrap();
-    let file_name = path.file_name().unwrap().to_string_lossy();
+    let file_name = path.to_string_lossy();
     load_library(&source_code, &file_name, debug_flags)
 }
 
