@@ -19,7 +19,7 @@ use self::instruction::{Instruction, op_codes::OpCode};
 #[derive(Debug, Clone, Copy)]
 pub struct LabelReference {
     pub label_reference: usize,
-    span: TextSpan,
+    pub span: TextSpan,
 }
 
 #[derive(Debug, Clone, Copy)]
