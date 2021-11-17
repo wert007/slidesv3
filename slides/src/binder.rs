@@ -182,9 +182,6 @@ struct BindingState<'a, 'b> {
     /// This collects all the structs, which fields still need to be bound by the
     /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody<'a>>,
-    /// This collects all imports, which are not executed yet. This should be
-    /// empty, before starting to bind structs or functions.
-    imports: Vec<BoundImportStatement<'a>>,
     /// This has all libraries which where loaded by imports. They can be
     /// referenced for name lookups.
     libraries: Vec<Library>,
@@ -554,7 +551,6 @@ pub fn bind_program<'a>(
         functions: vec![],
         label_offset: 0,
         structs: vec![],
-        imports: vec![],
         libraries: vec![],
         constants: vec![],
         safe_nodes: vec![],
@@ -573,11 +569,6 @@ pub fn bind_program<'a>(
             BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()),
             BoundNode::literal_from_value(constant.clone()),
         ));
-    }
-    statements.push(call_main(&mut binder));
-
-    for import in binder.imports.clone() {
-        execute_import_function(import, &mut binder);
     }
 
     for node in binder.structs.clone() {
@@ -688,7 +679,6 @@ pub fn bind_library<'a>(
         functions: vec![],
         label_offset: 0,
         structs: vec![],
-        imports: vec![],
         libraries: vec![],
         constants: vec![],
         safe_nodes: vec![],
@@ -709,9 +699,6 @@ pub fn bind_library<'a>(
         ));
     }
 
-    for import in binder.imports.clone() {
-        execute_import_function(import, &mut binder);
-    }
 
     for node in binder.structs.clone() {
         let fields = bind_struct_body(node.name, node.body, &mut binder);
@@ -1044,7 +1031,7 @@ fn bind_import_statement<'a>(
         name,
         span,
     };
-    binder.imports.push(import_statement);
+    execute_import_function(import_statement, binder);
 }
 
 fn bind_import_function<'a>(
