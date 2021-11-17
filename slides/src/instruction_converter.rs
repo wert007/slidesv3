@@ -74,6 +74,7 @@ impl InstructionConverter {
 #[derive(Debug)]
 pub struct Program {
     pub static_memory: StaticMemory,
+    pub startup_instructions: Vec<Instruction>,
     pub instructions: Vec<Instruction>,
     pub max_used_variables: usize,
     pub protected_variables: usize,
@@ -85,6 +86,7 @@ impl Program {
     pub fn error() -> Self {
         Self {
             static_memory: StaticMemory::new(DebugFlags::default()),
+            startup_instructions: vec![],
             instructions: vec![],
             max_used_variables: 0,
             protected_variables: 0,
@@ -103,7 +105,7 @@ pub fn convert<'a>(
     if diagnostic_bag.has_errors() {
         return Program::error();
     }
-    let bound_node = bound_program.program;
+    let bound_node = bound_program.functions;
     let mut converter = InstructionConverter {
         static_memory: StaticMemory::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
@@ -119,8 +121,9 @@ pub fn convert<'a>(
         }
         converter.static_memory.insert(&mut lib.program.static_memory);
     }
-    let mut instructions : Vec<_> = bound_program.referenced_libraries.into_iter().map(|l| l.instructions).flatten().collect();
-    let entry_point = instructions.len();
+    let mut instructions = bound_program.startup;
+    instructions.append(&mut bound_program.referenced_libraries.into_iter().map(|l| l.instructions).flatten().collect());
+    let entry_point = 0;
     instructions.append(&mut convert_node(bound_node, &mut converter));
     if debug_flags.print_instructions_and_labels {
         for (i, instruction) in instructions.iter().enumerate() {
@@ -135,6 +138,7 @@ pub fn convert<'a>(
         }
     }
     Program {
+        startup_instructions: vec![],
         instructions,
         static_memory: converter.static_memory,
         max_used_variables: bound_program.max_used_variables,
@@ -157,7 +161,7 @@ pub fn convert_library<'a>(
     let exported_functions = bound_program.exported_functions;
     let exported_structs = bound_program.exported_structs;
     let mut bound_program = bound_program.program;
-    let bound_node = bound_program.program;
+    let bound_node = bound_program.functions;
     let mut converter = InstructionConverter {
         static_memory: StaticMemory::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
@@ -187,7 +191,9 @@ pub fn convert_library<'a>(
     }
     Library {
         instructions,
+        startup: bound_program.startup,
         program: Program {
+            startup_instructions: vec![],
             instructions: vec![],
             static_memory: converter.static_memory,
             max_used_variables: bound_program.max_used_variables,

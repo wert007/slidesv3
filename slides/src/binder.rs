@@ -14,7 +14,7 @@ use crate::{DebugFlags, binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    }, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
+    }, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, instruction_converter::{InstructionOrLabelReference, LabelReference, instruction::Instruction}, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
         self,
         syntax_nodes::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
@@ -472,7 +472,8 @@ fn print_variable_table(variable_table: &[BoundVariableName]) {
 }
 
 pub struct BoundProgram<'a> {
-    pub program: BoundNode<'a>,
+    pub startup: Vec<InstructionOrLabelReference>,
+    pub functions: BoundNode<'a>,
     pub fixed_variable_count: usize,
     pub max_used_variables: usize,
     pub label_count: usize,
@@ -482,7 +483,8 @@ pub struct BoundProgram<'a> {
 impl BoundProgram<'_> {
     pub fn error() -> Self {
         Self {
-            program: BoundNode::error(TextSpan::zero()),
+            startup: vec![],
+            functions: BoundNode::error(TextSpan::zero()),
             fixed_variable_count: 0,
             max_used_variables: 0,
             label_count: 0,
@@ -561,14 +563,14 @@ pub fn bind_program<'a>(
         expected_type: None,
     };
     let span = node.span();
-    let mut statements = default_statements(&mut binder);
+    let mut startup = default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     for (index, constant) in binder.constants.iter().enumerate() {
-        statements.push(BoundNode::assignment(
-            TextSpan::zero(),
-            BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()),
-            BoundNode::literal_from_value(constant.clone()),
-        ));
+        todo!("Convert {:?} into the correct instruction representation. This is especially important for strings..", constant);
+        startup.push(Instruction::store_in_register(index as _).into());
+    }
+    for lib in binder.libraries.iter_mut() {
+        startup.append(&mut lib.startup);
     }
 
     for node in binder.structs.clone() {
@@ -588,6 +590,7 @@ pub fn bind_program<'a>(
 
     let fixed_variable_count = binder.variable_table.len();
     let mut label_count = binder.functions.len();
+    let mut statements = vec![];
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
         let index = index + binder.label_offset;
         let mut parameters = Vec::with_capacity(node.parameters.len());
@@ -624,14 +627,8 @@ pub fn bind_program<'a>(
                 .report_missing_return_statement(span, &binder.function_return_type);
         }
         let body = BoundNode::block_statement(span, body_statements);
-        statements.insert(
-            0,
-            BoundNode::assignment(
-                TextSpan::zero(),
-                BoundNode::variable(TextSpan::zero(), node.variable_id, Type::function(node.function_type.clone())),
-                BoundNode::label_reference(index, Type::function(node.function_type)),
-            ),
-        );
+        startup.push(LabelReference {label_reference: index, span: TextSpan::zero()}.into());
+        startup.push(Instruction::store_in_register(node.variable_id).into());
         statements.push(BoundNode::function_declaration(
             index,
             node.is_main,
@@ -640,10 +637,11 @@ pub fn bind_program<'a>(
         ));
         binder.delete_variables_until(fixed_variable_count);
     }
+    startup.append(&mut call_main(&mut binder));
 
-    let program = BoundNode::block_statement(span, statements);
+    let functions = BoundNode::block_statement(span, statements);
     if debug_flags.print_bound_program {
-        crate::debug::print_bound_node_as_code(&program);
+        crate::debug::print_bound_node_as_code(&functions);
     }
     if debug_flags.print_struct_table {
         for (id, entry) in binder.struct_table.iter().enumerate() {
@@ -652,7 +650,8 @@ pub fn bind_program<'a>(
     }
     let max_used_variables = binder.max_used_variables.max(binder.libraries.iter().map(|l|l.program.max_used_variables).max().unwrap_or(0));
     BoundProgram {
-        program,
+        startup,
+        functions,
         fixed_variable_count,
         max_used_variables,
         label_count,
@@ -689,16 +688,16 @@ pub fn bind_library<'a>(
         expected_type: None,
     };
     let span = node.span();
-    let mut statements = default_statements(&mut binder);
+    let mut startup = default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     for (index, constant) in binder.constants.iter().enumerate() {
-        statements.push(BoundNode::assignment(
-            TextSpan::zero(),
-            BoundNode::variable(TextSpan::zero(), index as _, constant.infer_type()),
-            BoundNode::literal_from_value(constant.clone()),
-        ));
+        todo!("Convert {:?} into the correct instruction representation. This is especially important for strings..", constant);
+        startup.push(Instruction::store_in_register(index as _).into());
     }
 
+    for lib in binder.libraries.iter_mut() {
+        startup.append(&mut lib.program.startup_instructions.iter().map(|&i|i.into()).collect());
+    }
 
     for node in binder.structs.clone() {
         let fields = bind_struct_body(node.name, node.body, &mut binder);
@@ -717,6 +716,7 @@ pub fn bind_library<'a>(
 
     let fixed_variable_count = binder.variable_table.len();
     let mut label_count = binder.functions.len() + binder.label_offset;
+    let mut statements = vec![];
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
         let index = index + binder.label_offset;
         let mut parameters = Vec::with_capacity(node.parameters.len());
@@ -753,14 +753,8 @@ pub fn bind_library<'a>(
                 .report_missing_return_statement(span, &binder.function_return_type);
         }
         let body = BoundNode::block_statement(span, body_statements);
-        statements.insert(
-            0,
-            BoundNode::assignment(
-                TextSpan::zero(),
-                BoundNode::variable(TextSpan::zero(), node.variable_id, Type::function(node.function_type.clone())),
-                BoundNode::label_reference(index, Type::function(node.function_type)),
-            ),
-        );
+        startup.push(LabelReference {label_reference: index, span: TextSpan::zero()}.into());
+        startup.push(Instruction::store_in_register(node.variable_id).into());
         statements.push(BoundNode::function_declaration(
             index,
             node.is_main,
@@ -770,9 +764,9 @@ pub fn bind_library<'a>(
         binder.delete_variables_until(fixed_variable_count);
     }
 
-    let program = BoundNode::block_statement(span, statements);
+    let functions = BoundNode::block_statement(span, statements);
     if debug_flags.print_bound_program {
-        crate::debug::print_bound_node_as_code(&program);
+        crate::debug::print_bound_node_as_code(&functions);
     }
     if debug_flags.print_struct_table {
         for (id, entry) in binder.struct_table.iter().enumerate() {
@@ -781,7 +775,8 @@ pub fn bind_library<'a>(
     }
     BoundLibrary {
         program: BoundProgram {
-                    program,
+                    startup,
+                    functions,
                     fixed_variable_count,
                     max_used_variables: binder.max_used_variables,
                     label_count,
@@ -835,17 +830,13 @@ fn load_library_into_binder<'a>(span: TextSpan, name: &'a str, mut lib: Library,
     binder.libraries.push(lib);
 }
 
-fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNode<'a>> {
-    let span = TextSpan::zero();
+fn default_statements(binder: &mut BindingState) -> Vec<InstructionOrLabelReference> {
     let variable_index = binder
         .register_variable("print", Type::SystemCall(SystemCallKind::Print), true)
         .unwrap();
-    let print_statement = BoundNode::variable_declaration(
-        span,
-        variable_index,
-        BoundNode::literal_from_value(Value::SystemCall(SystemCallKind::Print)),
-        None,
-    );
+    let mut instructions = vec![];
+    instructions.push(Instruction::load_immediate(SystemCallKind::Print as _).into());
+    instructions.push(Instruction::store_in_register(variable_index).into());
     let variable_index = binder
         .register_variable(
             "heapdump",
@@ -853,27 +844,24 @@ fn default_statements<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<BoundNod
             true,
         )
         .unwrap();
-    let heapdump_statement = BoundNode::variable_declaration(
-        span,
-        variable_index,
-        BoundNode::literal_from_value(Value::SystemCall(SystemCallKind::DebugHeapDump)),
-        None,
-    );
-    vec![print_statement, heapdump_statement]
+    instructions.push(Instruction::load_immediate(SystemCallKind::DebugHeapDump as _).into());
+    instructions.push(Instruction::store_in_register(variable_index).into());
+    instructions
 }
 
-fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
-    let span = TextSpan::zero();
+fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<InstructionOrLabelReference> {
     let base = binder
         .look_up_variable_by_name("main");
     if base.is_none() {
         binder.diagnostic_bag.report_no_main_function_found();
-        return BoundNode::error(span);
+        return vec![];
     }
     let base = base.unwrap();
-    let base = BoundNode::variable(span, base.id, base.type_);
-    let call_main = BoundNode::function_call(span, base, vec![], false, Type::Void);
-    BoundNode::expression_statement(span, call_main)
+    let mut instructions = vec![];
+    instructions.push(Instruction::load_register(base.id).into());
+    instructions.push(Instruction::load_immediate(0).into());
+    instructions.push(Instruction::function_call().into());
+    instructions
 }
 
 fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {

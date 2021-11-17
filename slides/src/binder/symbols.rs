@@ -5,6 +5,7 @@ use super::{BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, 
 #[derive(Debug)]
 pub struct Library {
     pub instructions: Vec<InstructionOrLabelReference>,
+    pub startup: Vec<InstructionOrLabelReference>,
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
     pub structs: Vec<StructSymbol>,
@@ -15,6 +16,7 @@ impl Library {
     pub fn error() -> Self {
         Self {
             instructions: vec![],
+            startup: vec![],
             program: Program::error(),
             functions: vec![],
             structs: vec![],
@@ -27,7 +29,7 @@ impl Library {
     }
 
     pub fn relocate_static_memory(&mut self, label_offset: usize) {
-        for inst in self.instructions.iter_mut() {
+        for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
                 InstructionOrLabelReference::Instruction(Instruction {
                     arg,
