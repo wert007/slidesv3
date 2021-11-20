@@ -19,7 +19,7 @@ use crate::{
     dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction},
     diagnostics::DiagnosticBag,
     instruction_converter::{
-        self, instruction::Instruction, InstructionOrLabelReference, LabelReference,
+        self, instruction::Instruction, InstructionOrLabelReference,
     },
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
     parser::{
@@ -1051,7 +1051,7 @@ fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingS
 
 fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
     match node.kind {
-        SyntaxNodeKind::ConstDeclaration(const_declaration) => {
+        SyntaxNodeKind::_ConstDeclaration(const_declaration) => {
             bind_const_declaration(const_declaration, binder)
         }
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
@@ -1123,7 +1123,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         struct_name, function_declaration.identifier.lexeme
     );
     let type_ = Type::Function(Box::new(function_type.clone()));
-    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;;
+    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;
     binder.register_generated_constant(function_name.clone(), Value::LabelPointer(function_id as usize, type_.clone()));
     binder.functions.push(FunctionDeclarationBody {
         function_name: function_name.into(),

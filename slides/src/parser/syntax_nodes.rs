@@ -37,39 +37,6 @@ impl<'a> SyntaxNode<'a> {
         result
     }
 
-    pub fn generated_const_declaration(
-        span: TextSpan,
-        identifier: SyntaxToken<'a>,
-        initializer: SyntaxNode<'a>,
-    ) -> Self {
-        let const_keyword = SyntaxToken {
-            kind: SyntaxTokenKind::ConstKeyword,
-            lexeme: "const",
-            start: span.start(),
-        };
-        let equals_token = SyntaxToken {
-            kind: SyntaxTokenKind::Equals,
-            lexeme: "=",
-            start: identifier.span().end(),
-        };
-        let semicolon_token = SyntaxToken {
-            kind: SyntaxTokenKind::Semicolon,
-            lexeme: ";",
-            start: initializer.span().end(),
-        };
-        Self {
-            span,
-            kind: SyntaxNodeKind::ConstDeclaration(ConstDeclarationNodeKind {
-                const_keyword,
-                identifier,
-                equals_token,
-                initializer: Box::new(initializer),
-                semicolon_token,
-            }),
-            is_inserted: false,
-        }
-    }
-
     pub fn import_statement(
         import_keyword: SyntaxToken<'a>,
         expression: SyntaxNode<'a>,
@@ -533,7 +500,7 @@ impl<'a> SyntaxNode<'a> {
 pub enum SyntaxNodeKind<'a> {
     // Top Level Statements
     CompilationUnit(CompilationUnitNodeKind<'a>),
-    ConstDeclaration(ConstDeclarationNodeKind<'a>),
+    _ConstDeclaration(ConstDeclarationNodeKind<'a>),
     ImportStatement(ImportStatementNodeKind<'a>),
     FunctionDeclaration(Box<FunctionDeclarationNodeKind<'a>>),
     StructDeclaration(StructDeclarationNodeKind<'a>),
