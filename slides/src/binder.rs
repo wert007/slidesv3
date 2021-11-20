@@ -705,7 +705,7 @@ pub fn bind_program<'a>(
         .append(&mut type_names);
 
     let fixed_variable_count = binder.variable_table.len();
-    let mut label_count = binder.functions.len();
+    let mut label_count = binder.functions.len() + binder.label_offset;
     let mut statements = vec![];
     for (index, node) in binder.functions.clone().into_iter().enumerate() {
         let index = index + binder.label_offset;
