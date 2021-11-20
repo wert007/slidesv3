@@ -269,7 +269,7 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn for_statement(
+    pub fn for_statement_array(
         span: TextSpan,
         index_variable: u64,
         collection_variable: u64,
@@ -334,6 +334,83 @@ impl<'a> BoundNode<'a> {
                     None,
                 ), // let $index = 0;
                 BoundNode::variable_declaration(span, collection_variable, collection, None), // let $collection = collection;
+                BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
+            ],
+        )
+    }
+
+    /// for i in range {
+    ///     body
+    /// }
+    ///
+    /// i = range.start;
+    /// i$index = 0;
+    /// while i < range.end {
+    ///     {
+    ///         body
+    ///     }
+    ///     i += range.step_by;
+    ///     i$index += 1;
+    /// }
+
+    pub fn for_statement_range(
+        span: TextSpan,
+        index_variable: u64,
+        collection_variable: u64,
+        variable: BoundNode<'a>,
+        collection: BoundNode<'a>,
+        body: BoundNode<'a>,
+    ) -> Self {
+        let while_condition = BoundNode::binary(
+            span,
+            variable.clone(),
+            BoundBinaryOperator::LessThan,
+            BoundNode::field_access(span, BoundNode::variable(span, collection_variable, collection.type_.clone()), 8, Type::Integer),
+            Type::Boolean,
+        );
+        let while_body = BoundNode::block_statement(
+            span,
+            vec![
+                // {
+                body,
+                // }
+                // $index = $index + 1;
+                BoundNode::assignment(
+                    span,
+                    BoundNode::variable(span, index_variable, Type::Integer),
+                    BoundNode::binary(
+                        span,
+                        BoundNode::variable(span, index_variable, Type::Integer),
+                        BoundBinaryOperator::ArithmeticAddition,
+                        BoundNode::literal_from_value(Value::Integer(1)),
+                        Type::Integer,
+                    ),
+                ),
+                // variable = variable + $collection.step_by;
+                BoundNode::assignment(
+                    span,
+                    variable.clone(),
+                    BoundNode::binary(
+                        span,
+                        variable.clone(),
+                        BoundBinaryOperator::ArithmeticAddition,
+                        BoundNode::field_access(span, BoundNode::variable(span, collection_variable, collection.type_.clone()), 16, Type::Integer),
+                        Type::Integer,
+                    ),
+                ),
+            ],
+        );
+        BoundNode::block_statement(
+            span,
+            vec![
+                BoundNode::variable_declaration(span, collection_variable, collection.clone(), None), // let $collection = collection;
+                BoundNode::assignment(span, variable, BoundNode::field_access(span, BoundNode::variable(span, collection_variable, collection.type_.clone()), 0, Type::Integer)),
+                BoundNode::variable_declaration(
+                    span,
+                    index_variable,
+                    BoundNode::literal_from_value(Value::Integer(0)),
+                    None,
+                ), // let $index = 0;
                 BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
             ],
         )

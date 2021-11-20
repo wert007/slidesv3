@@ -2388,9 +2388,12 @@ fn bind_for_statement<'a, 'b>(
     for_statement: ForStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
+    let range_type = binder.look_up_std_type(StdTypeKind::Range);
     let variable_count = binder.variable_table.len();
     let collection = bind_node(*for_statement.collection, binder);
-    if !matches!(collection.type_, Type::Array(_)) {
+    let is_array = matches!(collection.type_, Type::Array(_));
+    let is_range = collection.type_.can_be_converted_to(&range_type);
+    if !is_array && !is_range {
         binder.diagnostic_bag.report_cannot_convert(
             collection.span,
             &collection.type_,
@@ -2398,7 +2401,13 @@ fn bind_for_statement<'a, 'b>(
         );
         return BoundNode::error(span);
     }
-    let variable_type = collection.type_.array_base_type().unwrap();
+    // collection.type_ is either an array or a range. So if it has no array
+    // base type it must be a range.
+    let variable_type = if is_array {
+        collection.type_.array_base_type().unwrap()
+    } else {
+        &Type::Integer
+    };
     let variable =
         binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
     if variable.is_none() {
@@ -2436,14 +2445,19 @@ fn bind_for_statement<'a, 'b>(
         .unwrap();
     let body = bind_node(*for_statement.body, binder);
     let variable = BoundNode::variable(span, variable, variable_type.clone());
-    let result = BoundNode::for_statement(
-        span,
-        index_variable,
-        collection_variable,
-        variable,
-        collection,
-        body,
-    );
+    let result = if is_array {
+        BoundNode::for_statement_array(
+            span,
+            index_variable,
+            collection_variable,
+            variable,
+            collection,
+            body,
+        )
+    }
+    else {
+        BoundNode::for_statement_range(span, index_variable, collection_variable, variable, collection, body)
+    };
     if binder.print_variable_table {
         print_variable_table(&binder.variable_table);
     }
