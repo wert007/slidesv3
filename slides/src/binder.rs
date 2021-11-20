@@ -1000,15 +1000,21 @@ fn load_library_into_binder<'a>(
             }
         }
     }
-    for function in &lib.functions {
-        if function.is_member_function {
-            binder.register_generated_constant(
-                format!("{}.{}", name, function.name),
-                Value::LabelPointer(
-                    function.label_index as usize,
-                    Type::function(function.function_type.clone()),
-                ),
-            );
+    if name.is_empty() {
+        for function in &lib.functions {
+            binder.register_generated_constant(function.name.clone(), Value::LabelPointer(function.label_index as usize, Type::function(function.function_type.clone())));
+        }
+    } else {
+        for function in &lib.functions {
+            if function.is_member_function {
+                binder.register_generated_constant(
+                    format!("{}.{}", name, function.name),
+                    Value::LabelPointer(
+                        function.label_index as usize,
+                        Type::function(function.function_type.clone()),
+                    ),
+                );
+            }
         }
     }
     binder.libraries.push(lib);
