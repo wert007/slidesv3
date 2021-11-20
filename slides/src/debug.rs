@@ -10,6 +10,7 @@ pub use instructions::instruction_to_string;
 pub use instructions::output_instructions_or_labels_with_source_code_to_sldasm;
 pub use instructions::output_instructions_with_source_code_to_sldasm;
 pub use instructions::output_instructions_with_source_code_to_sldasm_skip;
+pub use instructions::output_instructions_or_labels_with_source_code_to_sldasm_skip;
 pub use instructions::print_instructions_or_labels_with_source_code;
 pub use instructions::print_instructions_with_source_code;
 
@@ -27,6 +28,7 @@ pub struct DebugFlags {
     pub print_labels: bool,
     pub output_basic_blocks_to_dot: bool,
     pub output_instructions_to_sldasm: bool,
+    pub output_instructions_and_labels_to_sldasm: bool,
     pub run_program: bool,
     pub slow_mode: bool,
 }

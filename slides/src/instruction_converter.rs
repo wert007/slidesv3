@@ -170,6 +170,14 @@ pub fn convert<'a>(
             println!("  {:000}: {}", i, instruction);
         }
     }
+    if debug_flags.output_instructions_and_labels_to_sldasm {
+        crate::debug::output_instructions_or_labels_with_source_code_to_sldasm_skip(
+            foreign_instruction_start,
+            foreign_instruction_end,
+            &instructions,
+            source_text,
+        );
+    }
 
     let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.print_instructions() {

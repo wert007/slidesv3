@@ -69,6 +69,28 @@ pub fn output_instructions_with_source_code_to_sldasm_skip(
     std::fs::write(output_path, contents).unwrap();
 }
 
+pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
+    skip_start: usize,
+    skip_end: usize,
+    instructions: &[InstructionOrLabelReference],
+    source: &SourceText,
+) {
+    let mut contents =
+        instructions_or_labels_with_source_code_to_string(0, &instructions[..skip_start], source);
+    contents += "> Foreign instructions start\n";
+    contents += &instructions_or_labels_to_string(skip_start, &instructions[skip_start..skip_end]);
+    contents += "> Foreign instructions end\n";
+    contents +=
+        &instructions_or_labels_with_source_code_to_string(skip_end, &instructions[skip_end..], source);
+    let output_path = PathBuf::from("../debug-out").join(
+        Path::new(source.file_name)
+            .with_extension("sldasm")
+            .file_name()
+            .unwrap(),
+    );
+    std::fs::write(output_path, contents).unwrap();
+}
+
 pub fn output_instructions_or_labels_with_source_code_to_sldasm(
     start_index: usize,
     instructions: &[InstructionOrLabelReference],
@@ -128,18 +150,50 @@ fn instructions_or_labels_with_source_code_to_string(
                 result.push_str(" }\n");
             }
         }
+        result.push_str("  ");
         match instruction {
             InstructionOrLabelReference::Instruction(instruction) => {
-                result.push_str("  ");
-                result.push_str(&format!("{:3X}: ", index));
-                result.push_str(&instruction_to_string(*instruction));
-                index += 1;
+                if instruction.op_code == OpCode::Label {
+                    result.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
+                } else {
+                    result.push_str(&format!("{:3X}: ", index));
+                    result.push_str(&instruction_or_label_to_string(*instruction, true));
+                }
             }
             InstructionOrLabelReference::LabelReference(label) => {
-                result.push(' ');
-                result.push_str(&label_to_string(*label));
+                result.push_str(&format!("{:3X}: ", index));
+                result.push_str(&label_reference_to_string(*label));
             }
         }
+        index += 1;
+        result.push('\n');
+    }
+    result
+}
+
+fn instructions_or_labels_to_string(
+    start_index: usize,
+    instructions: &[InstructionOrLabelReference],
+) -> String {
+    let mut result = String::new();
+    let mut index = start_index;
+    for instruction in instructions {
+        result.push_str("  ");
+        match instruction {
+            InstructionOrLabelReference::Instruction(instruction) => {
+                if instruction.op_code == OpCode::Label {
+                    result.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
+                } else {
+                    result.push_str(&format!("{:3X}: ", index));
+                    result.push_str(&instruction_or_label_to_string(*instruction, true));
+                }
+            }
+            InstructionOrLabelReference::LabelReference(label) => {
+                result.push_str(&format!("{:3X}: ", index));
+                result.push_str(&label_reference_to_string(*label));
+            }
+        }
+        index += 1;
         result.push('\n');
     }
     result
@@ -158,11 +212,15 @@ fn instructions_to_string(start_index: usize, instructions: &[Instruction]) -> S
     result
 }
 
-fn label_to_string(label: LabelReference) -> String {
-    format!("L{:X}:", label.label_reference)
+fn label_reference_to_string(label: LabelReference) -> String {
+    format!("ldlbl L{:X}", label.label_reference)
 }
 
 pub fn instruction_to_string(instruction: Instruction) -> String {
+    instruction_or_label_to_string(instruction, false)
+}
+
+fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) -> String {
     match instruction.op_code {
         OpCode::NoOp => instruction_no_arg_to_string("noop"),
         OpCode::LoadImmediate => instruction_dec_signed_arg_to_string("ldimm", instruction.arg),
@@ -201,9 +259,12 @@ pub fn instruction_to_string(instruction: Instruction) -> String {
         OpCode::StringConcat => instruction_no_arg_to_string("strconcat"),
         OpCode::PointerAddition => instruction_no_arg_to_string("addptr"),
         OpCode::NoneableOrValue => instruction_no_arg_to_string("noneableor"),
-        OpCode::Jump => instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg),
-        OpCode::JumpIfFalse => instruction_ptr_unsigned_arg_to_string("jmpfalse", instruction.arg),
-        OpCode::JumpIfTrue => instruction_ptr_unsigned_arg_to_string("jmptrue", instruction.arg),
+        OpCode::Jump if !has_labels => instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg),
+        OpCode::JumpIfFalse if !has_labels => instruction_ptr_unsigned_arg_to_string("jmpfalse", instruction.arg),
+        OpCode::JumpIfTrue if !has_labels => instruction_ptr_unsigned_arg_to_string("jmptrue", instruction.arg),
+        OpCode::Jump => instruction_label_arg_to_string("jmp", instruction.arg),
+        OpCode::JumpIfFalse => instruction_label_arg_to_string("jmpfalse", instruction.arg),
+        OpCode::JumpIfTrue => instruction_label_arg_to_string("jmptrue", instruction.arg),
         OpCode::SysCall => instruction_syscall_arg_to_string("syscall", instruction.arg),
         OpCode::FunctionCall => instruction_no_arg_to_string("fncall"),
         OpCode::Return => instruction_return_arg_to_string("ret", instruction.arg),
@@ -232,7 +293,7 @@ fn instruction_reg_arg_to_string(name: &str, arg: u64) -> String {
 }
 
 fn instruction_label_arg_to_string(name: &str, arg: u64) -> String {
-    format!("{} l{}", name, arg)
+    format!("{} L{:02X}", name, arg)
 }
 
 fn instruction_word_count_arg_to_string(name: &str, arg: u64) -> String {

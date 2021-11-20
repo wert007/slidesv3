@@ -18,6 +18,7 @@ fn main() -> Result<(), std::io::Error> {
         print_labels: args.contains(&String::from("-dlabels")),
         output_basic_blocks_to_dot: args.contains(&String::from("-dbb")),
         output_instructions_to_sldasm: args.contains(&String::from("-dasm")),
+        output_instructions_and_labels_to_sldasm: args.contains(&String::from("-dasml")),
         run_program: !args.contains(&String::from("-no-run")),
         slow_mode: args.contains(&String::from("-slow")),
     };
