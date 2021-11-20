@@ -20,4 +20,10 @@ func main() {
         a = a + 1;
         print(a);
     }
+
+    // let r = new Range(1, 5, 1);
+    let r = 1..5;
+    for i in r {
+        print(i);
+    }
 }

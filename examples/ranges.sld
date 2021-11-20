@@ -37,16 +37,22 @@ func main() {
     }
     print(b);
 
+    let max = 9;
+    for i, j in 3..max {
+        print(i + ' ' + j);
 
-    // TODO: Ranges
-    // for i in 3..12 {
-    //     print(i * i);
-    // }
+    }
 
-    // TODO: Ranges with step size
-    // for i in (3..12).step_by(5) {
-    //     print(i * i);
-    // }
+    for i, j in stepBy(3..12, 5) {
+        print(i + ' ' + j);
+    }
+
+    let changed = [1, 2, 3, 4];
+    for i in 0..changed.length() {
+        changed[i] = i;
+    }
+
+    print(changed);
 
     // {
     //     let i = 3;
