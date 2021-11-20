@@ -982,9 +982,12 @@ fn load_library_into_binder<'a>(
                 binder.rename_struct_by_id(struct_id, new_name);
             }
             None => {
-                let struct_id = binder
+                let struct_id = if lib.name.is_empty() {
+                    binder.register_generated_struct_name(strct.name.clone())
+                } else {
+                    binder
                     .register_generated_struct_name(format!("{}.{}", name, strct.name))
-                    .unwrap();
+                }.unwrap();
                 binder.register_struct(
                     struct_id,
                     strct
