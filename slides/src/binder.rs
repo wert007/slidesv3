@@ -14,7 +14,7 @@ use crate::{DebugFlags, binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    }, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, instruction_converter::{InstructionOrLabelReference, LabelReference, instruction::Instruction}, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
+    }, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, instruction_converter::{self, InstructionOrLabelReference, LabelReference, instruction::Instruction}, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
         self,
         syntax_nodes::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
@@ -28,8 +28,12 @@ use crate::{DebugFlags, binder::{
         },
     }, text::{SourceText, TextSpan}, value::Value};
 
-use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator, symbols::{FunctionSymbol, Library, StructFieldSymbol, StructSymbol}, typing::{FunctionType, StructType, SystemCallKind}};
-
+use self::{
+    bound_nodes::BoundNode,
+    operators::BoundBinaryOperator,
+    symbols::{FunctionSymbol, Library, StructFieldSymbol, StructSymbol},
+    typing::{FunctionType, StructType, SystemCallKind},
+};
 
 #[derive(Debug, Clone)]
 enum SafeNodeInCondition<'a> {
@@ -671,7 +675,10 @@ pub fn bind_program<'a>(
     let mut startup = default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     for (index, constant) in binder.constants.iter().enumerate() {
-        todo!("Convert {:?} into the correct instruction representation. This is especially important for strings..", constant);
+        if constant.value.as_string().is_some() {
+            todo!("Constants are not implemented for strings.")
+        }
+        startup.append(&mut instruction_converter::convert_value(TextSpan::zero(), constant.value.clone(), &mut instruction_converter::InstructionConverter::default()));
         startup.push(Instruction::store_in_register(index as _).into());
     }
     for lib in binder.libraries.iter_mut() {
@@ -796,7 +803,10 @@ pub fn bind_library<'a>(
     let mut startup = default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     for (index, constant) in binder.constants.iter().enumerate() {
-        todo!("Convert {:?} into the correct instruction representation. This is especially important for strings..", constant);
+        if constant.value.as_string().is_some() {
+            todo!("Constants are not implemented for strings.")
+        }
+        startup.append(&mut instruction_converter::convert_value(TextSpan::zero(), constant.value.clone(), &mut instruction_converter::InstructionConverter::default()));
         startup.push(Instruction::store_in_register(index as _).into());
     }
 
@@ -996,18 +1006,26 @@ fn default_statements(binder: &mut BindingState) -> Vec<InstructionOrLabelRefere
 }
 
 fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<InstructionOrLabelReference> {
-    let base = binder
-        .look_up_variable_by_name("main");
-    if base.is_none() {
-        binder.diagnostic_bag.report_no_main_function_found();
-        return vec![];
+    let base = binder.look_up_variable_or_constant_by_name("main");
+    match base.kind {
+        VariableOrConstantKind::None => {
+            binder.diagnostic_bag.report_no_main_function_found();
+            vec![]
+        },
+        VariableOrConstantKind::Variable(variable_id) => {
+            vec![
+                Instruction::load_register(variable_id).into(),
+                Instruction::load_immediate(0).into(),
+                Instruction::function_call().into(),
+            ]
+        }
+        VariableOrConstantKind::Constant(value) => {
+            let mut result = instruction_converter::convert_value(TextSpan::zero(), value, &mut instruction_converter::InstructionConverter::default());
+            result.push(Instruction::load_immediate(0).into());
+            result.push(Instruction::function_call().into());
+            result
+        },
     }
-    let base = base.unwrap();
-    let mut instructions = vec![];
-    instructions.push(Instruction::load_register(base.id).into());
-    instructions.push(Instruction::load_immediate(0).into());
-    instructions.push(Instruction::function_call().into());
-    instructions
 }
 
 fn bind_top_level_statements<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) {
@@ -1297,11 +1315,15 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     let type_span = type_.span();
     let mut result = if let Some(library_token) = &type_.library_name {
         let library_name = library_token.lexeme;
-        let library_variable = if let Some(it) = binder.look_up_variable_by_name(library_name) {
-            it
-        } else {
-            binder.diagnostic_bag.report_unknown_library(library_token.span(), library_name);
-            return Type::Error;
+        let library_variable = binder.look_up_variable_or_constant_by_name(library_name);
+        let library_variable = match library_variable.kind {
+            VariableOrConstantKind::None => {
+                binder
+                    .diagnostic_bag
+                    .report_unknown_library(library_token.span(), library_name);
+                return Type::Error;
+            }
+            _ => library_variable,
         };
         match &library_variable.type_ {
             Type::Error => return Type::Error,

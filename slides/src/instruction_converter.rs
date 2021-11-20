@@ -67,7 +67,8 @@ impl From<LabelReference> for InstructionOrLabelReference {
     }
 }
 
-struct InstructionConverter {
+#[derive(Debug, Default)]
+pub struct InstructionConverter {
     pub static_memory: StaticMemory,
     pub fixed_variable_count: usize,
     next_label_index: usize,
@@ -326,7 +327,15 @@ fn convert_literal(
     literal: LiteralNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let value = match literal.value {
+    convert_value(span, literal.value, converter)
+}
+
+pub fn convert_value(
+    span: TextSpan,
+    value: Value,
+    converter: &mut InstructionConverter,
+) -> Vec<InstructionOrLabelReference> {
+    let value = match value {
         Value::Integer(value) => value as u64,
         Value::Boolean(value) => {
             if value {
