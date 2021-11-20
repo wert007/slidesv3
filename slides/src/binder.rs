@@ -455,6 +455,27 @@ impl<'a> BindingState<'a, '_> {
         assert!(iterator.next().is_none());
         result
     }
+
+    pub fn look_up_struct_id_by_name(&self, name: &str) -> Option<u64> {
+        self.struct_table
+            .iter()
+            .enumerate()
+            .find(|(_, s)| s.name == name)
+            .map(|(i, _)| (i + type_table().len()) as u64)
+    }
+
+    pub fn rename_struct_by_id(&mut self, struct_id: u64, new_name: String) {
+        self.struct_table[struct_id as usize - type_table().len()].name = new_name.clone().into();
+        self.type_table
+            .iter_mut()
+            .find(|t|match &t.type_ {
+                Type::Struct(struct_type) => struct_type.id == struct_id,
+                Type::StructReference(id) if id == &struct_id => true,
+                _ => false,
+            })
+            .unwrap()
+            .identifier = new_name.into();
+    }
 }
 
 fn print_variable_table(variable_table: &[BoundVariableName]) {
@@ -792,13 +813,30 @@ fn execute_import_function<'a>(import: BoundImportStatement<'a>, binder: &mut Bi
     match import.function {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
-            let lib = crate::load_library_from_path(directory.join(library.path).with_extension("sld"), binder.debug_flags);
-            load_library_into_binder(import.span, import.name, lib, binder);
-        },
+            let path = directory.join(library.path).with_extension("sld");
+            let (path, lib) = binder
+                .libraries
+                .iter()
+                .find_map(|l| l.find_imported_library_by_path(&path))
+                .map(|(s, l)| (Some(s), l))
+                .unwrap_or_else(|| {
+                    (
+                        None,
+                        crate::load_library_from_path(path, binder.debug_flags),
+                    )
+                });
+            load_library_into_binder(import.span, import.name, lib, path, binder);
+        }
     }
 }
 
-fn load_library_into_binder<'a>(span: TextSpan, name: &'a str, mut lib: Library, binder: &mut BindingState<'a, '_>) {
+fn load_library_into_binder<'a>(
+    span: TextSpan,
+    name: &'a str,
+    mut lib: Library,
+    path: Option<String>,
+    binder: &mut BindingState<'a, '_>,
+) {
     let index = binder.libraries.len();
     let mut should_load_library = true;
     let variable = if lib.has_errors {
@@ -815,12 +853,35 @@ fn load_library_into_binder<'a>(span: TextSpan, name: &'a str, mut lib: Library,
     if !should_load_library {
         return;
     }
-    lib.relocate_static_memory(binder.label_offset);
-    lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
-    binder.label_offset += lib.program.label_count;
+    lib.name = name.into();
+    if path.is_none() {
+        lib.relocate_static_memory(binder.label_offset);
+        lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
+        binder.label_offset += lib.program.label_count;
+    }
     for strct in &lib.structs {
-        let struct_id = binder.register_generated_struct_name(format!("{}.{}", name, strct.name)).unwrap();
-        binder.register_struct(struct_id, strct.fields.iter().map(ToOwned::to_owned).map(Into::into).collect());
+        match &path {
+            Some(path) => {
+                let old_name = format!("{}.{}", path, strct.name);
+                let new_name = format!("{}.{}", name, strct.name);
+                let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
+                binder.rename_struct_by_id(struct_id, new_name);
+            }
+            None => {
+                let struct_id = binder
+                    .register_generated_struct_name(format!("{}.{}", name, strct.name))
+                    .unwrap();
+                binder.register_struct(
+                    struct_id,
+                    strct
+                        .fields
+                        .iter()
+                        .map(ToOwned::to_owned)
+                        .map(Into::into)
+                        .collect(),
+                );
+            }
+        }
     }
     for function in &lib.functions {
         if function.is_member_function {
