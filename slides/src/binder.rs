@@ -71,7 +71,6 @@ struct FunctionDeclarationBody<'a> {
     parameters: Vec<(&'a str, Type)>,
     is_main: bool,
     function_id: u64,
-    variable_id: u64,
     function_type: FunctionType,
     is_struct_function: bool,
 }
@@ -754,14 +753,6 @@ pub fn bind_program<'a>(
                 .report_missing_return_statement(span, &binder.function_return_type);
         }
         let body = BoundNode::block_statement(span, body_statements);
-        startup.push(
-            LabelReference {
-                label_reference: index,
-                span: TextSpan::zero(),
-            }
-            .into(),
-        );
-        startup.push(Instruction::store_in_register(node.variable_id).into());
         statements.push(BoundNode::function_declaration(
             index,
             node.is_main,
@@ -909,14 +900,6 @@ pub fn bind_library<'a>(
                 .report_missing_return_statement(span, &binder.function_return_type);
         }
         let body = BoundNode::block_statement(span, body_statements);
-        startup.push(
-            LabelReference {
-                label_reference: index,
-                span: TextSpan::zero(),
-            }
-            .into(),
-        );
-        startup.push(Instruction::store_in_register(node.variable_id).into());
         statements.push(BoundNode::function_declaration(
             index,
             node.is_main,
@@ -1131,25 +1114,14 @@ fn bind_function_declaration<'a, 'b>(
         bind_function_type(None, function_declaration.function_type, binder);
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
-    let function_id = binder.functions.len() as u64;
-    let variable_id = if let Some(it) =
-        binder.register_variable(function_declaration.identifier.lexeme, type_, false)
-    {
-        it
-    } else {
-        binder.diagnostic_bag.report_cannot_declare_variable(
-            function_declaration.identifier.span(),
-            function_declaration.identifier.lexeme,
-        );
-        0
-    };
+    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;
+    binder.register_constant(function_declaration.identifier.lexeme, Value::LabelPointer(function_id as _, type_.clone()));
     binder.functions.push(FunctionDeclarationBody {
         function_name: function_declaration.identifier.lexeme.into(),
         body: *function_declaration.body,
         parameters: variables,
         is_main,
         function_id,
-        variable_id,
         function_type,
         is_struct_function: false,
     });
@@ -1173,24 +1145,13 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     );
     let type_ = Type::Function(Box::new(function_type.clone()));
     let function_id = binder.functions.len() as _;
-    let variable_id = if let Some(it) =
-        binder.register_generated_variable(function_name.clone(), type_.clone(), true)
-    {
-        it
-    } else {
-        binder.diagnostic_bag.report_cannot_declare_variable(
-            function_declaration.identifier.span(),
-            function_declaration.identifier.lexeme,
-        );
-        0
-    };
+    binder.register_generated_constant(function_name.clone(), Value::LabelPointer(function_id as usize, type_.clone()));
     binder.functions.push(FunctionDeclarationBody {
         function_name: function_name.into(),
         body: *function_declaration.body,
         parameters: variables,
         is_main: false,
         function_id,
-        variable_id,
         function_type,
         is_struct_function: true,
     });
