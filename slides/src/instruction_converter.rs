@@ -4,6 +4,8 @@ mod tests;
 
 mod label_replacer;
 
+use std::path::PathBuf;
+
 use crate::{binder::{self, bound_nodes::{
             BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
             BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
@@ -71,7 +73,7 @@ impl InstructionConverter {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Program {
     pub static_memory: StaticMemory,
     pub startup_instructions: Vec<Instruction>,
@@ -190,6 +192,12 @@ pub fn convert_library<'a>(
         }
     }
     Library {
+        path: source_text.file_name.into(),
+        // FIXME: Every library should have a library statement, which also
+        // specifies its name!
+        // NOTE: This value is overwritten anyway by the binder.
+        name: PathBuf::from(source_text.file_name).file_stem().unwrap().to_string_lossy().into_owned(),
+        referenced_libraries: bound_program.referenced_libraries,
         instructions,
         startup: bound_program.startup,
         program: Program {

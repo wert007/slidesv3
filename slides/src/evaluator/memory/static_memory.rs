@@ -2,7 +2,7 @@ use crate::DebugFlags;
 
 use super::WORD_SIZE_IN_BYTES;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct StaticMemory {
     pub data : Vec<u64>,
 }

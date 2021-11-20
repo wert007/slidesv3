@@ -1,27 +1,47 @@
+use std::path::{Path, PathBuf};
+
 use crate::instruction_converter::{InstructionOrLabelReference, LabelReference, Program, instruction::{Instruction, op_codes::OpCode}};
 
 use super::{BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, typing::{FunctionType, Type}};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Library {
+    pub name: String,
     pub instructions: Vec<InstructionOrLabelReference>,
     pub startup: Vec<InstructionOrLabelReference>,
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
     pub structs: Vec<StructSymbol>,
     pub has_errors: bool,
+    pub path: PathBuf,
+    pub referenced_libraries: Vec<Library>,
 }
 
 impl Library {
     pub fn error() -> Self {
         Self {
+            name: "error".into(),
             instructions: vec![],
             startup: vec![],
             program: Program::error(),
             functions: vec![],
             structs: vec![],
             has_errors: true,
+            path: PathBuf::new(),
+            referenced_libraries: vec![],
         }
+    }
+
+    pub fn find_imported_library_by_path(&self, path: &Path) -> Option<(String, Library)> {
+        if self.path == path {
+            return Some((self.name.clone(), self.clone()));
+        }
+        for lib in &self.referenced_libraries {
+            if let Some((rel_path, lib)) = lib.find_imported_library_by_path(path) {
+                return Some((format!("{}.{}", self.name, rel_path), lib));
+            }
+        }
+        None
     }
 
     pub fn look_up_function_by_name(&self, name: &str) -> Option<&FunctionSymbol> {
@@ -64,7 +84,7 @@ impl Library {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionSymbol {
     pub name: String,
     pub function_type: FunctionType,
