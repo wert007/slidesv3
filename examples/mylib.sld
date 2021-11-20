@@ -17,6 +17,6 @@ struct Point {
     }
 }
 
-// func printPoint(pt: Point) {
-//     print('Point(' + pt.x + ', ' + pt.y + ')');
-// }
+func printPoint(pt: Point) {
+    print('Point(' + pt.x + ', ' + pt.y + ')');
+}

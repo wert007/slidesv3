@@ -1,3 +1,8 @@
+// Those crash the compiler right now. Add check, that there are no circular
+// dependencies.
+// import lib('mylib') as mylib;
+// import lib('math') as math;
+
 struct Vec2 {
     // There are no floats currently.
     x: int;
