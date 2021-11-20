@@ -684,17 +684,7 @@ pub fn bind_program<'a>(
     let mut startup = vec![];
     default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
-    for (index, constant) in binder.constants.iter().enumerate() {
-        if constant.value.as_string().is_some() {
-            todo!("Constants are not implemented for strings.")
-        }
-        startup.append(&mut instruction_converter::convert_value(
-            TextSpan::zero(),
-            constant.value.clone(),
-            &mut instruction_converter::InstructionConverter::default(),
-        ));
-        startup.push(Instruction::store_in_register(index as _).into());
-    }
+
     for lib in binder.libraries.iter_mut() {
         startup.append(&mut lib.startup);
     }
@@ -822,17 +812,6 @@ pub fn bind_library<'a>(
     let mut startup = vec![];
     default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
-    for (index, constant) in binder.constants.iter().enumerate() {
-        if constant.value.as_string().is_some() {
-            todo!("Constants are not implemented for strings.")
-        }
-        startup.append(&mut instruction_converter::convert_value(
-            TextSpan::zero(),
-            constant.value.clone(),
-            &mut instruction_converter::InstructionConverter::default(),
-        ));
-        startup.push(Instruction::store_in_register(index as _).into());
-    }
 
     for lib in binder.libraries.iter_mut() {
         startup.append(
