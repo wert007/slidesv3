@@ -216,8 +216,9 @@ pub fn convert_library<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
+    import_std_lib: bool,
 ) -> Library {
-    let bound_program = binder::bind_library(source_text, diagnostic_bag, debug_flags);
+    let bound_program = binder::bind_library(source_text, diagnostic_bag, debug_flags, import_std_lib);
     if diagnostic_bag.has_errors() {
         return Library::error();
     }

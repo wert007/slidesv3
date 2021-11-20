@@ -8,7 +8,7 @@ pub mod typing;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use std::{borrow::Cow, path::PathBuf};
+use std::{borrow::Cow, path::{Path, PathBuf}};
 
 use crate::{
     binder::{
@@ -682,7 +682,7 @@ pub fn bind_program<'a>(
     };
     let span = node.span();
     let mut startup = vec![];
-    default_statements(&mut binder);
+    default_statements(&mut binder, true);
     bind_top_level_statements(node, &mut binder);
 
     for lib in binder.libraries.iter_mut() {
@@ -784,6 +784,7 @@ pub fn bind_library<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
+    import_std_lib: bool,
 ) -> BoundLibrary<'a> {
     let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
@@ -810,7 +811,7 @@ pub fn bind_library<'a>(
     };
     let span = node.span();
     let mut startup = vec![];
-    default_statements(&mut binder);
+    default_statements(&mut binder, import_std_lib);
     bind_top_level_statements(node, &mut binder);
 
     for lib in binder.libraries.iter_mut() {
@@ -919,20 +920,24 @@ fn execute_import_function<'a>(
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
             let path = directory.join(library.path).with_extension("sld");
-            let (path, lib) = binder
-                .libraries
-                .iter()
-                .find_map(|l| l.find_imported_library_by_path(&path))
-                .map(|(s, l)| (Some(s), l))
-                .unwrap_or_else(|| {
-                    (
-                        None,
-                        crate::load_library_from_path(path, binder.debug_flags),
-                    )
-                });
-            load_library_into_binder(import.span, import.name, lib, path, binder);
+            load_library_from_path(binder, &path, import.span, import.name, true);
         }
     }
+}
+
+fn load_library_from_path<'a>(binder: &mut BindingState<'a, '_>, path: &Path, span: TextSpan, library_name: &'a str, import_std_lib: bool) {
+    let (path, lib) = binder
+        .libraries
+        .iter()
+        .find_map(|l| l.find_imported_library_by_path(&path))
+        .map(|(s, l)| (Some(s), l))
+        .unwrap_or_else(|| {
+            (
+                None,
+                crate::load_library_from_path(path, binder.debug_flags, import_std_lib),
+            )
+        });
+    load_library_into_binder(span, library_name, lib, path, binder);
 }
 
 fn load_library_into_binder<'a>(
@@ -1006,9 +1011,12 @@ fn load_library_into_binder<'a>(
     binder.libraries.push(lib);
 }
 
-fn default_statements(binder: &mut BindingState) {
+fn default_statements(binder: &mut BindingState, import_std_lib: bool) {
     binder.register_constant("print", Value::SystemCall(SystemCallKind::Print));
     binder.register_constant("heapdump", Value::SystemCall(SystemCallKind::DebugHeapDump));
+    if import_std_lib {
+        load_library_from_path(binder, Path::new("../slides/builtin/std.sld"), TextSpan::zero(), "", false);
+    }
 }
 
 fn call_main(binder: &mut BindingState) -> Vec<InstructionOrLabelReference> {
