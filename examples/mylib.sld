@@ -4,9 +4,9 @@ import lib('math') as math;
 //     use func;
 // }
 
-// func sayHello(name: string) {
-//     print('Hello, ' + name + '!');
-// }
+func sayHello(name: string) {
+    print('Hello, ' + name + '!');
+}
 
 struct Point {
     x : int;
