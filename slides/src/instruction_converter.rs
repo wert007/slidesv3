@@ -347,8 +347,10 @@ pub fn convert_value(
         Value::SystemCall(kind) => kind as u64,
         Value::String(value) => return convert_string_literal(span, value, converter),
         Value::None => return vec![Instruction::load_pointer(0).span(span).into()],
+        Value::LabelPointer(label_reference, _) => return vec![LabelReference{label_reference, span}.into()],
     };
     vec![Instruction::load_immediate(value).span(span).into()]
+
 }
 
 fn convert_string_literal(
