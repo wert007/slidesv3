@@ -191,6 +191,18 @@ impl From<StructFieldSymbol> for BoundStructFieldSymbol<'_> {
     }
 }
 
+enum StdTypeKind {
+    Range
+}
+
+impl StdTypeKind {
+    pub fn name(&self) -> &str {
+        match self {
+            StdTypeKind::Range => "Range",
+        }
+    }
+}
+
 struct BindingState<'a, 'b> {
     debug_flags: DebugFlags,
     /// The directory, in which the current file relative or absolute to the
@@ -499,6 +511,10 @@ impl<'a> BindingState<'a, '_> {
         self.variable_table
             .get(id as usize)
             .map(|v| v.identifier.as_ref())
+    }
+
+    fn look_up_std_type(&self, kind: StdTypeKind) -> Type {
+        self.look_up_type_by_name(kind.name()).unwrap_or_else(|| panic!("Could not load std type {}.", kind.name()))
     }
 
     fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
