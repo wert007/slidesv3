@@ -1243,7 +1243,7 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     }.unwrap_or_else(|| {
         binder
             .diagnostic_bag
-            .report_unknown_type(type_span, type_name);
+            .report_unknown_type(type_span, &type_.full_type_name());
         Type::Error
     });
     if type_.optional_question_mark.is_some() {

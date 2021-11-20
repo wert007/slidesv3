@@ -729,6 +729,13 @@ impl<'a> TypeNode<'a> {
             self.brackets.last().unwrap_or(&self.type_name).span(),
         )
     }
+
+    pub fn full_type_name(&self) -> String {
+        match &self.library_name {
+            Some(it) => format!("{}.{}", it.lexeme, self.type_name.lexeme),
+            None => self.type_name.lexeme.to_owned(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
