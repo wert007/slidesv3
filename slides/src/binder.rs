@@ -964,7 +964,7 @@ fn load_library_into_binder<'a>(
     }
     lib.name = name.into();
     if path.is_none() {
-        lib.relocate_static_memory(binder.label_offset);
+        lib.relocate_labels(binder.label_offset);
         lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
         binder.label_offset += lib.program.label_count;
     }

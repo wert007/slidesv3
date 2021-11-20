@@ -54,7 +54,10 @@ impl Library {
         self.functions.iter().find(|f| f.name == name)
     }
 
-    pub fn relocate_static_memory(&mut self, label_offset: usize) {
+    pub fn relocate_labels(&mut self, label_offset: usize) {
+        for function in self.functions.iter_mut() {
+            function.label_index += label_offset as u64;
+        }
         for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
                 InstructionOrLabelReference::Instruction(Instruction {
