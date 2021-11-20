@@ -458,6 +458,7 @@ impl std::fmt::Display for StructType {
 pub enum FunctionKind {
     FunctionId(u64),
     SystemCall(SystemCallKind),
+    LabelReference(usize),
 }
 
 impl std::fmt::Display for FunctionKind {
@@ -465,6 +466,7 @@ impl std::fmt::Display for FunctionKind {
         match self {
             FunctionKind::FunctionId(id) => write!(f, "fn#{}", id),
             FunctionKind::SystemCall(kind) => write!(f, "{}", kind),
+            FunctionKind::LabelReference(label_reference) => write!(f, "L{:X}", label_reference),
         }
     }
 }

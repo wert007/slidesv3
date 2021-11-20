@@ -1859,17 +1859,20 @@ fn bind_function_call<'a, 'b>(
     let mut more_arguments = vec![];
     let function = if let BoundNodeKind::Closure(closure) = function.kind {
         more_arguments.append(&mut closure.arguments());
+        let type_ = if let Type::Closure(closure_type) = function.type_ {
+            Type::Function(Box::new(closure_type.base_function_type))
+        } else {
+            unreachable!("There is a closure, which is not of type closure???");
+        };
         match closure.function {
             typing::FunctionKind::FunctionId(id) => {
-                let type_ = if let Type::Closure(closure_type) = function.type_ {
-                    Type::Function(Box::new(closure_type.base_function_type))
-                } else {
-                    unreachable!("There is a closure, which is not of type closure???");
-                };
                 BoundNode::variable(function.span, id, type_)
             }
             typing::FunctionKind::SystemCall(kind) => {
                 BoundNode::literal_from_value(Value::SystemCall(kind))
+            }
+            typing::FunctionKind::LabelReference(label_reference) => {
+                BoundNode::label_reference(label_reference, type_)
             }
         }
     } else {
@@ -1983,19 +1986,23 @@ fn bind_field_access<'a, 'b>(
                 })
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
+                let function_name = format!("{}::{}", bound_struct_type.name, field_name);
                 if let Type::Function(function_type) = &field.type_ {
-                    let variable_id = binder
-                        .look_up_variable_by_name(&format!(
-                            "{}::{}",
-                            bound_struct_type.name, field_name
-                        ))
-                        .unwrap();
-                    BoundNode::closure(
-                        span,
-                        base,
-                        variable_id.id,
-                        Type::closure(*function_type.clone()),
-                    )
+                    let type_ = Type::closure(*function_type.clone());
+                    let variable = binder
+                    .look_up_variable_or_constant_by_name(&function_name);
+                    match variable.kind {
+                        VariableOrConstantKind::None => todo!("The binder missed a function on a struct somehow ({})", function_name),
+                        VariableOrConstantKind::Variable(variable_id) => BoundNode::closure(
+                                    span,
+                                    base,
+                                    variable_id,
+                                    type_),
+                        VariableOrConstantKind::Constant(value) => {
+                            let label_index = value.as_label_pointer().unwrap().0;
+                            BoundNode::closure_label(span, base, label_index, type_)
+                        },
+                    }
                 } else {
                     BoundNode::field_access(span, base, field.offset, field.type_.clone())
                 }
@@ -2018,23 +2025,30 @@ fn bind_field_access<'a, 'b>(
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
                 if let Type::Function(function_type) = &field.type_ {
+                    let function_name = format!(
+                        "{}::{}",
+                        bound_struct_type.name, field_name
+                    );
                     let variable_id = binder
-                        .look_up_variable_by_name(&format!(
-                            "{}::{}",
-                            bound_struct_type.name, field_name
-                        ))
-                        .unwrap_or_else(||
-                            panic!(
-                                "{}::{}",
-                                bound_struct_type.name, field_name
-                            )
-                        );
-                    BoundNode::closure(
-                        span,
-                        base,
-                        variable_id.id,
-                        Type::closure(*function_type.clone()),
-                    )
+                        .look_up_variable_or_constant_by_name(&function_name);
+                    match variable_id.kind {
+                        VariableOrConstantKind::None => todo!("Binder thought a function ({}) existed, but there is neither a variable or a constant for it.", function_name),
+                        VariableOrConstantKind::Variable(variable_id) => BoundNode::closure(
+                            span,
+                            base,
+                            variable_id,
+                            Type::closure(*function_type.clone()),
+                        ),
+                        VariableOrConstantKind::Constant(constant) => {
+                            let label_index = constant.as_label_pointer().unwrap().0;
+                                BoundNode::closure_label(
+                                    span,
+                                    base,
+                                    label_index,
+                                    Type::closure(*function_type.clone()),
+                                )
+                        },
+                    }
                 } else {
                     BoundNode::field_access(span, base, field.offset, field.type_.clone())
                 }

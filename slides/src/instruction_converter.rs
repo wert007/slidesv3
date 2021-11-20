@@ -700,6 +700,9 @@ fn convert_closure(
             result.push(Instruction::load_register(id).span(span).into());
         }
         FunctionKind::SystemCall(_) => {}
+        FunctionKind::LabelReference(label_reference) => {
+            result.push(LabelReference{ label_reference, span}.into());
+        },
     }
     result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
     result.push(
