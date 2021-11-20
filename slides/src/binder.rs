@@ -1221,7 +1221,7 @@ fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -
 fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     let type_name = type_.type_name.lexeme;
     let type_span = type_.span();
-    let mut result = if let Some(library_token) = type_.library_name {
+    let mut result = if let Some(library_token) = &type_.library_name {
         let library_name = library_token.lexeme;
         let library_variable = if let Some(it) = binder.look_up_variable_by_name(library_name) {
             it
