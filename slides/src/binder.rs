@@ -1,20 +1,28 @@
 pub mod bound_nodes;
 pub mod operators;
+pub mod symbols;
 #[cfg(test)]
 mod tests;
 pub mod typing;
-pub mod symbols;
 
 pub mod control_flow_analyzer;
 mod lowerer;
 
 use std::{borrow::Cow, path::PathBuf};
 
-use crate::{DebugFlags, binder::{
+use crate::{
+    binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         typing::Type,
-    }, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, instruction_converter::{self, InstructionOrLabelReference, LabelReference, instruction::Instruction}, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
+    },
+    dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction},
+    diagnostics::DiagnosticBag,
+    instruction_converter::{
+        self, instruction::Instruction, InstructionOrLabelReference, LabelReference,
+    },
+    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
+    parser::{
         self,
         syntax_nodes::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
@@ -26,7 +34,11 @@ use crate::{DebugFlags, binder::{
             StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
             VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
         },
-    }, text::{SourceText, TextSpan}, value::Value};
+    },
+    text::{SourceText, TextSpan},
+    value::Value,
+    DebugFlags,
+};
 
 use self::{
     bound_nodes::BoundNode,
@@ -134,8 +146,6 @@ enum VariableOrConstantKind {
     Constant(Value),
 }
 
-
-
 /// This is quite similiar to symbols::StructSymbol, the only difference being,
 /// that this version does not need an allocation. They can be easily converted
 /// into each other. This version is only used during binding, while the other
@@ -148,7 +158,7 @@ pub struct BoundStructSymbol<'a> {
 
 impl BoundStructSymbol<'_> {
     pub fn field(&self, name: &str) -> Option<&BoundStructFieldSymbol> {
-        self.fields.iter().find(|f|f.name == name)
+        self.fields.iter().find(|f| f.name == name)
     }
 
     pub fn empty() -> Self {
@@ -347,10 +357,7 @@ impl<'a> BindingState<'a, '_> {
 
     pub fn insert_into_struct_table(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>) {
         let name = self.type_table[id as usize].identifier.clone();
-        let bound_struct_type = BoundStructSymbol {
-            name,
-            fields,
-        };
+        let bound_struct_type = BoundStructSymbol { name, fields };
         let struct_id = id as usize - type_table().len();
         while struct_id >= self.struct_table.len() {
             self.struct_table.push(BoundStructSymbol::empty());
@@ -397,7 +404,7 @@ impl<'a> BindingState<'a, '_> {
 
     fn register_constant(&mut self, name: &'a str, value: Value) -> Option<u64> {
         let index = self.constants.len() as u64;
-        let constant_name_already_registered = self.constants.iter().any(|c|&c.identifier == name);
+        let constant_name_already_registered = self.constants.iter().any(|c| &c.identifier == name);
         if constant_name_already_registered {
             None
         } else {
@@ -411,7 +418,8 @@ impl<'a> BindingState<'a, '_> {
 
     fn register_generated_constant(&mut self, name: String, value: Value) -> Option<u64> {
         let index = self.constants.len() as u64;
-        let constant_name_already_registered = self.constants.iter().any(|c|&c.identifier == &name);
+        let constant_name_already_registered =
+            self.constants.iter().any(|c| &c.identifier == &name);
         if constant_name_already_registered {
             None
         } else {
@@ -424,7 +432,10 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn look_up_constant_by_name(&self, name: &str) -> Option<Value> {
-        self.constants.iter().find(|c|&c.identifier == name).map(|c|c.value.clone())
+        self.constants
+            .iter()
+            .find(|c| &c.identifier == name)
+            .map(|c| c.value.clone())
     }
 
     fn register_safe_node(&mut self, node: BoundNode<'a>, safe_type: Type) -> usize {
@@ -556,7 +567,7 @@ impl<'a> BindingState<'a, '_> {
         self.struct_table[struct_id as usize - type_table().len()].name = new_name.clone().into();
         self.type_table
             .iter_mut()
-            .find(|t|match &t.type_ {
+            .find(|t| match &t.type_ {
                 Type::Struct(struct_type) => struct_type.id == struct_id,
                 Type::StructReference(id) if id == &struct_id => true,
                 _ => false,
@@ -678,7 +689,11 @@ pub fn bind_program<'a>(
         if constant.value.as_string().is_some() {
             todo!("Constants are not implemented for strings.")
         }
-        startup.append(&mut instruction_converter::convert_value(TextSpan::zero(), constant.value.clone(), &mut instruction_converter::InstructionConverter::default()));
+        startup.append(&mut instruction_converter::convert_value(
+            TextSpan::zero(),
+            constant.value.clone(),
+            &mut instruction_converter::InstructionConverter::default(),
+        ));
         startup.push(Instruction::store_in_register(index as _).into());
     }
     for lib in binder.libraries.iter_mut() {
@@ -739,7 +754,13 @@ pub fn bind_program<'a>(
                 .report_missing_return_statement(span, &binder.function_return_type);
         }
         let body = BoundNode::block_statement(span, body_statements);
-        startup.push(LabelReference {label_reference: index, span: TextSpan::zero()}.into());
+        startup.push(
+            LabelReference {
+                label_reference: index,
+                span: TextSpan::zero(),
+            }
+            .into(),
+        );
         startup.push(Instruction::store_in_register(node.variable_id).into());
         statements.push(BoundNode::function_declaration(
             index,
@@ -760,7 +781,14 @@ pub fn bind_program<'a>(
             println!("  {}: {:#?}", id, entry);
         }
     }
-    let max_used_variables = binder.max_used_variables.max(binder.libraries.iter().map(|l|l.program.max_used_variables).max().unwrap_or(0));
+    let max_used_variables = binder.max_used_variables.max(
+        binder
+            .libraries
+            .iter()
+            .map(|l| l.program.max_used_variables)
+            .max()
+            .unwrap_or(0),
+    );
     BoundProgram {
         startup,
         functions,
@@ -806,12 +834,23 @@ pub fn bind_library<'a>(
         if constant.value.as_string().is_some() {
             todo!("Constants are not implemented for strings.")
         }
-        startup.append(&mut instruction_converter::convert_value(TextSpan::zero(), constant.value.clone(), &mut instruction_converter::InstructionConverter::default()));
+        startup.append(&mut instruction_converter::convert_value(
+            TextSpan::zero(),
+            constant.value.clone(),
+            &mut instruction_converter::InstructionConverter::default(),
+        ));
         startup.push(Instruction::store_in_register(index as _).into());
     }
 
     for lib in binder.libraries.iter_mut() {
-        startup.append(&mut lib.program.startup_instructions.iter().map(|&i|i.into()).collect());
+        startup.append(
+            &mut lib
+                .program
+                .startup_instructions
+                .iter()
+                .map(|&i| i.into())
+                .collect(),
+        );
     }
 
     for node in binder.structs.clone() {
@@ -869,7 +908,13 @@ pub fn bind_library<'a>(
                 .report_missing_return_statement(span, &binder.function_return_type);
         }
         let body = BoundNode::block_statement(span, body_statements);
-        startup.push(LabelReference {label_reference: index, span: TextSpan::zero()}.into());
+        startup.push(
+            LabelReference {
+                label_reference: index,
+                span: TextSpan::zero(),
+            }
+            .into(),
+        );
         startup.push(Instruction::store_in_register(node.variable_id).into());
         statements.push(BoundNode::function_declaration(
             index,
@@ -891,20 +936,22 @@ pub fn bind_library<'a>(
     }
     BoundLibrary {
         program: BoundProgram {
-                    startup,
-                    functions,
-                    fixed_variable_count,
-                    max_used_variables: binder.max_used_variables,
-                    label_count,
-                    referenced_libraries: binder.libraries,
-                },
+            startup,
+            functions,
+            fixed_variable_count,
+            max_used_variables: binder.max_used_variables,
+            label_count,
+            referenced_libraries: binder.libraries,
+        },
         exported_functions: binder.functions.into_iter().map(Into::into).collect(),
         exported_structs: binder.struct_table.into_iter().map(Into::into).collect(),
     }
 }
 
-
-fn execute_import_function<'a>(import: BoundImportStatement<'a>, binder: &mut BindingState<'a, '_>) {
+fn execute_import_function<'a>(
+    import: BoundImportStatement<'a>,
+    binder: &mut BindingState<'a, '_>,
+) {
     match import.function {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
@@ -935,14 +982,18 @@ fn load_library_into_binder<'a>(
     let index = binder.libraries.len();
     let mut should_load_library = true;
     let variable = if lib.has_errors {
-        binder.diagnostic_bag.report_errors_in_referenced_library(span, name);
+        binder
+            .diagnostic_bag
+            .report_errors_in_referenced_library(span, name);
         should_load_library = false;
         binder.register_variable(name, Type::Error, true)
     } else {
         binder.register_variable(name, Type::Library(index), true)
     };
     if variable.is_none() {
-        binder.diagnostic_bag.report_cannot_declare_variable(span, name);
+        binder
+            .diagnostic_bag
+            .report_cannot_declare_variable(span, name);
         should_load_library = false;
     }
     if !should_load_library {
@@ -980,7 +1031,13 @@ fn load_library_into_binder<'a>(
     }
     for function in &lib.functions {
         if function.is_member_function {
-            binder.register_generated_constant(format!("{}.{}", name, function.name), Value::LabelPointer(function.label_index as usize, Type::function(function.function_type.clone())));
+            binder.register_generated_constant(
+                format!("{}.{}", name, function.name),
+                Value::LabelPointer(
+                    function.label_index as usize,
+                    Type::function(function.function_type.clone()),
+                ),
+            );
         }
     }
     binder.libraries.push(lib);
@@ -1011,7 +1068,7 @@ fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<InstructionOrLabe
         VariableOrConstantKind::None => {
             binder.diagnostic_bag.report_no_main_function_found();
             vec![]
-        },
+        }
         VariableOrConstantKind::Variable(variable_id) => {
             vec![
                 Instruction::load_register(variable_id).into(),
@@ -1020,11 +1077,15 @@ fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<InstructionOrLabe
             ]
         }
         VariableOrConstantKind::Constant(value) => {
-            let mut result = instruction_converter::convert_value(TextSpan::zero(), value, &mut instruction_converter::InstructionConverter::default());
+            let mut result = instruction_converter::convert_value(
+                TextSpan::zero(),
+                value,
+                &mut instruction_converter::InstructionConverter::default(),
+            );
             result.push(Instruction::load_immediate(0).into());
             result.push(Instruction::function_call().into());
             result
-        },
+        }
     }
 }
 
@@ -1084,7 +1145,8 @@ fn bind_function_declaration<'a, 'b>(
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
     let function_id = binder.functions.len() as u64;
-    let variable_id = if let Some(it) = binder.register_variable(function_declaration.identifier.lexeme, type_.clone(), false)
+    let variable_id = if let Some(it) =
+        binder.register_variable(function_declaration.identifier.lexeme, type_, false)
     {
         it
     } else {
@@ -1124,16 +1186,17 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     );
     let type_ = Type::Function(Box::new(function_type.clone()));
     let function_id = binder.functions.len() as _;
-    let variable_id =
-        if let Some(it) = binder.register_generated_variable(function_name.clone(), type_.clone(), true) {
-            it
-        } else {
-            binder.diagnostic_bag.report_cannot_declare_variable(
-                function_declaration.identifier.span(),
-                function_declaration.identifier.lexeme,
-            );
-            0
-        };
+    let variable_id = if let Some(it) =
+        binder.register_generated_variable(function_name.clone(), type_.clone(), true)
+    {
+        it
+    } else {
+        binder.diagnostic_bag.report_cannot_declare_variable(
+            function_declaration.identifier.span(),
+            function_declaration.identifier.lexeme,
+        );
+        0
+    };
     binder.functions.push(FunctionDeclarationBody {
         function_name: function_name.into(),
         body: *function_declaration.body,
@@ -1183,7 +1246,9 @@ fn bind_import_function<'a>(
                 "lib" => {
                     let path = function.arguments.pop();
                     if path.is_none() {
-                        binder.diagnostic_bag.report_unexpected_argument_count(function_span, 0, 1);
+                        binder
+                            .diagnostic_bag
+                            .report_unexpected_argument_count(function_span, 0, 1);
                         return None;
                     }
                     let path = path.unwrap();
@@ -1195,7 +1260,11 @@ fn bind_import_function<'a>(
                     }
                     let path = path.constant_value.unwrap().value;
                     if path.as_string().is_none() {
-                        binder.diagnostic_bag.report_cannot_convert(argument_span, &path.infer_type(), &Type::String);
+                        binder.diagnostic_bag.report_cannot_convert(
+                            argument_span,
+                            &path.infer_type(),
+                            &Type::String,
+                        );
                         return None;
                     }
                     let path = path.as_string()?.into();
@@ -1327,16 +1396,21 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
         };
         match &library_variable.type_ {
             Type::Error => return Type::Error,
-            Type::Library(_) => {},
+            Type::Library(_) => {}
             wrong_type => {
-                binder.diagnostic_bag.report_cannot_convert(library_token.span(), wrong_type, &Type::Library(0));
+                binder.diagnostic_bag.report_cannot_convert(
+                    library_token.span(),
+                    wrong_type,
+                    &Type::Library(0),
+                );
                 return Type::Error;
             }
         }
         binder.look_up_type_by_generated_name(format!("{}.{}", library_name, type_name))
     } else {
         binder.look_up_type_by_name(type_name)
-    }.unwrap_or_else(|| {
+    }
+    .unwrap_or_else(|| {
         binder
             .diagnostic_bag
             .report_unknown_type(type_span, &type_.full_type_name());
@@ -1546,14 +1620,14 @@ fn bind_constructor_call<'a>(
     let type_name = constructor_call.type_name.lexeme;
     let type_name_span = constructor_call.type_name.span();
     let type_ = bind_type(
-            TypeNode {
-                library_name: constructor_call.library_name,
-                type_name: constructor_call.type_name,
-                optional_question_mark: None,
-                brackets: vec![],
-            },
-            binder,
-        );
+        TypeNode {
+            library_name: constructor_call.library_name,
+            type_name: constructor_call.type_name,
+            optional_question_mark: None,
+            brackets: vec![],
+        },
+        binder,
+    );
     let struct_type = match type_ {
         Type::Struct(it) => *it,
         Type::StructReference(id) => binder.get_struct_by_id(id).unwrap(),
@@ -1600,7 +1674,9 @@ fn bind_variable<'a, 'b>(
                 .report_variable_not_found(span, variable_name);
             BoundNode::error(span)
         }
-        VariableOrConstantKind::Variable(variable_index) => BoundNode::variable(span, variable_index, variable.type_),
+        VariableOrConstantKind::Variable(variable_index) => {
+            BoundNode::variable(span, variable_index, variable.type_)
+        }
         VariableOrConstantKind::Constant(value) => {
             let mut result = BoundNode::literal_from_value(value);
             result.span = span;
@@ -1615,7 +1691,8 @@ fn bind_variable_for_assignment<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let variable_is_read_only = binder
-        .look_up_variable_or_constant_by_name(variable.token.lexeme).is_read_only;
+        .look_up_variable_or_constant_by_name(variable.token.lexeme)
+        .is_read_only;
     if variable_is_read_only {
         binder
             .diagnostic_bag
@@ -1865,9 +1942,7 @@ fn bind_function_call<'a, 'b>(
             unreachable!("There is a closure, which is not of type closure???");
         };
         match closure.function {
-            typing::FunctionKind::FunctionId(id) => {
-                BoundNode::variable(function.span, id, type_)
-            }
+            typing::FunctionKind::FunctionId(id) => BoundNode::variable(function.span, id, type_),
             typing::FunctionKind::SystemCall(kind) => {
                 BoundNode::literal_from_value(Value::SystemCall(kind))
             }
@@ -1989,19 +2064,19 @@ fn bind_field_access<'a, 'b>(
                 let function_name = format!("{}::{}", bound_struct_type.name, field_name);
                 if let Type::Function(function_type) = &field.type_ {
                     let type_ = Type::closure(*function_type.clone());
-                    let variable = binder
-                    .look_up_variable_or_constant_by_name(&function_name);
+                    let variable = binder.look_up_variable_or_constant_by_name(&function_name);
                     match variable.kind {
-                        VariableOrConstantKind::None => todo!("The binder missed a function on a struct somehow ({})", function_name),
-                        VariableOrConstantKind::Variable(variable_id) => BoundNode::closure(
-                                    span,
-                                    base,
-                                    variable_id,
-                                    type_),
+                        VariableOrConstantKind::None => todo!(
+                            "The binder missed a function on a struct somehow ({})",
+                            function_name
+                        ),
+                        VariableOrConstantKind::Variable(variable_id) => {
+                            BoundNode::closure(span, base, variable_id, type_)
+                        }
                         VariableOrConstantKind::Constant(value) => {
                             let label_index = value.as_label_pointer().unwrap().0;
                             BoundNode::closure_label(span, base, label_index, type_)
-                        },
+                        }
                     }
                 } else {
                     BoundNode::field_access(span, base, field.offset, field.type_.clone())
@@ -2025,12 +2100,8 @@ fn bind_field_access<'a, 'b>(
                 .clone();
             if let Some(field) = bound_struct_type.field(field_name) {
                 if let Type::Function(function_type) = &field.type_ {
-                    let function_name = format!(
-                        "{}::{}",
-                        bound_struct_type.name, field_name
-                    );
-                    let variable_id = binder
-                        .look_up_variable_or_constant_by_name(&function_name);
+                    let function_name = format!("{}::{}", bound_struct_type.name, field_name);
+                    let variable_id = binder.look_up_variable_or_constant_by_name(&function_name);
                     match variable_id.kind {
                         VariableOrConstantKind::None => todo!("Binder thought a function ({}) existed, but there is neither a variable or a constant for it.", function_name),
                         VariableOrConstantKind::Variable(variable_id) => BoundNode::closure(
@@ -2065,9 +2136,16 @@ fn bind_field_access<'a, 'b>(
             let library = &binder.libraries[*index];
             let function_name = field_access.field.lexeme;
             if let Some(function) = library.look_up_function_by_name(function_name) {
-                BoundNode::label_reference(function.label_index as _, Type::function(function.function_type.clone()))
+                BoundNode::label_reference(
+                    function.label_index as _,
+                    Type::function(function.function_type.clone()),
+                )
             } else {
-                binder.diagnostic_bag.report_no_field_named_on_type(span, function_name, &Type::Library(*index));
+                binder.diagnostic_bag.report_no_field_named_on_type(
+                    span,
+                    function_name,
+                    &Type::Library(*index),
+                );
                 BoundNode::error(span)
             }
         }

@@ -35,7 +35,11 @@ impl<'a> SourceText<'a> {
     }
 
     pub fn directory(&self) -> &str {
-        std::path::Path::new(self.file_name).parent().unwrap().to_str().unwrap()
+        std::path::Path::new(self.file_name)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap()
     }
 }
 

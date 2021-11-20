@@ -285,7 +285,7 @@ fn print_bound_node_if_statement_as_code(
     if let Some(else_body) = &if_statement.else_body {
         printer.print_indentation();
         buffer.push_str("else ");
-        print_bound_node_as_code_with_indent(&else_body, printer, buffer);
+        print_bound_node_as_code_with_indent(else_body, printer, buffer);
     }
 }
 
@@ -338,7 +338,7 @@ fn print_bound_node_return_statement_as_code(
     buffer.push_str("return");
     if let Some(expression) = &return_statement.expression {
         buffer.push(' ');
-        print_bound_node_as_code_with_indent(&expression, printer, buffer);
+        print_bound_node_as_code_with_indent(expression, printer, buffer);
     }
     buffer.push_str(";\n");
 }
@@ -350,7 +350,7 @@ fn print_bound_node_jump_as_code(
 ) {
     if let Some(condition) = &jump.condition {
         buffer.push_str("jump if ");
-        print_bound_node_as_code_with_indent(&condition, printer, buffer);
+        print_bound_node_as_code_with_indent(condition, printer, buffer);
         buffer.push_str(&format!(" is {} to  ", jump.jump_if_true));
     } else {
         buffer.push_str("jump to ");

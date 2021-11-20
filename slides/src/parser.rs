@@ -117,7 +117,13 @@ fn parse_import_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
     let semicolon_token = parser.match_token(SyntaxTokenKind::Semicolon);
 
-    SyntaxNode::import_statement(import_keyword, expression, as_keyword, identifier, semicolon_token)
+    SyntaxNode::import_statement(
+        import_keyword,
+        expression,
+        as_keyword,
+        identifier,
+        semicolon_token,
+    )
 }
 
 fn parse_function_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
@@ -141,7 +147,10 @@ fn parse_function_type<'a>(parser: &mut Parser<'a, '_>) -> FunctionTypeNode<'a> 
     let lparen = parser.match_token(SyntaxTokenKind::LParen);
     let mut parameters = vec![];
     let mut comma_tokens = vec![];
-    while !matches!(parser.peek_token().kind, SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi) {
+    while !matches!(
+        parser.peek_token().kind,
+        SyntaxTokenKind::RParen | SyntaxTokenKind::Eoi
+    ) {
         let token_count = parser.token_count();
         let parameter = parse_parameter(parser);
         parameters.push(parameter);
@@ -172,7 +181,10 @@ fn parse_function_type<'a>(parser: &mut Parser<'a, '_>) -> FunctionTypeNode<'a> 
 fn parse_struct_body<'a>(parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
     let lbrace = parser.match_token(SyntaxTokenKind::LBrace);
     let mut statements = vec![];
-    while !matches!(parser.peek_token().kind, SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi) {
+    while !matches!(
+        parser.peek_token().kind,
+        SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi
+    ) {
         let token_count = parser.token_count();
         let statement = match parser.peek_token().kind {
             SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
@@ -574,7 +586,10 @@ fn parse_constructor<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     let (library_name, type_name) = if parser.peek_token().kind == SyntaxTokenKind::Period {
         // FIXME: It would be nice to keep the period token around.
         parser.next_token();
-        (Some(type_name), parser.match_token(SyntaxTokenKind::Identifier))
+        (
+            Some(type_name),
+            parser.match_token(SyntaxTokenKind::Identifier),
+        )
     } else {
         (None, type_name)
     };

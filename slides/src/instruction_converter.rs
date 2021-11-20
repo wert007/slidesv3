@@ -6,7 +6,10 @@ mod label_replacer;
 
 use std::path::PathBuf;
 
-use crate::{binder::{self, bound_nodes::{
+use crate::{
+    binder::{
+        self,
+        bound_nodes::{
             BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
             BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
             BoundConstructorCallNodeKind, BoundConversionNodeKind,
@@ -14,9 +17,20 @@ use crate::{binder::{self, bound_nodes::{
             BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
             BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
             BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind,
-        }, operators::{BoundBinaryOperator, BoundUnaryOperator}, symbols::Library, typing::{FunctionKind, SystemCallKind, Type}}, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::memory::{WORD_SIZE_IN_BYTES, bytes_to_word, static_memory::StaticMemory}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
+        },
+        operators::{BoundBinaryOperator, BoundUnaryOperator},
+        symbols::Library,
+        typing::{FunctionKind, SystemCallKind, Type},
+    },
+    debug::DebugFlags,
+    diagnostics::DiagnosticBag,
+    evaluator::memory::{bytes_to_word, static_memory::StaticMemory, WORD_SIZE_IN_BYTES},
+    parser::syntax_nodes::LiteralNodeKind,
+    text::{SourceText, TextSpan},
+    value::Value,
+};
 
-use self::instruction::{Instruction, op_codes::OpCode};
+use self::instruction::{op_codes::OpCode, Instruction};
 
 #[derive(Debug, Clone, Copy)]
 pub struct LabelReference {
@@ -125,15 +139,29 @@ pub fn convert<'a>(
     for lib in bound_program.referenced_libraries.iter_mut() {
         let static_memory_size = converter.static_memory.size_in_bytes();
         for inst in lib.instructions.iter_mut() {
-            if let InstructionOrLabelReference::Instruction(Instruction { arg, op_code: OpCode::LoadPointer, ..}) = inst {
+            if let InstructionOrLabelReference::Instruction(Instruction {
+                arg,
+                op_code: OpCode::LoadPointer,
+                ..
+            }) = inst
+            {
                 *arg += static_memory_size;
             }
         }
-        converter.static_memory.insert(&mut lib.program.static_memory);
+        converter
+            .static_memory
+            .insert(&mut lib.program.static_memory);
     }
     let mut instructions = bound_program.startup;
     let foreign_instruction_start = instructions.len();
-    instructions.append(&mut bound_program.referenced_libraries.into_iter().map(|l| l.instructions).flatten().collect());
+    instructions.append(
+        &mut bound_program
+            .referenced_libraries
+            .into_iter()
+            .map(|l| l.instructions)
+            .flatten()
+            .collect(),
+    );
     let foreign_instruction_end = instructions.len();
     let entry_point = 0;
     instructions.append(&mut convert_node(bound_node, &mut converter));
@@ -145,12 +173,25 @@ pub fn convert<'a>(
 
     let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.print_instructions() {
-        crate::debug::print_instructions_with_source_code(0, &instructions[..foreign_instruction_start], source_text);
+        crate::debug::print_instructions_with_source_code(
+            0,
+            &instructions[..foreign_instruction_start],
+            source_text,
+        );
         println!("> Skipping library code right now, their code will be emitted extra.");
-        crate::debug::print_instructions_with_source_code(foreign_instruction_end, &instructions[foreign_instruction_end..], source_text);
+        crate::debug::print_instructions_with_source_code(
+            foreign_instruction_end,
+            &instructions[foreign_instruction_end..],
+            source_text,
+        );
     }
     if debug_flags.output_instructions_to_sldasm {
-        crate::debug::output_instructions_with_source_code_to_sldasm_skip(foreign_instruction_start, foreign_instruction_end, &instructions, source_text);
+        crate::debug::output_instructions_with_source_code_to_sldasm_skip(
+            foreign_instruction_start,
+            foreign_instruction_end,
+            &instructions,
+            source_text,
+        );
     }
     Program {
         startup_instructions: vec![],
@@ -162,7 +203,6 @@ pub fn convert<'a>(
         entry_point,
     }
 }
-
 
 pub fn convert_library<'a>(
     source_text: &'a SourceText<'a>,
@@ -185,11 +225,18 @@ pub fn convert_library<'a>(
     for lib in bound_program.referenced_libraries.iter_mut() {
         let static_memory_size = converter.static_memory.size_in_bytes();
         for inst in lib.instructions.iter_mut() {
-            if let InstructionOrLabelReference::Instruction(Instruction { arg, op_code: OpCode::LoadPointer, ..}) = inst {
+            if let InstructionOrLabelReference::Instruction(Instruction {
+                arg,
+                op_code: OpCode::LoadPointer,
+                ..
+            }) = inst
+            {
                 *arg += static_memory_size;
             }
         }
-        converter.static_memory.insert(&mut lib.program.static_memory);
+        converter
+            .static_memory
+            .insert(&mut lib.program.static_memory);
     }
     let instructions = convert_node(bound_node, &mut converter);
     if debug_flags.print_instructions_and_labels {
@@ -203,14 +250,22 @@ pub fn convert_library<'a>(
         crate::debug::print_instructions_or_labels_with_source_code(0, &instructions, source_text);
     }
     if debug_flags.output_instructions_to_sldasm {
-        crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(0, &instructions, source_text);
+        crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
+            0,
+            &instructions,
+            source_text,
+        );
     }
     Library {
         path: source_text.file_name.into(),
         // FIXME: Every library should have a library statement, which also
         // specifies its name!
         // NOTE: This value is overwritten anyway by the binder.
-        name: PathBuf::from(source_text.file_name).file_stem().unwrap().to_string_lossy().into_owned(),
+        name: PathBuf::from(source_text.file_name)
+            .file_stem()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned(),
         referenced_libraries: bound_program.referenced_libraries,
         instructions,
         startup: bound_program.startup,
@@ -347,10 +402,15 @@ pub fn convert_value(
         Value::SystemCall(kind) => kind as u64,
         Value::String(value) => return convert_string_literal(span, value, converter),
         Value::None => return vec![Instruction::load_pointer(0).span(span).into()],
-        Value::LabelPointer(label_reference, _) => return vec![LabelReference{label_reference, span}.into()],
+        Value::LabelPointer(label_reference, _) => {
+            return vec![LabelReference {
+                label_reference,
+                span,
+            }
+            .into()]
+        }
     };
     vec![Instruction::load_immediate(value).span(span).into()]
-
 }
 
 fn convert_string_literal(
@@ -701,8 +761,14 @@ fn convert_closure(
         }
         FunctionKind::SystemCall(_) => {}
         FunctionKind::LabelReference(label_reference) => {
-            result.push(LabelReference{ label_reference, span}.into());
-        },
+            result.push(
+                LabelReference {
+                    label_reference,
+                    span,
+                }
+                .into(),
+            );
+        }
     }
     result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
     result.push(
@@ -766,7 +832,11 @@ fn convert_conversion(
     result
 }
 
-fn convert_type_identifier(base_type: Type, span: TextSpan, result: &mut Vec<InstructionOrLabelReference>) -> u64 {
+fn convert_type_identifier(
+    base_type: Type,
+    span: TextSpan,
+    result: &mut Vec<InstructionOrLabelReference>,
+) -> u64 {
     let size_in_words = base_type.type_identifier_size_in_words();
     let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
     let type_identifier_kind = base_type.type_identifier_kind();
@@ -779,7 +849,11 @@ fn convert_type_identifier(base_type: Type, span: TextSpan, result: &mut Vec<Ins
                 dimension_count += 1;
             }
             let type_word_count = convert_type_identifier(base_type, span, result) + 3;
-            result.push(Instruction::load_immediate(dimension_count).span(span).into());
+            result.push(
+                Instruction::load_immediate(dimension_count)
+                    .span(span)
+                    .into(),
+            );
             type_word_count
         }
         Type::Noneable(base_type) => convert_type_identifier(*base_type, span, result) + 2,
@@ -793,10 +867,17 @@ fn convert_type_identifier(base_type: Type, span: TextSpan, result: &mut Vec<Ins
             // ReturnType
             type_word_count += convert_type_identifier(function_type.return_type, span, result);
             // ThisType or Void
-            type_word_count +=
-                convert_type_identifier(function_type.this_type.unwrap_or(Type::Void), span, result);
+            type_word_count += convert_type_identifier(
+                function_type.this_type.unwrap_or(Type::Void),
+                span,
+                result,
+            );
             // ParameterCount + 2
-            result.push(Instruction::load_immediate(parameter_count + 2).span(span).into());
+            result.push(
+                Instruction::load_immediate(parameter_count + 2)
+                    .span(span)
+                    .into(),
+            );
             type_word_count
         }
         Type::Closure(closure_type) => {
@@ -824,11 +905,19 @@ fn convert_type_identifier(base_type: Type, span: TextSpan, result: &mut Vec<Ins
                 result,
             );
             // ParameterCount + 2
-            result.push(Instruction::load_immediate(parameter_count + 2).span(span).into());
+            result.push(
+                Instruction::load_immediate(parameter_count + 2)
+                    .span(span)
+                    .into(),
+            );
             type_word_count
         }
         Type::Struct(struct_type) => {
-            result.push(Instruction::load_immediate(struct_type.id).span(span).into());
+            result.push(
+                Instruction::load_immediate(struct_type.id)
+                    .span(span)
+                    .into(),
+            );
             3
         }
         Type::StructReference(id) => {
@@ -837,7 +926,11 @@ fn convert_type_identifier(base_type: Type, span: TextSpan, result: &mut Vec<Ins
         }
         _ => 2,
     };
-    result.push(Instruction::load_immediate(type_identifier_kind).span(span).into());
+    result.push(
+        Instruction::load_immediate(type_identifier_kind)
+            .span(span)
+            .into(),
+    );
     result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
     type_word_count
 }

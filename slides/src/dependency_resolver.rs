@@ -9,7 +9,7 @@ pub struct BoundImportStatement<'a> {
 
 #[derive(Debug, Clone)]
 pub enum ImportFunction {
-    Library(ImportLibraryFunction)
+    Library(ImportLibraryFunction),
 }
 
 #[derive(Debug, Clone)]

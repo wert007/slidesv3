@@ -248,7 +248,7 @@ fn connect_basic_blocks<'a>(
                                     incoming_connections
                                         .push((basic_block.index, basic_block.index + 1));
                                     OutgoingConnections::IfTrue(
-                                        &condition,
+                                        condition,
                                         then_address,
                                         basic_block.index + 1,
                                     )
@@ -260,7 +260,7 @@ fn connect_basic_blocks<'a>(
                                     incoming_connections
                                         .push((basic_block.index, basic_block.index + 1));
                                     OutgoingConnections::IfFalse(
-                                        &condition,
+                                        condition,
                                         then_address,
                                         basic_block.index + 1,
                                     )

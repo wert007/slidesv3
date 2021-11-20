@@ -1,6 +1,6 @@
 use crate::{evaluator::WORD_SIZE_IN_BYTES, DebugFlags};
 
-use super::{FlaggedWord, Flags, static_memory::StaticMemory};
+use super::{static_memory::StaticMemory, FlaggedWord, Flags};
 
 pub struct Stack {
     pub data: Vec<u64>,

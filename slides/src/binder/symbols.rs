@@ -1,8 +1,14 @@
 use std::path::{Path, PathBuf};
 
-use crate::instruction_converter::{InstructionOrLabelReference, LabelReference, Program, instruction::{Instruction, op_codes::OpCode}};
+use crate::instruction_converter::{
+    instruction::{op_codes::OpCode, Instruction},
+    InstructionOrLabelReference, LabelReference, Program,
+};
 
-use super::{BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, typing::{FunctionType, Type}};
+use super::{
+    typing::{FunctionType, Type},
+    BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody,
+};
 
 #[derive(Debug, Clone)]
 pub struct Library {
@@ -58,7 +64,10 @@ impl Library {
                 }) => {
                     *arg += label_offset as u64;
                 }
-                InstructionOrLabelReference::LabelReference(LabelReference {label_reference, .. }) => {
+                InstructionOrLabelReference::LabelReference(LabelReference {
+                    label_reference,
+                    ..
+                }) => {
                     *label_reference += label_offset;
                 }
                 _ => {}
@@ -111,7 +120,7 @@ pub struct StructSymbol {
 
 impl StructSymbol {
     pub fn field(&self, name: &str) -> Option<&StructFieldSymbol> {
-        self.fields.iter().find(|f|f.name == name)
+        self.fields.iter().find(|f| f.name == name)
     }
 }
 

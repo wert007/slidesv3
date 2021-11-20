@@ -197,7 +197,12 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn closure_label(span: TextSpan, base: BoundNode<'a>, label_index: usize, type_: Type) -> Self {
+    pub fn closure_label(
+        span: TextSpan,
+        base: BoundNode<'a>,
+        label_index: usize,
+        type_: Type,
+    ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {

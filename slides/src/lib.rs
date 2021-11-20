@@ -17,7 +17,10 @@ use crate::{diagnostics::DiagnosticBag, text::SourceText};
 use binder::symbols::Library;
 pub use debug::DebugFlags;
 
-pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags) -> Library where P: AsRef<Path>{
+pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags) -> Library
+where
+    P: AsRef<Path>,
+{
     let path = path.as_ref().to_owned();
     let source_code = std::fs::read_to_string(&path);
     if source_code.is_err() {
@@ -31,7 +34,8 @@ pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags) -> Library wh
 pub fn load_library(input: &str, file_name: &str, debug_flags: DebugFlags) -> Library {
     let source_text = SourceText::new(input, file_name);
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let mut result = instruction_converter::convert_library(&source_text, &mut diagnostic_bag, debug_flags);
+    let mut result =
+        instruction_converter::convert_library(&source_text, &mut diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         result.has_errors = true;
         diagnostic_bag.flush_to_console();

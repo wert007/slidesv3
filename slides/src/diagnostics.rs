@@ -1,4 +1,9 @@
-use crate::{binder::{BoundStructSymbol, typing::Type}, lexer::syntax_token::SyntaxTokenKind, parser::syntax_nodes::SyntaxNodeKind, text::{SourceText, TextLocation, TextSpan}};
+use crate::{
+    binder::{typing::Type, BoundStructSymbol},
+    lexer::syntax_token::SyntaxTokenKind,
+    parser::syntax_nodes::SyntaxNodeKind,
+    text::{SourceText, TextLocation, TextSpan},
+};
 
 #[derive(Debug, Clone)]
 pub struct Diagnostic<'a> {
@@ -329,17 +334,25 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_only_function_call_in_import_statement(&mut self, span: TextSpan) {
-        let message = "Only function calls like lib('path/to/lib.sld') are valid in import statements.".into();
+        let message =
+            "Only function calls like lib('path/to/lib.sld') are valid in import statements."
+                .into();
         self.report(message, span);
     }
 
     pub fn report_unknown_import_function(&mut self, span: TextSpan, function_name: &str) {
-        let message = format!("No function named {} found for imports. Use lib('path/to/lib.sld') instead.", function_name);
+        let message = format!(
+            "No function named {} found for imports. Use lib('path/to/lib.sld') instead.",
+            function_name
+        );
         self.report(message, span);
     }
 
     pub(crate) fn report_unknown_library(&mut self, span: TextSpan, library_name: &str) {
-        let message = format!("No library named {} found. Did you misspell it? Or are you missing an import?", library_name);
+        let message = format!(
+            "No library named {} found. Did you misspell it? Or are you missing an import?",
+            library_name
+        );
         self.report(message, span);
     }
 
@@ -349,7 +362,9 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_no_main_function_found(&mut self) {
-        let message = "No main() function found in file. Did you forget it? Or maybe this is a library.".into();
+        let message =
+            "No main() function found in file. Did you forget it? Or maybe this is a library."
+                .into();
         self.report(message, TextSpan::zero());
     }
 

@@ -1,9 +1,12 @@
 use crate::binder::bound_nodes::BoundNodeKind;
 
-use super::{bound_nodes::{
-    BoundBlockStatementNodeKind, BoundFunctionDeclarationNodeKind, BoundIfStatementNodeKind,
-    BoundNode, BoundWhileStatementNodeKind,
-}, typing::Type};
+use super::{
+    bound_nodes::{
+        BoundBlockStatementNodeKind, BoundFunctionDeclarationNodeKind, BoundIfStatementNodeKind,
+        BoundNode, BoundWhileStatementNodeKind,
+    },
+    typing::Type,
+};
 
 struct Flattener {
     pub label_count: usize,
@@ -128,5 +131,8 @@ fn flatten_while_statement<'a>(
 
 fn create_label<'a>(flattener: &mut Flattener) -> (BoundNode<'a>, BoundNode<'a>) {
     let index = flattener.next_label_index();
-    (BoundNode::label(index), BoundNode::label_reference(index, Type::Error))
+    (
+        BoundNode::label(index),
+        BoundNode::label_reference(index, Type::Error),
+    )
 }

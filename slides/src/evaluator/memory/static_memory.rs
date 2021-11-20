@@ -4,7 +4,7 @@ use super::WORD_SIZE_IN_BYTES;
 
 #[derive(Default, Debug, Clone)]
 pub struct StaticMemory {
-    pub data : Vec<u64>,
+    pub data: Vec<u64>,
 }
 
 impl StaticMemory {
@@ -19,14 +19,14 @@ impl StaticMemory {
         self.data.push(length);
         for word in string.as_bytes().chunks(8) {
             let word = [
-                word.get(0).map(|&b|b).unwrap_or_default(),
-                word.get(1).map(|&b|b).unwrap_or_default(),
-                word.get(2).map(|&b|b).unwrap_or_default(),
-                word.get(3).map(|&b|b).unwrap_or_default(),
-                word.get(4).map(|&b|b).unwrap_or_default(),
-                word.get(5).map(|&b|b).unwrap_or_default(),
-                word.get(6).map(|&b|b).unwrap_or_default(),
-                word.get(7).map(|&b|b).unwrap_or_default(),
+                word.get(0).copied().unwrap_or_default(),
+                word.get(1).copied().unwrap_or_default(),
+                word.get(2).copied().unwrap_or_default(),
+                word.get(3).copied().unwrap_or_default(),
+                word.get(4).copied().unwrap_or_default(),
+                word.get(5).copied().unwrap_or_default(),
+                word.get(6).copied().unwrap_or_default(),
+                word.get(7).copied().unwrap_or_default(),
             ];
             let word = u64::from_be_bytes(word);
             self.data.push(word);

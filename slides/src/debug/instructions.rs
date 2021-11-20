@@ -1,40 +1,95 @@
-use std::{convert::TryFrom, path::{Path, PathBuf}};
+use std::{
+    convert::TryFrom,
+    path::{Path, PathBuf},
+};
 
-use crate::{binder::typing::SystemCallKind, evaluator::memory::WORD_SIZE_IN_BYTES, instruction_converter::{InstructionOrLabelReference, LabelReference, instruction::{Instruction, op_codes::OpCode}}, text::SourceText};
+use crate::{
+    binder::typing::SystemCallKind,
+    evaluator::memory::WORD_SIZE_IN_BYTES,
+    instruction_converter::{
+        instruction::{op_codes::OpCode, Instruction},
+        InstructionOrLabelReference, LabelReference,
+    },
+    text::SourceText,
+};
 
-pub fn print_instructions_with_source_code(start_index: usize, instructions: &[Instruction], source: &SourceText) {
+pub fn print_instructions_with_source_code(
+    start_index: usize,
+    instructions: &[Instruction],
+    source: &SourceText,
+) {
     let output = instructions_with_source_code_to_string(start_index, instructions, source);
     println!("{}", output)
 }
 
-pub fn print_instructions_or_labels_with_source_code(start_index: usize, instructions: &[InstructionOrLabelReference], source: &SourceText) {
-    let output = instructions_or_labels_with_source_code_to_string(start_index, instructions, source);
+pub fn print_instructions_or_labels_with_source_code(
+    start_index: usize,
+    instructions: &[InstructionOrLabelReference],
+    source: &SourceText,
+) {
+    let output =
+        instructions_or_labels_with_source_code_to_string(start_index, instructions, source);
     println!("{}", output)
 }
 
-pub fn output_instructions_with_source_code_to_sldasm(start_index: usize, instructions: &[Instruction], source: &SourceText) {
+pub fn output_instructions_with_source_code_to_sldasm(
+    start_index: usize,
+    instructions: &[Instruction],
+    source: &SourceText,
+) {
     let contents = instructions_with_source_code_to_string(start_index, instructions, source);
-    let output_path = PathBuf::from("../debug-out").join(Path::new(source.file_name).with_extension("sldasm").file_name().unwrap());
+    let output_path = PathBuf::from("../debug-out").join(
+        Path::new(source.file_name)
+            .with_extension("sldasm")
+            .file_name()
+            .unwrap(),
+    );
     std::fs::write(output_path, contents).unwrap();
 }
 
-pub fn output_instructions_with_source_code_to_sldasm_skip(skip_start: usize, skip_end: usize, instructions: &[Instruction], source: &SourceText) {
-    let mut contents = instructions_with_source_code_to_string(0, &instructions[..skip_start], source);
+pub fn output_instructions_with_source_code_to_sldasm_skip(
+    skip_start: usize,
+    skip_end: usize,
+    instructions: &[Instruction],
+    source: &SourceText,
+) {
+    let mut contents =
+        instructions_with_source_code_to_string(0, &instructions[..skip_start], source);
     contents += "> Foreign instructions start\n";
     contents += &instructions_to_string(skip_start, &instructions[skip_start..skip_end]);
     contents += "> Foreign instructions end\n";
-    contents += &instructions_with_source_code_to_string(skip_end, &instructions[skip_end..], source);
-    let output_path = PathBuf::from("../debug-out").join(Path::new(source.file_name).with_extension("sldasm").file_name().unwrap());
+    contents +=
+        &instructions_with_source_code_to_string(skip_end, &instructions[skip_end..], source);
+    let output_path = PathBuf::from("../debug-out").join(
+        Path::new(source.file_name)
+            .with_extension("sldasm")
+            .file_name()
+            .unwrap(),
+    );
     std::fs::write(output_path, contents).unwrap();
 }
 
-pub fn output_instructions_or_labels_with_source_code_to_sldasm(start_index: usize, instructions: &[InstructionOrLabelReference], source: &SourceText) {
-    let contents = instructions_or_labels_with_source_code_to_string(start_index, instructions, source);
-    let output_path = PathBuf::from("../debug-out").join(Path::new(source.file_name).with_extension("sldasm").file_name().unwrap());
+pub fn output_instructions_or_labels_with_source_code_to_sldasm(
+    start_index: usize,
+    instructions: &[InstructionOrLabelReference],
+    source: &SourceText,
+) {
+    let contents =
+        instructions_or_labels_with_source_code_to_string(start_index, instructions, source);
+    let output_path = PathBuf::from("../debug-out").join(
+        Path::new(source.file_name)
+            .with_extension("sldasm")
+            .file_name()
+            .unwrap(),
+    );
     std::fs::write(output_path, contents).unwrap();
 }
 
-fn instructions_with_source_code_to_string(start_index: usize, instructions: &[Instruction], source: &SourceText) -> String {
+fn instructions_with_source_code_to_string(
+    start_index: usize,
+    instructions: &[Instruction],
+    source: &SourceText,
+) -> String {
     let mut current_span = None;
     let mut result = String::new();
     let mut index = start_index;
@@ -56,7 +111,11 @@ fn instructions_with_source_code_to_string(start_index: usize, instructions: &[I
     result
 }
 
-fn instructions_or_labels_with_source_code_to_string(start_index: usize, instructions: &[InstructionOrLabelReference], source: &SourceText) -> String {
+fn instructions_or_labels_with_source_code_to_string(
+    start_index: usize,
+    instructions: &[InstructionOrLabelReference],
+    source: &SourceText,
+) -> String {
     let mut current_span = None;
     let mut result = String::new();
     let mut index = start_index;
@@ -77,7 +136,7 @@ fn instructions_or_labels_with_source_code_to_string(start_index: usize, instruc
                 index += 1;
             }
             InstructionOrLabelReference::LabelReference(label) => {
-                result.push_str(" ");
+                result.push(' ');
                 result.push_str(&label_to_string(*label));
             }
         }
@@ -116,7 +175,9 @@ pub fn instruction_to_string(instruction: Instruction) -> String {
         OpCode::StoreInMemory => instruction_ptr_unsigned_arg_to_string("stm", instruction.arg),
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
         OpCode::WriteToHeap => instruction_word_count_arg_to_string("wrtheap", instruction.arg),
-        OpCode::ReadWordWithOffset => instruction_byte_count_arg_to_string("rdwrdoffset", instruction.arg),
+        OpCode::ReadWordWithOffset => {
+            instruction_byte_count_arg_to_string("rdwrdoffset", instruction.arg)
+        }
         OpCode::MemoryCopy => instruction_no_arg_to_string("memcpy"),
         OpCode::TypeIdentifier => instruction_dec_signed_arg_to_string("ldtyp", instruction.arg),
         OpCode::Label => instruction_label_arg_to_string("lbl", instruction.arg),
@@ -146,13 +207,12 @@ pub fn instruction_to_string(instruction: Instruction) -> String {
         OpCode::SysCall => instruction_syscall_arg_to_string("syscall", instruction.arg),
         OpCode::FunctionCall => instruction_no_arg_to_string("fncall"),
         OpCode::Return => instruction_return_arg_to_string("ret", instruction.arg),
-        OpCode::DecodeClosure => instruction_decode_closure_arg_to_string("decclosure", instruction.arg),
+        OpCode::DecodeClosure => {
+            instruction_decode_closure_arg_to_string("decclosure", instruction.arg)
+        }
         OpCode::CheckArrayBounds => instruction_no_arg_to_string("chkarraybounds"),
     }
 }
-
-
-
 
 fn instruction_no_arg_to_string(name: &str) -> String {
     name.into()
@@ -205,7 +265,10 @@ fn instruction_decode_closure_arg_to_string(name: &str, arg: u64) -> String {
     let has_function_pointer = arg & 1 != 0;
     let argument_count = arg >> 1;
     if has_function_pointer {
-        format!("{} argument count {} with function pointer", name, argument_count)
+        format!(
+            "{} argument count {} with function pointer",
+            name, argument_count
+        )
     } else {
         format!("{} argument count {}", name, argument_count)
     }
