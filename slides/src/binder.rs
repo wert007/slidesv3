@@ -1123,7 +1123,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         struct_name, function_declaration.identifier.lexeme
     );
     let type_ = Type::Function(Box::new(function_type.clone()));
-    let function_id = binder.functions.len() as _;
+    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;;
     binder.register_generated_constant(function_name.clone(), Value::LabelPointer(function_id as usize, type_.clone()));
     binder.functions.push(FunctionDeclarationBody {
         function_name: function_name.into(),
