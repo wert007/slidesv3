@@ -1,10 +1,17 @@
 mod allocator;
 mod basic_blocks;
 mod bound_nodes;
+mod instructions;
 
 pub use allocator::output_allocator_to_dot;
 pub use basic_blocks::output_basic_blocks_to_dot;
 pub use bound_nodes::print_bound_node_as_code;
+pub use instructions::print_instructions_with_source_code;
+pub use instructions::print_instructions_or_labels_with_source_code;
+pub use instructions::output_instructions_with_source_code_to_sldasm;
+pub use instructions::output_instructions_with_source_code_to_sldasm_skip;
+pub use instructions::output_instructions_or_labels_with_source_code_to_sldasm;
+pub use instructions::instruction_to_string;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DebugFlags {
@@ -19,6 +26,7 @@ pub struct DebugFlags {
     pub print_stack: bool,
     pub print_labels: bool,
     pub output_basic_blocks_to_dot: bool,
+    pub output_instructions_to_sldasm: bool,
     pub run_program: bool,
     pub slow_mode: bool,
 }

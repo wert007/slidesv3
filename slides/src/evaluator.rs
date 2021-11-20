@@ -111,7 +111,7 @@ pub fn evaluate(
     while state.pc < instructions.len() {
         let pc = state.pc;
         if debug_flags.print_current_instruction() {
-            println!("  CI {}: {:?}", pc, instructions[pc]);
+            println!("  CI {:X}: {}", pc, crate::debug::instruction_to_string(instructions[pc]));
         }
         if debug_flags.slow_mode {
             std::thread::sleep(std::time::Duration::from_millis(500));

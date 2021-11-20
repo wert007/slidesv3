@@ -136,7 +136,7 @@ impl std::fmt::Display for TextLocation<'_> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TextSpan {
     start: usize,
     length: usize,
