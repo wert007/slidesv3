@@ -748,6 +748,7 @@ pub fn bind_library<'a>(
         }
         binder.function_return_type = node.function_type.return_type.clone();
         binder.is_struct_function = node.is_struct_function;
+        let span = node.body.span;
         let mut body = bind_node(node.body, &mut binder);
         if matches!(&binder.function_return_type, Type::Void) {
             body = BoundNode::block_statement(

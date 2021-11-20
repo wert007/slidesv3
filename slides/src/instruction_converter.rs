@@ -506,21 +506,23 @@ fn convert_binary(
     }
     .span(span);
     let mut result = vec![];
+    let lhs_span = binary.lhs.span;
+    let rhs_span = binary.rhs.span;
     result.append(&mut convert_node(*binary.lhs, converter));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) {
-        result.push(Instruction::load_immediate(1).span(span).into());
+        result.push(Instruction::load_immediate(1).span(lhs_span).into());
         result.push(
             Instruction::system_call(SystemCallKind::ToString)
-                .span(span)
+                .span(lhs_span)
                 .into(),
         );
     }
     result.append(&mut convert_node(*binary.rhs, converter));
     if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) {
-        result.push(Instruction::load_immediate(1).span(span).into());
+        result.push(Instruction::load_immediate(1).span(rhs_span).into());
         result.push(
             Instruction::system_call(SystemCallKind::ToString)
-                .span(span)
+                .span(rhs_span)
                 .into(),
         );
     }
@@ -708,7 +710,7 @@ fn convert_conversion(
     match conversion_kind {
         ConversionKind::None => {}
         ConversionKind::TypeBoxing => {
-            let type_word_count = convert_type_identifier(base_type, &mut result);
+            let type_word_count = convert_type_identifier(base_type, span, &mut result);
             result.push(
                 Instruction::write_to_heap(type_word_count + 1)
                     .span(span)
@@ -718,6 +720,7 @@ fn convert_conversion(
         ConversionKind::TypeUnboxing => {
             let type_word_count = convert_type_identifier(
                 conversion.type_.noneable_base_type().unwrap().clone(),
+                span,
                 &mut result,
             );
             // Write to heap to keep code simpler. This can be optimized later!
@@ -749,7 +752,7 @@ fn convert_conversion(
     result
 }
 
-fn convert_type_identifier(base_type: Type, result: &mut Vec<InstructionOrLabelReference>) -> u64 {
+fn convert_type_identifier(base_type: Type, span: TextSpan, result: &mut Vec<InstructionOrLabelReference>) -> u64 {
     let size_in_words = base_type.type_identifier_size_in_words();
     let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
     let type_identifier_kind = base_type.type_identifier_kind();
@@ -761,25 +764,25 @@ fn convert_type_identifier(base_type: Type, result: &mut Vec<InstructionOrLabelR
                 base_type = *inner;
                 dimension_count += 1;
             }
-            let type_word_count = convert_type_identifier(base_type, result) + 3;
-            result.push(Instruction::load_immediate(dimension_count).into());
+            let type_word_count = convert_type_identifier(base_type, span, result) + 3;
+            result.push(Instruction::load_immediate(dimension_count).span(span).into());
             type_word_count
         }
-        Type::Noneable(base_type) => convert_type_identifier(*base_type, result) + 2,
+        Type::Noneable(base_type) => convert_type_identifier(*base_type, span, result) + 2,
         Type::Function(function_type) => {
             let mut type_word_count = 3;
             let parameter_count = function_type.parameter_types.len() as u64;
             // ParameterTypes
             for parameter in function_type.parameter_types.into_iter().rev() {
-                type_word_count += convert_type_identifier(parameter, result);
+                type_word_count += convert_type_identifier(parameter, span, result);
             }
             // ReturnType
-            type_word_count += convert_type_identifier(function_type.return_type, result);
+            type_word_count += convert_type_identifier(function_type.return_type, span, result);
             // ThisType or Void
             type_word_count +=
-                convert_type_identifier(function_type.this_type.unwrap_or(Type::Void), result);
+                convert_type_identifier(function_type.this_type.unwrap_or(Type::Void), span, result);
             // ParameterCount + 2
-            result.push(Instruction::load_immediate(parameter_count + 2).into());
+            result.push(Instruction::load_immediate(parameter_count + 2).span(span).into());
             type_word_count
         }
         Type::Closure(closure_type) => {
@@ -792,35 +795,36 @@ fn convert_type_identifier(base_type: Type, result: &mut Vec<InstructionOrLabelR
                 .into_iter()
                 .rev()
             {
-                type_word_count += convert_type_identifier(parameter, result);
+                type_word_count += convert_type_identifier(parameter, span, result);
             }
             // ReturnType
             type_word_count +=
-                convert_type_identifier(closure_type.base_function_type.return_type, result);
+                convert_type_identifier(closure_type.base_function_type.return_type, span, result);
             // ThisType or Void
             type_word_count += convert_type_identifier(
                 closure_type
                     .base_function_type
                     .this_type
                     .unwrap_or(Type::Void),
+                span,
                 result,
             );
             // ParameterCount + 2
-            result.push(Instruction::load_immediate(parameter_count + 2).into());
+            result.push(Instruction::load_immediate(parameter_count + 2).span(span).into());
             type_word_count
         }
         Type::Struct(struct_type) => {
-            result.push(Instruction::load_immediate(struct_type.id).into());
+            result.push(Instruction::load_immediate(struct_type.id).span(span).into());
             3
         }
         Type::StructReference(id) => {
-            result.push(Instruction::load_immediate(id).into());
+            result.push(Instruction::load_immediate(id).span(span).into());
             3
         }
         _ => 2,
     };
-    result.push(Instruction::load_immediate(type_identifier_kind).into());
-    result.push(Instruction::load_immediate(size_in_bytes).into());
+    result.push(Instruction::load_immediate(type_identifier_kind).span(span).into());
+    result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
     type_word_count
 }
 
