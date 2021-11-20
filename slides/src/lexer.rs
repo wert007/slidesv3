@@ -283,17 +283,17 @@ pub fn lex<'a>(
 fn is_operator(character: char) -> bool {
     matches!(
         character,
-        '+' | '*' | '(' | ')' | ';' | ':' | '{' | '}' | ',' | '[' | ']' | '.'
+        '+' | '*' | '(' | ')' | ';' | ':' | '{' | '}' | ',' | '[' | ']'
     )
 }
 
 fn is_multi_char_operator(character: char) -> bool {
-    matches!(character, '=' | '<' | '>' | '-' | '?')
+    matches!(character, '=' | '<' | '>' | '-' | '?' | '.')
 }
 
 fn is_valid_operator(operator: &str) -> bool {
     matches!(
         operator,
-        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-" | "?" | "??"
+        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-" | "?" | "??" | "." | ".."
     )
 }

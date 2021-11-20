@@ -109,6 +109,7 @@ pub enum SyntaxTokenKind {
     Colon,
     Comma,
     Period,
+    PeriodPeriod,
     QuestionMark,
     QuestionMarkQuestionMark,
     Plus,
@@ -149,16 +150,17 @@ pub enum SyntaxTokenKind {
 impl SyntaxTokenKind {
     pub fn unary_precedence(&self) -> u32 {
         match self {
-            Self::Plus | Self::Minus | Self::Bang => 6,
+            Self::Plus | Self::Minus | Self::Bang => 7,
             _ => 0,
         }
     }
 
     pub fn binary_precedence(&self) -> u32 {
         match self {
-            Self::Star | Self::Slash => 5,
-            Self::Plus | Self::Minus => 4,
-            Self::QuestionMarkQuestionMark => 3,
+            Self::Star | Self::Slash => 6,
+            Self::Plus | Self::Minus => 5,
+            Self::QuestionMarkQuestionMark => 4,
+            Self::PeriodPeriod => 3,
             Self::EqualsEquals
             | Self::BangEquals
             | Self::LessThan
@@ -220,6 +222,7 @@ impl From<&str> for SyntaxTokenKind {
             ":" => Self::Colon,
             "," => Self::Comma,
             "." => Self::Period,
+            ".." => Self::PeriodPeriod,
             "?" => Self::QuestionMark,
             "??" => Self::QuestionMarkQuestionMark,
             "==" => Self::EqualsEquals,
@@ -245,6 +248,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::Colon => write!(f, "ColonToken"),
             SyntaxTokenKind::Comma => write!(f, "CommaToken"),
             SyntaxTokenKind::Period => write!(f, "PeriodToken"),
+            SyntaxTokenKind::PeriodPeriod => write!(f, "Period-Period-Token"),
             SyntaxTokenKind::QuestionMark => write!(f, "Question-Mark-Token"),
             SyntaxTokenKind::QuestionMarkQuestionMark => {
                 write!(f, "Question-Mark-Question-Mark-Token")

@@ -583,6 +583,7 @@ fn convert_binary(
         BoundBinaryOperator::NoneableOrValue => {
             Instruction::noneable_or_value(!binary.lhs.type_.is_pointer())
         }
+        BoundBinaryOperator::Range => return generate_range(span, *binary.lhs, *binary.rhs, converter),
     }
     .span(span);
     let mut result = vec![];
@@ -607,6 +608,15 @@ fn convert_binary(
         );
     }
     result.push(operator_instruction.into());
+    result
+}
+
+fn generate_range(span: TextSpan, start: BoundNode, end: BoundNode, converter: &mut InstructionConverter) -> Vec<InstructionOrLabelReference> {
+    let mut result = vec![];
+    result.push(Instruction::load_immediate(1).span(span).into());
+    result.append(&mut convert_node(end, converter));
+    result.append(&mut convert_node(start, converter));
+    result.push(Instruction::write_to_heap(3).span(span).into());
     result
 }
 
