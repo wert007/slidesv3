@@ -682,7 +682,8 @@ pub fn bind_program<'a>(
         expected_type: None,
     };
     let span = node.span();
-    let mut startup = default_statements(&mut binder);
+    let mut startup = vec![];
+    default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     for (index, constant) in binder.constants.iter().enumerate() {
         if constant.value.as_string().is_some() {
@@ -827,7 +828,8 @@ pub fn bind_library<'a>(
         expected_type: None,
     };
     let span = node.span();
-    let mut startup = default_statements(&mut binder);
+    let mut startup = vec![];
+    default_statements(&mut binder);
     bind_top_level_statements(node, &mut binder);
     for (index, constant) in binder.constants.iter().enumerate() {
         if constant.value.as_string().is_some() {
@@ -1042,24 +1044,9 @@ fn load_library_into_binder<'a>(
     binder.libraries.push(lib);
 }
 
-fn default_statements(binder: &mut BindingState) -> Vec<InstructionOrLabelReference> {
-    let variable_index = binder
-        .register_variable("print", Type::SystemCall(SystemCallKind::Print), true)
-        .unwrap();
-    let mut instructions = vec![
-        Instruction::load_immediate(SystemCallKind::Print as _).into(),
-        Instruction::store_in_register(variable_index).into(),
-    ];
-    let variable_index = binder
-        .register_variable(
-            "heapdump",
-            Type::SystemCall(SystemCallKind::DebugHeapDump),
-            true,
-        )
-        .unwrap();
-    instructions.push(Instruction::load_immediate(SystemCallKind::DebugHeapDump as _).into());
-    instructions.push(Instruction::store_in_register(variable_index).into());
-    instructions
+fn default_statements(binder: &mut BindingState) {
+    binder.register_constant("print", Value::SystemCall(SystemCallKind::Print));
+    binder.register_constant("heapdump", Value::SystemCall(SystemCallKind::DebugHeapDump));
 }
 
 fn call_main(binder: &mut BindingState) -> Vec<InstructionOrLabelReference> {
