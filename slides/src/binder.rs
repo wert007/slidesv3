@@ -1048,22 +1048,8 @@ fn bind_const_declaration<'a>(
     binder: &mut BindingState<'a, '_>,
 ) {
     let initializer = bind_node(*const_declaration.initializer, binder);
-    let index = binder.register_variable(
-        const_declaration.identifier.lexeme,
-        initializer.type_.clone(),
-        true,
-    );
-    let index = if let Some(it) = index {
-        it
-    } else {
-        binder.diagnostic_bag.report_cannot_declare_variable(
-            const_declaration.identifier.span(),
-            const_declaration.identifier.lexeme,
-        );
-        return;
-    };
     if let Some(constant_value) = initializer.constant_value {
-        binder.register_constant(index, constant_value.value);
+        binder.register_constant(const_declaration.identifier.lexeme, constant_value.value);
     } else {
         binder
             .diagnostic_bag
@@ -1583,13 +1569,20 @@ fn bind_variable<'a, 'b>(
     variable: VariableNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
-    match binder.look_up_variable_by_name(variable.token.lexeme) {
-        Some(VariableEntry { id, type_, .. }) => BoundNode::variable(span, id, type_),
-        None => {
+    let variable_name = variable.token.lexeme;
+    let variable = binder.look_up_variable_or_constant_by_name(variable_name);
+    match variable.kind {
+        VariableOrConstantKind::None => {
             binder
                 .diagnostic_bag
-                .report_variable_not_found(span, variable.token.lexeme);
+                .report_variable_not_found(span, variable_name);
             BoundNode::error(span)
+        }
+        VariableOrConstantKind::Variable(variable_index) => BoundNode::variable(span, variable_index, variable.type_),
+        VariableOrConstantKind::Constant(value) => {
+            let mut result = BoundNode::literal_from_value(value);
+            result.span = span;
+            result
         }
     }
 }
@@ -1600,9 +1593,8 @@ fn bind_variable_for_assignment<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let variable_is_read_only = binder
-        .look_up_variable_by_name(variable.token.lexeme)
-        .map(|ve| ve.is_read_only);
-    if variable_is_read_only == Some(true) {
+        .look_up_variable_or_constant_by_name(variable.token.lexeme).is_read_only;
+    if variable_is_read_only {
         binder
             .diagnostic_bag
             .report_variable_is_read_only(variable.token.span());
