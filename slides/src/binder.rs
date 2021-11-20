@@ -80,6 +80,58 @@ struct BoundVariableName<'a> {
     pub is_read_only: bool,
 }
 
+#[derive(Debug)]
+struct BoundConstant<'a> {
+    pub identifier: Cow<'a, str>,
+    pub value: Value,
+}
+
+#[derive(Debug, PartialEq)]
+struct VariableOrConstant {
+    type_: Type,
+    is_read_only: bool,
+    kind: VariableOrConstantKind,
+}
+
+impl VariableOrConstant {
+    pub fn none() -> Self {
+        Self {
+            type_: Type::Error,
+            is_read_only: true,
+            kind: VariableOrConstantKind::None,
+        }
+    }
+}
+
+impl From<VariableEntry> for VariableOrConstant {
+    fn from(it: VariableEntry) -> Self {
+        Self {
+            type_: it.type_,
+            is_read_only: it.is_read_only,
+            kind: VariableOrConstantKind::Variable(it.id),
+        }
+    }
+}
+
+impl From<Value> for VariableOrConstant {
+    fn from(it: Value) -> Self {
+        Self {
+            type_: it.infer_type(),
+            is_read_only: true,
+            kind: VariableOrConstantKind::Constant(it),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum VariableOrConstantKind {
+    None,
+    Variable(u64),
+    Constant(Value),
+}
+
+
+
 /// This is quite similiar to symbols::StructSymbol, the only difference being,
 /// that this version does not need an allocation. They can be easily converted
 /// into each other. This version is only used during binding, while the other
@@ -186,7 +238,7 @@ struct BindingState<'a, 'b> {
     /// referenced for name lookups.
     libraries: Vec<Library>,
     /// This is a simple hack to bring constants into the binder.
-    constants: Vec<Value>,
+    constants: Vec<BoundConstant<'a>>,
     /// These safe nodes are the nodes which are normally of a noneable type, but
     /// are currently be known to have an actual value and not be none. Next to
     /// the actual safe node is its safe type stored, which it should be
@@ -339,11 +391,36 @@ impl<'a> BindingState<'a, '_> {
         }
     }
 
-    fn register_constant(&mut self, variable_index: u64, value: Value) {
-        while self.constants.len() <= variable_index as _ {
-            self.constants.push(Value::None);
+    fn register_constant(&mut self, name: &'a str, value: Value) -> Option<u64> {
+        let index = self.constants.len() as u64;
+        let constant_name_already_registered = self.constants.iter().any(|c|&c.identifier == name);
+        if constant_name_already_registered {
+            None
+        } else {
+            self.constants.push(BoundConstant {
+                identifier: name.into(),
+                value,
+            });
+            Some(index)
         }
-        self.constants[variable_index as usize] = value;
+    }
+
+    fn register_generated_constant(&mut self, name: String, value: Value) -> Option<u64> {
+        let index = self.constants.len() as u64;
+        let constant_name_already_registered = self.constants.iter().any(|c|&c.identifier == &name);
+        if constant_name_already_registered {
+            None
+        } else {
+            self.constants.push(BoundConstant {
+                identifier: name.into(),
+                value,
+            });
+            Some(index)
+        }
+    }
+
+    fn look_up_constant_by_name(&self, name: &str) -> Option<Value> {
+        self.constants.iter().find(|c|&c.identifier == name).map(|c|c.value.clone())
     }
 
     fn register_safe_node(&mut self, node: BoundNode<'a>, safe_type: Type) -> usize {
@@ -380,6 +457,16 @@ impl<'a> BindingState<'a, '_> {
         let current = self.variable_table.len() - 1;
         for _ in index..=current {
             self.variable_table.pop();
+        }
+    }
+
+    fn look_up_variable_or_constant_by_name(&self, name: &str) -> VariableOrConstant {
+        match self.look_up_variable_by_name(name) {
+            Some(it) => it.into(),
+            None => match self.look_up_constant_by_name(name) {
+                Some(it) => it.into(),
+                None => VariableOrConstant::none(),
+            },
         }
     }
 
