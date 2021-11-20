@@ -25,7 +25,6 @@ pub struct BoundNode<'a> {
     pub span: TextSpan,
     pub kind: BoundNodeKind<'a>,
     pub type_: Type,
-    pub byte_width: u64,
     pub constant_value: Option<BoundConstant>,
 }
 
@@ -35,18 +34,12 @@ impl<'a> BoundNode<'a> {
             span,
             kind: BoundNodeKind::ErrorExpression,
             type_: Type::Error,
-            byte_width: 0,
             constant_value: None,
         }
     }
 
     pub fn literal_from_value(value: Value) -> Self {
         let type_ = value.infer_type();
-        let byte_width = match &value {
-            Value::Integer(_) | Value::Boolean(_) | Value::SystemCall(_) => 4,
-            Value::String(value) => 8 + value.len(),
-            Value::None => 4,
-        } as _;
         Self {
             span: TextSpan::zero(),
             kind: BoundNodeKind::LiteralExpression(LiteralNodeKind {
@@ -58,7 +51,6 @@ impl<'a> BoundNode<'a> {
                 value: value.clone(),
             }),
             type_,
-            byte_width,
             constant_value: Some(value.into()),
         }
     }
@@ -66,27 +58,19 @@ impl<'a> BoundNode<'a> {
     pub fn literal(span: TextSpan, literal: LiteralNodeKind<'a>) -> Self {
         let value = literal.value.clone();
         let type_ = value.infer_type();
-        let byte_width = match &value {
-            Value::Integer(_) | Value::Boolean(_) | Value::SystemCall(_) => 4,
-            Value::String(value) => 8 + value.len(),
-            Value::None => 4,
-        } as _;
         Self {
             span,
             kind: BoundNodeKind::LiteralExpression(literal),
             type_,
-            byte_width,
             constant_value: Some(value.into()),
         }
     }
 
     pub fn array_literal(span: TextSpan, children: Vec<BoundNode<'a>>, type_: Type) -> Self {
-        let byte_width = 8 + children.iter().map(|b| (b.byte_width + 3) / 4).sum::<u64>() * 4;
         Self {
             span,
             kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
             type_,
-            byte_width,
             constant_value: None,
         }
     }
@@ -103,7 +87,6 @@ impl<'a> BoundNode<'a> {
                 base_type: base_type.clone(),
             }),
             type_: Type::Struct(Box::new(base_type)),
-            byte_width: 4,
             constant_value: None,
         }
     }
@@ -113,7 +96,6 @@ impl<'a> BoundNode<'a> {
             span,
             kind: BoundNodeKind::VariableExpression(BoundVariableNodeKind { variable_index }),
             type_,
-            byte_width: 4,
             constant_value: None,
         }
     }
@@ -125,7 +107,6 @@ impl<'a> BoundNode<'a> {
         rhs: BoundNode<'a>,
         type_: Type,
     ) -> Self {
-        let byte_width = 4;
         Self {
             span,
             kind: BoundNodeKind::BinaryExpression(BoundBinaryNodeKind {
@@ -134,7 +115,6 @@ impl<'a> BoundNode<'a> {
                 rhs: Box::new(rhs),
             }),
             type_,
-            byte_width,
             constant_value: None,
         }
     }
@@ -145,7 +125,6 @@ impl<'a> BoundNode<'a> {
         operand: BoundNode<'a>,
         type_: Type,
     ) -> Self {
-        let byte_width = operand.byte_width;
         Self {
             span,
             kind: BoundNodeKind::UnaryExpression(BoundUnaryNodeKind {
@@ -153,7 +132,6 @@ impl<'a> BoundNode<'a> {
                 operand: Box::new(operand),
             }),
             type_,
-            byte_width,
             constant_value: None,
         }
     }
@@ -173,7 +151,6 @@ impl<'a> BoundNode<'a> {
                 has_this_argument,
             }),
             type_,
-            byte_width: 4,
             constant_value: None,
         }
     }
@@ -184,7 +161,6 @@ impl<'a> BoundNode<'a> {
         index: BoundNode<'a>,
         type_: Type,
     ) -> Self {
-        let byte_width = index.byte_width + base.byte_width;
         Self {
             span,
             kind: BoundNodeKind::ArrayIndex(BoundArrayIndexNodeKind {
@@ -192,13 +168,11 @@ impl<'a> BoundNode<'a> {
                 index: Box::new(index),
             }),
             type_,
-            byte_width,
             constant_value: None,
         }
     }
 
     pub fn field_access(span: TextSpan, base: BoundNode<'a>, offset: u64, type_: Type) -> Self {
-        let byte_width = base.byte_width;
         Self {
             span,
             kind: BoundNodeKind::FieldAccess(BoundFieldAccessNodeKind {
@@ -207,7 +181,6 @@ impl<'a> BoundNode<'a> {
                 type_: type_.clone(),
             }),
             type_,
-            byte_width,
             constant_value: None,
         }
     }
@@ -220,7 +193,6 @@ impl<'a> BoundNode<'a> {
                 function: FunctionKind::FunctionId(id),
             }),
             type_,
-            byte_width: 4,
             constant_value: None,
         }
     }
@@ -238,7 +210,6 @@ impl<'a> BoundNode<'a> {
                 function: FunctionKind::SystemCall(system_call_kind),
             }),
             type_,
-            byte_width: 4,
             constant_value: None,
         }
     }
@@ -252,7 +223,6 @@ impl<'a> BoundNode<'a> {
                 type_: type_.clone(),
             }),
             type_,
-            byte_width: 4,
         }
     }
 
@@ -262,13 +232,10 @@ impl<'a> BoundNode<'a> {
         arguments: Vec<BoundNode<'a>>,
         type_: Type,
     ) -> Self {
-        let byte_width =
-            4 * (arguments.len() as u64 + 1) + arguments.iter().map(|b| b.byte_width).sum::<u64>();
         Self {
             span,
             kind: BoundNodeKind::SystemCall(BoundSystemCallNodeKind { base, arguments }),
             type_,
-            byte_width,
             constant_value: None,
         }
     }
@@ -281,7 +248,6 @@ impl<'a> BoundNode<'a> {
                 body: Box::new(body),
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -370,7 +336,6 @@ impl<'a> BoundNode<'a> {
                 initializer: Box::new(initializer),
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -389,7 +354,6 @@ impl<'a> BoundNode<'a> {
                 else_body: else_body.map(Box::new),
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -402,7 +366,6 @@ impl<'a> BoundNode<'a> {
                 expression: Box::new(expression),
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -412,7 +375,6 @@ impl<'a> BoundNode<'a> {
             span,
             kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind { statements }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -424,7 +386,6 @@ impl<'a> BoundNode<'a> {
                 expression: Box::new(expression),
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -444,7 +405,6 @@ impl<'a> BoundNode<'a> {
                 parameters,
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -454,7 +414,6 @@ impl<'a> BoundNode<'a> {
             span: TextSpan::zero(),
             kind: BoundNodeKind::LabelReference(index),
             type_,
-            byte_width: 4,
             constant_value: None,
         }
     }
@@ -464,7 +423,6 @@ impl<'a> BoundNode<'a> {
             span: TextSpan::zero(),
             kind: BoundNodeKind::Label(index),
             type_: Type::Void,
-            byte_width: 4,
             constant_value: None,
         }
     }
@@ -478,7 +436,6 @@ impl<'a> BoundNode<'a> {
                 jump_if_true: true,
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -492,7 +449,6 @@ impl<'a> BoundNode<'a> {
                 jump_if_true: true,
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -506,7 +462,6 @@ impl<'a> BoundNode<'a> {
                 jump_if_true: false,
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
@@ -523,7 +478,6 @@ impl<'a> BoundNode<'a> {
                 restores_variables,
             }),
             type_: Type::Void,
-            byte_width: 0,
             constant_value: None,
         }
     }
