@@ -404,7 +404,7 @@ impl<'a> BindingState<'a, '_> {
 
     fn register_constant(&mut self, name: &'a str, value: Value) -> Option<u64> {
         let index = self.constants.len() as u64;
-        let constant_name_already_registered = self.constants.iter().any(|c| &c.identifier == name);
+        let constant_name_already_registered = self.constants.iter().any(|c| c.identifier == name);
         if constant_name_already_registered {
             None
         } else {
@@ -418,8 +418,7 @@ impl<'a> BindingState<'a, '_> {
 
     fn register_generated_constant(&mut self, name: String, value: Value) -> Option<u64> {
         let index = self.constants.len() as u64;
-        let constant_name_already_registered =
-            self.constants.iter().any(|c| &c.identifier == &name);
+        let constant_name_already_registered = self.constants.iter().any(|c| c.identifier == name);
         if constant_name_already_registered {
             None
         } else {
@@ -434,7 +433,7 @@ impl<'a> BindingState<'a, '_> {
     fn look_up_constant_by_name(&self, name: &str) -> Option<Value> {
         self.constants
             .iter()
-            .find(|c| &c.identifier == name)
+            .find(|c| c.identifier == name)
             .map(|c| c.value.clone())
     }
 
@@ -1047,9 +1046,10 @@ fn default_statements(binder: &mut BindingState) -> Vec<InstructionOrLabelRefere
     let variable_index = binder
         .register_variable("print", Type::SystemCall(SystemCallKind::Print), true)
         .unwrap();
-    let mut instructions = vec![];
-    instructions.push(Instruction::load_immediate(SystemCallKind::Print as _).into());
-    instructions.push(Instruction::store_in_register(variable_index).into());
+    let mut instructions = vec![
+        Instruction::load_immediate(SystemCallKind::Print as _).into(),
+        Instruction::store_in_register(variable_index).into(),
+    ];
     let variable_index = binder
         .register_variable(
             "heapdump",
@@ -1062,7 +1062,7 @@ fn default_statements(binder: &mut BindingState) -> Vec<InstructionOrLabelRefere
     instructions
 }
 
-fn call_main<'a, 'b>(binder: &mut BindingState<'a, 'b>) -> Vec<InstructionOrLabelReference> {
+fn call_main(binder: &mut BindingState) -> Vec<InstructionOrLabelReference> {
     let base = binder.look_up_variable_or_constant_by_name("main");
     match base.kind {
         VariableOrConstantKind::None => {
@@ -1363,7 +1363,7 @@ fn bind_struct_body<'a>(
             }
             unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
         };
-        if result.iter().any(|f| &f.name == &field.name) {
+        if result.iter().any(|f| f.name == field.name) {
             binder
                 .diagnostic_bag
                 .report_parameter_already_declared(span, &field.name);
@@ -1572,7 +1572,7 @@ fn bind_array_literal_first_child<'a>(
     } else {
         vec![bind_node(first_child, binder)]
     };
-    let type_ = expected_type.unwrap_or(children[0].type_.clone());
+    let type_ = expected_type.unwrap_or_else(|| children[0].type_.clone());
     let children = children
         .into_iter()
         .map(|c| bind_conversion(c, &type_, binder))
