@@ -140,8 +140,28 @@ pub struct BoundStructSymbol<'a> {
 }
 
 impl BoundStructSymbol<'_> {
-    pub fn field(&self, name: &str) -> Option<&BoundStructFieldSymbol> {
-        self.fields.iter().find(|f| f.name == name)
+    pub fn field_functions_first(&self, name: &str) -> Option<&BoundStructFieldSymbol> {
+        let mut iter = self.fields.iter().filter(|f| f.name == name);
+        let mut result = iter.next()?;
+        while let Some(next) = iter.next() {
+            if matches!(result.type_, Type::Function(_)) {
+                break;
+            }
+            result = next;
+        }
+        Some(result)
+    }
+
+    pub fn field_fields_first(&self, name: &str) -> Option<&BoundStructFieldSymbol> {
+        let mut iter = self.fields.iter().filter(|f| f.name == name);
+        let mut result = iter.next()?;
+        while let Some(next) = iter.next() {
+            if !matches!(result.type_, Type::Function(_)) {
+                break;
+            }
+            result = next;
+        }
+        Some(result)
     }
 
     pub fn empty() -> Self {
@@ -1988,92 +2008,62 @@ fn bind_field_access<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode<'a> {
     let base_span = field_access.base.span();
+    let field = field_access.field;
     let base = bind_node(*field_access.base, binder);
+    let mut struct_handler = |id: u64, base| {
+        let field_name = field.lexeme;
+        let bound_struct_type = binder
+            .get_struct_type_by_id(id)
+            .unwrap_or_else(|| {
+                panic!("Referenced a struct, which doesn't exist, somehow.");
+            })
+            .clone();
+        let field_symbol = if binder.is_struct_function {
+            bound_struct_type.field_fields_first(field_name)
+        } else {
+            bound_struct_type.field_functions_first(field_name)
+        };
+        if let Some(field) = field_symbol {
+            let function_name = format!("{}::{}", bound_struct_type.name, field_name);
+            if let Type::Function(function_type) = &field.type_ {
+                let type_ = Type::closure(*function_type.clone());
+                let variable = binder.look_up_variable_or_constant_by_name(&function_name);
+                match variable.kind {
+                    VariableOrConstantKind::None => todo!(
+                        "The binder missed a function on a struct somehow ({})",
+                        function_name
+                    ),
+                    VariableOrConstantKind::Variable(variable_id) => {
+                        BoundNode::closure(span, base, variable_id, type_)
+                    }
+                    VariableOrConstantKind::Constant(value) => {
+                        let label_index = value.as_label_pointer().unwrap().0;
+                        BoundNode::closure_label(span, base, label_index, type_)
+                    }
+                }
+            } else {
+                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+            }
+        } else {
+            binder.diagnostic_bag.report_no_field_named_on_struct(
+                field.span(),
+                field_name,
+                bound_struct_type,
+            );
+            BoundNode::error(span)
+        }
+    };
     match &base.type_ {
         Type::Error => base,
         Type::StructReference(id) => {
-            let field_name = field_access.field.lexeme;
-            let bound_struct_type = binder
-                .get_struct_type_by_id(*id)
-                .unwrap_or_else(|| {
-                    panic!("Referenced a struct, which doesn't exist, somehow.");
-                })
-                .clone();
-            if let Some(field) = bound_struct_type.field(field_name) {
-                let function_name = format!("{}::{}", bound_struct_type.name, field_name);
-                if let Type::Function(function_type) = &field.type_ {
-                    let type_ = Type::closure(*function_type.clone());
-                    let variable = binder.look_up_variable_or_constant_by_name(&function_name);
-                    match variable.kind {
-                        VariableOrConstantKind::None => todo!(
-                            "The binder missed a function on a struct somehow ({})",
-                            function_name
-                        ),
-                        VariableOrConstantKind::Variable(variable_id) => {
-                            BoundNode::closure(span, base, variable_id, type_)
-                        }
-                        VariableOrConstantKind::Constant(value) => {
-                            let label_index = value.as_label_pointer().unwrap().0;
-                            BoundNode::closure_label(span, base, label_index, type_)
-                        }
-                    }
-                } else {
-                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
-                }
-            } else {
-                binder.diagnostic_bag.report_no_field_named_on_struct(
-                    field_access.field.span(),
-                    field_name,
-                    bound_struct_type,
-                );
-                BoundNode::error(span)
-            }
+            struct_handler(*id, base)
         }
         Type::Struct(struct_type) => {
-            let field_name = field_access.field.lexeme;
-            let bound_struct_type = binder
-                .get_struct_type_by_id(struct_type.id)
-                .unwrap_or_else(|| {
-                    panic!("Referenced a struct, which doesn't exist, somehow.");
-                })
-                .clone();
-            if let Some(field) = bound_struct_type.field(field_name) {
-                if let Type::Function(function_type) = &field.type_ {
-                    let function_name = format!("{}::{}", bound_struct_type.name, field_name);
-                    let variable_id = binder.look_up_variable_or_constant_by_name(&function_name);
-                    match variable_id.kind {
-                        VariableOrConstantKind::None => todo!("Binder thought a function ({}) existed, but there is neither a variable or a constant for it.", function_name),
-                        VariableOrConstantKind::Variable(variable_id) => BoundNode::closure(
-                            span,
-                            base,
-                            variable_id,
-                            Type::closure(*function_type.clone()),
-                        ),
-                        VariableOrConstantKind::Constant(constant) => {
-                            let label_index = constant.as_label_pointer().unwrap().0;
-                                BoundNode::closure_label(
-                                    span,
-                                    base,
-                                    label_index,
-                                    Type::closure(*function_type.clone()),
-                                )
-                        },
-                    }
-                } else {
-                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
-                }
-            } else {
-                binder.diagnostic_bag.report_no_field_named_on_struct(
-                    field_access.field.span(),
-                    field_name,
-                    bound_struct_type,
-                );
-                BoundNode::error(span)
-            }
+            struct_handler(struct_type.id, base)
         }
         Type::Library(index) => {
             let library = &binder.libraries[*index];
-            let function_name = field_access.field.lexeme;
+            let function_name = field.lexeme;
             if let Some(function) = library.look_up_function_by_name(function_name) {
                 BoundNode::label_reference(
                     function.label_index as _,
@@ -2103,7 +2093,7 @@ fn bind_field_access<'a, 'b>(
             BoundNode::error(span)
         }
         Type::Array(_) | Type::String => {
-            if field_access.field.lexeme == "length" {
+            if field.lexeme == "length" {
                 let base = bind_conversion(base, &Type::Any, binder);
                 let function_type = FunctionType::system_call(SystemCallKind::ArrayLength);
                 BoundNode::system_call_closure(
@@ -2115,7 +2105,7 @@ fn bind_field_access<'a, 'b>(
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     span,
-                    field_access.field.lexeme,
+                    field.lexeme,
                     &base.type_,
                 );
                 BoundNode::error(span)
@@ -2144,7 +2134,12 @@ fn bind_field_access_for_assignment<'a>(
                 panic!("Referenced a struct, which doesn't exist, somehow.");
             })
             .clone();
-        if let Some(field) = bound_struct_type.field(field_name) {
+        let field_symbol = if binder.is_struct_function {
+            bound_struct_type.field_fields_first(field_name)
+        } else {
+            bound_struct_type.field_functions_first(field_name)
+        };
+        if let Some(field) = field_symbol {
             if field.is_read_only {
                 binder.diagnostic_bag.report_cannot_assign_to(span);
                 BoundNode::error(span)
