@@ -657,127 +657,7 @@ pub fn bind_program<'a>(
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
 ) -> BoundProgram<'a> {
-    let node = parser::parse(source_text, diagnostic_bag, debug_flags);
-    if diagnostic_bag.has_errors() {
-        return BoundProgram::error();
-    }
-    let mut binder = BindingState {
-        debug_flags,
-        directory: source_text.directory(),
-        diagnostic_bag,
-        variable_table: vec![],
-        type_table: type_table(),
-        struct_table: vec![],
-        functions: vec![],
-        label_offset: 0,
-        structs: vec![],
-        libraries: vec![],
-        constants: vec![],
-        safe_nodes: vec![],
-        print_variable_table: debug_flags.print_variable_table(),
-        max_used_variables: 0,
-        function_return_type: Type::Error,
-        is_struct_function: false,
-        expected_type: None,
-    };
-    let span = node.span();
-    let mut startup = vec![];
-    default_statements(&mut binder, true);
-    bind_top_level_statements(node, &mut binder);
-
-    for lib in binder.libraries.iter_mut() {
-        startup.append(&mut lib.startup);
-    }
-
-    for node in binder.structs.clone() {
-        let (fields, function_table) = bind_struct_body(node.name, node.body, &mut binder);
-        binder.register_struct(node.id, fields, function_table);
-    }
-
-    let mut type_names = binder
-        .type_table
-        .iter()
-        .map(|b| b.identifier.as_ref().to_owned())
-        .collect();
-    binder
-        .diagnostic_bag
-        .registered_types
-        .append(&mut type_names);
-
-    let fixed_variable_count = binder.variable_table.len();
-    let mut label_count = binder.functions.len() + binder.label_offset;
-    let mut statements = vec![];
-    for (index, node) in binder.functions.clone().into_iter().enumerate() {
-        let index = index + binder.label_offset;
-        let mut parameters = Vec::with_capacity(node.parameters.len());
-        for (variable_name, variable_type) in node.parameters {
-            if let Some(it) = binder.register_variable(variable_name, variable_type, false) {
-                parameters.push(it);
-            } else {
-                // binder.diagnostic_bag.report_cannot_declare_variable(span, variable_name)
-                panic!("Could not declare a parameter! This sounds like an error in the binder!");
-            }
-        }
-        binder.function_return_type = node.function_type.return_type.clone();
-        binder.is_struct_function = node.is_struct_function;
-        let mut body = bind_node(node.body, &mut binder);
-        if matches!(&binder.function_return_type, Type::Void) {
-            body = BoundNode::block_statement(
-                body.span,
-                vec![
-                    body,
-                    BoundNode::return_statement(TextSpan::zero(), None, !node.is_main),
-                ],
-            );
-        }
-        let body_statements = lowerer::flatten(body, &mut label_count);
-        if !matches!(&binder.function_return_type, Type::Void)
-            && !control_flow_analyzer::check_if_all_paths_return(
-                &node.function_name,
-                &body_statements,
-                debug_flags,
-            )
-        {
-            binder
-                .diagnostic_bag
-                .report_missing_return_statement(span, &binder.function_return_type);
-        }
-        let body = BoundNode::block_statement(span, body_statements);
-        statements.push(BoundNode::function_declaration(
-            index,
-            node.is_main,
-            body,
-            parameters,
-        ));
-        binder.delete_variables_until(fixed_variable_count);
-    }
-    startup.append(&mut call_main(&mut binder));
-
-    let functions = BoundNode::block_statement(span, statements);
-    if debug_flags.print_bound_program {
-        crate::debug::print_bound_node_as_code(&functions);
-    }
-    if debug_flags.print_struct_table {
-        for (id, entry) in binder.struct_table.iter().enumerate() {
-            println!("  {}: {:#?}", id, entry);
-        }
-    }
-    let max_used_variables = binder.max_used_variables.max(
-        binder
-            .libraries
-            .iter()
-            .map(|l| l.program.max_used_variables)
-            .max()
-            .unwrap_or(0),
-    );
-    BoundProgram {
-        startup,
-        functions,
-        fixed_variable_count,
-        max_used_variables,
-        label_count,
-        referenced_libraries: binder.libraries,
-    }
+    bind(source_text, diagnostic_bag, false, true, debug_flags).program
 }
 
 pub fn bind_library<'a>(
@@ -786,6 +666,10 @@ pub fn bind_library<'a>(
     debug_flags: DebugFlags,
     import_std_lib: bool,
 ) -> BoundLibrary<'a> {
+    bind(source_text, diagnostic_bag, true, import_std_lib, debug_flags)
+}
+
+fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>, is_library: bool, import_std_lib: bool, debug_flags: DebugFlags) -> BoundLibrary<'a> {
     let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return BoundLibrary::error();
@@ -889,6 +773,10 @@ pub fn bind_library<'a>(
         binder.delete_variables_until(fixed_variable_count);
     }
 
+    if !is_library {
+        startup.append(&mut call_main(&mut binder));
+    }
+
     let functions = BoundNode::block_statement(span, statements);
     if debug_flags.print_bound_program {
         crate::debug::print_bound_node_as_code(&functions);
@@ -898,15 +786,16 @@ pub fn bind_library<'a>(
             println!("  {}: {:#?}", id, entry);
         }
     }
+    let program = BoundProgram {
+        startup,
+        functions,
+        fixed_variable_count,
+        max_used_variables: binder.max_used_variables,
+        label_count,
+        referenced_libraries: binder.libraries,
+    };
     BoundLibrary {
-        program: BoundProgram {
-            startup,
-            functions,
-            fixed_variable_count,
-            max_used_variables: binder.max_used_variables,
-            label_count,
-            referenced_libraries: binder.libraries,
-        },
+        program,
         exported_functions: binder.functions.into_iter().map(Into::into).collect(),
         exported_structs: binder.struct_table.into_iter().map(Into::into).collect(),
     }
