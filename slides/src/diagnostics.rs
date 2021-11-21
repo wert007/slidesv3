@@ -208,6 +208,19 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span)
     }
 
+    pub fn report_unexpected_parameter_count(
+        &mut self,
+        span: TextSpan,
+        actual_parameter_count: usize,
+        expected_parameter_count: usize,
+    ) {
+        let message = format!(
+            "Expected {} parameters, but actually found {}.",
+            expected_parameter_count, actual_parameter_count
+        );
+        self.report(message, span)
+    }
+
     pub fn report_unterminated_comment(&mut self, start: usize, text: &str) {
         let span = TextSpan::new(start, text.len());
         let message = "Unterminated comment found here.".into();

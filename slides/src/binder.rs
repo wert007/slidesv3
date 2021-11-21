@@ -777,7 +777,7 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
                     binder.diagnostic_bag.report_not_all_fields_have_been_assigned(node.header_span, &strct.name, &unassigned_fields);
                 }
             }
-            None => {}
+            Some(StructFunctionKind::ToString) | None => {}
         }
         binder.assigned_fields.clear();
         if matches!(&binder.function_return_type, Type::Void) {
@@ -1093,6 +1093,14 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 StructFunctionKind::Constructor => {
                     if !function_type.return_type.can_be_converted_to(&Type::Void) {
                         binder.diagnostic_bag.report_cannot_convert(header_span, &function_type.return_type, &Type::Void);
+                    }
+                }
+                StructFunctionKind::ToString => {
+                    if !function_type.return_type.can_be_converted_to(&Type::String) {
+                        binder.diagnostic_bag.report_cannot_convert(header_span, &function_type.return_type, &Type::String);
+                    }
+                    if function_type.parameter_types.len() != 0 {
+                        binder.diagnostic_bag.report_unexpected_parameter_count(header_span, function_type.parameter_types.len(), 0);
                     }
                 }
             }
