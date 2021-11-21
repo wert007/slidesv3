@@ -1942,7 +1942,6 @@ fn bind_field_access<'a, 'b>(
     let base = bind_node(*field_access.base, binder);
     match &base.type_ {
         Type::Error => base,
-        Type::Any => todo!(),
         Type::StructReference(id) => {
             let field_name = field_access.field.lexeme;
             let bound_struct_type = binder
@@ -2040,7 +2039,8 @@ fn bind_field_access<'a, 'b>(
                 BoundNode::error(span)
             }
         }
-        Type::Void
+        Type::Any
+        | Type::Void
         | Type::Integer
         | Type::Boolean
         | Type::None
@@ -2083,8 +2083,8 @@ fn bind_field_access_for_assignment<'a>(
     let base = bind_node_for_assignment(*field_access.base, binder);
     match &base.type_ {
         Type::Error => base,
-        Type::Any => todo!(),
-        Type::Void
+        Type::Any
+        | Type::Void
         | Type::Integer
         | Type::Boolean
         | Type::None
