@@ -8,21 +8,11 @@ pub mod typing;
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use std::{borrow::Cow, path::{Path, PathBuf}};
+use std::{borrow::Cow, convert::TryFrom, path::{Path, PathBuf}};
 
-use crate::{
-    binder::{
-        bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
-        operators::{BoundBinary, BoundUnaryOperator},
-        typing::Type,
-    },
-    dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction},
-    diagnostics::DiagnosticBag,
-    instruction_converter::{
+use crate::{DebugFlags, binder::{bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind}, operators::{BoundBinary, BoundUnaryOperator}, symbols::StructFunctionKind, typing::Type}, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, instruction_converter::{
         self, instruction::Instruction, InstructionOrLabelReference,
-    },
-    lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    parser::{
+    }, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
         self,
         syntax_nodes::{
             ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
@@ -34,18 +24,9 @@ use crate::{
             StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
             VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
         },
-    },
-    text::{SourceText, TextSpan},
-    value::Value,
-    DebugFlags,
-};
+    }, text::{SourceText, TextSpan}, value::Value};
 
-use self::{
-    bound_nodes::BoundNode,
-    operators::BoundBinaryOperator,
-    symbols::{FunctionSymbol, Library, StructFieldSymbol, StructSymbol},
-    typing::{FunctionType, StructType, SystemCallKind},
-};
+use self::{bound_nodes::BoundNode, operators::BoundBinaryOperator, symbols::{FunctionSymbol, Library, StructFieldSymbol, StructFunctionTable, StructSymbol}, typing::{FunctionType, StructType, SystemCallKind}};
 
 #[derive(Debug, Clone)]
 enum SafeNodeInCondition<'a> {
@@ -153,6 +134,7 @@ enum VariableOrConstantKind {
 pub struct BoundStructSymbol<'a> {
     pub name: Cow<'a, str>,
     pub fields: Vec<BoundStructFieldSymbol<'a>>,
+    pub function_table: StructFunctionTable,
 }
 
 impl BoundStructSymbol<'_> {
@@ -164,6 +146,7 @@ impl BoundStructSymbol<'_> {
         Self {
             name: String::new().into(),
             fields: vec![],
+            function_table: StructFunctionTable::default(),
         }
     }
 }
@@ -347,7 +330,7 @@ impl<'a> BindingState<'a, '_> {
         self.register_generated_type(name, Type::StructReference(id))
     }
 
-    fn register_struct(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>) -> u64 {
+    fn register_struct(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>, function_table: StructFunctionTable) -> u64 {
         let struct_type = StructType {
             id,
             fields: fields
@@ -360,15 +343,16 @@ impl<'a> BindingState<'a, '_> {
                 .filter(|f| matches!(&f.type_, &Type::Function(_)))
                 .map(|f| f.type_.clone())
                 .collect(),
+            function_table: function_table.clone(),
         };
         self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
-        self.insert_into_struct_table(id, fields.into_iter().map(Into::into).collect());
+        self.insert_into_struct_table(id, fields.into_iter().map(Into::into).collect(), function_table);
         id
     }
 
-    pub fn insert_into_struct_table(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>) {
+    pub fn insert_into_struct_table(&mut self, id: u64, fields: Vec<BoundStructFieldSymbol<'a>>, function_table: StructFunctionTable) {
         let name = self.type_table[id as usize].identifier.clone();
-        let bound_struct_type = BoundStructSymbol { name, fields };
+        let bound_struct_type = BoundStructSymbol { name, fields, function_table };
         let struct_id = id as usize - type_table().len();
         while struct_id >= self.struct_table.len() {
             self.struct_table.push(BoundStructSymbol::empty());
@@ -706,8 +690,8 @@ pub fn bind_program<'a>(
     }
 
     for node in binder.structs.clone() {
-        let fields = bind_struct_body(node.name, node.body, &mut binder);
-        binder.register_struct(node.id, fields);
+        let (fields, function_table) = bind_struct_body(node.name, node.body, &mut binder);
+        binder.register_struct(node.id, fields, function_table);
     }
 
     let mut type_names = binder
@@ -842,8 +826,8 @@ pub fn bind_library<'a>(
     }
 
     for node in binder.structs.clone() {
-        let fields = bind_struct_body(node.name, node.body, &mut binder);
-        binder.register_struct(node.id, fields);
+        let (fields, function_table) = bind_struct_body(node.name, node.body, &mut binder);
+        binder.register_struct(node.id, fields, function_table);
     }
 
     let mut type_names = binder
@@ -1012,6 +996,7 @@ fn load_library_into_binder<'a>(
                         .map(ToOwned::to_owned)
                         .map(Into::into)
                         .collect(),
+                    strct.function_table.clone(),
                 );
             }
         }
@@ -1302,8 +1287,9 @@ fn bind_struct_body<'a>(
     struct_name: &'a str,
     struct_body: StructBodyNode<'a>,
     binder: &mut BindingState<'a, '_>,
-) -> Vec<BoundStructFieldSymbol<'a>> {
-    let mut result: Vec<BoundStructFieldSymbol<'a>> = vec![];
+) -> (Vec<BoundStructFieldSymbol<'a>>, StructFunctionTable) {
+    let mut fields: Vec<BoundStructFieldSymbol<'a>> = vec![];
+    let mut function_table = StructFunctionTable::default();
     let mut offset = 0;
     for statement in struct_body.statements {
         let span = statement.span;
@@ -1323,14 +1309,14 @@ fn bind_struct_body<'a>(
             }
             unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
         };
-        if result.iter().any(|f| f.name == field.name) {
+        if fields.iter().any(|f| f.name == field.name) {
             binder
                 .diagnostic_bag
                 .report_parameter_already_declared(span, &field.name);
         }
-        result.push(field);
+        fields.push(field);
     }
-    result
+    (fields, function_table)
 }
 
 fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -> (&'a str, Type) {

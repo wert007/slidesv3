@@ -5,6 +5,8 @@ use num_enum::TryFromPrimitive;
 
 use crate::evaluator::memory::WORD_SIZE_IN_BYTES;
 
+use super::symbols::StructFunctionTable;
+
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Type {
     Error,
@@ -431,6 +433,7 @@ pub struct StructType {
     pub id: u64,
     pub fields: Vec<Type>,
     pub functions: Vec<Type>,
+    pub function_table: StructFunctionTable,
 }
 
 impl StructType {

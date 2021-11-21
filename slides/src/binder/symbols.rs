@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    convert::TryFrom,
+    path::{Path, PathBuf},
+};
 
 use crate::instruction_converter::{
     instruction::{op_codes::OpCode, Instruction},
@@ -96,7 +99,7 @@ impl Library {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionSymbol {
     pub name: String,
     pub function_type: FunctionType,
@@ -119,6 +122,7 @@ impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
 pub struct StructSymbol {
     pub name: String,
     pub fields: Vec<StructFieldSymbol>,
+    pub function_table: StructFunctionTable,
 }
 
 impl StructSymbol {
@@ -132,6 +136,7 @@ impl From<BoundStructSymbol<'_>> for StructSymbol {
         Self {
             name: it.name.into(),
             fields: it.fields.into_iter().map(Into::into).collect(),
+            function_table: it.function_table,
         }
     }
 }
@@ -151,6 +156,56 @@ impl From<BoundStructFieldSymbol<'_>> for StructFieldSymbol {
             type_: it.type_,
             offset: it.offset,
             is_read_only: it.is_read_only,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StructFunctionTable {
+    pub constructor_function: Option<FunctionSymbol>,
+}
+
+impl StructFunctionTable {
+    pub fn set(&mut self, kind: StructFunctionKind, function: FunctionSymbol) {
+        match kind {
+            StructFunctionKind::Constructor => self.constructor_function = Some(function),
+        }
+    }
+
+    fn relocate_labels(&mut self, label_offset: usize) {
+        self.constructor_function
+            .iter_mut()
+            .for_each(|f| f.label_index += label_offset as u64);
+    }
+
+    fn relocate_structs(&mut self, struct_offset: usize) {
+        self.constructor_function.iter_mut().for_each(|f| {
+            f.function_type
+                .parameter_types
+                .iter_mut()
+                .filter_map(|p| {
+                    if let Type::StructReference(id) = p {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                })
+                .for_each(|id| *id += struct_offset as u64)
+        });
+    }
+}
+
+pub enum StructFunctionKind {
+    Constructor,
+}
+
+impl<'a> TryFrom<&'a str> for StructFunctionKind {
+    type Error = &'a str;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        match value {
+            "$constructor" => Ok(Self::Constructor),
+            _ => Err(value),
         }
     }
 }
