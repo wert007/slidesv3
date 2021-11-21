@@ -112,6 +112,13 @@ impl Instruction {
             span: None,
         }
     }
+    pub const fn allocate(size_in_bytes: u64) -> Self {
+        Self {
+            op_code: OpCode::Allocate,
+            arg: size_in_bytes,
+            span: None,
+        }
+    }
 
     pub const fn read_word_with_offset(offset: u64) -> Self {
         Self {

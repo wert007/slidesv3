@@ -155,6 +155,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
         OpCode::WriteToHeap => evaluate_write_to_heap(state, instruction),
+        OpCode::Allocate => evaluate_allocate(state, instruction),
         OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction),
         OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
@@ -265,6 +266,15 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
             state.heap.write_flagged_word(writing_pointer as _, value);
             writing_pointer += WORD_SIZE_IN_BYTES;
         }
+    }
+    state.stack.push_pointer(address);
+}
+
+fn evaluate_allocate(state: &mut EvaluatorState, instruction: Instruction) {
+    let size_in_bytes = instruction.arg;
+    let address = state.allocate(size_in_bytes);
+    if address == 0 {
+        runtime_error!(state, no_heap_memory_left(instruction.span, size_in_bytes));
     }
     state.stack.push_pointer(address);
 }

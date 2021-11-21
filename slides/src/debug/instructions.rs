@@ -233,6 +233,7 @@ fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) ->
         OpCode::StoreInMemory => instruction_ptr_unsigned_arg_to_string("stm", instruction.arg),
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
         OpCode::WriteToHeap => instruction_word_count_arg_to_string("wrtheap", instruction.arg),
+        OpCode::Allocate => instruction_byte_count_arg_to_string("alloc", instruction.arg),
         OpCode::ReadWordWithOffset => {
             instruction_byte_count_arg_to_string("rdwrdoffset", instruction.arg)
         }
