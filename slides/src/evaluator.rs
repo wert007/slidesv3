@@ -462,26 +462,26 @@ fn evaluate_type_identifier_equals(state: &mut EvaluatorState, _: Instruction) {
 }
 
 fn evaluate_less_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value();
-    let lhs = state.stack.pop().unwrap_value();
+    let rhs = state.stack.pop().unwrap_value() as i64;
+    let lhs = state.stack.pop().unwrap_value() as i64;
     state.stack.push((lhs < rhs) as _);
 }
 
 fn evaluate_greater_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value();
-    let lhs = state.stack.pop().unwrap_value();
+    let rhs = state.stack.pop().unwrap_value() as i64;
+    let lhs = state.stack.pop().unwrap_value() as i64;
     state.stack.push((lhs > rhs) as _);
 }
 
 fn evaluate_less_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value();
-    let lhs = state.stack.pop().unwrap_value();
+    let rhs = state.stack.pop().unwrap_value() as i64;
+    let lhs = state.stack.pop().unwrap_value() as i64;
     state.stack.push((lhs <= rhs) as _);
 }
 
 fn evaluate_greater_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value();
-    let lhs = state.stack.pop().unwrap_value();
+    let rhs = state.stack.pop().unwrap_value() as i64;
+    let lhs = state.stack.pop().unwrap_value() as i64;
     state.stack.push((lhs >= rhs) as _);
 }
 
