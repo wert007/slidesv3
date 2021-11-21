@@ -53,7 +53,7 @@ struct FunctionDeclarationBody<'a> {
     is_main: bool,
     function_id: u64,
     function_type: FunctionType,
-    is_struct_function: bool,
+    base_struct: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -739,7 +739,7 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
             }
         }
         binder.function_return_type = node.function_type.return_type.clone();
-        binder.is_struct_function = node.is_struct_function;
+        binder.is_struct_function = node.base_struct.is_some();
         let span = node.body.span;
         let mut body = bind_node(node.body, &mut binder);
         if matches!(&binder.function_return_type, Type::Void) {
@@ -1009,7 +1009,7 @@ fn bind_function_declaration<'a, 'b>(
         is_main,
         function_id,
         function_type,
-        is_struct_function: false,
+        base_struct: None,
     });
 }
 
@@ -1032,6 +1032,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         "{}::{}",
         struct_name, function_declaration.identifier.lexeme
     );
+    let base_struct = binder.structs.iter().find_map(|s|if s.name == struct_name { Some(s.id) } else { None }).unwrap();
     match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
         Ok(struct_function_kind) => {
             binder.functions.push(FunctionDeclarationBody {
@@ -1041,7 +1042,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 is_main: false,
                 function_id,
                 function_type: function_type.clone(),
-                is_struct_function: true,
+                base_struct: Some(base_struct),
             });
             struct_function_table.set(struct_function_kind, FunctionSymbol {
                 name: function_name,
@@ -1067,7 +1068,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                     is_main: false,
                     function_id,
                     function_type,
-                    is_struct_function: true,
+                    base_struct: Some(base_struct),
                 });
                 Some(
                     BoundStructFieldSymbol {

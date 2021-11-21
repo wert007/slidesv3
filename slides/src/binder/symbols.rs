@@ -117,7 +117,7 @@ impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
             name: it.function_name.into(),
             function_type: it.function_type,
             label_index: it.function_id,
-            is_member_function: it.is_struct_function,
+            is_member_function: it.base_struct.is_some(),
         }
     }
 }
