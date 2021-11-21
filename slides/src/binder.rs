@@ -55,6 +55,7 @@ struct FunctionDeclarationBody<'a> {
     function_id: u64,
     function_type: FunctionType,
     base_struct: Option<u64>,
+    struct_function_kind: Option<StructFunctionKind>,
 }
 
 #[derive(Clone, Debug)]
@@ -1019,6 +1020,7 @@ fn bind_function_declaration<'a, 'b>(
         function_id,
         function_type,
         base_struct: None,
+        struct_function_kind: None,
     });
 }
 
@@ -1060,6 +1062,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 function_id,
                 function_type: function_type.clone(),
                 base_struct: Some(base_struct),
+                struct_function_kind: Some(struct_function_kind),
             });
             struct_function_table.set(struct_function_kind, FunctionSymbol {
                 name: function_name,
@@ -1087,6 +1090,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                     function_id,
                     function_type,
                     base_struct: Some(base_struct),
+                    struct_function_kind: None,
                 });
                 Some(
                     BoundStructFieldSymbol {

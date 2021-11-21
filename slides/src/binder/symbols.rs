@@ -199,6 +199,7 @@ impl StructFunctionTable {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum StructFunctionKind {
     Constructor,
 }
