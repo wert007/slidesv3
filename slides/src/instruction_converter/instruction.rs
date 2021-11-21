@@ -46,9 +46,13 @@ impl Instruction {
     }
 
     pub const fn duplicate() -> Self {
+        Self::duplicate_over(0)
+    }
+
+    pub const fn duplicate_over(words_over: u64) -> Self {
         Self {
-            op_code: OpCode::Duplicate,
-            arg: 0,
+            op_code: OpCode::DuplicateOver,
+            arg: words_over,
             span: None,
         }
     }

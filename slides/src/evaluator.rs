@@ -147,7 +147,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::NoOp => {}
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),
         OpCode::LoadPointer => evaluate_load_pointer(state, instruction),
-        OpCode::Duplicate => evaluate_duplicate(state, instruction),
+        OpCode::DuplicateOver => evaluate_duplicate_over(state, instruction),
         OpCode::Pop => evaluate_pop(state, instruction),
         OpCode::LoadRegister => evaluate_load_register(state, instruction),
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
@@ -197,9 +197,8 @@ fn evaluate_load_pointer(state: &mut EvaluatorState, instruction: Instruction) {
     state.stack.push_pointer(instruction.arg);
 }
 
-fn evaluate_duplicate(state: &mut EvaluatorState, _: Instruction) {
-    let value = state.stack.pop();
-    state.stack.push_flagged_word(value);
+fn evaluate_duplicate_over(state: &mut EvaluatorState, instruction: Instruction) {
+    let value = state.stack.read_flagged_word((state.stack.len() as u64 - instruction.arg - 1) * WORD_SIZE_IN_BYTES);
     state.stack.push_flagged_word(value);
 }
 

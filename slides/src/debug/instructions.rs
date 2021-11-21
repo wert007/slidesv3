@@ -225,7 +225,7 @@ fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) ->
         OpCode::NoOp => instruction_no_arg_to_string("noop"),
         OpCode::LoadImmediate => instruction_dec_signed_arg_to_string("ldimm", instruction.arg),
         OpCode::LoadPointer => instruction_ptr_unsigned_arg_to_string("ldptr", instruction.arg),
-        OpCode::Duplicate => instruction_no_arg_to_string("dup"),
+        OpCode::DuplicateOver => instruction_word_count_arg_to_string("dupover", instruction.arg),
         OpCode::Pop => instruction_no_arg_to_string("pop"),
         OpCode::LoadRegister => instruction_reg_arg_to_string("ldreg", instruction.arg),
         OpCode::StoreInRegister => instruction_reg_arg_to_string("streg", instruction.arg),

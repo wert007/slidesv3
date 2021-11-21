@@ -5,7 +5,7 @@ pub enum OpCode {
     NoOp = 0,
     LoadImmediate = 1,
     LoadPointer = 2,
-    Duplicate = 3,
+    DuplicateOver = 3,
     Pop = 4,
     LoadRegister = 5,
     StoreInRegister = 6,
