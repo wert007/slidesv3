@@ -61,6 +61,9 @@ impl Library {
         for function in self.functions.iter_mut() {
             function.label_index += label_offset as u64;
         }
+        for strct in self.structs.iter_mut() {
+            strct.function_table.relocate_labels(label_offset);
+        }
         for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
                 InstructionOrLabelReference::Instruction(Instruction {
@@ -95,6 +98,7 @@ impl Library {
                     *index += struct_offset as u64;
                 }
             }
+            strct.function_table.relocate_structs(struct_offset);
         }
     }
 }

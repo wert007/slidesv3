@@ -1127,8 +1127,9 @@ fn bind_function_declaration<'a, 'b>(
 fn bind_function_declaration_for_struct<'a, 'b>(
     struct_name: &'a str,
     function_declaration: FunctionDeclarationNodeKind<'a>,
+    struct_function_table: &mut StructFunctionTable,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundStructFieldSymbol<'a> {
+) -> Option<BoundStructFieldSymbol<'a>> {
     let struct_type = binder.look_up_type_by_name(struct_name).unwrap();
     let (function_type, mut variables) = bind_function_type(
         Some(struct_type.clone()),
@@ -1136,27 +1137,58 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         binder,
     );
     variables.push(("this", struct_type));
+    let type_ = Type::Function(Box::new(function_type.clone()));
+    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;
     let function_name = format!(
         "{}::{}",
         struct_name, function_declaration.identifier.lexeme
     );
-    let type_ = Type::Function(Box::new(function_type.clone()));
-    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;
-    binder.register_generated_constant(function_name.clone(), Value::LabelPointer(function_id as usize, type_.clone()));
-    binder.functions.push(FunctionDeclarationBody {
-        function_name: function_name.into(),
-        body: *function_declaration.body,
-        parameters: variables,
-        is_main: false,
-        function_id,
-        function_type,
-        is_struct_function: true,
-    });
-    BoundStructFieldSymbol {
-        name: function_declaration.identifier.lexeme.into(),
-        type_,
-        is_read_only: true,
-        offset: 0,
+    match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
+        Ok(struct_function_kind) => {
+            binder.functions.push(FunctionDeclarationBody {
+                function_name: function_name.clone().into(),
+                body: *function_declaration.body,
+                parameters: variables,
+                is_main: false,
+                function_id,
+                function_type: function_type.clone(),
+                is_struct_function: true,
+            });
+            struct_function_table.set(struct_function_kind, FunctionSymbol {
+                name: function_name,
+                function_type,
+                label_index: function_id,
+                // FIXME: Actually it is, but, we do not want other libraries
+                // register this as a constant, since it is not actually
+                // callable.
+                is_member_function: false,
+            });
+            None
+        },
+        Err(identifier) => {
+            if identifier.starts_with('$') {
+                todo!("This is invalid. The user cannot just define their own $functions! They cannot call them in any way!");
+            } else {
+                binder.register_generated_constant(function_name.clone(), Value::LabelPointer(function_id as usize, type_.clone()));
+                binder.functions.push(FunctionDeclarationBody {
+                    function_name: function_name.into(),
+                    body: *function_declaration.body,
+                    parameters: variables,
+                    is_main: false,
+                    function_id,
+                    function_type,
+                    is_struct_function: true,
+                });
+                Some(
+                    BoundStructFieldSymbol {
+                        name: function_declaration.identifier.lexeme.into(),
+                        type_,
+                        is_read_only: true,
+                        offset: 0,
+                    }
+                )
+            }
+        },
     }
 }
 
@@ -1295,20 +1327,22 @@ fn bind_struct_body<'a>(
         let span = statement.span;
         let field = match statement.kind {
             SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
-                bind_function_declaration_for_struct(struct_name, *function_declaration, binder)
+                bind_function_declaration_for_struct(struct_name, *function_declaration, &mut function_table, binder)
             }
             SyntaxNodeKind::StructField(struct_field) => {
                 let (name, type_) = bind_parameter(struct_field.field, binder);
                 offset += type_.size_in_bytes();
-                BoundStructFieldSymbol {
+                Some(BoundStructFieldSymbol {
                     name: name.into(),
                     offset: offset - type_.size_in_bytes(),
                     type_,
                     is_read_only: false,
-                }
+                })
             }
             unexpected => unreachable!("Unexpected Struct Member {:#?} found!", unexpected),
         };
+        if field.is_none() { continue; }
+        let field = field.unwrap();
         if fields.iter().any(|f| f.name == field.name) {
             binder
                 .diagnostic_bag
