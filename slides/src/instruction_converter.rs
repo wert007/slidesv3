@@ -587,26 +587,8 @@ fn convert_binary(
     }
     .span(span);
     let mut result = vec![];
-    let lhs_span = binary.lhs.span;
-    let rhs_span = binary.rhs.span;
     result.append(&mut convert_node(*binary.lhs, converter));
-    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) {
-        result.push(Instruction::load_immediate(1).span(lhs_span).into());
-        result.push(
-            Instruction::system_call(SystemCallKind::ToString)
-                .span(lhs_span)
-                .into(),
-        );
-    }
     result.append(&mut convert_node(*binary.rhs, converter));
-    if matches!(binary.operator_token, BoundBinaryOperator::StringConcat) {
-        result.push(Instruction::load_immediate(1).span(rhs_span).into());
-        result.push(
-            Instruction::system_call(SystemCallKind::ToString)
-                .span(rhs_span)
-                .into(),
-        );
-    }
     result.push(operator_instruction.into());
     result
 }

@@ -1665,8 +1665,11 @@ fn bind_binary<'a, 'b>(
     let rhs = bind_node(*binary.rhs, binder);
     match bind_binary_operator(span, &lhs, binary.operator_token, &rhs, binder) {
         Some(bound_binary) => {
-            let lhs = bind_conversion(lhs, &bound_binary.lhs, binder);
-            let rhs = bind_conversion(rhs, &bound_binary.rhs, binder);
+            let (lhs, rhs) = if bound_binary.op == BoundBinaryOperator::StringConcat {
+                (call_to_string(lhs, binder), call_to_string(rhs, binder))
+            } else {
+                (bind_conversion(lhs, &bound_binary.lhs, binder), bind_conversion(rhs, &bound_binary.rhs, binder))
+            };
             if bound_binary.op == BoundBinaryOperator::Range {
                 let base_type = if let Type::StructReference(id) = binder.look_up_std_type(StdTypeKind::Range) {
                     binder.get_struct_by_id(id).unwrap()
@@ -2219,6 +2222,13 @@ fn bind_arguments_for_function<'a, 'b>(
                 .diagnostic_bag
                 .report_invalid_void_expression(argument.span);
         }
+        // FIXME: This ensures that print prints the same as to string would. In
+        // the long run you could probably say, that print accepts type any, but
+        // during binding all types will be actually turned into strings and the
+        // print implementation only accepts strings.
+        if let Some(SystemCallKind::Print) = function_type.system_call_kind {
+            argument = call_to_string(argument, binder);
+        }
         argument = bind_conversion(argument, parameter_type, binder);
         if let Type::Function(_) = argument.type_ {
             if let Some(SystemCallKind::Print) = function_type.system_call_kind {
@@ -2230,6 +2240,48 @@ fn bind_arguments_for_function<'a, 'b>(
         result.push(argument);
     }
     result
+}
+
+fn call_to_string<'a>(
+    base: BoundNode<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> BoundNode<'a> {
+    match &base.type_ {
+        Type::Error => base,
+        Type::Library(_) |
+        Type::Void => unreachable!(),
+        Type::Integer |
+        Type::Boolean |
+        Type::None |
+        Type::SystemCall(_) |
+        Type::Array(_) |
+        Type::Function(_) |
+        Type::Closure(_) |
+        Type::Any => BoundNode::system_call(base.span, SystemCallKind::ToString, vec![bind_conversion(base, &Type::Any, binder)], Type::String),
+        Type::Noneable(_) => {
+            // FIXME: You can easily call call_to_string_on_struct here, if you
+            // check the base type and add an if guard for the noneable type
+            // here.
+            BoundNode::system_call(base.span, SystemCallKind::ToString, vec![bind_conversion(base, &Type::Any, binder)], Type::String)
+        },
+        Type::String => base,
+        Type::Struct(struct_type) => {
+            let id = struct_type.id;
+            call_to_string_on_struct(base, id, binder)
+        }
+        &Type::StructReference(id) => call_to_string_on_struct(base, id, binder),
+    }
+}
+
+fn call_to_string_on_struct<'a>(base: BoundNode<'a>, struct_id: u64, binder: &mut BindingState<'a, '_>) -> BoundNode<'a> {
+    let struct_type = binder.get_struct_type_by_id(struct_id).unwrap();
+    match &struct_type.function_table.to_string_function {
+        Some(function) => {
+            let function = BoundNode::label_reference(function.label_index as _, Type::function(function.function_type.clone()));
+            BoundNode::function_call(base.span, function, vec![base], false, Type::String)
+        }
+        None => BoundNode::system_call(base.span, SystemCallKind::ToString, vec![bind_conversion(base, &Type::Any, binder)], Type::String),
+    }
 }
 
 fn bind_conversion<'a>(
