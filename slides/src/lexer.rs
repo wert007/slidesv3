@@ -15,42 +15,44 @@ use self::syntax_token::SyntaxTokenKind;
 
 #[derive(Clone, Copy)]
 enum State {
-    // Default state, this means that for the current token, there are no
-    // characters consumed and any token may follow.
+    /// Default state, this means that for the current token, there are no
+    /// characters consumed and any token may follow.
     Default,
-    // This is a simple decimal integer number right now. It checks, that the
-    // value fits into an i64 and only consumes chars 0..9
+    /// This is a simple decimal integer number right now. It checks, that the
+    /// value fits into an i64 and only consumes chars 0..9
     DecimalNumber(TextIndex),
-    // This is a simple string starting with ' and ending with the same
-    // character. StrintState stores the character which started the string and
-    // may in the future hold flags like formatted strings, math strings and
-    // similiar things.
+    /// This is a simple string starting with ' and ending with the same
+    /// character. StrintState stores the character which started the string and
+    /// may in the future hold flags like formatted strings, math strings and
+    /// similiar things.
     String(TextIndex, StringState),
-    // An Identifier is a single word, it might contain ascii letters, numbers
-    // and underscores, it cannot start with a number.
+    /// An Identifier is a single word, it might contain ascii letters, numbers
+    /// and underscores, it cannot start with a number. If it starts with an
+    /// dollar sign, this means its representing something which is normally not
+    /// accessible on user level.
     Identifier(TextIndex),
-    // These are operators wich exist as a single char operator and as a multi
-    // char operator, but it might make sense to repeat them. Like unary
-    // operators e.g. So "!!" gets parsed as two tokens and "!=" as one token.
-    // char is the expected next character of the mutli char operator.
+    /// These are operators wich exist as a single char operator and as a multi
+    /// char operator, but it might make sense to repeat them. Like unary
+    /// operators e.g. So "!!" gets parsed as two tokens and "!=" as one token.
+    /// char is the expected next character of the mutli char operator.
     MaybeTwoCharOperator(TextIndex, char),
-    // This is a operator which may be multi char but actually does not have to
-    // be. It simply consumes as long as there are operator characters in the
-    // input. It currently also has a max length of 2 characters, since there
-    // are no operators, which are longer.
+    /// This is a operator which may be multi char but actually does not have to
+    /// be. It simply consumes as long as there are operator characters in the
+    /// input. It currently also has a max length of 2 characters, since there
+    /// are no operators, which are longer.
     MultiCharOperator(TextIndex),
-    // This is a single dash, which might be an operator, a single line comment
-    // or a multiline comment.
+    /// This is a single dash, which might be an operator, a single line comment
+    /// or a multiline comment.
     MaybeComment(TextIndex),
-    // A single line comment starts with // and ends in a new line. Anything in
-    // between is ignored.
+    /// A single line comment starts with // and ends in a new line. Anything in
+    /// between is ignored.
     SingleLineComment(TextIndex),
-    // A multi line comment starts with /* and ends with */. Anything in between
-    // is ignored, it allows for nested multi line comments.
+    /// A multi line comment starts with /* and ends with */. Anything in
+    /// between is ignored, it allows for nested multi line comments.
     MultiLineComment(TextIndex),
-    // This is a single * inside a multi line comment. If the next char is a /
-    // the current multi line comment will be closed. Other wise the state will
-    // be set to multi line comment again.
+    /// This is a single * inside a multi line comment. If the next char is a /
+    /// the current multi line comment will be closed. Other wise the state will
+    /// be set to multi line comment again.
     MaybeCloseMultiLineComment(TextIndex),
 }
 
