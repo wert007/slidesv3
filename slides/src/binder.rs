@@ -2119,7 +2119,40 @@ fn bind_field_access_for_assignment<'a>(
     field_access: FieldAccessNodeKind<'a>,
     binder: &mut BindingState<'a, '_>,
 ) -> BoundNode<'a> {
+    let base_is_this = if let SyntaxNodeKind::Variable(identifier) = &field_access.base.kind {
+        identifier.token.lexeme == "this"
+    } else {
+        false
+    };
     let base = bind_node_for_assignment(*field_access.base, binder);
+    let field = field_access.field;
+    let mut struct_handler = |id : u64, base| {
+        let field_name = field.lexeme;
+        let bound_struct_type = binder
+            .get_struct_type_by_id(id)
+            .unwrap_or_else(|| {
+                panic!("Referenced a struct, which doesn't exist, somehow.");
+            })
+            .clone();
+        if let Some(field) = bound_struct_type.field(field_name) {
+            if field.is_read_only {
+                binder.diagnostic_bag.report_cannot_assign_to(span);
+                BoundNode::error(span)
+            } else {
+                if base_is_this && !binder.assigned_fields.contains(&field_name) {
+                    binder.assigned_fields.push(field_name);
+                }
+                BoundNode::field_access(span, base, field.offset, field.type_.clone())
+            }
+        } else {
+            binder.diagnostic_bag.report_no_field_named_on_struct(
+                field.span(),
+                field_name,
+                bound_struct_type,
+            );
+            BoundNode::error(span)
+        }
+    };
     match &base.type_ {
         Type::Error => base,
         Type::Any
@@ -2141,52 +2174,10 @@ fn bind_field_access_for_assignment<'a>(
             BoundNode::error(span)
         }
         Type::StructReference(id) => {
-            let field_name = field_access.field.lexeme;
-            let bound_struct_type = binder
-                .get_struct_type_by_id(*id)
-                .unwrap_or_else(|| {
-                    panic!("Referenced a struct, which doesn't exist, somehow.");
-                })
-                .clone();
-            if let Some(field) = bound_struct_type.field(field_name) {
-                if field.is_read_only {
-                    binder.diagnostic_bag.report_cannot_assign_to(span);
-                    BoundNode::error(span)
-                } else {
-                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
-                }
-            } else {
-                binder.diagnostic_bag.report_no_field_named_on_struct(
-                    field_access.field.span(),
-                    field_name,
-                    bound_struct_type,
-                );
-                BoundNode::error(span)
-            }
+            struct_handler(*id, base)
         }
         Type::Struct(struct_type) => {
-            let field_name = field_access.field.lexeme;
-            let bound_struct_type = binder
-                .get_struct_type_by_id(struct_type.id)
-                .unwrap_or_else(|| {
-                    panic!("Referenced a struct, which doesn't exist, somehow.");
-                })
-                .clone();
-            if let Some(field) = bound_struct_type.field(field_name) {
-                if field.is_read_only {
-                    binder.diagnostic_bag.report_cannot_assign_to(span);
-                    BoundNode::error(span)
-                } else {
-                    BoundNode::field_access(span, base, field.offset, field.type_.clone())
-                }
-            } else {
-                binder.diagnostic_bag.report_no_field_named_on_struct(
-                    field_access.field.span(),
-                    field_name,
-                    bound_struct_type,
-                );
-                BoundNode::error(span)
-            }
+            struct_handler(struct_type.id, base)
         }
     }
 }
