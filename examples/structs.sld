@@ -10,6 +10,11 @@ struct Point {
 struct Rect {
     top_left: Point;
     bottom_right: Point;
+
+    func $constructor(x: int, y: int, width: int, height: int) {
+        this.top_left = new Point(x, y);
+        this.bottom_right = new Point(x + width, y + height);
+    }
 }
 
 struct Cube {
@@ -18,6 +23,10 @@ struct Cube {
 
 struct Bar {
     a: Foo;
+
+    func $constructor(a: int) {
+        this.a = new Foo(a);
+    }
 }
 
 struct Foo {
@@ -47,14 +56,14 @@ struct Square {
 
 func main() {
     let p = new Point(43, 87);
-    let r = new Rect(p, new Point(1200, 3400));
+    let r = new Rect(10, 10, 200, 300);
     let c = new Cube([r, r, r, r, r, r]);
     print('Point.x = ' + p.x);
     print('Rect.bottom_right.y = ' + r.bottom_right.y);
     r.bottom_right.x = 99;
     print('Cube.sides[0].bottom_right.x = ' + c.sides[0].bottom_right.x);
 
-    let b = new Bar(new Foo(2312));
+    let b = new Bar(2312);
     print('Bar.Foo.a = ' + b.a.a);
 
     let s = new Square(5);

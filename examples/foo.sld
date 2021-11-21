@@ -1,3 +1,16 @@
+struct Value {
+    value: int;
+
+    func value() -> int {
+        return this.value;
+    }
+
+    // func value(value: int) {
+    //     this.value = value;
+    // }
+}
+
 func main() {
-    print('Hello World');
+    let value = new Value(42);
+    print(value.value());
 }
