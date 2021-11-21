@@ -174,9 +174,9 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_parameter_already_declared(&mut self, span: TextSpan, name: &str) {
-        let message = format!("Parameter named {} already declared in struct.", name);
-        // FIXME: Reference the first declaration of a struct with that name.
+    pub fn report_field_already_declared(&mut self, span: TextSpan, name: &str) {
+        let message = format!("Field named {} already declared in struct.", name);
+        // FIXME: Reference the first declaration of a field with that name.
         self.report(message, span);
     }
 

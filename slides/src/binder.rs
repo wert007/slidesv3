@@ -1261,11 +1261,14 @@ fn bind_struct_body<'a>(
     let mut offset = 0;
     for statement in struct_body.statements {
         let span = statement.span;
+        let is_function;
         let field = match statement.kind {
             SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
+                is_function = true;
                 bind_function_declaration_for_struct(struct_name, *function_declaration, &mut function_table, binder)
             }
             SyntaxNodeKind::StructField(struct_field) => {
+                is_function = false;
                 let (name, type_) = bind_parameter(struct_field.field, binder);
                 offset += type_.size_in_bytes();
                 Some(BoundStructFieldSymbol {
@@ -1279,10 +1282,10 @@ fn bind_struct_body<'a>(
         };
         if field.is_none() { continue; }
         let field = field.unwrap();
-        if fields.iter().any(|f| f.name == field.name) {
+        if !is_function && fields.iter().any(|f| f.name == field.name) {
             binder
                 .diagnostic_bag
-                .report_parameter_already_declared(span, &field.name);
+                .report_field_already_declared(span, &field.name);
         }
         fields.push(field);
     }
