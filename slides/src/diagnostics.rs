@@ -373,6 +373,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_unrecognized_operator_function(&mut self, span: TextSpan, identifier: &str) {
+        let message = format!("Function name {} was not recognized as a valid operator functions. Remove the $ if you want to call this function. Or use a valid name like $constructor.", identifier);
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(

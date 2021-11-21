@@ -1056,7 +1056,8 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         },
         Err(identifier) => {
             if identifier.starts_with('$') {
-                todo!("This is invalid. The user cannot just define their own $functions! They cannot call them in any way!");
+                binder.diagnostic_bag.report_unrecognized_operator_function(function_declaration.identifier.span(), identifier);
+                None
             } else {
                 binder.register_generated_constant(function_name.clone(), Value::LabelPointer(function_id as usize, type_.clone()));
                 binder.functions.push(FunctionDeclarationBody {
