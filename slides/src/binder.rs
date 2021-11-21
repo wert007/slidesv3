@@ -271,6 +271,9 @@ struct BindingState<'a, 'b> {
     function_return_type: Type,
     /// This is used to reserve a this variable inside the function.
     is_struct_function: bool,
+    /// This is used to check if all fields have been set to a value in a
+    /// constructor.
+    assigned_fields: Vec<&'a str>,
     /// The type the current expression is expected to have. This is only used in
     /// bind_array_literal, to convert each expression inside the array literal
     /// to the right type. Everywhere else the expression is converted
@@ -693,6 +696,7 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
         max_used_variables: 0,
         function_return_type: Type::Error,
         is_struct_function: false,
+        assigned_fields: vec![],
         expected_type: None,
     };
     let span = node.span();
@@ -744,6 +748,18 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
         binder.is_struct_function = node.base_struct.is_some();
         let span = node.body.span;
         let mut body = bind_node(node.body, &mut binder);
+        match node.struct_function_kind {
+            Some(StructFunctionKind::Constructor) => {
+                let strct = node.base_struct.unwrap();
+                let strct = binder.get_struct_type_by_id(strct).unwrap().clone();
+                let unassigned_fields : Vec<_> = strct.fields.iter().filter_map(|f| if matches!(f.type_, Type::Function(_)) { None } else { Some(f.name.as_ref())}).filter(|s| !binder.assigned_fields.contains(&s)).collect();
+                if !unassigned_fields.is_empty() {
+                    binder.diagnostic_bag.report_not_all_fields_have_been_assigned(node.header_span, &strct.name, &unassigned_fields);
+                }
+            }
+            None => {}
+        }
+        binder.assigned_fields.clear();
         if matches!(&binder.function_return_type, Type::Void) {
             body = BoundNode::block_statement(
                 body.span,
