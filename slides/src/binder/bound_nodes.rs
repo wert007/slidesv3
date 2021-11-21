@@ -347,7 +347,7 @@ impl<'a> BoundNode<'a> {
     ///
     /// i = range.start;
     /// i$index = 0;
-    /// while i < range.end {
+    /// while range.hasNextValue(i) {
     ///     {
     ///         body
     ///     }
@@ -362,14 +362,19 @@ impl<'a> BoundNode<'a> {
         variable: BoundNode<'a>,
         collection: BoundNode<'a>,
         body: BoundNode<'a>,
+        range_has_next_value_function_base: BoundNode<'a>,
     ) -> Self {
-        let while_condition = BoundNode::binary(
+        let while_condition = BoundNode::function_call(
             span,
-            variable.clone(),
-            BoundBinaryOperator::LessThan,
-            BoundNode::field_access(span, BoundNode::variable(span, collection_variable, collection.type_.clone()), 8, Type::Integer),
-            Type::Boolean,
-        );
+            range_has_next_value_function_base,
+            vec![
+                variable.clone(),
+                BoundNode::variable(span, collection_variable, collection.type_.clone()),
+            ],
+            // FIXME: Actually true, but the this argument is normally not in
+            // the parameter list.
+            false,
+            Type::Boolean);
         let while_body = BoundNode::block_statement(
             span,
             vec![

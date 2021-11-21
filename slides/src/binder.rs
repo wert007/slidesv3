@@ -2487,7 +2487,8 @@ fn bind_for_statement<'a, 'b>(
         )
     }
     else {
-        BoundNode::for_statement_range(span, index_variable, collection_variable, variable, collection, body)
+        let range_has_next_value_function_base = BoundNode::literal_from_value(binder.look_up_constant_by_name("Range::hasNextValue").unwrap());
+        BoundNode::for_statement_range(span, index_variable, collection_variable, variable, collection, body, range_has_next_value_function_base)
     };
     if binder.print_variable_table {
         print_variable_table(&binder.variable_table);
