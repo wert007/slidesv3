@@ -1619,25 +1619,33 @@ fn bind_constructor_call<'a>(
             return BoundNode::error(span);
         }
     };
-    if constructor_call.arguments.len() != struct_type.fields.len() {
-        binder.diagnostic_bag.report_unexpected_argument_count(
-            span,
-            constructor_call.arguments.len(),
-            struct_type.fields.len(),
-        );
-    }
-    let mut arguments = vec![];
-    for (argument, parameter_type) in constructor_call
-        .arguments
-        .into_iter()
-        .zip(struct_type.fields.iter())
-    {
-        let argument = bind_node(argument, binder);
-        let argument = bind_conversion(argument, parameter_type, binder);
-        arguments.push(argument);
-    }
+    let (arguments, function) = match &struct_type.function_table.constructor_function {
+        Some(function) => {
+            (bind_arguments_for_function(span, constructor_call.arguments, &function.function_type, binder), Some(function.label_index))
+        },
+        None => {
+            if constructor_call.arguments.len() != struct_type.fields.len() {
+                binder.diagnostic_bag.report_unexpected_argument_count(
+                    span,
+                    constructor_call.arguments.len(),
+                    struct_type.fields.len(),
+                );
+            }
+            let mut arguments = Vec::with_capacity(constructor_call.arguments.len());
+            for (argument, parameter_type) in constructor_call
+                .arguments
+                .into_iter()
+                .zip(struct_type.fields.iter())
+            {
+                let argument = bind_node(argument, binder);
+                let argument = bind_conversion(argument, parameter_type, binder);
+                arguments.push(argument);
+            }
+            (arguments, None)
+        }
+    };
 
-    BoundNode::constructor_call(span, arguments, struct_type)
+    BoundNode::constructor_call(span, arguments, struct_type, function)
 }
 
 fn bind_variable<'a, 'b>(

@@ -661,10 +661,25 @@ fn convert_constructor_call(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
     let word_count = bytes_to_word(constructor_call.base_type.size_in_bytes());
-    for argument in constructor_call.arguments.into_iter().rev() {
-        result.append(&mut convert_node(argument, converter));
+    match constructor_call.function {
+        Some(function) => {
+            let argument_count = constructor_call.arguments.len() as u64;
+            result.push(Instruction::allocate(word_count * WORD_SIZE_IN_BYTES).span(span).into());
+            for argument in constructor_call.arguments.into_iter() {
+                result.append(&mut convert_node(argument, converter));
+            }
+            result.push(Instruction::duplicate_over(argument_count).span(span).into());
+            result.push(LabelReference { label_reference: function as _, span }.into());
+            result.push(Instruction::load_immediate(argument_count + 1).span(span).into());
+            result.push(Instruction::function_call().span(span).into());
+        },
+        None => {
+            for argument in constructor_call.arguments.into_iter().rev() {
+                result.append(&mut convert_node(argument, converter));
+            }
+            result.push(Instruction::write_to_heap(word_count).span(span).into());
+        },
     }
-    result.push(Instruction::write_to_heap(word_count).span(span).into());
     result
 }
 

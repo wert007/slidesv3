@@ -79,12 +79,14 @@ impl<'a> BoundNode<'a> {
         span: TextSpan,
         arguments: Vec<BoundNode<'a>>,
         base_type: StructType,
+        function: Option<u64>,
     ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::ConstructorCall(BoundConstructorCallNodeKind {
                 arguments,
                 base_type: base_type.clone(),
+                function,
             }),
             type_: Type::Struct(Box::new(base_type)),
             constant_value: None,
@@ -634,6 +636,7 @@ pub struct BoundArrayLiteralNodeKind<'a> {
 pub struct BoundConstructorCallNodeKind<'a> {
     pub arguments: Vec<BoundNode<'a>>,
     pub base_type: StructType,
+    pub function: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
