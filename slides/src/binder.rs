@@ -1700,7 +1700,17 @@ fn bind_binary<'a, 'b>(
         Some(bound_binary) => {
             let lhs = bind_conversion(lhs, &bound_binary.lhs, binder);
             let rhs = bind_conversion(rhs, &bound_binary.rhs, binder);
-            BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+            if bound_binary.op == BoundBinaryOperator::Range {
+                let base_type = if let Type::StructReference(id) = binder.look_up_std_type(StdTypeKind::Range) {
+                    binder.get_struct_by_id(id).unwrap()
+                } else {
+                    unreachable!()
+                };
+                let function = base_type.function_table.constructor_function.as_ref().map(|c|c.label_index);
+                BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
+            } else {
+                BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+            }
         }
         None => BoundNode::error(span),
     }
