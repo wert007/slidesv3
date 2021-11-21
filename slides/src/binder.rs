@@ -47,6 +47,7 @@ impl SafeNodeInCondition<'_> {
 
 #[derive(Clone, Debug)]
 struct FunctionDeclarationBody<'a> {
+    header_span: TextSpan,
     function_name: Cow<'a, str>,
     body: SyntaxNode<'a>,
     parameters: Vec<(&'a str, Type)>,
@@ -996,6 +997,13 @@ fn bind_function_declaration<'a, 'b>(
     function_declaration: FunctionDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) {
+    let header_span = TextSpan::bounds(
+        function_declaration.func_keyword.span(),
+        function_declaration
+            .function_type
+            .return_type.as_ref()
+            .map(|r|r.return_type.span())
+            .unwrap_or(function_declaration.function_type.rparen.span()));
     let (function_type, variables) =
         bind_function_type(None, function_declaration.function_type, binder);
     let type_ = Type::Function(Box::new(function_type.clone()));
@@ -1003,6 +1011,7 @@ fn bind_function_declaration<'a, 'b>(
     let function_id = binder.functions.len() as u64 + binder.label_offset as u64;
     binder.register_constant(function_declaration.identifier.lexeme, Value::LabelPointer(function_id as _, type_.clone()));
     binder.functions.push(FunctionDeclarationBody {
+        header_span,
         function_name: function_declaration.identifier.lexeme.into(),
         body: *function_declaration.body,
         parameters: variables,
@@ -1019,6 +1028,13 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     struct_function_table: &mut StructFunctionTable,
     binder: &mut BindingState<'a, 'b>,
 ) -> Option<BoundStructFieldSymbol<'a>> {
+    let header_span = TextSpan::bounds(
+        function_declaration.func_keyword.span(),
+        function_declaration
+            .function_type
+            .return_type.as_ref()
+            .map(|r|r.return_type.span())
+            .unwrap_or(function_declaration.function_type.rparen.span()));
     let struct_type = binder.look_up_type_by_name(struct_name).unwrap();
     let (function_type, mut variables) = bind_function_type(
         Some(struct_type.clone()),
@@ -1036,6 +1052,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
         Ok(struct_function_kind) => {
             binder.functions.push(FunctionDeclarationBody {
+                header_span,
                 function_name: function_name.clone().into(),
                 body: *function_declaration.body,
                 parameters: variables,
@@ -1062,6 +1079,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
             } else {
                 binder.register_generated_constant(function_name.clone(), Value::LabelPointer(function_id as usize, type_.clone()));
                 binder.functions.push(FunctionDeclarationBody {
+                    header_span,
                     function_name: function_name.into(),
                     body: *function_declaration.body,
                     parameters: variables,
