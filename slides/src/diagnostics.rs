@@ -368,6 +368,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, TextSpan::zero());
     }
 
+    pub fn report_invalid_field_name(&mut self, span: TextSpan, field_name: &str) {
+        let message = format!("Cannot use $ fields in code. Field was {}.", field_name);
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(

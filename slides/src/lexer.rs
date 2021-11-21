@@ -100,7 +100,7 @@ pub fn lex<'a>(
                 (State::Default, '\'') => {
                     state = State::String(index, StringState::single_quote());
                 }
-                (State::Default, c) if c.is_alphabetic() || c == '_' => {
+                (State::Default, c) if c.is_alphabetic() || c == '_' || c == '$' => {
                     state = State::Identifier(index);
                 }
                 (State::Default, ws) if ws.is_whitespace() => {}
