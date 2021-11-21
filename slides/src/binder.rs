@@ -715,11 +715,6 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
         );
     }
 
-    for node in binder.structs.clone() {
-        let (fields, function_table) = bind_struct_body(node.name, node.body, &mut binder);
-        binder.register_struct(node.id, fields, function_table);
-    }
-
     let mut type_names = binder
         .type_table
         .iter()
@@ -729,6 +724,11 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
         .diagnostic_bag
         .registered_types
         .append(&mut type_names);
+
+    for node in binder.structs.clone() {
+        let (fields, function_table) = bind_struct_body(node.name, node.body, &mut binder);
+        binder.register_struct(node.id, fields, function_table);
+    }
 
     let fixed_variable_count = binder.variable_table.len();
     let mut label_count = binder.functions.len() + binder.label_offset;
@@ -1069,6 +1069,13 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     let base_struct = binder.structs.iter().find_map(|s|if s.name == struct_name { Some(s.id) } else { None }).unwrap();
     match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
         Ok(struct_function_kind) => {
+            match struct_function_kind {
+                StructFunctionKind::Constructor => {
+                    if !function_type.return_type.can_be_converted_to(&Type::Void) {
+                        binder.diagnostic_bag.report_cannot_convert(header_span, &function_type.return_type, &Type::Void);
+                    }
+                }
+            }
             binder.functions.push(FunctionDeclarationBody {
                 header_span,
                 function_name: function_name.clone().into(),
