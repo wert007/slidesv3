@@ -203,7 +203,7 @@ pub fn lex<'a>(
                     }
                 }
                 (State::MultiCharOperator(start), o) => {
-                    if !is_multi_char_operator(o) || char_index - start.char_index > 2 {
+                    if !is_multi_char_operator(o) || char_index - start.char_index >= 2 {
                         state = State::Default;
                         let lexeme = &text[start.byte_index..byte_index];
                         if is_valid_operator(lexeme) {
