@@ -1663,7 +1663,17 @@ fn bind_binary<'a, 'b>(
 ) -> BoundNode<'a> {
     let lhs = bind_node(*binary.lhs, binder);
     let rhs = bind_node(*binary.rhs, binder);
-    match bind_binary_operator(span, &lhs, binary.operator_token, &rhs, binder) {
+    bind_binary_insertion(span, lhs, binary.operator_token, rhs, binder)
+}
+
+fn bind_binary_insertion<'a>(
+    span: TextSpan,
+    lhs: BoundNode<'a>,
+    operator_token: SyntaxToken<'a>,
+    rhs: BoundNode<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> BoundNode<'a> {
+    match bind_binary_operator(span, &lhs, operator_token, &rhs, binder) {
         Some(bound_binary) => {
             let (lhs, rhs) = if bound_binary.op == BoundBinaryOperator::StringConcat {
                 (call_to_string(lhs, binder), call_to_string(rhs, binder))
@@ -2258,11 +2268,31 @@ fn call_to_string<'a>(
         Type::Function(_) |
         Type::Closure(_) |
         Type::Any => BoundNode::system_call(base.span, SystemCallKind::ToString, vec![bind_conversion(base, &Type::Any, binder)], Type::String),
-        Type::Noneable(_) => {
-            // FIXME: You can easily call call_to_string_on_struct here, if you
-            // check the base type and add an if guard for the noneable type
-            // here.
-            BoundNode::system_call(base.span, SystemCallKind::ToString, vec![bind_conversion(base, &Type::Any, binder)], Type::String)
+        Type::Noneable(base_type) => {
+            match &**base_type {
+                Type::Error => base,
+                Type::Library(_) |
+                Type::Void => unreachable!(),
+                Type::Noneable(_) => unreachable!("Type Noneable of Nonable is impossible right now.."),
+                Type::Any |
+                Type::Integer |
+                Type::Boolean |
+                Type::None |
+                Type::SystemCall(_) |
+                Type::Array(_) |
+                Type::String |
+                Type::Function(_) |
+                Type::Closure(_) => BoundNode::system_call(base.span, SystemCallKind::ToString, vec![bind_conversion(base, &Type::Any, binder)], Type::String),
+                Type::Struct(struct_type) => {
+                    let id = struct_type.id;
+                    let base_type = *base_type.clone();
+                    call_to_string_on_noneable_struct(base, base_type, id, binder)
+                }
+                &Type::StructReference(id) => {
+                    let base_type = *base_type.clone();
+                    call_to_string_on_noneable_struct(base, base_type, id, binder)
+                }
+            }
         },
         Type::String => base,
         Type::Struct(struct_type) => {
@@ -2271,6 +2301,13 @@ fn call_to_string<'a>(
         }
         &Type::StructReference(id) => call_to_string_on_struct(base, id, binder),
     }
+}
+
+fn call_to_string_on_noneable_struct<'a>(base: BoundNode<'a>, base_type: Type, struct_id: u64, binder: &mut BindingState<'a, '_>) -> BoundNode<'a> {
+    let span = base.span;
+    let condition = bind_binary_insertion(span, base.clone(), SyntaxToken::operator(span.start(), "!="), BoundNode::literal_from_value(Value::None), binder);
+    let to_string_call = call_to_string_on_struct(BoundNode::conversion(span, base, base_type), struct_id, binder);
+    BoundNode::if_expression(span, condition, to_string_call, Some(BoundNode::literal_from_value(String::from("none").into())), Type::String)
 }
 
 fn call_to_string_on_struct<'a>(base: BoundNode<'a>, struct_id: u64, binder: &mut BindingState<'a, '_>) -> BoundNode<'a> {
