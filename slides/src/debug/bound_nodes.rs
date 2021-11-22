@@ -252,8 +252,9 @@ fn print_bound_node_conversion_as_code(
     printer: DebugPrinter,
     buffer: &mut String,
 ) {
+    buffer.push('(');
     print_bound_node_as_code_with_indent(&closure.base, printer, buffer);
-    buffer.push_str(" as ");
+    buffer.push_str(") as ");
     buffer.push_str(&closure.type_.to_string());
 }
 
