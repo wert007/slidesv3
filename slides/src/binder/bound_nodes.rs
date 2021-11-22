@@ -447,6 +447,19 @@ impl<'a> BoundNode<'a> {
         body: BoundNode<'a>,
         else_body: Option<BoundNode<'a>>,
     ) -> Self {
+        Self::if_expression(span, condition, body, else_body, Type::Void)
+    }
+
+    pub fn if_expression(
+        span: TextSpan,
+        condition: BoundNode<'a>,
+        body: BoundNode<'a>,
+        else_body: Option<BoundNode<'a>>,
+        type_: Type,
+    ) -> Self {
+        if else_body.is_none() {
+            assert_eq!(type_, Type::Void);
+        }
         Self {
             span,
             kind: BoundNodeKind::IfStatement(BoundIfStatementNodeKind {
@@ -454,7 +467,7 @@ impl<'a> BoundNode<'a> {
                 body: Box::new(body),
                 else_body: else_body.map(Box::new),
             }),
-            type_: Type::Void,
+            type_,
             constant_value: None,
         }
     }
@@ -472,10 +485,14 @@ impl<'a> BoundNode<'a> {
     }
 
     pub fn block_statement(span: TextSpan, statements: Vec<BoundNode<'a>>) -> Self {
+        Self::block_expression(span, statements, Type::Void)
+    }
+
+    pub fn block_expression(span: TextSpan, expressions: Vec<BoundNode<'a>>, type_: Type) -> Self {
         Self {
             span,
-            kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind { statements }),
-            type_: Type::Void,
+            kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind { statements: expressions }),
+            type_,
             constant_value: None,
         }
     }
