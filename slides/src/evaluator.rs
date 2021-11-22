@@ -360,8 +360,8 @@ fn evaluate_equals(state: &mut EvaluatorState, _: Instruction) {
 }
 
 fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value();
-    let lhs = state.stack.pop().unwrap_value();
+    let rhs = state.stack.pop().value;
+    let lhs = state.stack.pop().value;
     state.stack.push((lhs != rhs) as _);
 }
 
