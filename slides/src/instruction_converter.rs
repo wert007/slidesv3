@@ -920,16 +920,19 @@ fn convert_type_identifier(
             type_word_count
         }
         Type::Struct(struct_type) => {
+            result.push(match struct_type.function_table.to_string_function {
+                Some(function) => LabelReference { label_reference: function.label_index as _, span }.into(),
+                None => Instruction::load_pointer(0).into(),
+            });
             result.push(
                 Instruction::load_immediate(struct_type.id)
                     .span(span)
                     .into(),
             );
-            3
+            4
         }
-        Type::StructReference(id) => {
-            result.push(Instruction::load_immediate(id).span(span).into());
-            3
+        Type::StructReference(_) => {
+            unimplemented!("TypeBoxing needs the struct table and a struct reference just does not have this information!");
         }
         _ => 2,
     };
