@@ -412,6 +412,17 @@ impl FunctionType {
             system_call_kind: None,
         }
     }
+
+    pub fn relocate_structs(&mut self, struct_offset: usize) {
+        for type_ in self.parameter_types.iter_mut().chain(self.this_type.iter_mut()) {
+            if let Type::StructReference(index) = type_ {
+                *index += struct_offset as u64;
+            }
+        }
+        if let Type::StructReference(index) = &mut self.return_type {
+            *index += struct_offset as u64;
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]

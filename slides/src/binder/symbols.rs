@@ -86,16 +86,17 @@ impl Library {
 
     pub fn relocate_structs(&mut self, struct_offset: usize) {
         for function in self.functions.iter_mut() {
-            for parameter in function.function_type.parameter_types.iter_mut() {
-                if let Type::StructReference(index) = parameter {
-                    *index += struct_offset as u64;
-                }
-            }
+            function.relocate_structs(struct_offset);
         }
         for strct in self.structs.iter_mut() {
             for field in strct.fields.iter_mut() {
-                if let Type::StructReference(index) = &mut field.type_ {
-                    *index += struct_offset as u64;
+                match &mut field.type_ {
+                    Type::Function(function_type) => {
+                        function_type.relocate_structs(struct_offset)
+                    },
+                    Type::Struct(_) => unreachable!("relocate_structs currently only works for StructReferences"),
+                    Type::StructReference(index) => *index += struct_offset as u64,
+                    _ => {}
                 }
             }
             strct.function_table.relocate_structs(struct_offset);
@@ -109,6 +110,19 @@ pub struct FunctionSymbol {
     pub function_type: FunctionType,
     pub label_index: u64,
     pub is_member_function: bool,
+}
+
+impl FunctionSymbol {
+    pub fn relocate_structs(&mut self, struct_offset: usize) {
+        for parameter in self.function_type.parameter_types.iter_mut().chain(self.function_type.this_type.iter_mut()) {
+            if let Type::StructReference(index) = parameter {
+                *index += struct_offset as u64;
+            }
+        }
+        if let Type::StructReference(index) = &mut self.function_type.return_type {
+            *index += struct_offset as u64;
+        }
+    }
 }
 
 impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
@@ -178,25 +192,19 @@ impl StructFunctionTable {
         }
     }
 
+    fn function_symbols_iter_mut(&mut self) -> impl Iterator<Item = &mut FunctionSymbol> {
+        self.constructor_function.iter_mut().chain(self.to_string_function.iter_mut())
+    }
+
     fn relocate_labels(&mut self, label_offset: usize) {
-        self.constructor_function
-            .iter_mut()
+        self.function_symbols_iter_mut()
             .for_each(|f| f.label_index += label_offset as u64);
     }
 
     fn relocate_structs(&mut self, struct_offset: usize) {
-        self.constructor_function.iter_mut().for_each(|f| {
-            f.function_type
-                .parameter_types
-                .iter_mut()
-                .filter_map(|p| {
-                    if let Type::StructReference(id) = p {
-                        Some(id)
-                    } else {
-                        None
-                    }
-                })
-                .for_each(|id| *id += struct_offset as u64)
+        self.function_symbols_iter_mut()
+        .for_each(|f| {
+            f.relocate_structs(struct_offset)
         });
     }
 }
