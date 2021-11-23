@@ -21,10 +21,10 @@ func main() {
     print(a);
     a = none;
     print(a);
-    // TODO: Implement $toString for any types.
     let b : any = new Value(13);
     print(b);
-    // TODO: Implement $toString for array types.
     let c = [new Value(1), new Value(2)];
     print(c);
+    let d : any = a;
+    print(d);
 }
