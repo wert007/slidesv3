@@ -31,11 +31,13 @@ macro_rules! runtime_error {
 type ResultType = Value;
 
 pub struct EvaluatorState<'a> {
+    debug_flags: DebugFlags,
     stack: Stack,
     heap: Allocator,
     registers: Vec<FlaggedWord>,
     protected_registers: usize,
     pc: usize,
+    instructions: Vec<Instruction>,
     is_main_call: bool,
     runtime_diagnostics: DiagnosticBag<'a>,
     runtime_error_happened: bool,
@@ -97,36 +99,18 @@ pub fn evaluate(
     let mut stack = Stack::new(debug_flags);
     stack.push_static_memory(program.static_memory);
     let mut state = EvaluatorState {
+        debug_flags,
         stack,
         heap: Allocator::new(64 * 1024, debug_flags),
         registers: vec![FlaggedWord::default(); program.max_used_variables],
         protected_registers: program.protected_variables,
         pc: 0,
+        instructions: program.instructions,
         is_main_call: true,
         runtime_diagnostics: DiagnosticBag::new(source_text),
         runtime_error_happened: false,
     };
-    let instructions = program.instructions;
-    state.pc = program.entry_point;
-    while state.pc < instructions.len() {
-        let pc = state.pc;
-        if debug_flags.print_current_instruction() {
-            println!(
-                "  CI {:X}: {}",
-                pc,
-                crate::debug::instruction_to_string(instructions[pc])
-            );
-        }
-        if debug_flags.slow_mode {
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-        execute_instruction(&mut state, instructions[pc]);
-        if state.runtime_error_happened {
-            println!("Unusual termination.");
-            break;
-        }
-        state.pc += 1;
-    }
+    execute_function(&mut state, program.entry_point, &[]);
     if state.stack.len() == 1 {
         (state.stack.pop().unwrap_value() as i64).into()
     } else {
@@ -138,6 +122,54 @@ pub fn evaluate(
             }
         }
         Value::Integer(-1)
+    }
+}
+
+fn execute_function(state: &mut EvaluatorState, entry_point: usize, arguments: &[FlaggedWord]) -> Option<FlaggedWord> {
+    let old_pc = state.pc;
+    state.pc = entry_point;
+    state.runtime_error_happened = false;
+    let min_stack_count = state.stack.len();
+    for argument in arguments {
+        state.stack.push_flagged_word(*argument);
+    }
+    let mut nestedness = 0;
+    while state.pc < state.instructions.len() {
+        let pc = state.pc;
+        if state.debug_flags.print_current_instruction() {
+            println!(
+                "  CI {:X}: {}",
+                pc,
+                crate::debug::instruction_to_string(state.instructions[pc])
+            );
+        }
+        if state.debug_flags.slow_mode {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        if state.instructions[pc].op_code == OpCode::FunctionCall {
+            nestedness += 1;
+        }
+        match state.instructions[pc].op_code {
+            OpCode::FunctionCall => nestedness += 1,
+            OpCode::Return => nestedness -= 1,
+            _ => {}
+        }
+        if nestedness < 0 {
+            break;
+        }
+        execute_instruction(state, state.instructions[pc]);
+        if state.runtime_error_happened {
+            println!("Unusual termination.");
+            break;
+        }
+        assert!(state.stack.len() >= min_stack_count, "{} >= {}", state.stack.len(), min_stack_count);
+        state.pc += 1;
+    }
+    state.pc = old_pc;
+    if !state.runtime_error_happened && state.stack.len() > min_stack_count {
+        Some(state.stack.pop())
+    } else {
+        None
     }
 }
 
