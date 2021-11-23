@@ -598,6 +598,28 @@ impl<'a> BindingState<'a, '_> {
             .unwrap()
             .identifier = new_name.into();
     }
+
+    fn convert_struct_reference_to_struct(&self, type_: Type) -> Type {
+        match type_ {
+            Type::Error |
+            Type::Void |
+            Type::Any |
+            Type::Integer |
+            Type::Boolean |
+            Type::None |
+            Type::String |
+            Type::Function(_) |
+            Type::Closure(_) |
+            Type::Library(_) |
+            Type::Struct(_) |
+            Type::SystemCall(_) => type_,
+            Type::Noneable(base_type) => Type::noneable(self.convert_struct_reference_to_struct(*base_type)),
+            Type::Array(base_type) => Type::array(self.convert_struct_reference_to_struct(*base_type)),
+            Type::StructReference(id) => {
+                Type::Struct(Box::new(self.get_struct_by_id(id).unwrap()))
+            }
+        }
+    }
 }
 
 fn print_variable_table(variable_table: &[BoundVariableName]) {
@@ -2322,13 +2344,15 @@ fn call_to_string_on_struct<'a>(base: BoundNode<'a>, struct_id: u64, binder: &mu
 }
 
 fn bind_conversion<'a>(
-    base: BoundNode<'a>,
+    mut base: BoundNode<'a>,
     type_: &Type,
     binder: &mut BindingState<'a, '_>,
 ) -> BoundNode<'a> {
     if &base.type_ == type_ {
         base
     } else if base.type_.can_be_converted_to(type_) {
+        base.type_ = binder.convert_struct_reference_to_struct(base.type_);
+        let type_ = binder.convert_struct_reference_to_struct(type_.clone());
         BoundNode::conversion(base.span, base, type_.clone())
     } else if type_ != &Type::Error && base.type_ != Type::Error {
         binder
