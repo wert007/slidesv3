@@ -2253,6 +2253,8 @@ fn bind_arguments_for_function<'a, 'b>(
             binder
                 .diagnostic_bag
                 .report_invalid_void_expression(argument.span);
+            result.push(BoundNode::error(argument.span));
+            continue;
         }
         // FIXME: This ensures that print prints the same as to string would. In
         // the long run you could probably say, that print accepts type any, but
