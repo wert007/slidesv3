@@ -3,14 +3,15 @@ pub mod operators;
 pub mod symbols;
 #[cfg(test)]
 mod tests;
+mod dependency_resolver;
 pub mod typing;
 
 pub mod control_flow_analyzer;
 mod lowerer;
 
-use std::{borrow::Cow, convert::TryFrom, path::{Path, PathBuf}};
+use std::{borrow::Cow, convert::TryFrom, path::{Path}};
 
-use crate::{DebugFlags, binder::{bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind}, operators::{BoundBinary, BoundUnaryOperator}, symbols::StructFunctionKind, typing::Type}, dependency_resolver::{BoundImportStatement, ImportFunction, ImportLibraryFunction}, diagnostics::DiagnosticBag, instruction_converter::{
+use crate::{DebugFlags, binder::{bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind}, operators::{BoundBinary, BoundUnaryOperator}, symbols::StructFunctionKind, typing::Type}, diagnostics::DiagnosticBag, instruction_converter::{
         self, instruction::Instruction, InstructionOrLabelReference,
     }, lexer::syntax_token::{SyntaxToken, SyntaxTokenKind}, parser::{
         self,
@@ -19,7 +20,7 @@ use crate::{DebugFlags, binder::{bound_nodes::{is_same_expression::IsSameExpress
             BlockStatementNodeKind, CastExpressionNodeKind, ConstDeclarationNodeKind,
             ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
             ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
-            FunctionTypeNode, IfStatementNodeKind, ImportStatementNodeKind, LiteralNodeKind,
+            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind,
             ParameterNode, ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode,
             StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
             VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
@@ -743,7 +744,11 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
     };
     let span = node.span();
     let mut startup = vec![];
-    default_statements(&mut binder, import_std_lib);
+    default_statements(&mut binder);
+    let node = dependency_resolver::bind_import_statements(node, &mut binder).unwrap();
+    if import_std_lib {
+        std_imports(&mut binder);
+    }
     bind_top_level_statements(node, &mut binder);
 
     for lib in binder.libraries.iter_mut() {
@@ -861,122 +866,14 @@ fn bind<'a>(source_text: &'a SourceText, diagnostic_bag: &mut DiagnosticBag<'a>,
     }
 }
 
-fn execute_import_function<'a>(
-    import: BoundImportStatement<'a>,
-    binder: &mut BindingState<'a, '_>,
-) {
-    match import.function {
-        ImportFunction::Library(library) => {
-            let directory = PathBuf::from(binder.directory);
-            let path = directory.join(library.path).with_extension("sld");
-            load_library_from_path(binder, &path, import.span, import.name, true);
-        }
-    }
-}
-
-fn load_library_from_path<'a>(binder: &mut BindingState<'a, '_>, path: &Path, span: TextSpan, library_name: &'a str, import_std_lib: bool) {
-    let (path, lib) = binder
-        .libraries
-        .iter()
-        .find_map(|l| l.find_imported_library_by_path(&path))
-        .map(|(s, l)| (Some(s), l))
-        .unwrap_or_else(|| {
-            (
-                None,
-                crate::load_library_from_path(path, binder.debug_flags, import_std_lib),
-            )
-        });
-    load_library_into_binder(span, library_name, lib, path, binder);
-}
-
-fn load_library_into_binder<'a>(
-    span: TextSpan,
-    name: &'a str,
-    mut lib: Library,
-    path: Option<String>,
-    binder: &mut BindingState<'a, '_>,
-) {
-    let index = binder.libraries.len();
-    let mut should_load_library = true;
-    let variable = if lib.has_errors {
-        binder
-            .diagnostic_bag
-            .report_errors_in_referenced_library(span, name);
-        should_load_library = false;
-        binder.register_variable(name, Type::Error, true)
-    } else {
-        binder.register_variable(name, Type::Library(index), true)
-    };
-    if variable.is_none() {
-        binder
-            .diagnostic_bag
-            .report_cannot_declare_variable(span, name);
-        should_load_library = false;
-    }
-    if !should_load_library {
-        return;
-    }
-    lib.name = name.into();
-    if path.is_none() {
-        lib.relocate_labels(binder.label_offset);
-        lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
-        binder.label_offset += lib.program.label_count;
-    }
-    for strct in &lib.structs {
-        match &path {
-            Some(path) => {
-                let old_name = format!("{}.{}", path, strct.name);
-                let new_name = format!("{}.{}", name, strct.name);
-                let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
-                binder.rename_struct_by_id(struct_id, new_name);
-            }
-            None => {
-                let struct_id = if lib.name.is_empty() {
-                    binder.register_generated_struct_name(strct.name.clone())
-                } else {
-                    binder
-                    .register_generated_struct_name(format!("{}.{}", name, strct.name))
-                }.unwrap();
-                binder.register_struct(
-                    struct_id,
-                    strct
-                        .fields
-                        .iter()
-                        .map(ToOwned::to_owned)
-                        .map(Into::into)
-                        .collect(),
-                    strct.function_table.clone(),
-                );
-            }
-        }
-    }
-    if name.is_empty() {
-        for function in &lib.functions {
-            binder.register_generated_constant(function.name.clone(), Value::LabelPointer(function.label_index as usize, Type::function(function.function_type.clone())));
-        }
-    } else {
-        for function in &lib.functions {
-            if function.is_member_function {
-                binder.register_generated_constant(
-                    format!("{}.{}", name, function.name),
-                    Value::LabelPointer(
-                        function.label_index as usize,
-                        Type::function(function.function_type.clone()),
-                    ),
-                );
-            }
-        }
-    }
-    binder.libraries.push(lib);
-}
-
-fn default_statements(binder: &mut BindingState, import_std_lib: bool) {
+fn default_statements(binder: &mut BindingState) {
     binder.register_constant("print", Value::SystemCall(SystemCallKind::Print));
     binder.register_constant("heapdump", Value::SystemCall(SystemCallKind::DebugHeapDump));
-    if import_std_lib {
-        load_library_from_path(binder, Path::new("../slides/builtin/std.sld"), TextSpan::zero(), "", false);
-    }
     binder.register_constant("break", Value::SystemCall(SystemCallKind::Break));
+}
+
+fn std_imports(binder: &mut BindingState) {
+    dependency_resolver::load_library_from_path(binder, Path::new("../slides/builtin/std.sld"), TextSpan::zero(), "", false);
 }
 
 fn call_main(binder: &mut BindingState) -> Vec<InstructionOrLabelReference> {
@@ -1025,8 +922,9 @@ fn bind_top_level_statement<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingSt
         SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
             bind_function_declaration(*function_declaration, binder)
         }
-        SyntaxNodeKind::ImportStatement(import_statement) => {
-            bind_import_statement(node.span, import_statement, binder)
+        SyntaxNodeKind::ImportStatement(_) => {
+            //bind_import_statement(node.span, import_statement, binder)
+            unreachable!("ImportStatements should already be resolved by dependency_resolver!");
         }
         SyntaxNodeKind::StructDeclaration(struct_declaration) => {
             bind_struct_declaration(struct_declaration, binder)
@@ -1176,82 +1074,6 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 )
             }
         },
-    }
-}
-
-fn bind_import_statement<'a>(
-    span: TextSpan,
-    import_statement: ImportStatementNodeKind<'a>,
-    binder: &mut BindingState<'a, '_>,
-) {
-    let import_function = if let Some(it) = bind_import_function(*import_statement.function, binder)
-    {
-        it
-    } else {
-        return;
-    };
-    let name = import_statement.identifier.lexeme;
-    let import_statement = BoundImportStatement {
-        function: import_function,
-        name,
-        span,
-    };
-    execute_import_function(import_statement, binder);
-}
-
-fn bind_import_function<'a>(
-    function: SyntaxNode<'a>,
-    binder: &mut BindingState<'a, '_>,
-) -> Option<ImportFunction> {
-    let function_span = function.span;
-    if let SyntaxNodeKind::FunctionCall(mut function) = function.kind {
-        if let SyntaxNodeKind::Variable(base) = function.base.kind {
-            match base.token.lexeme {
-                "lib" => {
-                    let path = function.arguments.pop();
-                    if path.is_none() {
-                        binder
-                            .diagnostic_bag
-                            .report_unexpected_argument_count(function_span, 0, 1);
-                        return None;
-                    }
-                    let path = path.unwrap();
-                    let argument_span = path.span;
-                    let path = bind_node(path, binder);
-                    if path.constant_value.is_none() {
-                        binder.diagnostic_bag.report_expected_constant(path.span);
-                        return None;
-                    }
-                    let path = path.constant_value.unwrap().value;
-                    if path.as_string().is_none() {
-                        binder.diagnostic_bag.report_cannot_convert(
-                            argument_span,
-                            &path.infer_type(),
-                            &Type::String,
-                        );
-                        return None;
-                    }
-                    let path = path.as_string()?.into();
-                    Some(ImportFunction::Library(ImportLibraryFunction { path }))
-                }
-                function_name => {
-                    binder
-                        .diagnostic_bag
-                        .report_unknown_import_function(base.token.span(), function_name);
-                    None
-                }
-            }
-        } else {
-            binder
-                .diagnostic_bag
-                .report_only_function_call_in_import_statement(function.base.span);
-            None
-        }
-    } else {
-        binder
-            .diagnostic_bag
-            .report_only_function_call_in_import_statement(function.span);
-        None
     }
 }
 

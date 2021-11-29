@@ -1,7 +1,6 @@
 mod binder;
 #[allow(dead_code)]
 mod debug;
-mod dependency_resolver;
 mod diagnostics;
 mod evaluator;
 mod instruction_converter;
