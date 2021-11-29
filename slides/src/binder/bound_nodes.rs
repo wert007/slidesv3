@@ -83,11 +83,11 @@ impl<'a> BoundNode<'a> {
     ) -> Self {
         Self {
             span,
-            kind: BoundNodeKind::ConstructorCall(BoundConstructorCallNodeKind {
+            kind: BoundNodeKind::ConstructorCall(Box::new(BoundConstructorCallNodeKind {
                 arguments,
                 base_type: base_type.clone(),
                 function,
-            }),
+            })),
             type_: Type::Struct(Box::new(base_type)),
             constant_value: None,
         }
@@ -374,7 +374,8 @@ impl<'a> BoundNode<'a> {
             // FIXME: Actually true, but the this argument is normally not in
             // the parameter list.
             false,
-            Type::Boolean);
+            Type::Boolean,
+        );
         let while_body = BoundNode::block_statement(
             span,
             vec![
@@ -401,7 +402,16 @@ impl<'a> BoundNode<'a> {
                         span,
                         variable.clone(),
                         BoundBinaryOperator::ArithmeticAddition,
-                        BoundNode::field_access(span, BoundNode::variable(span, collection_variable, collection.type_.clone()), 16, Type::Integer),
+                        BoundNode::field_access(
+                            span,
+                            BoundNode::variable(
+                                span,
+                                collection_variable,
+                                collection.type_.clone(),
+                            ),
+                            16,
+                            Type::Integer,
+                        ),
                         Type::Integer,
                     ),
                 ),
@@ -410,8 +420,22 @@ impl<'a> BoundNode<'a> {
         BoundNode::block_statement(
             span,
             vec![
-                BoundNode::variable_declaration(span, collection_variable, collection.clone(), None), // let $collection = collection;
-                BoundNode::assignment(span, variable, BoundNode::field_access(span, BoundNode::variable(span, collection_variable, collection.type_.clone()), 0, Type::Integer)),
+                BoundNode::variable_declaration(
+                    span,
+                    collection_variable,
+                    collection.clone(),
+                    None,
+                ), // let $collection = collection;
+                BoundNode::assignment(
+                    span,
+                    variable,
+                    BoundNode::field_access(
+                        span,
+                        BoundNode::variable(span, collection_variable, collection.type_.clone()),
+                        0,
+                        Type::Integer,
+                    ),
+                ),
                 BoundNode::variable_declaration(
                     span,
                     index_variable,
@@ -491,7 +515,9 @@ impl<'a> BoundNode<'a> {
     pub fn block_expression(span: TextSpan, expressions: Vec<BoundNode<'a>>, type_: Type) -> Self {
         Self {
             span,
-            kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind { statements: expressions }),
+            kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind {
+                statements: expressions,
+            }),
             type_,
             constant_value: None,
         }
@@ -613,7 +639,7 @@ pub enum BoundNodeKind<'a> {
     // Expressions
     LiteralExpression(LiteralNodeKind<'a>),
     ArrayLiteralExpression(BoundArrayLiteralNodeKind<'a>),
-    ConstructorCall(BoundConstructorCallNodeKind<'a>),
+    ConstructorCall(Box<BoundConstructorCallNodeKind<'a>>),
     VariableExpression(BoundVariableNodeKind),
     UnaryExpression(BoundUnaryNodeKind<'a>),
     BinaryExpression(BoundBinaryNodeKind<'a>),

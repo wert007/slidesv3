@@ -281,12 +281,17 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_not_all_fields_have_been_assigned(&mut self, span: TextSpan, struct_name: &str, unassigned_fields: &[&str]) {
+    pub fn report_not_all_fields_have_been_assigned(
+        &mut self,
+        span: TextSpan,
+        struct_name: &str,
+        unassigned_fields: &[&str],
+    ) {
         let mut message = format!("Not all fields have been assigned in $constructor of struct {}. The following fields are missing:\n", struct_name);
         for field in unassigned_fields {
             message.push_str("    ");
             message.push_str(field);
-            message.push_str("\n");
+            message.push('\n');
         }
         self.report(message, span);
     }

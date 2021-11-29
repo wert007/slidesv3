@@ -1,6 +1,6 @@
+mod debugger;
 pub mod memory;
 mod sys_calls;
-mod debugger;
 
 use crate::{
     binder::typing::SystemCallKind,
@@ -115,9 +115,7 @@ pub fn evaluate(
         debug_mode: false,
     };
     match execute_function(&mut state, program.entry_point, &[]) {
-        Ok(Some(exit_code)) => {
-            (exit_code.unwrap_value() as i64).into()
-        },
+        Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
         Ok(None) => {
             for (variable, &value) in state.registers.iter().enumerate() {
                 if value.is_pointer() {
@@ -135,7 +133,11 @@ pub fn evaluate(
     }
 }
 
-fn execute_function(state: &mut EvaluatorState, entry_point: usize, arguments: &[FlaggedWord]) -> Result<Option<FlaggedWord>, ()> {
+fn execute_function(
+    state: &mut EvaluatorState,
+    entry_point: usize,
+    arguments: &[FlaggedWord],
+) -> Result<Option<FlaggedWord>, ()> {
     let old_pc = state.pc;
     state.pc = entry_point;
     state.runtime_error_happened = false;
@@ -176,22 +178,29 @@ fn execute_function(state: &mut EvaluatorState, entry_point: usize, arguments: &
             println!("Unusual termination.");
             return Err(());
         }
-        assert!(state.stack.len() >= min_stack_count, "{} >= {}", state.stack.len(), min_stack_count);
+        assert!(
+            state.stack.len() >= min_stack_count,
+            "{} >= {}",
+            state.stack.len(),
+            min_stack_count
+        );
         state.pc += 1;
     }
     state.pc = old_pc;
-    Ok(if !state.runtime_error_happened && state.stack.len() > min_stack_count {
-        Some(state.stack.pop())
-    } else {
-        None
-    })
+    Ok(
+        if !state.runtime_error_happened && state.stack.len() > min_stack_count {
+            Some(state.stack.pop())
+        } else {
+            None
+        },
+    )
 }
 
 fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
     match instruction.op_code {
         OpCode::Label => unreachable!(),
         OpCode::NoOp => {}
-        OpCode::Breakpoint => {},
+        OpCode::Breakpoint => {}
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),
         OpCode::LoadPointer => evaluate_load_pointer(state, instruction),
         OpCode::DuplicateOver => evaluate_duplicate_over(state, instruction),
@@ -246,7 +255,9 @@ fn evaluate_load_pointer(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_duplicate_over(state: &mut EvaluatorState, instruction: Instruction) {
-    let value = state.stack.read_flagged_word((state.stack.len() as u64 - instruction.arg - 1) * WORD_SIZE_IN_BYTES);
+    let value = state
+        .stack
+        .read_flagged_word((state.stack.len() as u64 - instruction.arg - 1) * WORD_SIZE_IN_BYTES);
     state.stack.push_flagged_word(value);
 }
 

@@ -21,7 +21,14 @@ use crate::{
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
         typing::{FunctionKind, SystemCallKind, Type},
-    }, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::memory::{self, WORD_SIZE_IN_BYTES, bytes_to_word, static_memory::StaticMemory}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
+    },
+    debug::DebugFlags,
+    diagnostics::DiagnosticBag,
+    evaluator::memory::{self, bytes_to_word, static_memory::StaticMemory, WORD_SIZE_IN_BYTES},
+    parser::syntax_nodes::LiteralNodeKind,
+    text::{SourceText, TextSpan},
+    value::Value,
+};
 
 use self::instruction::{op_codes::OpCode, Instruction};
 
@@ -131,7 +138,11 @@ pub fn convert<'a>(
     converter.static_memory.allocate_null();
     let minimum_memory_relocation = converter.static_memory.size_in_bytes();
     for lib in bound_program.referenced_libraries.iter_mut() {
-        let static_memory_size = if lib.is_already_loaded { minimum_memory_relocation } else { converter.static_memory.size_in_bytes() };
+        let static_memory_size = if lib.is_already_loaded {
+            minimum_memory_relocation
+        } else {
+            converter.static_memory.size_in_bytes()
+        };
         for inst in lib.instructions.iter_mut() {
             if let InstructionOrLabelReference::Instruction(Instruction {
                 arg,
@@ -217,7 +228,8 @@ pub fn convert_library<'a>(
     debug_flags: DebugFlags,
     import_std_lib: bool,
 ) -> Library {
-    let bound_program = binder::bind_library(source_text, diagnostic_bag, debug_flags, import_std_lib);
+    let bound_program =
+        binder::bind_library(source_text, diagnostic_bag, debug_flags, import_std_lib);
     if diagnostic_bag.has_errors() {
         return Library::error();
     }
@@ -230,7 +242,11 @@ pub fn convert_library<'a>(
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count,
     };
-    for lib in bound_program.referenced_libraries.iter_mut().filter(|l| !l.is_already_loaded) {
+    for lib in bound_program
+        .referenced_libraries
+        .iter_mut()
+        .filter(|l| !l.is_already_loaded)
+    {
         let static_memory_size = converter.static_memory.size_in_bytes();
         for inst in lib.instructions.iter_mut() {
             if let InstructionOrLabelReference::Instruction(Instruction {
@@ -315,7 +331,7 @@ fn convert_node(
             convert_function_call(node.span, function_call, converter)
         }
         BoundNodeKind::ConstructorCall(constructor_call) => {
-            convert_constructor_call(node.span, constructor_call, converter)
+            convert_constructor_call(node.span, *constructor_call, converter)
         }
         BoundNodeKind::SystemCall(system_call) => {
             convert_system_call(node.span, system_call, converter)
@@ -637,21 +653,39 @@ fn convert_constructor_call(
     match constructor_call.function {
         Some(function) => {
             let argument_count = constructor_call.arguments.len() as u64;
-            result.push(Instruction::allocate(word_count * WORD_SIZE_IN_BYTES).span(span).into());
+            result.push(
+                Instruction::allocate(word_count * WORD_SIZE_IN_BYTES)
+                    .span(span)
+                    .into(),
+            );
             for argument in constructor_call.arguments.into_iter() {
                 result.append(&mut convert_node(argument, converter));
             }
-            result.push(Instruction::duplicate_over(argument_count).span(span).into());
-            result.push(LabelReference { label_reference: function as _, span }.into());
-            result.push(Instruction::load_immediate(argument_count + 1).span(span).into());
+            result.push(
+                Instruction::duplicate_over(argument_count)
+                    .span(span)
+                    .into(),
+            );
+            result.push(
+                LabelReference {
+                    label_reference: function as _,
+                    span,
+                }
+                .into(),
+            );
+            result.push(
+                Instruction::load_immediate(argument_count + 1)
+                    .span(span)
+                    .into(),
+            );
             result.push(Instruction::function_call().span(span).into());
-        },
+        }
         None => {
             for argument in constructor_call.arguments.into_iter().rev() {
                 result.append(&mut convert_node(argument, converter));
             }
             result.push(Instruction::write_to_heap(word_count).span(span).into());
-        },
+        }
     }
     result
 }
@@ -925,7 +959,11 @@ fn convert_type_identifier(
         }
         Type::Struct(struct_type) => {
             result.push(match struct_type.function_table.to_string_function {
-                Some(function) => LabelReference { label_reference: function.label_index as _, span }.into(),
+                Some(function) => LabelReference {
+                    label_reference: function.label_index as _,
+                    span,
+                }
+                .into(),
                 None => Instruction::load_pointer(0).into(),
             });
             result.push(

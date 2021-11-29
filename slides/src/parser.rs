@@ -470,7 +470,9 @@ fn parse_function_call<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
                 let period = parser.next_token();
                 let identifier = parser.match_token(SyntaxTokenKind::Identifier);
                 base = if identifier.lexeme.starts_with('$') {
-                    parser.diagnostic_bag.report_invalid_field_name(identifier.span(), identifier.lexeme);
+                    parser
+                        .diagnostic_bag
+                        .report_invalid_field_name(identifier.span(), identifier.lexeme);
                     SyntaxNode::error(base.span().start())
                 } else {
                     SyntaxNode::field_access(base, period, identifier)

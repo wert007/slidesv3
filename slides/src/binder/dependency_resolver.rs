@@ -1,6 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use crate::{binder::{BindingState, symbols::Library, typing::Type}, parser::syntax_nodes::{CompilationUnitNodeKind, ImportStatementNodeKind, SyntaxNode, SyntaxNodeKind}, text::TextSpan, value::Value};
+use crate::{
+    binder::{symbols::Library, typing::Type, BindingState},
+    parser::syntax_nodes::{
+        CompilationUnitNodeKind, ImportStatementNodeKind, SyntaxNode, SyntaxNodeKind,
+    },
+    text::TextSpan,
+    value::Value,
+};
 
 #[derive(Debug, Clone)]
 pub struct BoundImportStatement<'a> {
@@ -19,42 +26,49 @@ pub struct ImportLibraryFunction {
     pub path: String,
 }
 
-
-pub(super) fn bind_import_statements<'a>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, '_>) -> Option<SyntaxNode<'a>> {
+pub(super) fn bind_import_statements<'a>(
+    node: SyntaxNode<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> Option<SyntaxNode<'a>> {
     match node.kind {
-        SyntaxNodeKind::CompilationUnit(compilation_unit) => Some(bind_import_statements_compilation_unit(compilation_unit, binder)),
+        SyntaxNodeKind::CompilationUnit(compilation_unit) => Some(
+            bind_import_statements_compilation_unit(compilation_unit, binder),
+        ),
         SyntaxNodeKind::ImportStatement(import_statement) => {
             bind_import_statements_import_statement(node.span, import_statement, binder);
             None
         }
-        SyntaxNodeKind::_ConstDeclaration(_) |
-        SyntaxNodeKind::FunctionDeclaration(_) |
-        SyntaxNodeKind::StructDeclaration(_) |
-        SyntaxNodeKind::Literal(_) |
-        SyntaxNodeKind::ArrayLiteral(_) |
-        SyntaxNodeKind::RepetitionNode(_) |
-        SyntaxNodeKind::CastExpression(_) |
-        SyntaxNodeKind::ConstructorCall(_) |
-        SyntaxNodeKind::Variable(_) |
-        SyntaxNodeKind::Binary(_) |
-        SyntaxNodeKind::Unary(_) |
-        SyntaxNodeKind::Parenthesized(_) |
-        SyntaxNodeKind::FunctionCall(_) |
-        SyntaxNodeKind::ArrayIndex(_) |
-        SyntaxNodeKind::FieldAccess(_) |
-        SyntaxNodeKind::BlockStatement(_) |
-        SyntaxNodeKind::ForStatement(_) |
-        SyntaxNodeKind::IfStatement(_) |
-        SyntaxNodeKind::VariableDeclaration(_) |
-        SyntaxNodeKind::ReturnStatement(_) |
-        SyntaxNodeKind::WhileStatement(_) |
-        SyntaxNodeKind::Assignment(_) |
-        SyntaxNodeKind::ExpressionStatement(_) |
-        SyntaxNodeKind::StructField(_) => Some(node),
+        SyntaxNodeKind::_ConstDeclaration(_)
+        | SyntaxNodeKind::FunctionDeclaration(_)
+        | SyntaxNodeKind::StructDeclaration(_)
+        | SyntaxNodeKind::Literal(_)
+        | SyntaxNodeKind::ArrayLiteral(_)
+        | SyntaxNodeKind::RepetitionNode(_)
+        | SyntaxNodeKind::CastExpression(_)
+        | SyntaxNodeKind::ConstructorCall(_)
+        | SyntaxNodeKind::Variable(_)
+        | SyntaxNodeKind::Binary(_)
+        | SyntaxNodeKind::Unary(_)
+        | SyntaxNodeKind::Parenthesized(_)
+        | SyntaxNodeKind::FunctionCall(_)
+        | SyntaxNodeKind::ArrayIndex(_)
+        | SyntaxNodeKind::FieldAccess(_)
+        | SyntaxNodeKind::BlockStatement(_)
+        | SyntaxNodeKind::ForStatement(_)
+        | SyntaxNodeKind::IfStatement(_)
+        | SyntaxNodeKind::VariableDeclaration(_)
+        | SyntaxNodeKind::ReturnStatement(_)
+        | SyntaxNodeKind::WhileStatement(_)
+        | SyntaxNodeKind::Assignment(_)
+        | SyntaxNodeKind::ExpressionStatement(_)
+        | SyntaxNodeKind::StructField(_) => Some(node),
     }
 }
 
-fn bind_import_statements_compilation_unit<'a>(compilation_unit: CompilationUnitNodeKind<'a>, binder: &mut BindingState<'a, '_>) -> SyntaxNode<'a> {
+fn bind_import_statements_compilation_unit<'a>(
+    compilation_unit: CompilationUnitNodeKind<'a>,
+    binder: &mut BindingState<'a, '_>,
+) -> SyntaxNode<'a> {
     let mut statements = Vec::with_capacity(compilation_unit.statements.len());
     for statement in compilation_unit.statements {
         if let Some(statement) = bind_import_statements(statement, binder) {
@@ -64,10 +78,13 @@ fn bind_import_statements_compilation_unit<'a>(compilation_unit: CompilationUnit
     SyntaxNode::compilation_unit(statements, compilation_unit.eoi)
 }
 
-fn bind_import_statements_import_statement<'a>(span: TextSpan, import_statement: ImportStatementNodeKind<'a>, binder: &mut BindingState<'a, '_>) {
+fn bind_import_statements_import_statement<'a>(
+    span: TextSpan,
+    import_statement: ImportStatementNodeKind<'a>,
+    binder: &mut BindingState<'a, '_>,
+) {
     bind_import_statement(span, import_statement, binder);
 }
-
 
 fn bind_import_statement<'a>(
     span: TextSpan,
@@ -145,7 +162,6 @@ fn bind_import_function<'a>(
     }
 }
 
-
 fn execute_import_function<'a>(
     import: BoundImportStatement<'a>,
     binder: &mut BindingState<'a, '_>,
@@ -159,12 +175,17 @@ fn execute_import_function<'a>(
     }
 }
 
-
-pub(super) fn load_library_from_path<'a>(binder: &mut BindingState<'a, '_>, path: &Path, span: TextSpan, library_name: &'a str, import_std_lib: bool) {
+pub(super) fn load_library_from_path<'a>(
+    binder: &mut BindingState<'a, '_>,
+    path: &Path,
+    span: TextSpan,
+    library_name: &'a str,
+    import_std_lib: bool,
+) {
     let (path, lib) = binder
         .libraries
         .iter()
-        .find_map(|l| l.find_imported_library_by_path(&path))
+        .find_map(|l| l.find_imported_library_by_path(path))
         .map(|(s, l)| (Some(s), l))
         .unwrap_or_else(|| {
             (
@@ -219,7 +240,9 @@ fn load_library_into_binder<'a>(
         match &path {
             Some(empty) if empty.is_empty() => {
                 assert!(lib.name.is_empty());
-                let struct_id = binder.register_generated_struct_name(strct.name.clone()).unwrap();
+                let struct_id = binder
+                    .register_generated_struct_name(strct.name.clone())
+                    .unwrap();
                 binder.register_struct(
                     struct_id,
                     strct
@@ -241,9 +264,9 @@ fn load_library_into_binder<'a>(
                 let struct_id = if lib.name.is_empty() {
                     binder.register_generated_struct_name(strct.name.clone())
                 } else {
-                    binder
-                    .register_generated_struct_name(format!("{}.{}", name, strct.name))
-                }.unwrap();
+                    binder.register_generated_struct_name(format!("{}.{}", name, strct.name))
+                }
+                .unwrap();
                 binder.register_struct(
                     struct_id,
                     strct
@@ -259,7 +282,13 @@ fn load_library_into_binder<'a>(
     }
     if name.is_empty() {
         for function in &lib.functions {
-            binder.register_generated_constant(function.name.clone(), Value::LabelPointer(function.label_index as usize, Type::function(function.function_type.clone())));
+            binder.register_generated_constant(
+                function.name.clone(),
+                Value::LabelPointer(
+                    function.label_index as usize,
+                    Type::function(function.function_type.clone()),
+                ),
+            );
         }
     } else {
         for function in &lib.functions {
@@ -276,4 +305,3 @@ fn load_library_into_binder<'a>(
     }
     binder.libraries.push(lib);
 }
-

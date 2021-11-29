@@ -100,10 +100,10 @@ impl Library {
         for strct in self.structs.iter_mut() {
             for field in strct.fields.iter_mut() {
                 match &mut field.type_ {
-                    Type::Function(function_type) => {
-                        function_type.relocate_structs(struct_offset)
-                    },
-                    Type::Struct(_) => unreachable!("relocate_structs currently only works for StructReferences"),
+                    Type::Function(function_type) => function_type.relocate_structs(struct_offset),
+                    Type::Struct(_) => {
+                        unreachable!("relocate_structs currently only works for StructReferences")
+                    }
                     Type::StructReference(index) => *index += struct_offset as u64,
                     _ => {}
                 }
@@ -123,7 +123,12 @@ pub struct FunctionSymbol {
 
 impl FunctionSymbol {
     pub fn relocate_structs(&mut self, struct_offset: usize) {
-        for parameter in self.function_type.parameter_types.iter_mut().chain(self.function_type.this_type.iter_mut()) {
+        for parameter in self
+            .function_type
+            .parameter_types
+            .iter_mut()
+            .chain(self.function_type.this_type.iter_mut())
+        {
             if let Type::StructReference(index) = parameter {
                 *index += struct_offset as u64;
             }
@@ -202,7 +207,9 @@ impl StructFunctionTable {
     }
 
     fn function_symbols_iter_mut(&mut self) -> impl Iterator<Item = &mut FunctionSymbol> {
-        self.constructor_function.iter_mut().chain(self.to_string_function.iter_mut())
+        self.constructor_function
+            .iter_mut()
+            .chain(self.to_string_function.iter_mut())
     }
 
     fn relocate_labels(&mut self, label_offset: usize) {
@@ -212,9 +219,7 @@ impl StructFunctionTable {
 
     fn relocate_structs(&mut self, struct_offset: usize) {
         self.function_symbols_iter_mut()
-        .for_each(|f| {
-            f.relocate_structs(struct_offset)
-        });
+            .for_each(|f| f.relocate_structs(struct_offset));
     }
 }
 

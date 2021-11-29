@@ -1,6 +1,16 @@
 use crate::{binder::bound_nodes::BoundNodeKind, text::TextSpan};
 
-use super::{bound_nodes::{BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind, BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind, BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind, BoundIfStatementNodeKind, BoundNode, BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundWhileStatementNodeKind}, typing::Type};
+use super::{
+    bound_nodes::{
+        BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
+        BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
+        BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind,
+        BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind,
+        BoundIfStatementNodeKind, BoundNode, BoundReturnStatementNodeKind, BoundSystemCallNodeKind,
+        BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundWhileStatementNodeKind,
+    },
+    typing::Type,
+};
 
 struct Flattener {
     pub label_count: usize,
@@ -26,25 +36,92 @@ pub fn flatten<'a>(node: BoundNode<'a>, label_count: &mut usize) -> Vec<BoundNod
 
 fn flatten_node<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Vec<BoundNode<'a>> {
     match node.kind {
-        BoundNodeKind::VariableDeclaration(variable_declaration) => vec![flatten_variable_declaration(node.span, node.type_, variable_declaration, flattener)],
-        BoundNodeKind::Assignment(assignment) => vec![flatten_assignment(node.span, node.type_, assignment, flattener)],
-        BoundNodeKind::ReturnStatement(return_statement) => vec![flatten_return_statement(node.span, node.type_, return_statement, flattener)],
-        BoundNodeKind::ExpressionStatement(expression_statement) => vec![flatten_expression_statement(node.span, node.type_, expression_statement, flattener)],
-        BoundNodeKind::FieldAccess(field_access) => vec![flatten_field_access(node.span, node.type_, field_access, flattener)],
-        BoundNodeKind::Closure(closure) => vec![flatten_closure(node.span, node.type_, closure, flattener)],
-        BoundNodeKind::Conversion(conversion) => vec![flatten_conversion(node.span, node.type_, conversion, flattener)],
-        BoundNodeKind::ArrayIndex(array_index) => vec![flatten_array_index(node.span, node.type_, array_index, flattener)],
-        BoundNodeKind::SystemCall(system_call) => vec![flatten_system_call(node.span, node.type_, system_call, flattener)],
-        BoundNodeKind::FunctionCall(function_call) => vec![flatten_function_call(node.span, node.type_, function_call, flattener)],
-        BoundNodeKind::BinaryExpression(binary_expression) => vec![flatten_binary_expression(node.span, node.type_, binary_expression, flattener)],
-        BoundNodeKind::UnaryExpression(unary_expression) => vec![flatten_unary_expression(node.span, node.type_, unary_expression, flattener)],
-        BoundNodeKind::ConstructorCall(constructor_call) => vec![flatten_constructor_call(node.span, node.type_, constructor_call, flattener)],
-        BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => vec![flatten_array_literal_expression(node.span, node.type_, array_literal_expression, flattener)],
-        BoundNodeKind::VariableExpression(_) |
-        BoundNodeKind::LiteralExpression(_) |
-        BoundNodeKind::Label(_) |
-        BoundNodeKind::LabelReference(_) |
-        BoundNodeKind::ErrorExpression => vec![node],
+        BoundNodeKind::VariableDeclaration(variable_declaration) => {
+            vec![flatten_variable_declaration(
+                node.span,
+                node.type_,
+                variable_declaration,
+                flattener,
+            )]
+        }
+        BoundNodeKind::Assignment(assignment) => vec![flatten_assignment(
+            node.span, node.type_, assignment, flattener,
+        )],
+        BoundNodeKind::ReturnStatement(return_statement) => vec![flatten_return_statement(
+            node.span,
+            node.type_,
+            return_statement,
+            flattener,
+        )],
+        BoundNodeKind::ExpressionStatement(expression_statement) => {
+            vec![flatten_expression_statement(
+                node.span,
+                node.type_,
+                expression_statement,
+                flattener,
+            )]
+        }
+        BoundNodeKind::FieldAccess(field_access) => vec![flatten_field_access(
+            node.span,
+            node.type_,
+            field_access,
+            flattener,
+        )],
+        BoundNodeKind::Closure(closure) => {
+            vec![flatten_closure(node.span, node.type_, closure, flattener)]
+        }
+        BoundNodeKind::Conversion(conversion) => vec![flatten_conversion(
+            node.span, node.type_, conversion, flattener,
+        )],
+        BoundNodeKind::ArrayIndex(array_index) => vec![flatten_array_index(
+            node.span,
+            node.type_,
+            array_index,
+            flattener,
+        )],
+        BoundNodeKind::SystemCall(system_call) => vec![flatten_system_call(
+            node.span,
+            node.type_,
+            system_call,
+            flattener,
+        )],
+        BoundNodeKind::FunctionCall(function_call) => vec![flatten_function_call(
+            node.span,
+            node.type_,
+            function_call,
+            flattener,
+        )],
+        BoundNodeKind::BinaryExpression(binary_expression) => vec![flatten_binary_expression(
+            node.span,
+            node.type_,
+            binary_expression,
+            flattener,
+        )],
+        BoundNodeKind::UnaryExpression(unary_expression) => vec![flatten_unary_expression(
+            node.span,
+            node.type_,
+            unary_expression,
+            flattener,
+        )],
+        BoundNodeKind::ConstructorCall(constructor_call) => vec![flatten_constructor_call(
+            node.span,
+            node.type_,
+            *constructor_call,
+            flattener,
+        )],
+        BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => {
+            vec![flatten_array_literal_expression(
+                node.span,
+                node.type_,
+                array_literal_expression,
+                flattener,
+            )]
+        }
+        BoundNodeKind::VariableExpression(_)
+        | BoundNodeKind::LiteralExpression(_)
+        | BoundNodeKind::Label(_)
+        | BoundNodeKind::LabelReference(_)
+        | BoundNodeKind::ErrorExpression => vec![node],
         BoundNodeKind::FunctionDeclaration(function_declaration) => {
             flatten_function_declaration(function_declaration, flattener)
         }
@@ -61,80 +138,179 @@ fn flatten_node<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Vec<Bound
 
 fn flatten_expression<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
     match node.kind {
-        BoundNodeKind::VariableDeclaration(variable_declaration) => flatten_variable_declaration(node.span, node.type_, variable_declaration, flattener),
-        BoundNodeKind::Assignment(assignment) => flatten_assignment(node.span, node.type_, assignment, flattener),
-        BoundNodeKind::ReturnStatement(return_statement) => flatten_return_statement(node.span, node.type_, return_statement, flattener),
-        BoundNodeKind::ExpressionStatement(expression_statement) => flatten_expression_statement(node.span, node.type_, expression_statement, flattener),
-        BoundNodeKind::FieldAccess(field_access) => flatten_field_access(node.span, node.type_, field_access, flattener),
-        BoundNodeKind::Closure(closure) => flatten_closure(node.span, node.type_, closure, flattener),
-        BoundNodeKind::Conversion(conversion) => flatten_conversion(node.span, node.type_, conversion, flattener),
-        BoundNodeKind::ArrayIndex(array_index) => flatten_array_index(node.span, node.type_, array_index, flattener),
-        BoundNodeKind::SystemCall(system_call) => flatten_system_call(node.span, node.type_, system_call, flattener),
-        BoundNodeKind::FunctionCall(function_call) => flatten_function_call(node.span, node.type_, function_call, flattener),
-        BoundNodeKind::BinaryExpression(binary_expression) => flatten_binary_expression(node.span, node.type_, binary_expression, flattener),
-        BoundNodeKind::UnaryExpression(unary_expression) => flatten_unary_expression(node.span, node.type_, unary_expression, flattener),
-        BoundNodeKind::ConstructorCall(constructor_call) => flatten_constructor_call(node.span, node.type_, constructor_call, flattener),
-        BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => flatten_array_literal_expression(node.span, node.type_, array_literal_expression, flattener),
-        BoundNodeKind::VariableExpression(_) |
-        BoundNodeKind::LiteralExpression(_) |
-        BoundNodeKind::Label(_) |
-        BoundNodeKind::LabelReference(_) |
-        BoundNodeKind::ErrorExpression => node,
+        BoundNodeKind::VariableDeclaration(variable_declaration) => {
+            flatten_variable_declaration(node.span, node.type_, variable_declaration, flattener)
+        }
+        BoundNodeKind::Assignment(assignment) => {
+            flatten_assignment(node.span, node.type_, assignment, flattener)
+        }
+        BoundNodeKind::ReturnStatement(return_statement) => {
+            flatten_return_statement(node.span, node.type_, return_statement, flattener)
+        }
+        BoundNodeKind::ExpressionStatement(expression_statement) => {
+            flatten_expression_statement(node.span, node.type_, expression_statement, flattener)
+        }
+        BoundNodeKind::FieldAccess(field_access) => {
+            flatten_field_access(node.span, node.type_, field_access, flattener)
+        }
+        BoundNodeKind::Closure(closure) => {
+            flatten_closure(node.span, node.type_, closure, flattener)
+        }
+        BoundNodeKind::Conversion(conversion) => {
+            flatten_conversion(node.span, node.type_, conversion, flattener)
+        }
+        BoundNodeKind::ArrayIndex(array_index) => {
+            flatten_array_index(node.span, node.type_, array_index, flattener)
+        }
+        BoundNodeKind::SystemCall(system_call) => {
+            flatten_system_call(node.span, node.type_, system_call, flattener)
+        }
+        BoundNodeKind::FunctionCall(function_call) => {
+            flatten_function_call(node.span, node.type_, function_call, flattener)
+        }
+        BoundNodeKind::BinaryExpression(binary_expression) => {
+            flatten_binary_expression(node.span, node.type_, binary_expression, flattener)
+        }
+        BoundNodeKind::UnaryExpression(unary_expression) => {
+            flatten_unary_expression(node.span, node.type_, unary_expression, flattener)
+        }
+        BoundNodeKind::ConstructorCall(constructor_call) => {
+            flatten_constructor_call(node.span, node.type_, *constructor_call, flattener)
+        }
+        BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => {
+            flatten_array_literal_expression(
+                node.span,
+                node.type_,
+                array_literal_expression,
+                flattener,
+            )
+        }
+        BoundNodeKind::VariableExpression(_)
+        | BoundNodeKind::LiteralExpression(_)
+        | BoundNodeKind::Label(_)
+        | BoundNodeKind::LabelReference(_)
+        | BoundNodeKind::ErrorExpression => node,
         BoundNodeKind::WhileStatement(_) => unreachable!("WhileStatments are no expressions!"),
-        BoundNodeKind::FunctionDeclaration(_) => unreachable!("FunctionDeclarations are no expressions!"),
+        BoundNodeKind::FunctionDeclaration(_) => {
+            unreachable!("FunctionDeclarations are no expressions!")
+        }
         BoundNodeKind::Jump(_) => unreachable!("Only the lowerer itself can emit Jump bound nodes"),
-        BoundNodeKind::BlockStatement(block_statement) => BoundNode::block_expression(node.span, flatten_block_statement(block_statement, flattener), node.type_),
-        BoundNodeKind::IfStatement(if_statement) => BoundNode::block_expression(node.span, flatten_if_statement(if_statement, flattener), node.type_),
+        BoundNodeKind::BlockStatement(block_statement) => BoundNode::block_expression(
+            node.span,
+            flatten_block_statement(block_statement, flattener),
+            node.type_,
+        ),
+        BoundNodeKind::IfStatement(if_statement) => BoundNode::block_expression(
+            node.span,
+            flatten_if_statement(if_statement, flattener),
+            node.type_,
+        ),
     }
 }
 
-fn flatten_variable_declaration<'a>(span: TextSpan, _type_: Type, variable_declaration: BoundVariableDeclarationNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_variable_declaration<'a>(
+    span: TextSpan,
+    _type_: Type,
+    variable_declaration: BoundVariableDeclarationNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let initializer = flatten_expression(*variable_declaration.initializer, flattener);
-    BoundNode::variable_declaration(span, variable_declaration.variable_index, initializer, Some(variable_declaration.variable_type))
+    BoundNode::variable_declaration(
+        span,
+        variable_declaration.variable_index,
+        initializer,
+        Some(variable_declaration.variable_type),
+    )
 }
 
-fn flatten_assignment<'a>(span: TextSpan, _type_: Type, assignment: BoundAssignmentNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_assignment<'a>(
+    span: TextSpan,
+    _type_: Type,
+    assignment: BoundAssignmentNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let lhs = flatten_expression(*assignment.variable, flattener);
     let expression = flatten_expression(*assignment.expression, flattener);
     BoundNode::assignment(span, lhs, expression)
 }
 
-fn flatten_return_statement<'a>(span: TextSpan, _type_: Type, return_statement: BoundReturnStatementNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
-    let expression = return_statement.expression.map(|r| flatten_expression(*r, flattener));
+fn flatten_return_statement<'a>(
+    span: TextSpan,
+    _type_: Type,
+    return_statement: BoundReturnStatementNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
+    let expression = return_statement
+        .expression
+        .map(|r| flatten_expression(*r, flattener));
     BoundNode::return_statement(span, expression, return_statement.restores_variables)
 }
 
-fn flatten_expression_statement<'a>(span: TextSpan, _type_: Type, expression_statement: BoundExpressionStatementNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_expression_statement<'a>(
+    span: TextSpan,
+    _type_: Type,
+    expression_statement: BoundExpressionStatementNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let expression = flatten_expression(*expression_statement.expression, flattener);
     BoundNode::expression_statement(span, expression)
 }
 
-fn flatten_field_access<'a>(span: TextSpan, _type_: Type, field_access: BoundFieldAccessNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_field_access<'a>(
+    span: TextSpan,
+    _type_: Type,
+    field_access: BoundFieldAccessNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let base = flatten_expression(*field_access.base, flattener);
     BoundNode::field_access(span, base, field_access.offset, field_access.type_)
 }
 
-fn flatten_closure<'a>(span: TextSpan, type_: Type, closure: BoundClosureNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_closure<'a>(
+    span: TextSpan,
+    type_: Type,
+    closure: BoundClosureNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let base = flatten_expression(*closure.base, flattener);
     match closure.function {
         super::typing::FunctionKind::FunctionId(id) => BoundNode::closure(span, base, id, type_),
-        super::typing::FunctionKind::SystemCall(system_call_kind) => BoundNode::system_call_closure(span, base, system_call_kind, type_),
-        super::typing::FunctionKind::LabelReference(label_index) => BoundNode::closure_label(span, base, label_index, type_),
+        super::typing::FunctionKind::SystemCall(system_call_kind) => {
+            BoundNode::system_call_closure(span, base, system_call_kind, type_)
+        }
+        super::typing::FunctionKind::LabelReference(label_index) => {
+            BoundNode::closure_label(span, base, label_index, type_)
+        }
     }
 }
 
-fn flatten_conversion<'a>(span: TextSpan, _type_: Type, conversion: BoundConversionNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_conversion<'a>(
+    span: TextSpan,
+    _type_: Type,
+    conversion: BoundConversionNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let base = flatten_expression(*conversion.base, flattener);
     BoundNode::conversion(span, base, conversion.type_)
 }
 
-fn flatten_array_index<'a>(span: TextSpan, type_: Type, array_index: BoundArrayIndexNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_array_index<'a>(
+    span: TextSpan,
+    type_: Type,
+    array_index: BoundArrayIndexNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let base = flatten_expression(*array_index.base, flattener);
     let index = flatten_expression(*array_index.index, flattener);
     BoundNode::array_index(span, base, index, type_)
 }
 
-fn flatten_system_call<'a>(span: TextSpan, type_: Type, system_call: BoundSystemCallNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_system_call<'a>(
+    span: TextSpan,
+    type_: Type,
+    system_call: BoundSystemCallNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let mut arguments = Vec::with_capacity(system_call.arguments.len());
     for argument in system_call.arguments {
         arguments.push(flatten_expression(argument, flattener));
@@ -142,35 +318,71 @@ fn flatten_system_call<'a>(span: TextSpan, type_: Type, system_call: BoundSystem
     BoundNode::system_call(span, system_call.base, arguments, type_)
 }
 
-fn flatten_function_call<'a>(span: TextSpan, type_: Type, function_call: BoundFunctionCallNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_function_call<'a>(
+    span: TextSpan,
+    type_: Type,
+    function_call: BoundFunctionCallNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let base = flatten_expression(*function_call.base, flattener);
     let mut arguments = Vec::with_capacity(function_call.arguments.len());
     for argument in function_call.arguments {
         arguments.push(flatten_expression(argument, flattener));
     }
-    BoundNode::function_call(span, base, arguments, function_call.has_this_argument, type_)
+    BoundNode::function_call(
+        span,
+        base,
+        arguments,
+        function_call.has_this_argument,
+        type_,
+    )
 }
 
-fn flatten_binary_expression<'a>(span: TextSpan, type_: Type, binary_expression: BoundBinaryNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_binary_expression<'a>(
+    span: TextSpan,
+    type_: Type,
+    binary_expression: BoundBinaryNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let lhs = flatten_expression(*binary_expression.lhs, flattener);
     let rhs = flatten_expression(*binary_expression.rhs, flattener);
     BoundNode::binary(span, lhs, binary_expression.operator_token, rhs, type_)
 }
 
-fn flatten_unary_expression<'a>(span: TextSpan, type_: Type, unary_expression: BoundUnaryNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_unary_expression<'a>(
+    span: TextSpan,
+    type_: Type,
+    unary_expression: BoundUnaryNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let operand = flatten_expression(*unary_expression.operand, flattener);
     BoundNode::unary(span, unary_expression.operator_token, operand, type_)
 }
 
-fn flatten_constructor_call<'a>(span: TextSpan, _type_: Type, constructor_call: BoundConstructorCallNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_constructor_call<'a>(
+    span: TextSpan,
+    _type_: Type,
+    constructor_call: BoundConstructorCallNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let mut arguments = Vec::with_capacity(constructor_call.arguments.len());
     for argument in constructor_call.arguments {
         arguments.push(flatten_expression(argument, flattener));
     }
-    BoundNode::constructor_call(span, arguments, constructor_call.base_type, constructor_call.function)
+    BoundNode::constructor_call(
+        span,
+        arguments,
+        constructor_call.base_type,
+        constructor_call.function,
+    )
 }
 
-fn flatten_array_literal_expression<'a>(span: TextSpan, type_: Type, array_literal_expression: BoundArrayLiteralNodeKind<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_array_literal_expression<'a>(
+    span: TextSpan,
+    type_: Type,
+    array_literal_expression: BoundArrayLiteralNodeKind<'a>,
+    flattener: &mut Flattener,
+) -> BoundNode<'a> {
     let mut children = Vec::with_capacity(array_literal_expression.children.len());
     for child in array_literal_expression.children {
         children.push(flatten_expression(child, flattener));

@@ -12,8 +12,8 @@ pub fn create_session(state: &mut EvaluatorState) -> bool {
                 Command::Quit => return false,
                 Command::NextInstruction => return true,
                 Command::Stack => print_stack(&state.stack),
-                Command::Pointer(address) => read_pointer(&state, address),
-            }
+                Command::Pointer(address) => read_pointer(state, address),
+            },
             None => {
                 println!("Unknown command {}", line);
             }
@@ -62,17 +62,17 @@ enum Command {
 }
 
 fn parse_command(input: &str) -> Option<Command> {
-    match &input.split(' ').collect::<Vec<_>>()[..] {
-        &["ptr", arg] => {
-            if arg.starts_with("0x") {
-                Some(Command::Pointer(usize::from_str_radix(&arg[2..], 16).ok()?))
+    match input.split(' ').collect::<Vec<_>>()[..] {
+        ["ptr", arg] => {
+            if let Some(arg) = arg.strip_prefix("0x") {
+                Some(Command::Pointer(usize::from_str_radix(arg, 16).ok()?))
             } else {
                 Some(Command::Pointer(arg.parse().ok()?))
             }
         }
-        &["stack"] => Some(Command::Stack),
-        &["q"|"quit"] => Some(Command::Quit),
-        &["n"|"next"] => Some(Command::NextInstruction),
+        ["stack"] => Some(Command::Stack),
+        ["q" | "quit"] => Some(Command::Quit),
+        ["n" | "next"] => Some(Command::NextInstruction),
         _ => None,
     }
 }

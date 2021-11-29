@@ -80,8 +80,11 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
     contents += "> Foreign instructions start\n";
     contents += &instructions_or_labels_to_string(skip_start, &instructions[skip_start..skip_end]);
     contents += "> Foreign instructions end\n";
-    contents +=
-        &instructions_or_labels_with_source_code_to_string(skip_end, &instructions[skip_end..], source);
+    contents += &instructions_or_labels_with_source_code_to_string(
+        skip_end,
+        &instructions[skip_end..],
+        source,
+    );
     let output_path = PathBuf::from("../debug-out").join(
         Path::new(source.file_name)
             .with_extension("sldasm")
@@ -260,9 +263,15 @@ fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) ->
         OpCode::StringConcat => instruction_no_arg_to_string("strconcat"),
         OpCode::PointerAddition => instruction_no_arg_to_string("addptr"),
         OpCode::NoneableOrValue => instruction_no_arg_to_string("noneableor"),
-        OpCode::Jump if !has_labels => instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg),
-        OpCode::JumpIfFalse if !has_labels => instruction_ptr_unsigned_arg_to_string("jmpfalse", instruction.arg),
-        OpCode::JumpIfTrue if !has_labels => instruction_ptr_unsigned_arg_to_string("jmptrue", instruction.arg),
+        OpCode::Jump if !has_labels => {
+            instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg)
+        }
+        OpCode::JumpIfFalse if !has_labels => {
+            instruction_ptr_unsigned_arg_to_string("jmpfalse", instruction.arg)
+        }
+        OpCode::JumpIfTrue if !has_labels => {
+            instruction_ptr_unsigned_arg_to_string("jmptrue", instruction.arg)
+        }
         OpCode::Jump => instruction_label_arg_to_string("jmp", instruction.arg),
         OpCode::JumpIfFalse => instruction_label_arg_to_string("jmpfalse", instruction.arg),
         OpCode::JumpIfTrue => instruction_label_arg_to_string("jmptrue", instruction.arg),

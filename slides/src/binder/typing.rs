@@ -186,9 +186,7 @@ impl Type {
             Type::SystemCall(SystemCallKind::DebugHeapDump) => {
                 Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP
             }
-            Type::SystemCall(SystemCallKind::Break) => {
-                Self::TYPE_IDENTIFIER_SYSTEM_CALL_BREAK
-            }
+            Type::SystemCall(SystemCallKind::Break) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_BREAK,
         }
     }
 
@@ -409,7 +407,7 @@ impl FunctionType {
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
-            }
+            },
         }
     }
 
@@ -427,7 +425,11 @@ impl FunctionType {
     }
 
     pub fn relocate_structs(&mut self, struct_offset: usize) {
-        for type_ in self.parameter_types.iter_mut().chain(self.this_type.iter_mut()) {
+        for type_ in self
+            .parameter_types
+            .iter_mut()
+            .chain(self.this_type.iter_mut())
+        {
             if let Type::StructReference(index) = type_ {
                 *index += struct_offset as u64;
             }
