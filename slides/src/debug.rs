@@ -23,6 +23,7 @@ pub struct DebugFlags {
     pub print_struct_table: bool,
     pub print_tokens: bool,
     pub print_heap_as_string: bool,
+    pub print_static_memory_as_string: bool,
     pub print_bound_program: bool,
     pub print_stack: bool,
     pub print_labels: bool,

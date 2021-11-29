@@ -21,14 +21,7 @@ use crate::{
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
         typing::{FunctionKind, SystemCallKind, Type},
-    },
-    debug::DebugFlags,
-    diagnostics::DiagnosticBag,
-    evaluator::memory::{bytes_to_word, static_memory::StaticMemory, WORD_SIZE_IN_BYTES},
-    parser::syntax_nodes::LiteralNodeKind,
-    text::{SourceText, TextSpan},
-    value::Value,
-};
+    }, debug::DebugFlags, diagnostics::DiagnosticBag, evaluator::memory::{self, WORD_SIZE_IN_BYTES, bytes_to_word, static_memory::StaticMemory}, parser::syntax_nodes::LiteralNodeKind, text::{SourceText, TextSpan}, value::Value};
 
 use self::instruction::{op_codes::OpCode, Instruction};
 
@@ -203,6 +196,9 @@ pub fn convert<'a>(
             &instructions,
             source_text,
         );
+    }
+    if debug_flags.print_static_memory_as_string {
+        memory::static_memory::print_static_memory_as_string(&converter.static_memory);
     }
     Program {
         startup_instructions: vec![],

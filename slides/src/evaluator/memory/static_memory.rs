@@ -48,3 +48,11 @@ impl StaticMemory {
         WORD_SIZE_IN_BYTES * self.data.len() as u64
     }
 }
+
+pub fn print_static_memory_as_string(static_memory: &StaticMemory) -> String {
+    let mut result = Vec::with_capacity(static_memory.size_in_bytes() as _);
+    for word in &static_memory.data {
+        result.extend_from_slice(&word.to_be_bytes());
+    }
+    String::from_utf8_lossy(&result).into_owned()
+}
