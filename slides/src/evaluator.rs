@@ -128,7 +128,7 @@ pub fn evaluate(
             Value::Integer(-1)
         }
         Err(()) => {
-            debugger::create_session(state);
+            debugger::create_session(&mut state);
             Value::Integer(-1)
         }
     }
@@ -169,7 +169,7 @@ fn execute_function(state: &mut EvaluatorState, entry_point: usize, arguments: &
         }
         execute_instruction(state, state.instructions[pc]);
         if state.debug_mode {
-            state.debug_mode = debugger::create_session(state.clone());
+            state.debug_mode = debugger::create_session(state);
         }
         if state.runtime_error_happened {
             println!("Unusual termination.");

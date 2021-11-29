@@ -2,7 +2,7 @@ use crate::evaluator::memory;
 
 use super::EvaluatorState;
 
-pub fn create_session(state: EvaluatorState) -> bool {
+pub fn create_session(state: &mut EvaluatorState) -> bool {
     println!("This is the debugger. Type :q to exit the debugger.");
     let mut line = String::new();
     loop {
