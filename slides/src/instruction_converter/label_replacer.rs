@@ -9,7 +9,7 @@ pub(crate) fn replace_labels(
     let labels = collect_labels(&instructions);
     if debug_flags.print_labels {
         for (index, label) in labels.iter().enumerate() {
-            println!("L{}: #{}", index, label);
+            println!("L{:X}: #{:x}", index, label);
         }
     }
     instructions
