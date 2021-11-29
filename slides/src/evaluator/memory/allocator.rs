@@ -40,7 +40,7 @@ impl Allocator {
             "Address 0x{:x} could not be assigned to a bucket! All Buckets ({}):\n\n{:#?}",
             address,
             self.buckets.len(),
-            &self.buckets
+            &self.buckets.iter().filter_map(|b| b.as_bucket()).collect::<Vec<_>>()
         );
     }
 
