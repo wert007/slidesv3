@@ -107,7 +107,10 @@ fn to_string_native(type_: Type, to_string_function: usize, argument: FlaggedWor
         }
         Type::Struct(struct_type) => {
             if to_string_function != 0 {
-                let return_value = super::execute_function(state, to_string_function as usize, &[argument]).unwrap();
+                // FIXME: If there is an Err(()) returned, this means, there was
+                // a runtime error, this should be handled the same way as in
+                // evaluate.
+                let return_value = super::execute_function(state, to_string_function as usize, &[argument]).unwrap().unwrap();
                 to_string_native(Type::String, 0, return_value, state)
             } else {
                 format!("type struct id#{}", struct_type.id)
@@ -115,7 +118,10 @@ fn to_string_native(type_: Type, to_string_function: usize, argument: FlaggedWor
         }
         Type::StructReference(id) => {
             if to_string_function != 0 {
-                let return_value = super::execute_function(state, to_string_function as usize, &[argument]).unwrap();
+                // FIXME: If there is an Err(()) returned, this means, there was
+                // a runtime error, this should be handled the same way as in
+                // evaluate.
+                let return_value = super::execute_function(state, to_string_function as usize, &[argument]).unwrap().unwrap();
                 to_string_native(Type::String, 0, return_value, state)
             } else {
                 format!("type struct id#{}", id)

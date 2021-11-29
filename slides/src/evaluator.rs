@@ -1,5 +1,6 @@
 pub mod memory;
 mod sys_calls;
+mod debugger;
 
 use crate::{
     binder::typing::SystemCallKind,
@@ -110,22 +111,28 @@ pub fn evaluate(
         runtime_diagnostics: DiagnosticBag::new(source_text),
         runtime_error_happened: false,
     };
-    execute_function(&mut state, program.entry_point, &[]);
-    if state.stack.len() == 1 {
-        (state.stack.pop().unwrap_value() as i64).into()
-    } else {
-        for (variable, &value) in state.registers.iter().enumerate() {
-            if value.is_pointer() {
-                println!("{:00}: #{}", variable, value.unwrap_pointer())
-            } else {
-                println!("{:00}: {}", variable, value.unwrap_value() as i64)
+    match execute_function(&mut state, program.entry_point, &[]) {
+        Ok(Some(exit_code)) => {
+            (exit_code.unwrap_value() as i64).into()
+        },
+        Ok(None) => {
+            for (variable, &value) in state.registers.iter().enumerate() {
+                if value.is_pointer() {
+                    println!("{:00}: #{}", variable, value.unwrap_pointer())
+                } else {
+                    println!("{:00}: {}", variable, value.unwrap_value() as i64)
+                }
             }
+            Value::Integer(-1)
         }
-        Value::Integer(-1)
+        Err(()) => {
+            debugger::create_session(state);
+            Value::Integer(-1)
+        }
     }
 }
 
-fn execute_function(state: &mut EvaluatorState, entry_point: usize, arguments: &[FlaggedWord]) -> Option<FlaggedWord> {
+fn execute_function(state: &mut EvaluatorState, entry_point: usize, arguments: &[FlaggedWord]) -> Result<Option<FlaggedWord>, ()> {
     let old_pc = state.pc;
     state.pc = entry_point;
     state.runtime_error_happened = false;
