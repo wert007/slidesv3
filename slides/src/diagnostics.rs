@@ -33,7 +33,7 @@ impl std::fmt::Display for Diagnostic<'_> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DiagnosticBag<'a> {
     pub diagnostics: Vec<Diagnostic<'a>>,
     pub source_text: &'a SourceText<'a>,

@@ -31,6 +31,7 @@ macro_rules! runtime_error {
 
 type ResultType = Value;
 
+#[derive(Debug)]
 pub struct EvaluatorState<'a> {
     debug_flags: DebugFlags,
     stack: Stack,

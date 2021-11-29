@@ -4,6 +4,7 @@ use super::{bytes_to_word, FlaggedWord, HEAP_POINTER, WORD_SIZE_IN_BYTES};
 
 pub mod garbage_collector;
 
+#[derive(Debug)]
 pub struct Allocator {
     pub data: Vec<u64>,
     pub flags: Vec<Flags>,
