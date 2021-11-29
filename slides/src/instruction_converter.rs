@@ -136,8 +136,9 @@ pub fn convert<'a>(
         next_label_index: bound_program.label_count,
     };
     converter.static_memory.allocate_null();
+    let minimum_memory_relocation = converter.static_memory.size_in_bytes();
     for lib in bound_program.referenced_libraries.iter_mut() {
-        let static_memory_size = converter.static_memory.size_in_bytes();
+        let static_memory_size = if lib.is_already_loaded { minimum_memory_relocation } else { converter.static_memory.size_in_bytes() };
         for inst in lib.instructions.iter_mut() {
             if let InstructionOrLabelReference::Instruction(Instruction {
                 arg,
@@ -148,9 +149,11 @@ pub fn convert<'a>(
                 *arg += static_memory_size;
             }
         }
-        converter
-            .static_memory
-            .insert(&mut lib.program.static_memory);
+        if !lib.is_already_loaded {
+            converter
+                .static_memory
+                .insert(&mut lib.program.static_memory);
+        }
     }
     let mut instructions = bound_program.startup;
     let foreign_instruction_start = instructions.len();
@@ -231,7 +234,7 @@ pub fn convert_library<'a>(
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count,
     };
-    for lib in bound_program.referenced_libraries.iter_mut() {
+    for lib in bound_program.referenced_libraries.iter_mut().filter(|l| !l.is_already_loaded) {
         let static_memory_size = converter.static_memory.size_in_bytes();
         for inst in lib.instructions.iter_mut() {
             if let InstructionOrLabelReference::Instruction(Instruction {
@@ -290,6 +293,7 @@ pub fn convert_library<'a>(
         functions: exported_functions,
         structs: exported_structs,
         has_errors: false,
+        is_already_loaded: false,
     }
 }
 

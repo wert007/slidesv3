@@ -24,6 +24,7 @@ pub struct Library {
     pub has_errors: bool,
     pub path: PathBuf,
     pub referenced_libraries: Vec<Library>,
+    pub is_already_loaded: bool,
 }
 
 impl Library {
@@ -38,12 +39,20 @@ impl Library {
             has_errors: true,
             path: PathBuf::new(),
             referenced_libraries: vec![],
+            is_already_loaded: false,
+        }
+    }
+
+    pub fn with_is_already_loaded(self, is_already_loaded: bool) -> Self {
+        Self {
+            is_already_loaded,
+            ..self
         }
     }
 
     pub fn find_imported_library_by_path(&self, path: &Path) -> Option<(String, Library)> {
         if self.path == path {
-            return Some((self.name.clone(), self.clone()));
+            return Some((self.name.clone(), self.clone().with_is_already_loaded(true)));
         }
         for lib in &self.referenced_libraries {
             if let Some((rel_path, lib)) = lib.find_imported_library_by_path(path) {
