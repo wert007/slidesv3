@@ -406,6 +406,14 @@ impl Instruction {
         }
     }
 
+    pub const fn breakpoint() -> Self {
+        Self {
+            op_code: OpCode::Breakpoint,
+            arg: 0,
+            span: None,
+        }
+    }
+
     pub const fn check_array_bounds() -> Self {
         Self {
             op_code: OpCode::CheckArrayBounds,

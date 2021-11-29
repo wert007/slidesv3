@@ -669,6 +669,7 @@ fn convert_system_call(
                 | SystemCallKind::ToString
                 | SystemCallKind::ArrayLength
                 | SystemCallKind::DebugHeapDump => 1,
+                SystemCallKind::Break => unreachable!(),
             };
 
             for argument in system_call.arguments {
@@ -684,6 +685,9 @@ fn convert_system_call(
         }
         SystemCallKind::ArrayLength => {
             convert_array_length_system_call(span, system_call, converter)
+        }
+        SystemCallKind::Break => {
+            vec![Instruction::breakpoint().span(span).into()]
         }
     }
 }

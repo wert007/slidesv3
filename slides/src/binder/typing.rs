@@ -157,6 +157,8 @@ impl Type {
         (1 + SystemCallKind::ArrayLength as u8 as u64) << 8;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP: u64 =
         (1 + SystemCallKind::DebugHeapDump as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_BREAK: u64 =
+        (1 + SystemCallKind::Break as u8 as u64) << 8;
 
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
@@ -183,6 +185,9 @@ impl Type {
             }
             Type::SystemCall(SystemCallKind::DebugHeapDump) => {
                 Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP
+            }
+            Type::SystemCall(SystemCallKind::Break) => {
+                Self::TYPE_IDENTIFIER_SYSTEM_CALL_BREAK
             }
         }
     }
@@ -317,6 +322,7 @@ pub enum SystemCallKind {
     ToString,
     ArrayLength,
     DebugHeapDump,
+    Break,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -329,6 +335,7 @@ impl std::fmt::Display for SystemCallKind {
                 SystemCallKind::ToString => "to$string",
                 SystemCallKind::ArrayLength => "array$length",
                 SystemCallKind::DebugHeapDump => "debug$heap$dump",
+                SystemCallKind::Break => "break",
             }
         )
     }
@@ -397,6 +404,12 @@ impl FunctionType {
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
             },
+            SystemCallKind::Break => Self {
+                parameter_types: vec![],
+                this_type: None,
+                return_type: Type::Void,
+                system_call_kind: Some(system_call_kind),
+            }
         }
     }
 

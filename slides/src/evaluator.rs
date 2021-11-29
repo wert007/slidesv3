@@ -42,6 +42,7 @@ pub struct EvaluatorState<'a> {
     is_main_call: bool,
     runtime_diagnostics: DiagnosticBag<'a>,
     runtime_error_happened: bool,
+    debug_mode: bool,
 }
 
 impl EvaluatorState<'_> {
@@ -110,6 +111,7 @@ pub fn evaluate(
         is_main_call: true,
         runtime_diagnostics: DiagnosticBag::new(source_text),
         runtime_error_happened: false,
+        debug_mode: false,
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => {
@@ -159,31 +161,36 @@ fn execute_function(state: &mut EvaluatorState, entry_point: usize, arguments: &
         match state.instructions[pc].op_code {
             OpCode::FunctionCall => nestedness += 1,
             OpCode::Return => nestedness -= 1,
+            OpCode::Breakpoint => state.debug_mode = true,
             _ => {}
         }
         if nestedness < 0 {
             break;
         }
         execute_instruction(state, state.instructions[pc]);
+        if state.debug_mode {
+            state.debug_mode = debugger::create_session(state.clone());
+        }
         if state.runtime_error_happened {
             println!("Unusual termination.");
-            break;
+            return Err(());
         }
         assert!(state.stack.len() >= min_stack_count, "{} >= {}", state.stack.len(), min_stack_count);
         state.pc += 1;
     }
     state.pc = old_pc;
-    if !state.runtime_error_happened && state.stack.len() > min_stack_count {
+    Ok(if !state.runtime_error_happened && state.stack.len() > min_stack_count {
         Some(state.stack.pop())
     } else {
         None
-    }
+    })
 }
 
 fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
     match instruction.op_code {
         OpCode::Label => unreachable!(),
         OpCode::NoOp => {}
+        OpCode::Breakpoint => {},
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),
         OpCode::LoadPointer => evaluate_load_pointer(state, instruction),
         OpCode::DuplicateOver => evaluate_duplicate_over(state, instruction),
@@ -623,6 +630,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::ArrayLength => sys_calls::array_length(arguments[0], state),
         SystemCallKind::ToString => sys_calls::to_string(arguments[0], state),
         SystemCallKind::DebugHeapDump => sys_calls::heap_dump(arguments[0], state),
+        SystemCallKind::Break => unreachable!(),
     }
 }
 

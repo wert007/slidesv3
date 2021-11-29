@@ -976,6 +976,7 @@ fn default_statements(binder: &mut BindingState, import_std_lib: bool) {
     if import_std_lib {
         load_library_from_path(binder, Path::new("../slides/builtin/std.sld"), TextSpan::zero(), "", false);
     }
+    binder.register_constant("break", Value::SystemCall(SystemCallKind::Break));
 }
 
 fn call_main(binder: &mut BindingState) -> Vec<InstructionOrLabelReference> {
