@@ -11,4 +11,8 @@ struct Vec2 {
     func lengthSquared() -> int {
         return this.x * this.x + this.y * this.y;
     }
+
+    func $toString() -> string {
+        return 'Vec2(' + this.x + ', ' + this.y + ')';
+    }
 }

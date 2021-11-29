@@ -15,8 +15,12 @@ struct Point {
     func toVec2() -> math.Vec2 {
         return new math.Vec2(this.x, this.y);
     }
+
+    func $toString() -> string {
+        return 'Point(' + this.x + ', ' + this.y + ')';
+    }
 }
 
 func printPoint(pt: Point) {
-    print('Point(' + pt.x + ', ' + pt.y + ')');
+    print(pt);
 }
