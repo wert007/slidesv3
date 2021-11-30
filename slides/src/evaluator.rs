@@ -166,7 +166,6 @@ fn execute_function(
         match state.instructions[pc].op_code {
             OpCode::FunctionCall => nestedness += 1,
             OpCode::Return => nestedness -= 1,
-            OpCode::Breakpoint => state.debug_mode = true,
             _ => {}
         }
         if nestedness < 0 {
@@ -202,7 +201,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
     match instruction.op_code {
         OpCode::Label => unreachable!(),
         OpCode::NoOp => {}
-        OpCode::Breakpoint => {}
+        OpCode::Breakpoint => evaluate_breakpoint(state, instruction),
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),
         OpCode::LoadPointer => evaluate_load_pointer(state, instruction),
         OpCode::DuplicateOver => evaluate_duplicate_over(state, instruction),
@@ -246,6 +245,10 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::DecodeClosure => evaluate_decode_closure(state, instruction),
         OpCode::CheckArrayBounds => evaluate_check_array_bounds(state, instruction),
     }
+}
+
+fn evaluate_breakpoint(state: &mut EvaluatorState, _: Instruction) {
+    state.debug_mode = true;
 }
 
 fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction) {
