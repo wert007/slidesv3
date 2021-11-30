@@ -22,6 +22,7 @@ fn main() -> Result<(), std::io::Error> {
         output_instructions_and_labels_to_sldasm: args.contains(&String::from("-dasml")),
         run_program: !args.contains(&String::from("-no-run")),
         slow_mode: args.contains(&String::from("-slow")),
+        use_debugger: args.contains(&String::from("-debugger")),
     };
     if args.len() == 1 || args[1].starts_with('-') {
         repl(debug_flags)

@@ -32,6 +32,7 @@ pub struct DebugFlags {
     pub output_instructions_and_labels_to_sldasm: bool,
     pub run_program: bool,
     pub slow_mode: bool,
+    pub use_debugger: bool,
 }
 
 impl DebugFlags {

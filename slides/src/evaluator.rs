@@ -127,7 +127,9 @@ pub fn evaluate(
             Value::Integer(-1)
         }
         Err(()) => {
-            debugger::create_session(&mut state);
+            if debug_flags.use_debugger {
+                debugger::create_session(&mut state);
+            }
             Value::Integer(-1)
         }
     }
