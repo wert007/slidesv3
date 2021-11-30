@@ -3,6 +3,14 @@ struct Person {
     age: int;
 }
 
+struct Value {
+    value: int;
+
+    func $toString() -> string {
+        return 'Value(' + this.value + ')';
+    }
+}
+
 func fib(n: int) -> int {
     if n <= 0 {
         return 1;
@@ -38,4 +46,11 @@ func main() {
     let s : string? = 'Noneable strings work just fine';
     log(s);
     log(new Person('John Doe', 32));
+    let v = new Value(42);
+    log(v);
+    let maybeV : Value? = none;
+    log(maybeV);
+    maybeV = v;
+    log(maybeV);
+    log([new Value(1), new Value(2), new Value(3), ]);
 }
