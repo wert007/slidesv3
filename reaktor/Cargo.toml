@@ -7,4 +7,4 @@ edition = "2018"
 
 [dependencies]
 slides = { path = "../slides" }
-clap = {version = "2.34", features = ["yaml"]}
+clap = {version = "2.34", features = ["yaml", "wrap_help"]}
