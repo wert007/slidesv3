@@ -1,0 +1,61 @@
+name: Slides
+version: "0.1"
+author: Pablo H.
+about: Compiles and runs .sld files to create awesome presentations!
+args:
+    - FILE:
+        help: Sets the input file to use
+        required: true
+        index: 1
+    - print-instructions:
+        long: di
+        help: Prints generated instructions before running and at runtime
+    - print-runtime-instructions:
+        long: drti
+        help: Prints generated instructions at runtime
+    - print-instructions-and-labels:
+        long: dil
+        help: Prints generated instructions with labels before running
+    - print-tokens:
+        long: dt
+        help: Prints the tokens, the lexer found
+    - print-bound-variable-table:
+        long: dbvt
+        help: Prints the variable names and the registers, to which they assign
+    - print-bound-struct-table:
+        long: dbst
+        help: Prints the struct names and the type indices, to which they belong
+    - print-bound-program:
+        long: dbp
+        help: Prints the bound representation of the programas source code
+    - print-labels:
+        long: dlbl
+        help: Prints the labels and their addresses
+    - print-heap-memory-as-string:
+        long: dheap
+        help: Prints the heap as a string, whenever it changes
+    - print-static-memory-as-string:
+        long: dstaticmem
+        help: Prints the static memory as a string
+    - print-stack:
+        long: dstack
+        help: Prints the stack, whenever it changes
+    - output-basic-blocks-to-dot:
+        long: dbb
+        help: Writes the basic blocks of each function to debug-out/FUNCTION_NAME.dot
+    - output-instructions-to-sldasm:
+        long: -dasm
+        help: Write the instructions of the source file to debug-out/SOURCE_FILE_NAME.sldasm
+    - output-instructions-and-labels-to-sldasm:
+        long: -dasml
+        help: Write the instructions and labels of the source file to debug-out/SOURCE_FILE_NAME.sldasm
+    - no-run:
+        long: no-run
+        help: Only compiles a program, but does not run it
+    # Give slow a parameter to change the wait time.
+    - slow:
+        long: slow
+        help: Waits half a second between each instruction
+    - debugger:
+        long: debugger
+        help: Starts the debugger, if a program had a runtime error

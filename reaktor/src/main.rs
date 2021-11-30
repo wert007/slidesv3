@@ -1,33 +1,36 @@
 use std::io::Write;
 
+use clap::{load_yaml, App};
 use slides::DebugFlags;
 
 fn main() -> Result<(), std::io::Error> {
-    println!("Hello, world!");
-    let args: Vec<String> = std::env::args().collect();
+    let yaml = load_yaml!("cli_arguments.yaml");
+    let matches = App::from_yaml(yaml).get_matches();
+
+    let input_file = matches.value_of("FILE");
     let debug_flags = DebugFlags {
-        print_instructions: args.contains(&String::from("-di")),
-        print_instructions_and_labels: args.contains(&String::from("-dil")),
-        print_tokens: args.contains(&String::from("-dt")),
-        print_current_instruction: args.contains(&String::from("-dci")),
-        print_variable_table: args.contains(&String::from("-dbv")),
-        print_struct_table: args.contains(&String::from("-dbst")),
-        print_heap_as_string: args.contains(&String::from("-dheap")),
-        print_static_memory_as_string: args.contains(&String::from("-dstaticmem")),
-        print_bound_program: args.contains(&String::from("-dbp")),
-        print_stack: args.contains(&String::from("-dstack")),
-        print_labels: args.contains(&String::from("-dlabels")),
-        output_basic_blocks_to_dot: args.contains(&String::from("-dbb")),
-        output_instructions_to_sldasm: args.contains(&String::from("-dasm")),
-        output_instructions_and_labels_to_sldasm: args.contains(&String::from("-dasml")),
-        run_program: !args.contains(&String::from("-no-run")),
-        slow_mode: args.contains(&String::from("-slow")),
-        use_debugger: args.contains(&String::from("-debugger")),
+        print_instructions: matches.is_present("print-instructions"),
+        print_runtime_instruction: matches.is_present("print-runtime-instructions"),
+        print_instructions_and_labels: matches.is_present("print-instructions-and-labels"),
+        print_tokens: matches.is_present("print-tokens"),
+        print_variable_table: matches.is_present("print-bound-variable-table"),
+        print_struct_table: matches.is_present("print-bound-struct-table"),
+        print_bound_program: matches.is_present("print-bound-program"),
+        print_labels: matches.is_present("print-labels"),
+        print_heap_as_string: matches.is_present("print-heap-memory-as-string"),
+        print_static_memory_as_string: matches.is_present("print-static-memory-as-string"),
+        print_stack: matches.is_present("print-stack"),
+        output_basic_blocks_to_dot: matches.is_present("output-basic-blocks-to-dot"),
+        output_instructions_to_sldasm: matches.is_present("output-instructions-to-sldasm"),
+        output_instructions_and_labels_to_sldasm: matches.is_present("output-instructions-and-labels-to-sldasm"),
+        run_program: !matches.is_present("no-run"),
+        slow_mode: matches.is_present("slow"),
+        use_debugger: matches.is_present("debugger"),
     };
-    if args.len() == 1 || args[1].starts_with('-') {
-        repl(debug_flags)
-    } else {
-        compile(&args[1], debug_flags)
+
+    match input_file {
+        Some(file_path) => compile(file_path, debug_flags),
+        None => repl(debug_flags),
     }
 }
 

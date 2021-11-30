@@ -18,7 +18,7 @@ pub use instructions::print_instructions_with_source_code;
 pub struct DebugFlags {
     pub print_instructions: bool,
     pub print_instructions_and_labels: bool,
-    pub print_current_instruction: bool,
+    pub print_runtime_instruction: bool,
     pub print_variable_table: bool,
     pub print_struct_table: bool,
     pub print_tokens: bool,
