@@ -649,6 +649,7 @@ impl<'a> BindingState<'a, '_> {
             | Type::Closure(_)
             | Type::Library(_)
             | Type::Struct(_)
+            | Type::Pointer
             | Type::SystemCall(_) => type_,
             Type::Noneable(base_type) => {
                 Type::noneable(self.convert_struct_reference_to_struct(*base_type))
@@ -657,6 +658,9 @@ impl<'a> BindingState<'a, '_> {
                 Type::array(self.convert_struct_reference_to_struct(*base_type))
             }
             Type::StructReference(id) => Type::Struct(Box::new(self.get_struct_by_id(id).unwrap())),
+            Type::PointerOf(base_type) => {
+                Type::pointer_of(self.convert_struct_reference_to_struct(*base_type))
+            }
         }
     }
 }
@@ -2081,6 +2085,8 @@ fn bind_field_access<'a, 'b>(
         | Type::Function(_)
         | Type::Closure(_)
         | Type::SystemCall(_)
+        | Type::Pointer
+        | Type::PointerOf(_)
         | Type::Noneable(_) => {
             binder
                 .diagnostic_bag
@@ -2163,6 +2169,8 @@ fn bind_field_access_for_assignment<'a>(
         | Type::SystemCall(_)
         | Type::Noneable(_)
         | Type::Function(_)
+        | Type::Pointer
+        | Type::PointerOf(_)
         | Type::Closure(_) => {
             binder
                 .diagnostic_bag
@@ -2235,6 +2243,10 @@ fn call_to_string<'a>(base: BoundNode<'a>, binder: &mut BindingState<'a, '_>) ->
         | Type::Array(_)
         | Type::Function(_)
         | Type::Closure(_)
+        | Type::Pointer
+        // FIXME: Try to reason, if this is correct, or if this should be
+        // handled like noneable.
+        | Type::PointerOf(_)
         | Type::Any => BoundNode::system_call(
             base.span,
             SystemCallKind::ToString,
@@ -2253,6 +2265,10 @@ fn call_to_string<'a>(base: BoundNode<'a>, binder: &mut BindingState<'a, '_>) ->
             | Type::Array(_)
             | Type::String
             | Type::Function(_)
+            | Type::Pointer
+            // FIXME: Try to reason, if this is correct, or if this should be
+            // handled like noneable.
+            | Type::PointerOf(_)
             | Type::Closure(_) => BoundNode::system_call(
                 base.span,
                 SystemCallKind::ToString,
@@ -2375,6 +2391,8 @@ fn bind_condition_conversion<'a>(
         | Type::Function(_)
         | Type::Closure(_)
         | Type::Struct(_)
+        | Type::Pointer
+        | Type::PointerOf(_)
         | Type::StructReference(_) => (
             bind_conversion(base, &Type::Boolean, binder),
             SafeNodeInCondition::None,

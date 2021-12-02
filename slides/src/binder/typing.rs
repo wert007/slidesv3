@@ -24,6 +24,8 @@ pub enum Type {
     Struct(Box<StructType>),
     StructReference(u64),
     Library(usize),
+    Pointer,
+    PointerOf(Box<Type>),
 }
 
 impl Type {
@@ -43,11 +45,17 @@ impl Type {
         Self::Noneable(Box::new(base_type))
     }
 
+    pub fn pointer_of(base_type: Type) -> Self {
+        Self::PointerOf(Box::new(base_type))
+    }
+
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         match (self, other) {
             (Type::Library(_), _) | (_, Type::Library(_)) => false,
             _ if self == other => true,
             (_, Type::Any) => true,
+            (Type::Pointer, Type::PointerOf(_)) => true,
+            (Type::PointerOf(_), Type::Pointer) => true,
             (Type::None, Type::Noneable(_)) => true,
             (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
             (Type::Array(base_type), Type::Array(other)) => base_type.can_be_converted_to(other),
@@ -61,6 +69,8 @@ impl Type {
         match (self, other) {
             (a, b) if a == b => false,
             (Type::Any, _) => true,
+            (Type::Pointer, Type::Integer) => true,
+            (Type::PointerOf(inner), Type::Noneable(other)) => inner.can_be_converted_to(other),
             (Type::Noneable(base_type), other) => base_type.can_be_converted_to(other),
             _ => false,
         }
@@ -93,6 +103,8 @@ impl Type {
             Type::None => 1,
             Type::String => 1,
             Type::SystemCall(_) => 1,
+            Type::Pointer => 1,
+            Type::PointerOf(base_type) => base_type.type_identifier_size_in_words() + 1,
             Type::Array(inner) => {
                 let mut base_type = inner;
                 while let Type::Array(inner) = base_type.as_ref() {
@@ -149,6 +161,8 @@ impl Type {
     pub const TYPE_IDENTIFIER_CLOSURE: u64 = 10;
     pub const TYPE_IDENTIFIER_STRUCT: u64 = 11;
     pub const TYPE_IDENTIFIER_STRUCT_REFERENCE: u64 = 12;
+    pub const TYPE_IDENTIFIER_POINTER: u64 = 13;
+    pub const TYPE_IDENTIFIER_POINTER_OF: u64 = 14;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_PRINT: u64 =
         (1 + SystemCallKind::Print as u8 as u64) << 8;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING: u64 =
@@ -176,6 +190,8 @@ impl Type {
             Type::Closure(_) => Self::TYPE_IDENTIFIER_CLOSURE,
             Type::Struct(_) => Self::TYPE_IDENTIFIER_STRUCT,
             Type::StructReference(_) => Self::TYPE_IDENTIFIER_STRUCT_REFERENCE,
+            Type::Pointer => Self::TYPE_IDENTIFIER_POINTER,
+            Type::PointerOf(_) => Self::TYPE_IDENTIFIER_POINTER_OF,
             Type::SystemCall(SystemCallKind::Print) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT,
             Type::SystemCall(SystemCallKind::ToString) => {
                 Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING
@@ -205,6 +221,8 @@ impl Type {
             Self::TYPE_IDENTIFIER_CLOSURE => None,
             Self::TYPE_IDENTIFIER_STRUCT => None,
             Self::TYPE_IDENTIFIER_STRUCT_REFERENCE => None,
+            Self::TYPE_IDENTIFIER_POINTER => Some(Type::Pointer),
+            Self::TYPE_IDENTIFIER_POINTER_OF => None,
             Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT => {
                 Some(Type::SystemCall(SystemCallKind::Print))
             }
@@ -237,6 +255,8 @@ impl Type {
             | Type::SystemCall(_)
             | Type::Array(_)
             | Type::Noneable(_)
+            | Type::Pointer
+            | Type::PointerOf(_)
             | Type::String => WORD_SIZE_IN_BYTES,
         }
     }
@@ -255,6 +275,8 @@ impl Type {
             | Type::Function(_)
             | Type::Closure(_)
             | Type::Struct(_)
+            | Type::Pointer
+            | Type::PointerOf(_)
             | Type::StructReference(_) => WORD_SIZE_IN_BYTES,
         }
     }
@@ -278,6 +300,8 @@ impl Type {
             | Type::String
             | Type::Closure(_)
             | Type::Struct(_)
+            | Type::Pointer
+            | Type::PointerOf(_)
             | Type::StructReference(_) => true,
         }
     }
@@ -309,6 +333,8 @@ impl std::fmt::Display for Type {
             Type::StructReference(struct_id) => {
                 write!(f, "struct#{}", struct_id)
             }
+            Type::Pointer => write!(f, "pointer"),
+            Type::PointerOf(base) => write!(f, "&{}", base),
         }
     }
 }

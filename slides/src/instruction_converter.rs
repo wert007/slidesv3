@@ -902,6 +902,7 @@ fn convert_type_identifier(
             type_word_count
         }
         Type::Noneable(base_type) => convert_type_identifier(*base_type, span, result) + 2,
+        Type::PointerOf(base_type) => convert_type_identifier(*base_type, span, result) + 2,
         Type::Function(function_type) => {
             let mut type_word_count = 3;
             let parameter_count = function_type.parameter_types.len() as u64;

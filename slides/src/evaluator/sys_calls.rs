@@ -149,6 +149,22 @@ fn to_string_native(
         Type::Integer => {
             format!("{}", argument.unwrap_value() as i64)
         }
+        Type::Pointer => {
+            format!("0x{:x}", argument.unwrap_pointer())
+        }
+        Type::PointerOf(base_type) => {
+            let ptr = argument.unwrap_pointer();
+            if ptr == 0 {
+                "none".into()
+            } else {
+                let argument = if base_type.is_pointer() {
+                    FlaggedWord::pointer(ptr)
+                } else {
+                    state.read_pointer(ptr)
+                };
+                to_string_native(*base_type, to_string_function, argument, state)
+            }
+        }
         Type::Boolean => {
             if argument.unwrap_value() == 0 {
                 "false".into()
