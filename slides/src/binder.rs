@@ -1331,6 +1331,9 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     if type_.optional_question_mark.is_some() {
         result = Type::noneable(result);
     }
+    if type_.optional_ampersand_token.is_some() {
+        result = Type::pointer_of(result);
+    }
     for _ in &type_.brackets {
         result = Type::array(result);
     }
@@ -1533,6 +1536,7 @@ fn bind_constructor_call<'a>(
     let type_name_span = constructor_call.type_name.span();
     let type_ = bind_type(
         TypeNode {
+            optional_ampersand_token: None,
             library_name: constructor_call.library_name,
             type_name: constructor_call.type_name,
             optional_question_mark: None,

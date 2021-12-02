@@ -110,6 +110,7 @@ pub enum SyntaxTokenKind {
     Comma,
     Period,
     PeriodPeriod,
+    Ampersand,
     QuestionMark,
     QuestionMarkQuestionMark,
     Plus,
@@ -223,6 +224,7 @@ impl From<&str> for SyntaxTokenKind {
             "," => Self::Comma,
             "." => Self::Period,
             ".." => Self::PeriodPeriod,
+            "&" => Self::Ampersand,
             "?" => Self::QuestionMark,
             "??" => Self::QuestionMarkQuestionMark,
             "==" => Self::EqualsEquals,
@@ -249,6 +251,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::Comma => write!(f, "CommaToken"),
             SyntaxTokenKind::Period => write!(f, "PeriodToken"),
             SyntaxTokenKind::PeriodPeriod => write!(f, "Period-Period-Token"),
+            SyntaxTokenKind::Ampersand => write!(f, "Ampersand-Token"),
             SyntaxTokenKind::QuestionMark => write!(f, "Question-Mark-Token"),
             SyntaxTokenKind::QuestionMarkQuestionMark => {
                 write!(f, "Question-Mark-Question-Mark-Token")
