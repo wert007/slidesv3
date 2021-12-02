@@ -210,6 +210,7 @@ fn load_library_into_binder<'a>(
     binder: &mut BindingState<'a, '_>,
 ) {
     let index = binder.libraries.len();
+    binder.max_used_variables = binder.max_used_variables.max(lib.program.max_used_variables);
     let mut should_load_library = true;
     let variable = if lib.has_errors {
         binder
