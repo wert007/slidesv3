@@ -12,7 +12,7 @@ pub fn print(argument: FlaggedWord, state: &mut EvaluatorState) {
 pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
     let string = to_string_native(Type::Any, 0, argument, state);
     let string_length = string.len() as u64;
-    let mut pointer = state.heap.allocate(WORD_SIZE_IN_BYTES + string_length);
+    let mut pointer = state.heap.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
     state.heap.write_word(pointer, string_length);
     pointer += WORD_SIZE_IN_BYTES;
@@ -243,4 +243,11 @@ pub fn heap_dump(argument: FlaggedWord, state: &mut EvaluatorState) {
     let argument = string_to_string_native(argument, state);
     let argument = argument.replace('\0', "");
     crate::debug::output_allocator_to_dot(&argument, &state.heap);
+}
+
+pub fn reallocate(pointer: FlaggedWord, size: FlaggedWord, state: &mut EvaluatorState) {
+    let pointer = pointer.unwrap_pointer();
+    let size = size.unwrap_value();
+    let result = state.reallocate(pointer, size);
+    state.stack.push_flagged_word(FlaggedWord::pointer(result));
 }

@@ -173,6 +173,8 @@ impl Type {
         (1 + SystemCallKind::DebugHeapDump as u8 as u64) << 8;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_BREAK: u64 =
         (1 + SystemCallKind::Break as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE: u64 =
+        (1 + SystemCallKind::Reallocate as u8 as u64) << 8;
 
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
@@ -203,6 +205,7 @@ impl Type {
                 Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP
             }
             Type::SystemCall(SystemCallKind::Break) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_BREAK,
+            Type::SystemCall(SystemCallKind::Reallocate) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE,
         }
     }
 
@@ -347,6 +350,7 @@ pub enum SystemCallKind {
     ArrayLength,
     DebugHeapDump,
     Break,
+    Reallocate,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -360,6 +364,7 @@ impl std::fmt::Display for SystemCallKind {
                 SystemCallKind::ArrayLength => "array$length",
                 SystemCallKind::DebugHeapDump => "debug$heap$dump",
                 SystemCallKind::Break => "break",
+                SystemCallKind::Reallocate => "reallocate",
             }
         )
     }
@@ -432,6 +437,12 @@ impl FunctionType {
                 parameter_types: vec![],
                 this_type: None,
                 return_type: Type::Void,
+                system_call_kind: Some(system_call_kind),
+            },
+            SystemCallKind::Reallocate => Self {
+                parameter_types: vec![Type::Pointer, Type::Integer],
+                this_type: None,
+                return_type: Type::Pointer,
                 system_call_kind: Some(system_call_kind),
             },
         }

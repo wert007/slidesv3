@@ -68,11 +68,11 @@ impl EvaluatorState<'_> {
         }
     }
 
-    fn allocate(&mut self, expected_size_in_bytes: u64) -> u64 {
-        let result = self.heap.allocate(expected_size_in_bytes);
+    fn reallocate(&mut self, old_address: u64, expected_size_in_bytes: u64) -> u64 {
+        let result = self.heap.reallocate(old_address, expected_size_in_bytes);
         if result == 0 {
             self.garbage_collect();
-            self.heap.allocate(expected_size_in_bytes)
+            self.heap.reallocate(old_address, expected_size_in_bytes)
         } else {
             result
         }
@@ -319,7 +319,7 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
 
 fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) {
     let size_in_bytes = instruction.arg * WORD_SIZE_IN_BYTES;
-    let address = state.allocate(size_in_bytes);
+    let address = state.reallocate(0, size_in_bytes);
     if address == 0 {
         runtime_error!(state, no_heap_memory_left(instruction.span, size_in_bytes));
     } else {
@@ -335,7 +335,7 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
 
 fn evaluate_allocate(state: &mut EvaluatorState, instruction: Instruction) {
     let size_in_bytes = instruction.arg;
-    let address = state.allocate(size_in_bytes);
+    let address = state.reallocate(0, size_in_bytes);
     if address == 0 {
         runtime_error!(state, no_heap_memory_left(instruction.span, size_in_bytes));
     }
@@ -555,7 +555,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
     let lhs_length = state.read_pointer(lhs).unwrap_value();
     let rhs_length = state.read_pointer(rhs).unwrap_value();
     let result_length = lhs_length + rhs_length;
-    let pointer = state.allocate(result_length + WORD_SIZE_IN_BYTES);
+    let pointer = state.reallocate(0, result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
         runtime_error!(
             state,
@@ -647,6 +647,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::ArrayLength => sys_calls::array_length(arguments[0], state),
         SystemCallKind::ToString => sys_calls::to_string(arguments[0], state),
         SystemCallKind::DebugHeapDump => sys_calls::heap_dump(arguments[0], state),
+        SystemCallKind::Reallocate => sys_calls::reallocate(arguments[0], arguments[1], state),
         SystemCallKind::Break => unreachable!(),
     }
 }
