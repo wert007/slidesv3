@@ -494,20 +494,29 @@ fn convert_array_index_for_assignment(
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
+    let (needs_array_check, base_type_size) = match &array_index.base.type_ {
+        Type::Array(base_type) => (true, base_type.array_element_size_in_bytes()),
+        Type::PointerOf(base_type) => (false, base_type.array_element_size_in_bytes()),
+        error => unreachable!("unexpected access type {}", error),
+    };
     // array
     let mut result = convert_node(*array_index.base, converter);
     // index
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(Instruction::load_immediate(1).span(span).into());
-    result.push(Instruction::addition().span(span).into());
+    if needs_array_check {
+        result.push(Instruction::load_immediate(1).span(span).into());
+        result.push(Instruction::addition().span(span).into());
+    }
     result.push(
-        Instruction::load_immediate(WORD_SIZE_IN_BYTES)
+        Instruction::load_immediate(base_type_size)
             .span(span)
             .into(),
     );
     result.push(Instruction::multiplication().span(span).into());
 
-    result.push(Instruction::check_array_bounds().span(span).into());
+    if needs_array_check {
+        result.push(Instruction::check_array_bounds().span(span).into());
+    }
     result.push(Instruction::store_in_memory().span(span).into());
     result
 }
@@ -751,9 +760,23 @@ fn convert_array_index(
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
+    let base_type_size = match &array_index.base.type_ {
+        Type::Array(base_type) => base_type.array_element_size_in_bytes(),
+        Type::PointerOf(base_type) => base_type.array_element_size_in_bytes(),
+        error => unreachable!("unexpected access type {}", error),
+    };
+
     let mut result = convert_node(*array_index.base, converter);
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(Instruction::array_index().span(span).into());
+    result.push(
+        Instruction::load_immediate(base_type_size)
+            .span(span)
+            .into(),
+    );
+    result.push(Instruction::multiplication().span(span).into());
+
+    result.push(Instruction::addition().span(span).into());
+    result.push(Instruction::read_word_with_offset(0).span(span).into());
     result
 }
 

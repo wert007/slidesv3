@@ -388,9 +388,15 @@ fn evaluate_bitwise_nxor(state: &mut EvaluatorState, _: Instruction) {
 }
 
 fn evaluate_addition(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value();
-    let lhs = state.stack.pop().unwrap_value();
-    state.stack.push(lhs.wrapping_add(rhs));
+    let rhs = state.stack.pop().value;
+    let lhs = state.stack.pop();
+    let is_pointer = lhs.is_pointer();
+    let lhs = lhs.value;
+    let result = FlaggedWord {
+        value: lhs.wrapping_add(rhs),
+        flags: memory::Flags { is_pointer },
+    };
+    state.stack.push_flagged_word(result);
 }
 
 fn evaluate_subtraction(state: &mut EvaluatorState, _: Instruction) {

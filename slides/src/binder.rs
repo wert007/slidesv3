@@ -1975,6 +1975,7 @@ fn bind_array_index<'a, 'b>(
     let base = bind_node(*array_index.base, binder);
     let type_ = match base.type_.clone() {
         Type::Array(base_type) => *base_type,
+        Type::PointerOf(base_type) => *base_type,
         error => {
             binder.diagnostic_bag.report_cannot_convert(
                 base_span,
@@ -1998,6 +1999,7 @@ fn bind_array_index_for_assignment<'a, 'b>(
     let base = bind_node_for_assignment(*array_index.base, binder);
     let type_ = match base.type_.clone() {
         Type::Array(base_type) => *base_type,
+        Type::PointerOf(base_type) => *base_type,
         error => {
             binder.diagnostic_bag.report_cannot_convert(
                 base_span,
