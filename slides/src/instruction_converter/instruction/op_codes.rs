@@ -9,7 +9,6 @@ pub enum OpCode {
     Pop = 4,
     LoadRegister = 5,
     StoreInRegister = 6,
-    ArrayIndex = 7,
     StoreInMemory = 8,
     WriteToStack = 9,
     WriteToHeap = 10,
@@ -37,7 +36,6 @@ pub enum OpCode {
     LessThanEquals = 40,
     GreaterThanEquals = 41,
     StringConcat = 42,
-    PointerAddition = 43,
     NoneableOrValue = 44,
     //Jumps
     Jump = 60,

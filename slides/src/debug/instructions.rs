@@ -232,7 +232,6 @@ fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) ->
         OpCode::Pop => instruction_no_arg_to_string("pop"),
         OpCode::LoadRegister => instruction_reg_arg_to_string("ldreg", instruction.arg),
         OpCode::StoreInRegister => instruction_reg_arg_to_string("streg", instruction.arg),
-        OpCode::ArrayIndex => instruction_no_arg_to_string("arrayidx"),
         OpCode::StoreInMemory => instruction_ptr_unsigned_arg_to_string("stm", instruction.arg),
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
         OpCode::WriteToHeap => instruction_word_count_arg_to_string("wrtheap", instruction.arg),
@@ -261,7 +260,6 @@ fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) ->
         OpCode::LessThanEquals => instruction_no_arg_to_string("lte"),
         OpCode::GreaterThanEquals => instruction_no_arg_to_string("gte"),
         OpCode::StringConcat => instruction_no_arg_to_string("strconcat"),
-        OpCode::PointerAddition => instruction_no_arg_to_string("addptr"),
         OpCode::NoneableOrValue => instruction_no_arg_to_string("noneableor"),
         OpCode::Jump if !has_labels => {
             instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg)

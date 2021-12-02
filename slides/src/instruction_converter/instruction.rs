@@ -81,14 +81,6 @@ impl Instruction {
         }
     }
 
-    pub const fn array_index() -> Self {
-        Self {
-            op_code: OpCode::ArrayIndex,
-            arg: 0,
-            span: None,
-        }
-    }
-
     pub const fn store_in_memory() -> Self {
         Self {
             op_code: OpCode::StoreInMemory,
@@ -293,14 +285,6 @@ impl Instruction {
         Self {
             op_code: OpCode::StringConcat,
             arg: 0,
-            span: None,
-        }
-    }
-
-    pub const fn add_to_pointer(value: i64) -> Self {
-        Self {
-            op_code: OpCode::PointerAddition,
-            arg: value as _,
             span: None,
         }
     }

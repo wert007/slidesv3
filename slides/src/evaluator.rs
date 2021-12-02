@@ -208,7 +208,6 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::Pop => evaluate_pop(state, instruction),
         OpCode::LoadRegister => evaluate_load_register(state, instruction),
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
-        OpCode::ArrayIndex => evaluate_array_index(state, instruction),
         OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
         OpCode::WriteToHeap => evaluate_write_to_heap(state, instruction),
@@ -234,7 +233,6 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
         OpCode::StringConcat => evaluate_string_concat(state, instruction),
-        OpCode::PointerAddition => evaluate_pointer_addition(state, instruction),
         OpCode::NoneableOrValue => evaluate_noneable_or_value(state, instruction),
         OpCode::Jump => evaluate_jump(state, instruction),
         OpCode::JumpIfFalse => evaluate_jump_if_false(state, instruction),
@@ -278,29 +276,6 @@ fn evaluate_load_register(state: &mut EvaluatorState, instruction: Instruction) 
 fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruction) {
     let value = state.stack.pop();
     state.set_variable(instruction.arg, value);
-}
-
-fn evaluate_array_index(state: &mut EvaluatorState, instruction: Instruction) {
-    let index_in_words = state.stack.pop().unwrap_value();
-    let array = state.stack.pop().unwrap_pointer();
-
-    let array_length_in_bytes = state.read_pointer(array).unwrap_value();
-    let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
-    if (index_in_words as i64) < 0 || index_in_words >= array_length_in_words {
-        runtime_error!(
-            state,
-            index_out_of_bounds(
-                instruction.span,
-                index_in_words as i64,
-                array_length_in_words
-            )
-        );
-        state.stack.push(0);
-        return;
-    }
-    let index_in_bytes = array + index_in_words * WORD_SIZE_IN_BYTES + WORD_SIZE_IN_BYTES;
-    let value = state.read_pointer(index_in_bytes);
-    state.stack.push_flagged_word(value);
 }
 
 fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
@@ -597,17 +572,6 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
         }
     }
     state.stack.push_pointer(pointer);
-}
-
-fn evaluate_pointer_addition(state: &mut EvaluatorState, instruction: Instruction) {
-    let lhs = state.stack.pop().unwrap_pointer();
-    let rhs = instruction.arg as i64;
-    let result = if rhs < 0 {
-        lhs - (-rhs) as u64
-    } else {
-        lhs + rhs as u64
-    };
-    state.stack.push_pointer(result);
 }
 
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
