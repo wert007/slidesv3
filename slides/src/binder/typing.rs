@@ -56,6 +56,8 @@ impl Type {
             (_, Type::Any) => true,
             (Type::Pointer, Type::PointerOf(_)) => true,
             (Type::PointerOf(_), Type::Pointer) => true,
+            (Type::None, Type::PointerOf(_)) => true,
+            (Type::None, Type::Pointer) => true,
             (Type::None, Type::Noneable(_)) => true,
             (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
             (Type::Array(base_type), Type::Array(other)) => base_type.can_be_converted_to(other),
