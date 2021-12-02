@@ -48,6 +48,11 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64, 
                 decode_type(FlaggedWord::pointer(address), state);
             (Type::noneable(base_type), address, to_string_function)
         }
+        Type::TYPE_IDENTIFIER_POINTER_OF => {
+            let (base_type, address, to_string_function) =
+                decode_type(FlaggedWord::pointer(address), state);
+            (Type::noneable(base_type), address, to_string_function)
+        }
         Type::TYPE_IDENTIFIER_STRUCT | Type::TYPE_IDENTIFIER_STRUCT_REFERENCE => {
             let struct_id = state.read_pointer(address).unwrap_value();
             let address = address + WORD_SIZE_IN_BYTES;
