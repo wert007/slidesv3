@@ -875,7 +875,7 @@ fn bind<'a>(
                         );
                 }
             }
-            Some(StructFunctionKind::ToString) | None => {}
+            Some(StructFunctionKind::ToString | StructFunctionKind::Get) | None => {}
         }
         binder.assigned_fields.clear();
         if matches!(&binder.function_return_type, Type::Void) {
@@ -1128,6 +1128,22 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                             header_span,
                             function_type.parameter_types.len(),
                             0,
+                        );
+                    }
+                }
+                StructFunctionKind::Get => {
+                    if function_type.parameter_types.len() != 1 {
+                        binder.diagnostic_bag.report_unexpected_parameter_count(
+                            header_span,
+                            function_type.parameter_types.len(),
+                            1,
+                        );
+                    }
+                    if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer) {
+                        binder.diagnostic_bag.report_cannot_convert(
+                            header_span,
+                            &function_type.parameter_types[0],
+                            &Type::Integer,
                         );
                     }
                 }
@@ -1973,9 +1989,25 @@ fn bind_array_index<'a, 'b>(
     let index = bind_conversion(index, &Type::Integer, binder);
     let base_span = array_index.base.span;
     let base = bind_node(*array_index.base, binder);
-    let type_ = match base.type_.clone() {
+    let type_ = match binder.convert_struct_reference_to_struct(base.type_.clone()) {
         Type::Array(base_type) => *base_type,
         Type::PointerOf(base_type) => *base_type,
+        Type::Struct(struct_type) => {
+            match struct_type.function_table.get_function {
+                Some(get_function) => {
+                    let function_base = BoundNode::label_reference(get_function.label_index as _, Type::function(get_function.function_type.clone()));
+                    return BoundNode::function_call(span, function_base, vec![index, base], false, get_function.function_type.return_type.clone());
+                },
+                None => {
+                    binder.diagnostic_bag.report_cannot_convert(
+                        base_span,
+                        &base.type_,
+                        &Type::array(base.type_.clone()),
+                    );
+                    Type::Error
+                },
+            }
+        }
         error => {
             binder.diagnostic_bag.report_cannot_convert(
                 base_span,

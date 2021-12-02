@@ -196,6 +196,7 @@ impl From<BoundStructFieldSymbol<'_>> for StructFieldSymbol {
 pub struct StructFunctionTable {
     pub constructor_function: Option<FunctionSymbol>,
     pub to_string_function: Option<FunctionSymbol>,
+    pub get_function: Option<FunctionSymbol>,
 }
 
 impl StructFunctionTable {
@@ -203,6 +204,7 @@ impl StructFunctionTable {
         match kind {
             StructFunctionKind::Constructor => self.constructor_function = Some(function),
             StructFunctionKind::ToString => self.to_string_function = Some(function),
+            StructFunctionKind::Get => self.get_function = Some(function),
         }
     }
 
@@ -227,6 +229,7 @@ impl StructFunctionTable {
 pub enum StructFunctionKind {
     Constructor,
     ToString,
+    Get,
 }
 
 impl<'a> TryFrom<&'a str> for StructFunctionKind {
@@ -236,6 +239,7 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
         match value {
             "$constructor" => Ok(Self::Constructor),
             "$toString" => Ok(Self::ToString),
+            "$get" => Ok(Self::Get),
             _ => Err(value),
         }
     }
