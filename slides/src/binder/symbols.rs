@@ -197,6 +197,7 @@ pub struct StructFunctionTable {
     pub constructor_function: Option<FunctionSymbol>,
     pub to_string_function: Option<FunctionSymbol>,
     pub get_function: Option<FunctionSymbol>,
+    pub set_function: Option<FunctionSymbol>,
 }
 
 impl StructFunctionTable {
@@ -205,6 +206,7 @@ impl StructFunctionTable {
             StructFunctionKind::Constructor => self.constructor_function = Some(function),
             StructFunctionKind::ToString => self.to_string_function = Some(function),
             StructFunctionKind::Get => self.get_function = Some(function),
+            StructFunctionKind::Set => self.set_function = Some(function),
         }
     }
 
@@ -230,6 +232,7 @@ pub enum StructFunctionKind {
     Constructor,
     ToString,
     Get,
+    Set,
 }
 
 impl<'a> TryFrom<&'a str> for StructFunctionKind {
@@ -240,6 +243,7 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
             "$constructor" => Ok(Self::Constructor),
             "$toString" => Ok(Self::ToString),
             "$get" => Ok(Self::Get),
+            "$set" => Ok(Self::Set),
             _ => Err(value),
         }
     }

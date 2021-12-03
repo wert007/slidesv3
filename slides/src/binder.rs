@@ -875,7 +875,7 @@ fn bind<'a>(
                         );
                 }
             }
-            Some(StructFunctionKind::ToString | StructFunctionKind::Get) | None => {}
+            Some(StructFunctionKind::ToString | StructFunctionKind::Get | StructFunctionKind::Set) | None => {}
         }
         binder.assigned_fields.clear();
         if matches!(&binder.function_return_type, Type::Void) {
@@ -1137,6 +1137,22 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                             header_span,
                             function_type.parameter_types.len(),
                             1,
+                        );
+                    }
+                    if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer) {
+                        binder.diagnostic_bag.report_cannot_convert(
+                            header_span,
+                            &function_type.parameter_types[0],
+                            &Type::Integer,
+                        );
+                    }
+                }
+                StructFunctionKind::Set => {
+                    if function_type.parameter_types.len() != 2 {
+                        binder.diagnostic_bag.report_unexpected_parameter_count(
+                            header_span,
+                            function_type.parameter_types.len(),
+                            2,
                         );
                     }
                     if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer) {
