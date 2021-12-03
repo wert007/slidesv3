@@ -272,14 +272,17 @@ fn flatten_closure<'a>(
     closure: BoundClosureNodeKind<'a>,
     flattener: &mut Flattener,
 ) -> BoundNode<'a> {
-    let base = flatten_expression(*closure.base, flattener);
+    let mut arguments = Vec::with_capacity(closure.arguments.len());
+    for argument in closure.arguments {
+        arguments.push(flatten_expression(argument, flattener));
+    }
     match closure.function {
-        super::typing::FunctionKind::FunctionId(id) => BoundNode::closure(span, base, id, type_),
+        super::typing::FunctionKind::FunctionId(id) => BoundNode::closure(span, arguments, id, type_),
         super::typing::FunctionKind::SystemCall(system_call_kind) => {
-            BoundNode::system_call_closure(span, base, system_call_kind, type_)
+            BoundNode::system_call_closure(span, arguments, system_call_kind, type_)
         }
         super::typing::FunctionKind::LabelReference(label_index) => {
-            BoundNode::closure_label(span, base, label_index, type_)
+            BoundNode::closure_label(span, arguments, label_index, type_)
         }
     }
 }

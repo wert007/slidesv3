@@ -812,7 +812,7 @@ fn convert_closure(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let arguments = closure.arguments();
+    let arguments = closure.arguments;
     let is_system_call = matches!(closure.function, FunctionKind::SystemCall(_));
     let size_in_words = if is_system_call {
         arguments.len()

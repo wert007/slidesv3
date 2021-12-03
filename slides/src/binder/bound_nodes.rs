@@ -187,11 +187,11 @@ impl<'a> BoundNode<'a> {
         }
     }
 
-    pub fn closure(span: TextSpan, base: BoundNode<'a>, id: u64, type_: Type) -> Self {
+    pub fn closure(span: TextSpan, arguments: Vec<BoundNode<'a>>, id: u64, type_: Type) -> Self {
         Self {
             span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
-                base: Box::new(base),
+                arguments,
                 function: FunctionKind::FunctionId(id),
             }),
             type_,
@@ -201,14 +201,14 @@ impl<'a> BoundNode<'a> {
 
     pub fn closure_label(
         span: TextSpan,
-        base: BoundNode<'a>,
+        arguments: Vec<BoundNode<'a>>,
         label_index: usize,
         type_: Type,
     ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
-                base: Box::new(base),
+                arguments,
                 function: FunctionKind::LabelReference(label_index),
             }),
             type_,
@@ -218,14 +218,14 @@ impl<'a> BoundNode<'a> {
 
     pub fn system_call_closure(
         span: TextSpan,
-        base: BoundNode<'a>,
+        arguments: Vec<BoundNode<'a>>,
         system_call_kind: SystemCallKind,
         type_: Type,
     ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
-                base: Box::new(base),
+                arguments,
                 function: FunctionKind::SystemCall(system_call_kind),
             }),
             type_,
@@ -733,14 +733,8 @@ pub struct BoundFieldAccessNodeKind<'a> {
 
 #[derive(Debug, Clone)]
 pub struct BoundClosureNodeKind<'a> {
-    pub base: Box<BoundNode<'a>>,
+    pub arguments: Vec<BoundNode<'a>>,
     pub function: FunctionKind,
-}
-
-impl<'a> BoundClosureNodeKind<'a> {
-    pub fn arguments(&self) -> Vec<BoundNode<'a>> {
-        vec![*self.base.clone()]
-    }
 }
 
 #[derive(Debug, Clone)]

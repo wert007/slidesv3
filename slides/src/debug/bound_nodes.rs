@@ -242,8 +242,15 @@ fn print_bound_node_closure_as_code(
     printer: DebugPrinter,
     buffer: &mut String,
 ) {
-    print_bound_node_as_code_with_indent(&closure.base, printer, buffer);
-    buffer.push('.');
+    buffer.push('(');
+    for (index, argument) in closure.arguments.iter().enumerate() {
+        if index != 0 {
+            buffer.push_str(", ");
+        }
+        print_bound_node_as_code_with_indent(argument, printer, buffer);
+
+    }
+    buffer.push_str(").");
     buffer.push_str(&closure.function.to_string());
 }
 

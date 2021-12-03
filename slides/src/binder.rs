@@ -1934,8 +1934,8 @@ fn bind_function_call<'a, 'b>(
     let function = bind_node(*function_call.base, binder);
     let mut arguments = vec![];
     let mut more_arguments = vec![];
-    let function = if let BoundNodeKind::Closure(closure) = function.kind {
-        more_arguments.append(&mut closure.arguments());
+    let function = if let BoundNodeKind::Closure(mut closure) = function.kind {
+        more_arguments.append(&mut closure.arguments);
         let type_ = if let Type::Closure(closure_type) = function.type_ {
             Type::Function(Box::new(closure_type.base_function_type))
         } else {
@@ -2092,11 +2092,11 @@ fn bind_field_access<'a, 'b>(
                         function_name
                     ),
                     VariableOrConstantKind::Variable(variable_id) => {
-                        BoundNode::closure(span, base, variable_id, type_)
+                        BoundNode::closure(span, vec![base], variable_id, type_)
                     }
                     VariableOrConstantKind::Constant(value) => {
                         let label_index = value.as_label_pointer().unwrap().0;
-                        BoundNode::closure_label(span, base, label_index, type_)
+                        BoundNode::closure_label(span, vec![base], label_index, type_)
                     }
                 }
             } else {
@@ -2154,7 +2154,7 @@ fn bind_field_access<'a, 'b>(
                 let function_type = FunctionType::system_call(SystemCallKind::ArrayLength);
                 BoundNode::system_call_closure(
                     span,
-                    base,
+                    vec![base],
                     SystemCallKind::ArrayLength,
                     Type::closure(function_type),
                 )
