@@ -1,6 +1,6 @@
 use crate::evaluator::memory;
 
-use super::EvaluatorState;
+use super::{EvaluatorState, memory::FlaggedWord};
 
 pub fn create_session(state: &mut EvaluatorState) -> bool {
     println!("This is the debugger. Type :q to exit the debugger.");
@@ -12,6 +12,7 @@ pub fn create_session(state: &mut EvaluatorState) -> bool {
                 Command::Quit => return false,
                 Command::NextInstruction => return true,
                 Command::Stack => print_stack(&state.stack),
+                Command::Registers => print_registers(&state.registers),
                 Command::Pointer(address) => read_pointer(state, address),
             },
             None => {
@@ -19,6 +20,17 @@ pub fn create_session(state: &mut EvaluatorState) -> bool {
             }
         }
         line.clear();
+    }
+}
+
+fn print_registers(registers: &[FlaggedWord]) {
+    for (index, value) in registers.iter().enumerate() {
+        print!("r#{}: ", index);
+        if value.is_pointer() {
+            println!("#{:x}", value.unwrap_pointer());
+        } else {
+            println!("{}", value.unwrap_value());
+        }
     }
 }
 
@@ -58,6 +70,7 @@ enum Command {
     Quit,
     NextInstruction,
     Stack,
+    Registers,
     Pointer(usize),
 }
 
@@ -71,6 +84,7 @@ fn parse_command(input: &str) -> Option<Command> {
             }
         }
         ["stack"] => Some(Command::Stack),
+        ["registers"] => Some(Command::Registers),
         ["q" | "quit"] => Some(Command::Quit),
         ["n" | "next"] => Some(Command::NextInstruction),
         _ => None,
