@@ -2048,6 +2048,22 @@ fn bind_array_index_for_assignment<'a, 'b>(
     let type_ = match base.type_.clone() {
         Type::Array(base_type) => *base_type,
         Type::PointerOf(base_type) => *base_type,
+        Type::Struct(struct_type) => {
+            match struct_type.function_table.set_function {
+                Some(set_function) => {
+                    let type_ = Type::closure(set_function.function_type.clone());
+                    return BoundNode::closure_label(span, vec![base, index], set_function.label_index as _, type_);
+                },
+                None => {
+                    binder.diagnostic_bag.report_cannot_convert(
+                        base_span,
+                        &base.type_,
+                        &Type::array(base.type_.clone()),
+                    );
+                    Type::Error
+                }
+            }
+        }
         error => {
             binder.diagnostic_bag.report_cannot_convert(
                 base_span,
@@ -2740,8 +2756,32 @@ fn bind_assignment<'a, 'b>(
         }
     }
     let expression = bind_node(*assignment.expression, binder);
-    let expression = bind_conversion(expression, &lhs.type_, binder);
-    BoundNode::assignment(span, lhs, expression)
+    if let Type::Closure(closure) = &lhs.type_ {
+        let function_type = &closure.base_function_type;
+        if let BoundNodeKind::Closure(mut closure) = lhs.kind {
+            let expression = bind_conversion(expression, &function_type.parameter_types[1], binder);
+            let base = match closure.function {
+                typing::FunctionKind::FunctionId(_) => todo!("Assignment as FunctionCall not implemented for FunctionId"),
+                typing::FunctionKind::SystemCall(_) => todo!("Assignment as FunctionCall not implemented for SystemCalls"),
+                typing::FunctionKind::LabelReference(label_reference) => BoundNode::label_reference(label_reference, Type::function(function_type.clone())),
+            };
+            let mut arguments = Vec::with_capacity(closure.arguments.len() + 1);
+            // index
+            arguments.push(closure.arguments.pop().unwrap());
+            // value
+            arguments.push(expression);
+            // this
+            arguments.push(closure.arguments.pop().unwrap());
+            assert!(closure.arguments.is_empty());
+            BoundNode::function_call(span, base, arguments, false, Type::Void)
+        } else {
+            let expression = bind_conversion(expression, &lhs.type_, binder);
+            BoundNode::assignment(span, lhs, expression)
+        }
+    } else {
+        let expression = bind_conversion(expression, &lhs.type_, binder);
+        BoundNode::assignment(span, lhs, expression)
+    }
 }
 
 fn bind_block_statement<'a, 'b>(
