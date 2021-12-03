@@ -2044,7 +2044,7 @@ fn bind_array_index_for_assignment<'a, 'b>(
     let index = bind_node(*array_index.index, binder);
     let index = bind_conversion(index, &Type::Integer, binder);
     let base_span = array_index.base.span;
-    let base = bind_node_for_assignment(*array_index.base, binder);
+    let base = bind_node(*array_index.base, binder);
     let type_ = match base.type_.clone() {
         Type::Array(base_type) => *base_type,
         Type::PointerOf(base_type) => *base_type,
@@ -2196,7 +2196,7 @@ fn bind_field_access_for_assignment<'a>(
     } else {
         false
     };
-    let base = bind_node_for_assignment(*field_access.base, binder);
+    let base = bind_node(*field_access.base, binder);
     let field = field_access.field;
     let mut struct_handler = |id: u64, base| {
         let field_name = field.lexeme;
