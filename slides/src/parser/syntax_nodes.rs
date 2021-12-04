@@ -485,8 +485,8 @@ impl<'a> SyntaxNode<'a> {
 
     pub fn compilation_unit(statements: Vec<SyntaxNode<'a>>, eoi: SyntaxToken<'a>) -> Self {
         let span = TextSpan::bounds(
-            statements.first().unwrap().span(),
-            statements.last().unwrap().span(),
+            statements.first().map(|s|s.span()).unwrap_or(TextSpan::zero()),
+            statements.last().map(|s|s.span()).unwrap_or(TextSpan::zero()),
         );
         Self {
             kind: SyntaxNodeKind::CompilationUnit(CompilationUnitNodeKind { statements, eoi }),
