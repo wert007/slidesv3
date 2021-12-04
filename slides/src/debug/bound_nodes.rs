@@ -123,7 +123,7 @@ fn print_bound_node_label_reference_as_code(
 }
 
 fn print_bound_node_literal_expression_as_code(
-    literal_expression: &LiteralNodeKind,
+    literal_expression: &BoundLiteralNodeKind,
     _: DebugPrinter,
     buffer: &mut String,
 ) {

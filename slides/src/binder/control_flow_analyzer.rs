@@ -73,8 +73,8 @@ impl IncomingConnections {
 pub enum OutgoingConnections<'a> {
     None,
     Single(usize),
-    IfTrue(&'a BoundNode<'a>, usize, usize),
-    IfFalse(&'a BoundNode<'a>, usize, usize),
+    IfTrue(&'a BoundNode, usize, usize),
+    IfFalse(&'a BoundNode, usize, usize),
 }
 
 impl OutgoingConnections<'_> {
@@ -149,7 +149,7 @@ fn collect_paths_to_end(basic_blocks: &[BasicBlock]) -> Vec<usize> {
     result
 }
 
-fn collect_basic_blocks<'a>(statements: &[BoundNode<'a>]) -> Vec<BasicBlock<'a>> {
+fn collect_basic_blocks<'a>(statements: &[BoundNode]) -> Vec<BasicBlock<'a>> {
     let mut result = vec![BasicBlock::start()];
     let mut current_block = BasicCodeBlock {
         index: 0,
@@ -215,7 +215,7 @@ fn collect_basic_blocks<'a>(statements: &[BoundNode<'a>]) -> Vec<BasicBlock<'a>>
 
 fn connect_basic_blocks<'a>(
     basic_blocks: &mut Vec<BasicBlock<'a>>,
-    statements: &'a [BoundNode<'a>],
+    statements: &'a [BoundNode],
 ) {
     let end_index = basic_blocks.last().unwrap().index;
     let mut incoming_connections = vec![];

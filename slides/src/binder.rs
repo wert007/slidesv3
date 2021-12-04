@@ -47,13 +47,13 @@ use self::{
 };
 
 #[derive(Debug, Clone)]
-enum SafeNodeInCondition<'a> {
+enum SafeNodeInCondition {
     None,
-    IfBody(BoundNode<'a>, Type),
-    ElseBody(BoundNode<'a>, Type),
+    IfBody(BoundNode, Type),
+    ElseBody(BoundNode, Type),
 }
 
-impl SafeNodeInCondition<'_> {
+impl SafeNodeInCondition {
     pub fn negate(self) -> Self {
         match self {
             SafeNodeInCondition::None => self,
@@ -297,7 +297,7 @@ struct BindingState<'a, 'b> {
     /// would be wrong now. So this is why this is used in a vector. This may
     /// also be done in a HashMap, but finding the next index would be harder
     /// then, I think.
-    safe_nodes: Vec<Option<(BoundNode<'a>, Type)>>,
+    safe_nodes: Vec<Option<(BoundNode, Type)>>,
     /// This is the debug flag. This will print all variable names and their
     /// indices, when ever some go out of scope. (Self::delete_variables_until())
     print_variable_table: bool,
@@ -493,7 +493,7 @@ impl<'a> BindingState<'a, '_> {
             .map(|c| c.value.clone())
     }
 
-    fn register_safe_node(&mut self, node: BoundNode<'a>, safe_type: Type) -> usize {
+    fn register_safe_node(&mut self, node: BoundNode, safe_type: Type) -> usize {
         if let Some(index) = self.safe_nodes.iter().position(|n| n.is_none()) {
             self.safe_nodes[index] = Some((node, safe_type));
             index
@@ -512,7 +512,7 @@ impl<'a> BindingState<'a, '_> {
         self.safe_nodes[index] = None;
     }
 
-    fn get_safe_node(&self, node: &BoundNode<'a>) -> Option<BoundNode<'a>> {
+    fn get_safe_node(&self, node: &BoundNode) -> Option<BoundNode> {
         self.safe_nodes
             .iter()
             .filter_map(|n| n.as_ref())
@@ -679,16 +679,16 @@ fn print_variable_table(variable_table: &[BoundVariableName]) {
     println!();
 }
 
-pub struct BoundProgram<'a> {
+pub struct BoundProgram {
     pub startup: Vec<InstructionOrLabelReference>,
-    pub functions: BoundNode<'a>,
+    pub functions: BoundNode,
     pub fixed_variable_count: usize,
     pub max_used_variables: usize,
     pub label_count: usize,
     pub referenced_libraries: Vec<Library>,
 }
 
-impl BoundProgram<'_> {
+impl BoundProgram {
     pub fn error() -> Self {
         Self {
             startup: vec![],
@@ -701,13 +701,13 @@ impl BoundProgram<'_> {
     }
 }
 
-pub struct BoundLibrary<'a> {
-    pub program: BoundProgram<'a>,
+pub struct BoundLibrary {
+    pub program: BoundProgram,
     pub exported_functions: Vec<FunctionSymbol>,
     pub exported_structs: Vec<StructSymbol>,
 }
 
-impl BoundLibrary<'_> {
+impl BoundLibrary {
     pub fn error() -> Self {
         Self {
             program: BoundProgram::error(),
@@ -743,19 +743,19 @@ fn type_table() -> Vec<BoundVariableName<'static>> {
 }
 
 pub fn bind_program<'a>(
-    source_text: &'a SourceText<'a>,
+    source_text: &'a SourceText,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
-) -> BoundProgram<'a> {
+) -> BoundProgram {
     bind(source_text, diagnostic_bag, false, true, debug_flags).program
 }
 
 pub fn bind_library<'a>(
-    source_text: &'a SourceText<'a>,
+    source_text: &'a SourceText,
     diagnostic_bag: &mut DiagnosticBag<'a>,
     debug_flags: DebugFlags,
     import_std_lib: bool,
-) -> BoundLibrary<'a> {
+) -> BoundLibrary {
     bind(
         source_text,
         diagnostic_bag,
@@ -771,7 +771,7 @@ fn bind<'a>(
     is_library: bool,
     import_std_lib: bool,
     debug_flags: DebugFlags,
-) -> BoundLibrary<'a> {
+) -> BoundLibrary {
     let node = parser::parse(source_text, diagnostic_bag, debug_flags);
     if diagnostic_bag.has_errors() {
         return BoundLibrary::error();
@@ -1065,7 +1065,7 @@ fn bind_function_declaration<'a, 'b>(
 }
 
 fn bind_function_declaration_for_struct<'a, 'b>(
-    struct_name: &'a str,
+    struct_name: &str,
     function_declaration: FunctionDeclarationNodeKind<'a>,
     struct_function_table: &mut StructFunctionTable,
     binder: &mut BindingState<'a, 'b>,
@@ -1271,11 +1271,11 @@ fn bind_function_type<'a>(
 }
 
 fn bind_struct_body<'a>(
-    struct_name: &'a str,
+    struct_name: &str,
     struct_body: StructBodyNode<'a>,
     binder: &mut BindingState<'a, '_>,
 ) -> (Vec<BoundStructFieldSymbol<'a>>, StructFunctionTable) {
-    let mut fields: Vec<BoundStructFieldSymbol<'a>> = vec![];
+    let mut fields: Vec<BoundStructFieldSymbol> = vec![];
     let mut function_table = StructFunctionTable::default();
     let mut offset = 0;
     for statement in struct_body.statements {
@@ -1373,7 +1373,7 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     result
 }
 
-fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode<'a> {
+fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode {
     let result = match node.kind {
         SyntaxNodeKind::Literal(literal) => bind_literal(node.span, literal, binder),
         SyntaxNodeKind::ArrayLiteral(array_literal) => {
@@ -1432,7 +1432,7 @@ fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) ->
 fn bind_node_for_assignment<'a, 'b>(
     node: SyntaxNode<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     match node.kind {
         SyntaxNodeKind::Variable(variable) => {
             bind_variable_for_assignment(node.span, variable, binder)
@@ -1451,19 +1451,19 @@ fn bind_node_for_assignment<'a, 'b>(
     }
 }
 
-fn bind_literal<'a>(
+fn bind_literal(
     span: TextSpan,
-    literal: LiteralNodeKind<'a>,
+    literal: LiteralNodeKind,
     _: &mut BindingState,
-) -> BoundNode<'a> {
-    BoundNode::literal(span, literal)
+) -> BoundNode {
+    BoundNode::literal(span, literal.value)
 }
 
 fn bind_array_literal<'a, 'b>(
     span: TextSpan,
     mut array_literal: ArrayLiteralNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let expected_type = if let Some(Type::Array(base_type)) = &binder.expected_type {
         Some(*base_type.clone())
     } else {
@@ -1502,7 +1502,7 @@ fn bind_array_literal_first_child<'a>(
     first_child: SyntaxNode<'a>,
     expected_type: Option<Type>,
     binder: &mut BindingState<'a, '_>,
-) -> (Type, Vec<BoundNode<'a>>) {
+) -> (Type, Vec<BoundNode>) {
     let children = if let SyntaxNodeKind::RepetitionNode(repetition_node) = first_child.kind {
         let base_expression = bind_node(*repetition_node.base_expression, binder);
         let repetition = bind_node(*repetition_node.repetition, binder);
@@ -1532,7 +1532,7 @@ fn bind_cast_expression<'a>(
     span: TextSpan,
     cast_expression: CastExpressionNodeKind<'a>,
     binder: &mut BindingState<'a, '_>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let expression = bind_node(*cast_expression.expression, binder);
     let type_ = bind_type(cast_expression.type_, binder);
     // Cast unnecessary and will always return a valid value.
@@ -1564,7 +1564,7 @@ fn bind_constructor_call<'a>(
     span: TextSpan,
     constructor_call: ConstructorCallNodeKind<'a>,
     binder: &mut BindingState<'a, '_>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let type_name = constructor_call.type_name.lexeme;
     let type_name_span = constructor_call.type_name.span();
     let type_ = bind_type(
@@ -1625,9 +1625,9 @@ fn bind_constructor_call<'a>(
 
 fn bind_variable<'a, 'b>(
     span: TextSpan,
-    variable: VariableNodeKind<'a>,
+    variable: VariableNodeKind,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let variable_name = variable.token.lexeme;
     let variable = binder.look_up_variable_or_constant_by_name(variable_name);
     match variable.kind {
@@ -1650,9 +1650,9 @@ fn bind_variable<'a, 'b>(
 
 fn bind_variable_for_assignment<'a, 'b>(
     span: TextSpan,
-    variable: VariableNodeKind<'a>,
+    variable: VariableNodeKind,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let variable_is_read_only = binder
         .look_up_variable_or_constant_by_name(variable.token.lexeme)
         .is_read_only;
@@ -1668,7 +1668,7 @@ fn bind_binary<'a, 'b>(
     span: TextSpan,
     binary: BinaryNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let lhs = bind_node(*binary.lhs, binder);
     let rhs = bind_node(*binary.rhs, binder);
     bind_binary_insertion(span, lhs, binary.operator_token, rhs, binder)
@@ -1676,11 +1676,11 @@ fn bind_binary<'a, 'b>(
 
 fn bind_binary_insertion<'a>(
     span: TextSpan,
-    lhs: BoundNode<'a>,
-    operator_token: SyntaxToken<'a>,
-    rhs: BoundNode<'a>,
+    lhs: BoundNode,
+    operator_token: SyntaxToken,
+    rhs: BoundNode,
     binder: &mut BindingState<'a, '_>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     match bind_binary_operator(span, &lhs, operator_token, &rhs, binder) {
         Some(bound_binary) => {
             let (lhs, rhs) = if bound_binary.op == BoundBinaryOperator::StringConcat {
@@ -1854,7 +1854,7 @@ fn bind_unary<'a, 'b>(
     span: TextSpan,
     unary: UnaryNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let operand = bind_node(*unary.operand, binder);
     match bind_unary_operator(span, &operand, unary.operator_token, binder) {
         Some((operator_token, type_)) => BoundNode::unary(span, operator_token, operand, type_),
@@ -1865,7 +1865,7 @@ fn bind_unary<'a, 'b>(
 fn bind_unary_operator<'a, 'b>(
     span: TextSpan,
     operand: &BoundNode,
-    operator_token: SyntaxToken,
+    operator_token: SyntaxToken<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> Option<(BoundUnaryOperator, Type)> {
     let result = match &operator_token.kind {
@@ -1897,7 +1897,7 @@ fn bind_parenthesized<'a, 'b>(
     _: TextSpan,
     parenthesized: ParenthesizedNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     bind_node(*parenthesized.expression, binder)
 }
 
@@ -1929,7 +1929,7 @@ fn bind_function_call<'a, 'b>(
     span: TextSpan,
     function_call: FunctionCallNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let argument_span = function_call.argument_span();
     let function = bind_node(*function_call.base, binder);
     let mut arguments = vec![];
@@ -2000,7 +2000,7 @@ fn bind_array_index<'a, 'b>(
     span: TextSpan,
     array_index: ArrayIndexNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let index = bind_node(*array_index.index, binder);
     let index = bind_conversion(index, &Type::Integer, binder);
     let base_span = array_index.base.span;
@@ -2040,7 +2040,7 @@ fn bind_array_index_for_assignment<'a, 'b>(
     span: TextSpan,
     array_index: ArrayIndexNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let index = bind_node(*array_index.index, binder);
     let index = bind_conversion(index, &Type::Integer, binder);
     let base_span = array_index.base.span;
@@ -2080,7 +2080,7 @@ fn bind_field_access<'a, 'b>(
     span: TextSpan,
     field_access: FieldAccessNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let base_span = field_access.base.span();
     let field = field_access.field;
     let base = bind_node(*field_access.base, binder);
@@ -2190,7 +2190,7 @@ fn bind_field_access_for_assignment<'a>(
     span: TextSpan,
     field_access: FieldAccessNodeKind<'a>,
     binder: &mut BindingState<'a, '_>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let base_is_this = if let SyntaxNodeKind::Variable(identifier) = &field_access.base.kind {
         identifier.token.lexeme == "this"
     } else {
@@ -2262,7 +2262,7 @@ fn bind_arguments_for_function<'a, 'b>(
     arguments: Vec<SyntaxNode<'a>>,
     function_type: &FunctionType,
     binder: &mut BindingState<'a, 'b>,
-) -> Vec<BoundNode<'a>> {
+) -> Vec<BoundNode> {
     let mut result = vec![];
     if function_type.parameter_types.len() != arguments.len() {
         binder.diagnostic_bag.report_unexpected_argument_count(
@@ -2303,7 +2303,7 @@ fn bind_arguments_for_function<'a, 'b>(
     result
 }
 
-fn call_to_string<'a>(base: BoundNode<'a>, binder: &mut BindingState<'a, '_>) -> BoundNode<'a> {
+fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> BoundNode {
     match &base.type_ {
         Type::Error => base,
         Type::Library(_) | Type::Void => unreachable!(),
@@ -2366,11 +2366,11 @@ fn call_to_string<'a>(base: BoundNode<'a>, binder: &mut BindingState<'a, '_>) ->
 }
 
 fn call_to_string_on_noneable_struct<'a>(
-    base: BoundNode<'a>,
+    base: BoundNode,
     base_type: Type,
     struct_id: u64,
     binder: &mut BindingState<'a, '_>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let span = base.span;
     let condition = bind_binary_insertion(
         span,
@@ -2394,10 +2394,10 @@ fn call_to_string_on_noneable_struct<'a>(
 }
 
 fn call_to_string_on_struct<'a>(
-    base: BoundNode<'a>,
+    base: BoundNode,
     struct_id: u64,
     binder: &mut BindingState<'a, '_>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let struct_type = binder.get_struct_type_by_id(struct_id).unwrap();
     match &struct_type.function_table.to_string_function {
         Some(function) => {
@@ -2417,10 +2417,10 @@ fn call_to_string_on_struct<'a>(
 }
 
 fn bind_conversion<'a>(
-    mut base: BoundNode<'a>,
+    mut base: BoundNode,
     type_: &Type,
     binder: &mut BindingState<'a, '_>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     if &base.type_ == type_ {
         base
     } else if base.type_.can_be_converted_to(type_) {
@@ -2438,9 +2438,9 @@ fn bind_conversion<'a>(
 }
 
 fn bind_condition_conversion<'a>(
-    base: BoundNode<'a>,
+    base: BoundNode,
     binder: &mut BindingState<'a, '_>,
-) -> (BoundNode<'a>, SafeNodeInCondition<'a>) {
+) -> (BoundNode, SafeNodeInCondition) {
     match &base.type_ {
         Type::Error => (base, SafeNodeInCondition::None),
         Type::None => (base, SafeNodeInCondition::None),
@@ -2468,11 +2468,11 @@ fn bind_condition_conversion<'a>(
             bind_conversion(base, &Type::Boolean, binder),
             SafeNodeInCondition::None,
         ),
-        Type::Library(_) => unimplemented!(),
+        Type::Library(_) | Type::GenericType => unimplemented!(),
     }
 }
 
-fn register_contained_safe_nodes<'a>(base: &BoundNode<'a>) -> SafeNodeInCondition<'a> {
+fn register_contained_safe_nodes(base: &BoundNode) -> SafeNodeInCondition {
     match &base.kind {
         BoundNodeKind::UnaryExpression(unary)
             if unary.operator_token == BoundUnaryOperator::LogicalNegation =>
@@ -2549,7 +2549,7 @@ fn bind_for_statement<'a, 'b>(
     span: TextSpan,
     for_statement: ForStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let range_type = binder.look_up_std_type(StdTypeKind::Range);
     let variable_count = binder.variable_table.len();
     let collection = bind_node(*for_statement.collection, binder);
@@ -2644,7 +2644,7 @@ fn bind_if_statement<'a, 'b>(
     span: TextSpan,
     if_statement: IfStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let condition = bind_node(*if_statement.condition, binder);
     let (condition, safe_node) = bind_condition_conversion(condition, binder);
     let optional_index = if let SafeNodeInCondition::IfBody(node, safe_type) = safe_node.clone() {
@@ -2672,7 +2672,7 @@ fn bind_variable_declaration<'a, 'b>(
     span: TextSpan,
     variable_declaration: VariableDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     binder.expected_type = variable_declaration
         .optional_type_declaration
         .map(|td| bind_type(td.type_, binder));
@@ -2712,7 +2712,7 @@ fn bind_return_statement<'a, 'b>(
     span: TextSpan,
     return_statement: ReturnStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let expression = return_statement
         .optional_expression
         .map(|e| bind_node(*e, binder));
@@ -2736,7 +2736,7 @@ fn bind_while_statement<'a, 'b>(
     span: TextSpan,
     while_statement: WhileStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let condition = bind_node(*while_statement.condition, binder);
     let condition = bind_conversion(condition, &Type::Boolean, binder);
     let body = bind_node(*while_statement.body, binder);
@@ -2747,7 +2747,7 @@ fn bind_assignment<'a, 'b>(
     span: TextSpan,
     assignment: AssignmentNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let lhs = bind_node_for_assignment(*assignment.lhs, binder);
     if let BoundNodeKind::VariableExpression(variable) = &lhs.kind {
         let name = binder.get_variable_name_by_id(variable.variable_index);
@@ -2788,7 +2788,7 @@ fn bind_block_statement<'a, 'b>(
     span: TextSpan,
     block_statement: BlockStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let variable_count = binder.variable_table.len();
     let mut statements = vec![];
     for node in block_statement.statements {
@@ -2805,7 +2805,7 @@ fn bind_expression_statement<'a, 'b>(
     span: TextSpan,
     expression_statement: ExpressionStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let expression = bind_node(*expression_statement.expression, binder);
     BoundNode::expression_statement(span, expression)
 }

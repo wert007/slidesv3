@@ -16,7 +16,7 @@ use crate::{
             BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind,
             BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
             BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
-            BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind,
+            BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind, BoundLiteralNodeKind,
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
@@ -404,7 +404,7 @@ fn convert_node_for_assignment(
 
 fn convert_literal(
     span: TextSpan,
-    literal: LiteralNodeKind,
+    literal: BoundLiteralNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     convert_value(span, literal.value, converter)

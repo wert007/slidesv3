@@ -1,7 +1,7 @@
 use assert_matches::assert_matches;
 
 use crate::{
-    binder::bound_nodes::BoundNodeKind, diagnostics::Diagnostic, text::SourceText, value::Value,
+    binder::bound_nodes::{BoundNodeKind, BoundLiteralNodeKind}, diagnostics::Diagnostic, text::SourceText, value::Value,
 };
 
 use super::*;
@@ -10,10 +10,10 @@ use super::*;
 fn successful_binding() {
     bind_helper_expression("1 + 1;", |node| {
         assert_matches!(node.kind, BoundNodeKind::BinaryExpression(binary) => {
-            assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(1), .. }));
+            assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(1) }));
             assert_matches!(binary.lhs.type_, Type::Integer);
             assert_matches!(binary.operator_token, BoundBinaryOperator::ArithmeticAddition);
-            assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(1), .. }));
+            assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(1) }));
             assert_matches!(binary.rhs.type_, Type::Integer);
         });
         assert_matches!(node.type_, Type::Integer);
@@ -21,10 +21,10 @@ fn successful_binding() {
 
     bind_helper_expression("true != false;", |node| {
         assert_matches!(node.kind, BoundNodeKind::BinaryExpression(binary) => {
-            assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Boolean(true), ..}));
+            assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Boolean(true)}));
             assert_matches!(binary.lhs.type_, Type::Boolean);
             assert_matches!(binary.operator_token, BoundBinaryOperator::NotEquals);
-            assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Boolean(false), .. }));
+            assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Boolean(false) }));
             assert_matches!(binary.rhs.type_, Type::Boolean);
         });
         assert_matches!(node.type_, Type::Boolean);
@@ -33,19 +33,19 @@ fn successful_binding() {
     bind_helper_expression("(1 == 2) == (3 != 4);", |node| {
         assert_matches!(node.kind, BoundNodeKind::BinaryExpression(binary) => {
             assert_matches!(binary.lhs.kind, BoundNodeKind::BinaryExpression(binary) => {
-                assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(1), .. }));
+                assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(1) }));
                 assert_matches!(binary.lhs.type_, Type::Integer);
                 assert_matches!(binary.operator_token, BoundBinaryOperator::Equals);
-                assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(2), .. }));
+                assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(2) }));
                 assert_matches!(binary.rhs.type_, Type::Integer);
             });
             assert_matches!(binary.lhs.type_, Type::Boolean);
             assert_matches!(binary.operator_token, BoundBinaryOperator::Equals);
             assert_matches!(binary.rhs.kind, BoundNodeKind::BinaryExpression(binary) => {
-                assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(3), .. }));
+                assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(3) }));
                 assert_matches!(binary.lhs.type_, Type::Integer);
                 assert_matches!(binary.operator_token, BoundBinaryOperator::NotEquals);
-                assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(4), .. }));
+                assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(4) }));
                 assert_matches!(binary.rhs.type_, Type::Integer);
             });
             assert_matches!(binary.rhs.type_, Type::Boolean);
@@ -56,7 +56,7 @@ fn successful_binding() {
     bind_helper("let a = 99;", |node| {
         assert_matches!(node.kind, BoundNodeKind::VariableDeclaration(variable_declaration) => {
             assert_matches!(variable_declaration.variable_index, 1);
-            assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(99), .. }));
+            assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(99) }));
             assert_matches!(variable_declaration.initializer.type_, Type::Integer);
         });
         assert_matches!(node.type_, Type::Void);
@@ -65,10 +65,10 @@ fn successful_binding() {
     bind_helper("if 9 == 12 { let a = 14; }", |node| {
         assert_matches!(node.kind, BoundNodeKind::IfStatement(if_statement) => {
             assert_matches!(if_statement.condition.kind, BoundNodeKind::BinaryExpression(binary) => {
-                assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(9), .. }));
+                assert_matches!(binary.lhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(9) }));
                 assert_matches!(binary.lhs.type_, Type::Integer);
                 assert_matches!(binary.operator_token, BoundBinaryOperator::Equals);
-                assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(12), .. }));
+                assert_matches!(binary.rhs.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(12) }));
                 assert_matches!(binary.rhs.type_, Type::Integer);
             });
             assert_matches!(if_statement.condition.type_, Type::Boolean);
@@ -76,7 +76,7 @@ fn successful_binding() {
                 assert_eq!(block_statement.statements.len(), 1);
                 assert_matches!(&block_statement.statements[0].kind, BoundNodeKind::VariableDeclaration(variable_declaration) => {
                     assert_matches!(variable_declaration.variable_index, 1);
-                    assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::LiteralExpression(LiteralNodeKind { value: Value::Integer(14), .. }));
+                    assert_matches!(variable_declaration.initializer.kind, BoundNodeKind::LiteralExpression(BoundLiteralNodeKind { value: Value::Integer(14) }));
                     assert_matches!(variable_declaration.initializer.type_, Type::Integer);
                 });
                 assert_matches!(block_statement.statements[0].type_, Type::Void);

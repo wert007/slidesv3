@@ -27,14 +27,14 @@ impl Flattener {
     }
 }
 
-pub fn flatten<'a>(node: BoundNode<'a>, label_count: &mut usize) -> Vec<BoundNode<'a>> {
+pub fn flatten(node: BoundNode, label_count: &mut usize) -> Vec<BoundNode> {
     let mut flattener = Flattener::new(*label_count);
     let result = flatten_node(node, &mut flattener);
     *label_count = flattener.label_count;
     result
 }
 
-fn flatten_node<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Vec<BoundNode<'a>> {
+fn flatten_node(node: BoundNode, flattener: &mut Flattener) -> Vec<BoundNode> {
     match node.kind {
         BoundNodeKind::VariableDeclaration(variable_declaration) => {
             vec![flatten_variable_declaration(
@@ -136,7 +136,7 @@ fn flatten_node<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Vec<Bound
     }
 }
 
-fn flatten_expression<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> BoundNode<'a> {
+fn flatten_expression(node: BoundNode, flattener: &mut Flattener) -> BoundNode {
     match node.kind {
         BoundNodeKind::VariableDeclaration(variable_declaration) => {
             flatten_variable_declaration(node.span, node.type_, variable_declaration, flattener)
@@ -208,12 +208,12 @@ fn flatten_expression<'a>(node: BoundNode<'a>, flattener: &mut Flattener) -> Bou
     }
 }
 
-fn flatten_variable_declaration<'a>(
+fn flatten_variable_declaration(
     span: TextSpan,
     _type_: Type,
-    variable_declaration: BoundVariableDeclarationNodeKind<'a>,
+    variable_declaration: BoundVariableDeclarationNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let initializer = flatten_expression(*variable_declaration.initializer, flattener);
     BoundNode::variable_declaration(
         span,
@@ -223,55 +223,55 @@ fn flatten_variable_declaration<'a>(
     )
 }
 
-fn flatten_assignment<'a>(
+fn flatten_assignment(
     span: TextSpan,
     _type_: Type,
-    assignment: BoundAssignmentNodeKind<'a>,
+    assignment: BoundAssignmentNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let lhs = flatten_expression(*assignment.variable, flattener);
     let expression = flatten_expression(*assignment.expression, flattener);
     BoundNode::assignment(span, lhs, expression)
 }
 
-fn flatten_return_statement<'a>(
+fn flatten_return_statement(
     span: TextSpan,
     _type_: Type,
-    return_statement: BoundReturnStatementNodeKind<'a>,
+    return_statement: BoundReturnStatementNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let expression = return_statement
         .expression
         .map(|r| flatten_expression(*r, flattener));
     BoundNode::return_statement(span, expression, return_statement.restores_variables)
 }
 
-fn flatten_expression_statement<'a>(
+fn flatten_expression_statement(
     span: TextSpan,
     _type_: Type,
-    expression_statement: BoundExpressionStatementNodeKind<'a>,
+    expression_statement: BoundExpressionStatementNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let expression = flatten_expression(*expression_statement.expression, flattener);
     BoundNode::expression_statement(span, expression)
 }
 
-fn flatten_field_access<'a>(
+fn flatten_field_access(
     span: TextSpan,
     _type_: Type,
-    field_access: BoundFieldAccessNodeKind<'a>,
+    field_access: BoundFieldAccessNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let base = flatten_expression(*field_access.base, flattener);
     BoundNode::field_access(span, base, field_access.offset, field_access.type_)
 }
 
-fn flatten_closure<'a>(
+fn flatten_closure(
     span: TextSpan,
     type_: Type,
-    closure: BoundClosureNodeKind<'a>,
+    closure: BoundClosureNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let mut arguments = Vec::with_capacity(closure.arguments.len());
     for argument in closure.arguments {
         arguments.push(flatten_expression(argument, flattener));
@@ -287,33 +287,33 @@ fn flatten_closure<'a>(
     }
 }
 
-fn flatten_conversion<'a>(
+fn flatten_conversion(
     span: TextSpan,
     _type_: Type,
-    conversion: BoundConversionNodeKind<'a>,
+    conversion: BoundConversionNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let base = flatten_expression(*conversion.base, flattener);
     BoundNode::conversion(span, base, conversion.type_)
 }
 
-fn flatten_array_index<'a>(
+fn flatten_array_index(
     span: TextSpan,
     type_: Type,
-    array_index: BoundArrayIndexNodeKind<'a>,
+    array_index: BoundArrayIndexNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let base = flatten_expression(*array_index.base, flattener);
     let index = flatten_expression(*array_index.index, flattener);
     BoundNode::array_index(span, base, index, type_)
 }
 
-fn flatten_system_call<'a>(
+fn flatten_system_call(
     span: TextSpan,
     type_: Type,
-    system_call: BoundSystemCallNodeKind<'a>,
+    system_call: BoundSystemCallNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let mut arguments = Vec::with_capacity(system_call.arguments.len());
     for argument in system_call.arguments {
         arguments.push(flatten_expression(argument, flattener));
@@ -321,12 +321,12 @@ fn flatten_system_call<'a>(
     BoundNode::system_call(span, system_call.base, arguments, type_)
 }
 
-fn flatten_function_call<'a>(
+fn flatten_function_call(
     span: TextSpan,
     type_: Type,
-    function_call: BoundFunctionCallNodeKind<'a>,
+    function_call: BoundFunctionCallNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let base = flatten_expression(*function_call.base, flattener);
     let mut arguments = Vec::with_capacity(function_call.arguments.len());
     for argument in function_call.arguments {
@@ -341,33 +341,33 @@ fn flatten_function_call<'a>(
     )
 }
 
-fn flatten_binary_expression<'a>(
+fn flatten_binary_expression(
     span: TextSpan,
     type_: Type,
-    binary_expression: BoundBinaryNodeKind<'a>,
+    binary_expression: BoundBinaryNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let lhs = flatten_expression(*binary_expression.lhs, flattener);
     let rhs = flatten_expression(*binary_expression.rhs, flattener);
     BoundNode::binary(span, lhs, binary_expression.operator_token, rhs, type_)
 }
 
-fn flatten_unary_expression<'a>(
+fn flatten_unary_expression(
     span: TextSpan,
     type_: Type,
-    unary_expression: BoundUnaryNodeKind<'a>,
+    unary_expression: BoundUnaryNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let operand = flatten_expression(*unary_expression.operand, flattener);
     BoundNode::unary(span, unary_expression.operator_token, operand, type_)
 }
 
-fn flatten_constructor_call<'a>(
+fn flatten_constructor_call(
     span: TextSpan,
     _type_: Type,
-    constructor_call: BoundConstructorCallNodeKind<'a>,
+    constructor_call: BoundConstructorCallNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let mut arguments = Vec::with_capacity(constructor_call.arguments.len());
     for argument in constructor_call.arguments {
         arguments.push(flatten_expression(argument, flattener));
@@ -380,12 +380,12 @@ fn flatten_constructor_call<'a>(
     )
 }
 
-fn flatten_array_literal_expression<'a>(
+fn flatten_array_literal_expression(
     span: TextSpan,
     type_: Type,
-    array_literal_expression: BoundArrayLiteralNodeKind<'a>,
+    array_literal_expression: BoundArrayLiteralNodeKind,
     flattener: &mut Flattener,
-) -> BoundNode<'a> {
+) -> BoundNode {
     let mut children = Vec::with_capacity(array_literal_expression.children.len());
     for child in array_literal_expression.children {
         children.push(flatten_expression(child, flattener));
@@ -393,21 +393,21 @@ fn flatten_array_literal_expression<'a>(
     BoundNode::array_literal(span, children, type_)
 }
 
-fn flatten_function_declaration<'a>(
-    function_declaration: BoundFunctionDeclarationNodeKind<'a>,
+fn flatten_function_declaration(
+    function_declaration: BoundFunctionDeclarationNodeKind,
     _flattener: &mut Flattener,
-) -> Vec<BoundNode<'a>> {
-    let mut _result = vec![BoundNode::label(function_declaration.index)];
+) -> Vec<BoundNode> {
+    let mut _result = vec![BoundNode::label(function_declaration.label)];
     // TODO: assign parameters here!
     unimplemented!();
     // result.append(&mut flatten_node(*function_declaration.body, flattener));
     // result
 }
 
-fn flatten_block_statement<'a>(
-    block_statement: BoundBlockStatementNodeKind<'a>,
+fn flatten_block_statement(
+    block_statement: BoundBlockStatementNodeKind,
     flattener: &mut Flattener,
-) -> Vec<BoundNode<'a>> {
+) -> Vec<BoundNode> {
     let mut result = Vec::with_capacity(block_statement.statements.len());
     for statement in block_statement.statements {
         result.append(&mut flatten_node(statement, flattener));
@@ -415,10 +415,10 @@ fn flatten_block_statement<'a>(
     result
 }
 
-fn flatten_if_statement<'a>(
-    if_statement: BoundIfStatementNodeKind<'a>,
+fn flatten_if_statement(
+    if_statement: BoundIfStatementNodeKind,
     flattener: &mut Flattener,
-) -> Vec<BoundNode<'a>> {
+) -> Vec<BoundNode> {
     let mut result = vec![];
     let (end_label, end_label_ref) = create_label(flattener);
     let (else_label, else_label_ref) = if if_statement.else_body.is_some() {
@@ -442,10 +442,10 @@ fn flatten_if_statement<'a>(
     result
 }
 
-fn flatten_while_statement<'a>(
-    while_statement: BoundWhileStatementNodeKind<'a>,
+fn flatten_while_statement(
+    while_statement: BoundWhileStatementNodeKind,
     flattener: &mut Flattener,
-) -> Vec<BoundNode<'a>> {
+) -> Vec<BoundNode> {
     let mut result = vec![];
     let (label, label_ref) = create_label(flattener);
     result.push(label);
@@ -457,7 +457,7 @@ fn flatten_while_statement<'a>(
     result
 }
 
-fn create_label<'a>(flattener: &mut Flattener) -> (BoundNode<'a>, BoundNode<'a>) {
+fn create_label(flattener: &mut Flattener) -> (BoundNode, BoundNode) {
     let index = flattener.next_label_index();
     (
         BoundNode::label(index),

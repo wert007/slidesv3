@@ -26,13 +26,13 @@ fn is_option_same_expression<T: AsRef<impl IsSameExpression>>(
     }
 }
 
-impl IsSameExpression for BoundNode<'_> {
+impl IsSameExpression for BoundNode {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.kind.is_same_expression(&other.kind)
     }
 }
 
-impl IsSameExpression for BoundNodeKind<'_> {
+impl IsSameExpression for BoundNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         match (self, other) {
             (BoundNodeKind::ErrorExpression, BoundNodeKind::ErrorExpression) => true,
@@ -112,16 +112,16 @@ impl IsSameExpression for BoundNodeKind<'_> {
     }
 }
 
-impl IsSameExpression for BoundFunctionDeclarationNodeKind<'_> {
+impl IsSameExpression for BoundFunctionDeclarationNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.body.is_same_expression(&other.body)
-            && self.index == other.index
+            && self.label == other.label
             && self.is_main == other.is_main
             && self.parameters == other.parameters
     }
 }
 
-impl IsSameExpression for BoundJumpNodeKind<'_> {
+impl IsSameExpression for BoundJumpNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         is_option_same_expression(&self.condition, &other.condition)
             && self.jump_if_true == other.jump_if_true
@@ -129,20 +129,20 @@ impl IsSameExpression for BoundJumpNodeKind<'_> {
     }
 }
 
-impl IsSameExpression for LiteralNodeKind<'_> {
+impl IsSameExpression for BoundLiteralNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.value == other.value
     }
 }
 
-impl IsSameExpression for BoundArrayLiteralNodeKind<'_> {
+impl IsSameExpression for BoundArrayLiteralNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.children.len() == other.children.len()
             && is_iterator_all_same_expression(&self.children, &other.children)
     }
 }
 
-impl IsSameExpression for BoundConstructorCallNodeKind<'_> {
+impl IsSameExpression for BoundConstructorCallNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.base_type == other.base_type
             && is_iterator_all_same_expression(&self.arguments, &other.arguments)
@@ -155,14 +155,14 @@ impl IsSameExpression for BoundVariableNodeKind {
     }
 }
 
-impl IsSameExpression for BoundUnaryNodeKind<'_> {
+impl IsSameExpression for BoundUnaryNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.operand.is_same_expression(&other.operand)
             && self.operator_token == other.operator_token
     }
 }
 
-impl IsSameExpression for BoundBinaryNodeKind<'_> {
+impl IsSameExpression for BoundBinaryNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.operator_token == other.operator_token
             && self.lhs.is_same_expression(&other.lhs)
@@ -170,7 +170,7 @@ impl IsSameExpression for BoundBinaryNodeKind<'_> {
     }
 }
 
-impl IsSameExpression for BoundFunctionCallNodeKind<'_> {
+impl IsSameExpression for BoundFunctionCallNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.has_this_argument == other.has_this_argument
             && self.base.is_same_expression(&other.base)
@@ -178,20 +178,20 @@ impl IsSameExpression for BoundFunctionCallNodeKind<'_> {
     }
 }
 
-impl IsSameExpression for BoundSystemCallNodeKind<'_> {
+impl IsSameExpression for BoundSystemCallNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.base == other.base
             && is_iterator_all_same_expression(&self.arguments, &other.arguments)
     }
 }
 
-impl IsSameExpression for BoundArrayIndexNodeKind<'_> {
+impl IsSameExpression for BoundArrayIndexNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.base.is_same_expression(&other.base) && self.index.is_same_expression(&other.index)
     }
 }
 
-impl IsSameExpression for BoundFieldAccessNodeKind<'_> {
+impl IsSameExpression for BoundFieldAccessNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.offset == other.offset
             && self.type_ == other.type_
@@ -199,25 +199,25 @@ impl IsSameExpression for BoundFieldAccessNodeKind<'_> {
     }
 }
 
-impl IsSameExpression for BoundClosureNodeKind<'_> {
+impl IsSameExpression for BoundClosureNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.function == other.function && is_iterator_all_same_expression(&self.arguments, &other.arguments)
     }
 }
 
-impl IsSameExpression for BoundConversionNodeKind<'_> {
+impl IsSameExpression for BoundConversionNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.type_ == other.type_ && self.base.is_same_expression(&other.base)
     }
 }
 
-impl IsSameExpression for BoundBlockStatementNodeKind<'_> {
+impl IsSameExpression for BoundBlockStatementNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         is_iterator_all_same_expression(&self.statements, &other.statements)
     }
 }
 
-impl IsSameExpression for BoundIfStatementNodeKind<'_> {
+impl IsSameExpression for BoundIfStatementNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.condition.is_same_expression(&other.condition)
             && self.body.is_same_expression(&other.body)
@@ -225,7 +225,7 @@ impl IsSameExpression for BoundIfStatementNodeKind<'_> {
     }
 }
 
-impl IsSameExpression for BoundVariableDeclarationNodeKind<'_> {
+impl IsSameExpression for BoundVariableDeclarationNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.variable_type == other.variable_type
             && self.variable_index == other.variable_index
@@ -233,27 +233,27 @@ impl IsSameExpression for BoundVariableDeclarationNodeKind<'_> {
     }
 }
 
-impl IsSameExpression for BoundWhileStatementNodeKind<'_> {
+impl IsSameExpression for BoundWhileStatementNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.condition.is_same_expression(&other.condition)
             && self.body.is_same_expression(&other.body)
     }
 }
 
-impl IsSameExpression for BoundAssignmentNodeKind<'_> {
+impl IsSameExpression for BoundAssignmentNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.variable.is_same_expression(&other.variable)
             && self.expression.is_same_expression(&other.expression)
     }
 }
 
-impl IsSameExpression for BoundExpressionStatementNodeKind<'_> {
+impl IsSameExpression for BoundExpressionStatementNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.expression.is_same_expression(&other.expression)
     }
 }
 
-impl IsSameExpression for BoundReturnStatementNodeKind<'_> {
+impl IsSameExpression for BoundReturnStatementNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.restores_variables == other.restores_variables
             && is_option_same_expression(&self.expression, &other.expression)
