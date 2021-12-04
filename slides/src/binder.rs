@@ -1755,7 +1755,6 @@ fn bind_binary_operator<'a, 'b>(
         SyntaxTokenKind::PeriodPeriod => BoundBinaryOperator::Range,
         _ => unreachable!(),
     };
-    let range_type = binder.look_up_std_type(StdTypeKind::Range);
     match (&lhs.type_, result, &rhs.type_) {
         (lhs, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, rhs)
             if lhs == rhs && lhs != &Type::Void =>
@@ -1855,6 +1854,7 @@ fn bind_binary_operator<'a, 'b>(
             rhs_type.clone(),
         )),
         (Type::Integer, BoundBinaryOperator::Range, Type::Integer) => {
+            let range_type = binder.look_up_std_type(StdTypeKind::Range);
             Some(BoundBinary::same_input(&Type::Integer, result, range_type))
         }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
