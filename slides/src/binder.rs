@@ -522,8 +522,11 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn delete_variables_until(&mut self, index: usize) {
-        if self.variable_table.is_empty() {
+        if self.variable_table.is_empty() || index == self.variable_table.len() {
             return;
+        }
+        if self.print_variable_table {
+            print_variable_table(&self.variable_table);
         }
         let current = self.variable_table.len() - 1;
         for _ in index..=current {
@@ -2649,9 +2652,6 @@ fn bind_for_statement<'a, 'b>(
             range_has_next_value_function_base,
         )
     };
-    if binder.print_variable_table {
-        print_variable_table(&binder.variable_table);
-    }
     binder.delete_variables_until(variable_count);
 
     result
@@ -2810,9 +2810,6 @@ fn bind_block_statement<'a, 'b>(
     let mut statements = vec![];
     for node in block_statement.statements {
         statements.push(bind_node(node, binder));
-    }
-    if binder.print_variable_table {
-        print_variable_table(&binder.variable_table);
     }
     binder.delete_variables_until(variable_count);
     BoundNode::block_statement(span, statements)
