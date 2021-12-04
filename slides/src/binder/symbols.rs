@@ -10,7 +10,7 @@ use crate::instruction_converter::{
 
 use super::{
     typing::{FunctionType, Type},
-    BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody,
+    BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, bound_nodes::BoundNode, BoundGenericStructSymbol,
 };
 
 #[derive(Debug, Clone)]
@@ -21,6 +21,7 @@ pub struct Library {
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
     pub structs: Vec<StructSymbol>,
+    pub generic_structs: Vec<GenericStructSymbol>,
     pub has_errors: bool,
     pub path: PathBuf,
     pub referenced_libraries: Vec<Library>,
@@ -36,6 +37,7 @@ impl Library {
             program: Program::error(),
             functions: vec![],
             structs: vec![],
+            generic_structs: vec![],
             has_errors: true,
             path: PathBuf::new(),
             referenced_libraries: vec![],
@@ -160,12 +162,6 @@ pub struct StructSymbol {
     pub function_table: StructFunctionTable,
 }
 
-impl StructSymbol {
-    pub fn field(&self, name: &str) -> Option<&StructFieldSymbol> {
-        self.fields.iter().find(|f| f.name == name)
-    }
-}
-
 impl From<BoundStructSymbol<'_>> for StructSymbol {
     fn from(it: BoundStructSymbol<'_>) -> Self {
         Self {
@@ -175,6 +171,33 @@ impl From<BoundStructSymbol<'_>> for StructSymbol {
         }
     }
 }
+
+impl StructSymbol {
+    pub fn field(&self, name: &str) -> Option<&StructFieldSymbol> {
+        self.fields.iter().find(|f| f.name == name)
+    }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct GenericStructSymbol {
+    pub name: String,
+    pub fields: Vec<StructFieldSymbol>,
+    pub function_table: StructFunctionTable,
+    pub body: Vec<BoundNode>,
+}
+
+impl From<BoundGenericStructSymbol<'_>> for GenericStructSymbol {
+    fn from(it: BoundGenericStructSymbol<'_>) -> Self {
+        Self {
+            name: it.name.into(),
+            fields: it.fields.into_iter().map(Into::into).collect(),
+            function_table: it.function_table,
+            body: it.body,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct StructFieldSymbol {

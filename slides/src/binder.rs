@@ -42,7 +42,7 @@ use crate::{
 use self::{
     bound_nodes::BoundNode,
     operators::BoundBinaryOperator,
-    symbols::{FunctionSymbol, Library, StructFieldSymbol, StructFunctionTable, StructSymbol},
+    symbols::{FunctionSymbol, Library, StructFieldSymbol, StructFunctionTable, StructSymbol, GenericStructSymbol},
     typing::{FunctionType, StructType, SystemCallKind},
 };
 
@@ -70,6 +70,7 @@ struct FunctionDeclarationBody<'a> {
     body: SyntaxNode<'a>,
     parameters: Vec<(&'a str, Type)>,
     is_main: bool,
+    is_generic: bool,
     function_label: u64,
     function_type: FunctionType,
     base_struct: Option<u64>,
@@ -78,9 +79,10 @@ struct FunctionDeclarationBody<'a> {
 
 #[derive(Clone, Debug)]
 struct StructDeclarationBody<'a> {
-    name: &'a str,
+    name: Cow<'a, str>,
     id: u64,
     body: StructBodyNode<'a>,
+    is_generic: bool,
 }
 
 struct VariableEntry {
@@ -155,6 +157,18 @@ pub struct BoundStructSymbol<'a> {
     pub name: Cow<'a, str>,
     pub fields: Vec<BoundStructFieldSymbol<'a>>,
     pub function_table: StructFunctionTable,
+}
+
+/// This is quite similiar to symbols::StructSymbol, the only difference being,
+/// that this version does not need an allocation. They can be easily converted
+/// into each other. This version is only used during binding, while the other
+/// version is exported in the symbols::Library type.
+#[derive(Debug, Clone)]
+pub struct BoundGenericStructSymbol<'a> {
+    pub name: Cow<'a, str>,
+    pub fields: Vec<BoundStructFieldSymbol<'a>>,
+    pub function_table: StructFunctionTable,
+    pub body: Vec<BoundNode>,
 }
 
 impl BoundStructSymbol<'_> {
@@ -263,6 +277,19 @@ struct BindingState<'a, 'b> {
     /// functions on structs since they are also fields in some way. But
     /// functions on structs are still registered in the functions table.
     struct_table: Vec<BoundStructSymbol<'a>>,
+    /// When registering a type for the type table, it is also registered in the
+    /// struct table if it is a struct. The struct table is used to access field
+    /// information on a struct. Since the type of a struct only has the types
+    /// of the fields and their offset into the struct it cannot be used to
+    /// check if a struct has a field with a certain name. This is what this is
+    /// used for. So this is used by constructors or field accesses. Fields can
+    /// also be read only, even though this is currently (12.10.2021) only used
+    /// for functions on structs since they are also fields in some way. But
+    /// functions on structs are still registered in the functions table.
+    ///
+    /// These only holds generic structs, which still need to be replaced with
+    /// the correct type.
+    generic_struct_table: Vec<BoundGenericStructSymbol<'a>>,
     /// This contains all function declarations the binder found while walking
     /// the top level statements and after that the struct fields. The function
     /// declaration body contains the necessary information for the function
@@ -283,6 +310,7 @@ struct BindingState<'a, 'b> {
     /// This collects all the structs, which fields still need to be bound by the
     /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody<'a>>,
+    generic_type: Option<Type>,
     /// This has all libraries which where loaded by imports. They can be
     /// referenced for name lookups.
     libraries: Vec<Library>,
@@ -372,6 +400,41 @@ impl<'a> BindingState<'a, '_> {
     fn register_generated_struct_name(&mut self, name: String) -> Option<u64> {
         let id = self.type_table.len() as u64;
         self.register_generated_type(name, Type::StructReference(id))
+    }
+
+    fn register_generic_struct(
+        &mut self,
+        id: u64,
+        fields: Vec<BoundStructFieldSymbol<'a>>,
+        function_table: StructFunctionTable,
+    ) -> u64 {
+        let struct_type = StructType {
+            id,
+            fields: fields
+                .iter()
+                .filter(|f| !matches!(&f.type_, &Type::Function(_)))
+                .map(|f| f.type_.clone())
+                .collect(),
+            functions: fields
+                .iter()
+                .filter(|f| matches!(&f.type_, &Type::Function(_)))
+                .map(|f| f.type_.clone())
+                .collect(),
+            function_table: function_table.clone(),
+        };
+        let name = self.type_table[id as usize].identifier.clone();
+        let bound_struct_type = BoundStructSymbol {
+            name,
+            fields,
+            function_table,
+        };
+        let struct_id = id as usize - type_table().len();
+        while struct_id >= self.struct_table.len() {
+            self.struct_table.push(BoundStructSymbol::empty());
+        }
+        assert!(self.struct_table[struct_id].name.is_empty());
+        self.struct_table[struct_id] = bound_struct_type;
+        id
     }
 
     fn register_struct(
@@ -568,6 +631,9 @@ impl<'a> BindingState<'a, '_> {
     }
 
     fn look_up_type_by_name(&self, name: &str) -> Option<Type> {
+        if name == "$Type" && self.generic_type.is_some() {
+            return Some(self.generic_type.clone().unwrap());
+        }
         self.type_table
             .iter()
             .find(|v| v.identifier.as_ref() == name)
@@ -599,6 +665,14 @@ impl<'a> BindingState<'a, '_> {
         self.struct_table.get(id as usize - type_table().len())
     }
 
+    fn get_generic_struct_type_by_id(&self, id: u64) -> Option<&BoundGenericStructSymbol<'a>> {
+        self.generic_struct_table.get(id as usize - type_table().len())
+    }
+
+    fn get_generic_struct_type_by_id_mut(&mut self, id: u64) -> Option<&mut BoundGenericStructSymbol<'a>> {
+        self.generic_struct_table.get_mut(id as usize - type_table().len())
+    }
+
     fn get_struct_by_id(&self, id: u64) -> Option<StructType> {
         let mut iterator =
             self.type_table
@@ -625,6 +699,10 @@ impl<'a> BindingState<'a, '_> {
             .enumerate()
             .find(|(_, s)| s.name == name)
             .map(|(i, _)| (i + type_table().len()) as u64)
+    }
+
+    fn look_up_generic_struct_id_by_name(&self, name: &str) -> Option<usize> {
+        self.generic_struct_table.iter().enumerate().find(|(_, s)| s.name == name).map(|(i, _)| i + type_table().len())
     }
 
     pub fn rename_struct_by_id(&mut self, struct_id: u64, new_name: String) {
@@ -716,6 +794,7 @@ pub struct BoundLibrary {
     pub program: BoundProgram,
     pub exported_functions: Vec<FunctionSymbol>,
     pub exported_structs: Vec<StructSymbol>,
+    pub exported_generic_structs: Vec<GenericStructSymbol>,
 }
 
 impl BoundLibrary {
@@ -724,6 +803,7 @@ impl BoundLibrary {
             program: BoundProgram::error(),
             exported_functions: vec![],
             exported_structs: vec![],
+            exported_generic_structs: vec![],
         }
     }
 }
@@ -798,7 +878,9 @@ fn bind<'a>(
         diagnostic_bag,
         variable_table: vec![],
         type_table: type_table(),
+        generic_type: None,
         struct_table: vec![],
+        generic_struct_table: vec![],
         functions: vec![],
         bound_functions: vec![],
         label_offset: 0,
@@ -843,16 +925,23 @@ fn bind<'a>(
         .registered_types
         .append(&mut type_names);
 
-    for node in binder.structs.clone() {
-        let (fields, function_table) = bind_struct_body(node.name, node.body, &mut binder);
-        binder.register_struct(node.id, fields, function_table);
+    for node in binder.structs.clone().into_iter() {
+        let (fields, function_table) = bind_struct_body(&node.name, node.body, &mut binder);
+        if node.is_generic {
+            binder.register_generic_struct(node.id, fields, function_table);
+        } else {
+            binder.register_struct(node.id, fields, function_table);
+        }
     }
 
     let fixed_variable_count = binder.variable_table.len();
     while let Some(node) = binder.functions.pop() {
         let base_struct = node.base_struct;
+        let is_generic = node.is_generic;
         let function = bind_function_declaration_body(node, &mut binder);
-        {
+        if is_generic {
+            binder.get_generic_struct_type_by_id_mut(base_struct.unwrap()).unwrap().body.push(function);
+        } else {
             binder.bound_functions.push(function);
         }
     }
@@ -882,6 +971,7 @@ fn bind<'a>(
         program,
         exported_functions: binder.functions.into_iter().map(Into::into).collect(),
         exported_structs: binder.struct_table.into_iter().map(Into::into).collect(),
+        exported_generic_structs: binder.generic_struct_table.into_iter().map(Into::into).collect(),
     }
 }
 
@@ -1072,6 +1162,8 @@ fn bind_function_declaration<'a, 'b>(
         bind_function_type(None, function_declaration.function_type, binder);
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
+    let is_generic = function_declaration.optional_generic_keyword.is_some();
+    assert!(is_generic == false);
     // FIXME: Turn into usize
     let function_label = binder.generate_label() as u64;
     binder.register_constant(
@@ -1084,6 +1176,7 @@ fn bind_function_declaration<'a, 'b>(
         body: *function_declaration.body,
         parameters: variables,
         is_main,
+        is_generic,
         function_label,
         function_type,
         base_struct: None,
@@ -1131,6 +1224,9 @@ fn bind_function_declaration_for_struct<'a, 'b>(
             }
         })
         .unwrap();
+    // FIXME: implement getter for generic structs.
+    let is_generic = binder.get_generic_struct_type_by_id(base_struct).is_some();
+    dbg!(&function_name, is_generic);
     match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
         Ok(struct_function_kind) => {
             match struct_function_kind {
@@ -1198,6 +1294,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 body: *function_declaration.body,
                 parameters: variables,
                 is_main: false,
+                is_generic,
                 function_label,
                 function_type: function_type.clone(),
                 base_struct: Some(base_struct),
@@ -1235,6 +1332,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                     body: *function_declaration.body,
                     parameters: variables,
                     is_main: false,
+                    is_generic,
                     function_label,
                     function_type,
                     base_struct: Some(base_struct),
@@ -1257,9 +1355,10 @@ fn bind_struct_declaration<'a, 'b>(
 ) {
     if let Some(id) = binder.register_struct_name(struct_declaration.identifier.lexeme) {
         binder.structs.push(StructDeclarationBody {
-            name: struct_declaration.identifier.lexeme,
+            name: struct_declaration.identifier.lexeme.into(),
             id,
             body: *struct_declaration.body,
+            is_generic: struct_declaration.optional_generic_keyword.is_some(),
         });
     } else {
         binder.diagnostic_bag.report_cannot_declare_struct(
@@ -1399,6 +1498,22 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
         result = Type::array(result);
     }
     result
+}
+
+fn bind_generic_type_for_type(generic_type_id: usize, type_: Type, binder: &mut BindingState) -> Type {
+    let generic_struct = binder.structs[generic_type_id - type_table().len()].clone();
+    let struct_name = format!("{}<{}>", generic_struct.name, type_);
+    if let Some(id) = binder.register_generated_struct_name(struct_name.clone()) {
+        binder.structs.push(StructDeclarationBody { name: struct_name.clone().into(), id, body: generic_struct.body.clone(), is_generic: false });
+        binder.generic_type = Some(type_);
+        let (fields, function_table) = bind_struct_body(&struct_name, generic_struct.body, binder);
+        binder.register_struct(id, fields, function_table);
+        for node in binder.functions.clone().into_iter() {
+            bind_function_declaration_body(node, binder);
+        }
+        binder.generic_type = None;
+    }
+    binder.look_up_type_by_name(&struct_name).unwrap()
 }
 
 fn bind_node<'a, 'b>(node: SyntaxNode<'a>, binder: &mut BindingState<'a, 'b>) -> BoundNode {
