@@ -276,6 +276,7 @@ struct BindingState<'a, 'b> {
     /// of the variable. Is struct and is main is used in some places to
     /// differentiate them.
     functions: Vec<FunctionDeclarationBody<'a>>,
+    bound_functions: Vec<BoundNode>,
     /// This is equal to the amount of labels used by the referenced libraries
     /// and will ensure, that all labels will be unique per bound program.
     label_offset: usize,
@@ -663,6 +664,12 @@ impl<'a> BindingState<'a, '_> {
             }
         }
     }
+
+    pub fn generate_label(&mut self) -> usize {
+        let result = self.label_offset;
+        self.label_offset += 1;
+        result
+    }
 }
 
 fn print_variable_table(variable_table: &[BoundVariableName]) {
@@ -784,6 +791,7 @@ fn bind<'a>(
         type_table: type_table(),
         struct_table: vec![],
         functions: vec![],
+        bound_functions: vec![],
         label_offset: 0,
         structs: vec![],
         libraries: vec![],
@@ -832,88 +840,19 @@ fn bind<'a>(
     }
 
     let fixed_variable_count = binder.variable_table.len();
-    let mut label_count = binder.functions.len() + binder.label_offset;
-    let mut statements = vec![];
-    for (index, node) in binder.functions.clone().into_iter().enumerate() {
-        let index = index + binder.label_offset;
-        let mut parameters = Vec::with_capacity(node.parameters.len());
-        for (variable_name, variable_type) in node.parameters {
-            if let Some(it) = binder.register_variable(variable_name, variable_type, false) {
-                parameters.push(it);
-            } else {
-                // binder.diagnostic_bag.report_cannot_declare_variable(span, variable_name)
-                panic!("Could not declare a parameter! This sounds like an error in the binder!");
-            }
-        }
-        binder.function_return_type = node.function_type.return_type.clone();
-        binder.is_struct_function = node.base_struct.is_some();
-        let span = node.body.span;
-        let mut body = bind_node(node.body, &mut binder);
-        match node.struct_function_kind {
-            Some(StructFunctionKind::Constructor) => {
-                let strct = node.base_struct.unwrap();
-                let strct = binder.get_struct_type_by_id(strct).unwrap().clone();
-                let unassigned_fields: Vec<_> = strct
-                    .fields
-                    .iter()
-                    .filter_map(|f| {
-                        if matches!(f.type_, Type::Function(_)) {
-                            None
-                        } else {
-                            Some(f.name.as_ref())
-                        }
-                    })
-                    .filter(|s| !binder.assigned_fields.contains(s))
-                    .collect();
-                if !unassigned_fields.is_empty() {
-                    binder
-                        .diagnostic_bag
-                        .report_not_all_fields_have_been_assigned(
-                            node.header_span,
-                            &strct.name,
-                            &unassigned_fields,
-                        );
-                }
-            }
-            Some(StructFunctionKind::ToString | StructFunctionKind::Get | StructFunctionKind::Set) | None => {}
-        }
-        binder.assigned_fields.clear();
-        if matches!(&binder.function_return_type, Type::Void) {
-            body = BoundNode::block_statement(
-                body.span,
-                vec![
-                    body,
-                    BoundNode::return_statement(TextSpan::zero(), None, !node.is_main),
-                ],
-            );
-        }
-        let body_statements = lowerer::flatten(body, &mut label_count);
-        if !matches!(&binder.function_return_type, Type::Void)
-            && !control_flow_analyzer::check_if_all_paths_return(
-                &node.function_name,
-                &body_statements,
-                debug_flags,
-            )
+    while let Some(node) = binder.functions.pop() {
+        let base_struct = node.base_struct;
+        let function = bind_function_declaration_body(node, &mut binder);
         {
-            binder
-                .diagnostic_bag
-                .report_missing_return_statement(span, &binder.function_return_type);
+            binder.bound_functions.push(function);
         }
-        let body = BoundNode::block_statement(span, body_statements);
-        statements.push(BoundNode::function_declaration(
-            index,
-            node.is_main,
-            body,
-            parameters,
-        ));
-        binder.delete_variables_until(fixed_variable_count);
     }
 
     if !is_library {
         startup.append(&mut call_main(&mut binder));
     }
 
-    let functions = BoundNode::block_statement(span, statements);
+    let functions = BoundNode::block_statement(span, binder.bound_functions);
     if debug_flags.print_bound_program {
         crate::debug::print_bound_node_as_code(&functions);
     }
@@ -935,6 +874,84 @@ fn bind<'a>(
         exported_functions: binder.functions.into_iter().map(Into::into).collect(),
         exported_structs: binder.struct_table.into_iter().map(Into::into).collect(),
     }
+}
+
+fn bind_function_declaration_body<'a, 'b>(node: FunctionDeclarationBody<'a>, binder: &'b mut BindingState<'a, '_>) -> BoundNode {
+    let fixed_variable_count = binder.variable_table.len();
+    let label = node.function_label as usize;
+    let mut parameters = Vec::with_capacity(node.parameters.len());
+    for (variable_name, variable_type) in node.parameters {
+        if let Some(it) = binder.register_variable(variable_name, variable_type, false) {
+            parameters.push(it);
+        } else {
+            // binder.diagnostic_bag.report_cannot_declare_variable(span, variable_name)
+            panic!("Could not declare a parameter! This sounds like an error in the binder!");
+        }
+    }
+    binder.function_return_type = node.function_type.return_type.clone();
+    binder.is_struct_function = node.base_struct.is_some();
+    let span = node.body.span;
+    let mut body = bind_node(node.body, binder);
+    match node.struct_function_kind {
+        Some(StructFunctionKind::Constructor) => {
+            let strct = node.base_struct.unwrap();
+            let strct = binder.get_struct_type_by_id(strct).unwrap().to_owned();
+            let unassigned_fields: Vec<_> = strct
+                .fields
+                .iter()
+                .filter_map(|f| {
+                    if matches!(f.type_, Type::Function(_)) {
+                        None
+                    } else {
+                        Some(f.name.as_ref())
+                    }
+                })
+                .filter(|s| !binder.assigned_fields.contains(s))
+                .collect();
+            if !unassigned_fields.is_empty() {
+                binder
+                    .diagnostic_bag
+                    .report_not_all_fields_have_been_assigned(
+                        node.header_span,
+                        &strct.name,
+                        &unassigned_fields,
+                    );
+            }
+        }
+        Some(StructFunctionKind::ToString | StructFunctionKind::Get | StructFunctionKind::Set) | None => {}
+    }
+    binder.assigned_fields.clear();
+    if matches!(&binder.function_return_type, Type::Void) {
+        body = BoundNode::block_statement(
+            body.span,
+            vec![
+                body,
+                BoundNode::return_statement(TextSpan::zero(), None, !node.is_main),
+            ],
+        );
+    }
+    let body_statements = lowerer::flatten(body, &mut binder.label_offset);
+    if !matches!(&binder.function_return_type, Type::Void)
+        && !control_flow_analyzer::check_if_all_paths_return(
+            &node.function_name,
+            &body_statements,
+            binder.debug_flags,
+        )
+    {
+        binder
+            .diagnostic_bag
+            .report_missing_return_statement(span, &binder.function_return_type);
+    }
+    let body = BoundNode::block_statement(span, body_statements);
+    let result = BoundNode::function_declaration(
+        label,
+        node.is_main,
+        body,
+        parameters,
+    );
+    binder.function_return_type = Type::Void;
+    binder.delete_variables_until(fixed_variable_count);
+    result
 }
 
 fn default_statements(binder: &mut BindingState) {
