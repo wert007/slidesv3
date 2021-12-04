@@ -209,26 +209,30 @@ fn load_library_into_binder<'a>(
     path: Option<String>,
     binder: &mut BindingState<'a, '_>,
 ) {
-    let index = binder.libraries.len();
     binder.max_used_variables = binder.max_used_variables.max(lib.program.max_used_variables);
-    let mut should_load_library = true;
-    let variable = if lib.has_errors {
+    if lib.has_errors {
         binder
             .diagnostic_bag
             .report_errors_in_referenced_library(span, name);
-        should_load_library = false;
-        binder.register_variable(name, Type::Error, true)
-    } else {
-        binder.register_variable(name, Type::Library(index), true)
-    };
-    if variable.is_none() {
-        binder
-            .diagnostic_bag
-            .report_cannot_declare_variable(span, name);
-        should_load_library = false;
     }
-    if !should_load_library {
-        return;
+    if !name.is_empty() {
+        let index = binder.libraries.len();
+        let mut should_load_library = true;
+        let variable = if lib.has_errors {
+            should_load_library = false;
+            binder.register_variable(name, Type::Error, true)
+        } else {
+            binder.register_variable(name, Type::Library(index), true)
+        };
+        if variable.is_none() {
+            binder
+                .diagnostic_bag
+                .report_cannot_declare_variable(span, name);
+            should_load_library = false;
+        }
+        if !should_load_library {
+            return;
+        }
     }
     lib.name = name.into();
     let need_to_load_std_libs = lib.name.is_empty() && binder.libraries.is_empty();
