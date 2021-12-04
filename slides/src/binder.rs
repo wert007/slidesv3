@@ -652,6 +652,7 @@ impl<'a> BindingState<'a, '_> {
             | Type::Function(_)
             | Type::Closure(_)
             | Type::Library(_)
+            | Type::GenericType
             | Type::Struct(_)
             | Type::Pointer
             | Type::SystemCall(_) => type_,
@@ -747,6 +748,11 @@ fn type_table() -> Vec<BoundVariableName<'static>> {
         BoundVariableName {
             identifier: "any".into(),
             type_: Type::Any,
+            is_read_only: true,
+        },
+        BoundVariableName {
+            identifier: "$Type".into(),
+            type_: Type::GenericType,
             is_read_only: true,
         },
     ]
@@ -2179,6 +2185,7 @@ fn bind_field_access<'a, 'b>(
         | Type::Closure(_)
         | Type::SystemCall(_)
         | Type::Pointer
+        | Type::GenericType
         | Type::PointerOf(_)
         | Type::Noneable(_) => {
             binder
@@ -2264,6 +2271,7 @@ fn bind_field_access_for_assignment<'a>(
         | Type::Function(_)
         | Type::Pointer
         | Type::PointerOf(_)
+        | Type::GenericType
         | Type::Closure(_) => {
             binder
                 .diagnostic_bag
@@ -2340,6 +2348,8 @@ fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> Bou
         // FIXME: Try to reason, if this is correct, or if this should be
         // handled like noneable.
         | Type::PointerOf(_)
+        // FIXME: This needs to be changed before execution. But any type should be printable.
+        | Type::GenericType
         | Type::Any => BoundNode::system_call(
             base.span,
             SystemCallKind::ToString,
@@ -2348,7 +2358,7 @@ fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> Bou
         ),
         Type::Noneable(base_type) => match &**base_type {
             Type::Error => base,
-            Type::Library(_) | Type::Void => unreachable!(),
+            Type::Library(_) | Type::GenericType | Type::Void => unreachable!(),
             Type::Noneable(_) => unreachable!("Type Noneable of Nonable is impossible right now.."),
             Type::Any
             | Type::Integer

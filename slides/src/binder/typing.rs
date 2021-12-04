@@ -26,6 +26,7 @@ pub enum Type {
     Library(usize),
     Pointer,
     PointerOf(Box<Type>),
+    GenericType,
 }
 
 impl Type {
@@ -97,6 +98,7 @@ impl Type {
     pub fn type_identifier_size_in_words(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
+            Type::GenericType => panic!("GenericTypes should only be accessed during binding!"),
             Type::Error => 1,
             Type::Void => 1,
             Type::Any => 1,
@@ -181,6 +183,7 @@ impl Type {
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
+            Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::Error => Self::TYPE_IDENTIFIER_ERROR,
             Type::Void => Self::TYPE_IDENTIFIER_VOID,
             Type::Any => Self::TYPE_IDENTIFIER_ANY,
@@ -247,6 +250,7 @@ impl Type {
     pub fn size_in_bytes(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
+            Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
@@ -269,6 +273,7 @@ impl Type {
     pub fn array_element_size_in_bytes(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
+            Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::Void | Type::Any | Type::Error => unreachable!(),
             Type::String => 1,
             Type::Integer
@@ -289,6 +294,7 @@ impl Type {
     pub fn is_pointer(&self) -> bool {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
+            Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::Error
             | Type::Void
             | Type::Any
@@ -316,6 +322,7 @@ impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::Library(_) => write!(f, "library"),
+            Type::GenericType => write!(f, "$Type"),
             Type::Error => write!(f, "error"),
             Type::Void => write!(f, "void"),
             Type::Any => write!(f, "any"),
