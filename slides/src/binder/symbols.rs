@@ -67,8 +67,11 @@ impl Library {
     }
 
     pub fn relocate_labels(&mut self, label_offset: usize) {
+        if label_offset == 0 {
+            return;
+        }
         for function in self.functions.iter_mut() {
-            function.label_index += label_offset as u64;
+            function.function_label += label_offset as u64;
         }
         for strct in self.structs.iter_mut() {
             strct.function_table.relocate_labels(label_offset);
@@ -214,9 +217,14 @@ impl StructFunctionTable {
         self.constructor_function
             .iter_mut()
             .chain(self.to_string_function.iter_mut())
+            .chain(self.get_function.iter_mut())
+            .chain(self.set_function.iter_mut())
     }
 
     fn relocate_labels(&mut self, label_offset: usize) {
+        if label_offset == 0 {
+            return;
+        }
         self.function_symbols_iter_mut()
             .for_each(|f| f.function_label += label_offset as u64);
     }
