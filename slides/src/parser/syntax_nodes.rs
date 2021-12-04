@@ -59,15 +59,17 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn function_declaration(
+        optional_generic_keyword: Option<SyntaxToken<'a>>,
         func_keyword: SyntaxToken<'a>,
         identifier: SyntaxToken<'a>,
         function_type: FunctionTypeNode<'a>,
         body: SyntaxNode<'a>,
     ) -> Self {
-        let span = TextSpan::bounds(func_keyword.span(), body.span());
+        let span = TextSpan::bounds(optional_generic_keyword.as_ref().unwrap_or(&func_keyword).span(), body.span());
         Self {
             span,
             kind: SyntaxNodeKind::FunctionDeclaration(Box::new(FunctionDeclarationNodeKind {
+                optional_generic_keyword,
                 func_keyword,
                 identifier,
                 function_type,
@@ -78,14 +80,16 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn struct_declaration(
+        optional_generic_keyword: Option<SyntaxToken<'a>>,
         struct_keyword: SyntaxToken<'a>,
         identifier: SyntaxToken<'a>,
         body: StructBodyNode<'a>,
     ) -> Self {
-        let span = TextSpan::bounds(struct_keyword.span(), body.span);
+        let span = TextSpan::bounds(optional_generic_keyword.as_ref().unwrap_or(&struct_keyword).span(), body.span);
         Self {
             span,
             kind: SyntaxNodeKind::StructDeclaration(StructDeclarationNodeKind {
+                optional_generic_keyword,
                 struct_keyword,
                 identifier,
                 body: Box::new(body),
@@ -568,6 +572,7 @@ pub struct ImportStatementNodeKind<'a> {
 
 #[derive(Debug, Clone)]
 pub struct FunctionDeclarationNodeKind<'a> {
+    pub optional_generic_keyword: Option<SyntaxToken<'a>>,
     pub func_keyword: SyntaxToken<'a>,
     pub identifier: SyntaxToken<'a>,
     pub function_type: FunctionTypeNode<'a>,
@@ -603,6 +608,7 @@ impl<'a> FunctionTypeNode<'a> {
 
 #[derive(Debug, Clone)]
 pub struct StructDeclarationNodeKind<'a> {
+    pub optional_generic_keyword: Option<SyntaxToken<'a>>,
     pub struct_keyword: SyntaxToken<'a>,
     pub identifier: SyntaxToken<'a>,
     pub body: Box<StructBodyNode<'a>>,

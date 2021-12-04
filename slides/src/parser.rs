@@ -45,6 +45,16 @@ impl<'a> Parser<'a, '_> {
         }
     }
 
+    fn peek_n_token(&self, n: usize) -> &SyntaxToken<'a> {
+        if self.tokens.is_empty() {
+            panic!("No tokens could be found!")
+        } else if self.tokens.len() > n {
+            &self.tokens[n]
+        } else {
+            self.tokens.back().unwrap()
+        }
+    }
+
     fn match_token(&mut self, kind: SyntaxTokenKind) -> SyntaxToken<'a> {
         let current_token_kind = self.peek_token().kind;
         let current_token_span = self.peek_token().span();
@@ -96,6 +106,22 @@ fn parse_top_level_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> 
         SyntaxTokenKind::ImportKeyword => parse_import_statement(parser),
         SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
         SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
+        SyntaxTokenKind::GenericKeyword => {
+            match parser.peek_n_token(1).kind {
+                SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
+                SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
+                _ => {
+                    let token = parser.next_token();
+                    let span = token.span();
+                    parser.diagnostic_bag.report_unexpected_token_kind(
+                        span,
+                        token.kind,
+                        SyntaxTokenKind::FuncKeyword,
+                    );
+                    SyntaxNode::error(span.start())
+                }
+            }
+        }
         _ => {
             let token = parser.next_token();
             let span = token.span();
@@ -127,20 +153,30 @@ fn parse_import_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
 }
 
 fn parse_function_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+    let optional_generic_keyword = if parser.peek_token().kind == SyntaxTokenKind::GenericKeyword {
+        Some(parser.match_token(SyntaxTokenKind::GenericKeyword))
+    } else {
+        None
+    };
     let func_keyword = parser.match_token(SyntaxTokenKind::FuncKeyword);
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
     let function_type = parse_function_type(parser);
     let body = parse_block_statement(parser);
 
-    SyntaxNode::function_declaration(func_keyword, identifier, function_type, body)
+    SyntaxNode::function_declaration(optional_generic_keyword, func_keyword, identifier, function_type, body)
 }
 
 fn parse_struct_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+    let optional_generic_keyword = if parser.peek_token().kind == SyntaxTokenKind::GenericKeyword {
+        Some(parser.match_token(SyntaxTokenKind::GenericKeyword))
+    } else {
+        None
+    };
     let struct_keyword = parser.match_token(SyntaxTokenKind::StructKeyword);
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
     let body = parse_struct_body(parser);
 
-    SyntaxNode::struct_declaration(struct_keyword, identifier, body)
+    SyntaxNode::struct_declaration(optional_generic_keyword, struct_keyword, identifier, body)
 }
 
 fn parse_function_type<'a>(parser: &mut Parser<'a, '_>) -> FunctionTypeNode<'a> {
@@ -187,7 +223,7 @@ fn parse_struct_body<'a>(parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
     ) {
         let token_count = parser.token_count();
         let statement = match parser.peek_token().kind {
-            SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
+            SyntaxTokenKind::FuncKeyword | SyntaxTokenKind::GenericKeyword => parse_function_statement(parser),
             SyntaxTokenKind::Identifier => {
                 let field = parse_parameter(parser);
                 let semicolon_token = parser.match_token(SyntaxTokenKind::Semicolon);
