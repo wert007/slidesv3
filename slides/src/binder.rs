@@ -70,7 +70,7 @@ struct FunctionDeclarationBody<'a> {
     body: SyntaxNode<'a>,
     parameters: Vec<(&'a str, Type)>,
     is_main: bool,
-    function_id: u64,
+    function_label: u64,
     function_type: FunctionType,
     base_struct: Option<u64>,
     struct_function_kind: Option<StructFunctionKind>,
@@ -869,7 +869,7 @@ fn bind<'a>(
         functions,
         fixed_variable_count,
         max_used_variables: binder.max_used_variables,
-        label_count,
+        label_count: binder.label_offset,
         referenced_libraries: binder.libraries,
     };
     BoundLibrary {
@@ -1066,10 +1066,11 @@ fn bind_function_declaration<'a, 'b>(
         bind_function_type(None, function_declaration.function_type, binder);
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
-    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;
+    // FIXME: Turn into usize
+    let function_label = binder.generate_label() as u64;
     binder.register_constant(
         function_declaration.identifier.lexeme,
-        Value::LabelPointer(function_id as _, type_),
+        Value::LabelPointer(function_label as _, type_),
     );
     binder.functions.push(FunctionDeclarationBody {
         header_span,
@@ -1077,7 +1078,7 @@ fn bind_function_declaration<'a, 'b>(
         body: *function_declaration.body,
         parameters: variables,
         is_main,
-        function_id,
+        function_label,
         function_type,
         base_struct: None,
         struct_function_kind: None,
@@ -1107,11 +1108,12 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     );
     variables.push(("this", struct_type));
     let type_ = Type::Function(Box::new(function_type.clone()));
-    let function_id = binder.functions.len() as u64 + binder.label_offset as u64;
+    // FIXME: Turn into usize
     let function_name = format!(
         "{}::{}",
         struct_name, function_declaration.identifier.lexeme
     );
+    let function_label = binder.generate_label() as u64;
     let base_struct = binder
         .structs
         .iter()
@@ -1190,7 +1192,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 body: *function_declaration.body,
                 parameters: variables,
                 is_main: false,
-                function_id,
+                function_label,
                 function_type: function_type.clone(),
                 base_struct: Some(base_struct),
                 struct_function_kind: Some(struct_function_kind),
@@ -1200,7 +1202,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 FunctionSymbol {
                     name: function_name,
                     function_type,
-                    label_index: function_id,
+                    function_label,
                     // FIXME: Actually it is, but, we do not want other libraries
                     // register this as a constant, since it is not actually
                     // callable.
@@ -1219,7 +1221,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
             } else {
                 binder.register_generated_constant(
                     function_name.clone(),
-                    Value::LabelPointer(function_id as usize, type_.clone()),
+                    Value::LabelPointer(function_label as usize, type_.clone()),
                 );
                 binder.functions.push(FunctionDeclarationBody {
                     header_span,
@@ -1227,7 +1229,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                     body: *function_declaration.body,
                     parameters: variables,
                     is_main: false,
-                    function_id,
+                    function_label,
                     function_type,
                     base_struct: Some(base_struct),
                     struct_function_kind: None,
@@ -1616,7 +1618,7 @@ fn bind_constructor_call<'a>(
                 &function.function_type,
                 binder,
             ),
-            Some(function.label_index),
+            Some(function.function_label),
         ),
         None => {
             if constructor_call.arguments.len() != struct_type.fields.len() {
@@ -1723,7 +1725,7 @@ fn bind_binary_insertion<'a>(
                     .function_table
                     .constructor_function
                     .as_ref()
-                    .map(|c| c.label_index);
+                    .map(|c| c.function_label);
                 BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
             } else {
                 BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
@@ -2031,7 +2033,7 @@ fn bind_array_index<'a, 'b>(
         Type::Struct(struct_type) => {
             match struct_type.function_table.get_function {
                 Some(get_function) => {
-                    let function_base = BoundNode::label_reference(get_function.label_index as _, Type::function(get_function.function_type.clone()));
+                    let function_base = BoundNode::label_reference(get_function.function_label as _, Type::function(get_function.function_type.clone()));
                     return BoundNode::function_call(span, function_base, vec![index, base], false, get_function.function_type.return_type.clone());
                 },
                 None => {
@@ -2072,7 +2074,7 @@ fn bind_array_index_for_assignment<'a, 'b>(
             match struct_type.function_table.set_function {
                 Some(set_function) => {
                     let type_ = Type::closure(set_function.function_type.clone());
-                    return BoundNode::closure_label(span, vec![base, index], set_function.label_index as _, type_);
+                    return BoundNode::closure_label(span, vec![base, index], set_function.function_label as _, type_);
                 },
                 None => {
                     binder.diagnostic_bag.report_cannot_convert(
@@ -2156,7 +2158,7 @@ fn bind_field_access<'a, 'b>(
             let function_name = field.lexeme;
             if let Some(function) = library.look_up_function_by_name(function_name) {
                 BoundNode::label_reference(
-                    function.label_index as _,
+                    function.function_label as _,
                     Type::function(function.function_type.clone()),
                 )
             } else {
@@ -2422,7 +2424,7 @@ fn call_to_string_on_struct<'a>(
     match &struct_type.function_table.to_string_function {
         Some(function) => {
             let function = BoundNode::label_reference(
-                function.label_index as _,
+                function.function_label as _,
                 Type::function(function.function_type.clone()),
             );
             BoundNode::function_call(base.span, function, vec![base], false, Type::String)

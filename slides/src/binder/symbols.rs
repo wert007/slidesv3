@@ -117,7 +117,7 @@ impl Library {
 pub struct FunctionSymbol {
     pub name: String,
     pub function_type: FunctionType,
-    pub label_index: u64,
+    pub function_label: u64,
     pub is_member_function: bool,
 }
 
@@ -144,7 +144,7 @@ impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
         Self {
             name: it.function_name.into(),
             function_type: it.function_type,
-            label_index: it.function_id,
+            function_label: it.function_label,
             is_member_function: it.base_struct.is_some(),
         }
     }
@@ -218,7 +218,7 @@ impl StructFunctionTable {
 
     fn relocate_labels(&mut self, label_offset: usize) {
         self.function_symbols_iter_mut()
-            .for_each(|f| f.label_index += label_offset as u64);
+            .for_each(|f| f.function_label += label_offset as u64);
     }
 
     fn relocate_structs(&mut self, struct_offset: usize) {

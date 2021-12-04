@@ -374,7 +374,7 @@ fn convert_function_declaration(
     function_declaration: BoundFunctionDeclarationNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let mut result = vec![Instruction::label(function_declaration.index)
+    let mut result = vec![Instruction::label(function_declaration.label)
         .span(span)
         .into()];
     for parameter in function_declaration.parameters.into_iter().rev() {
@@ -985,7 +985,7 @@ fn convert_type_identifier(
         Type::Struct(struct_type) => {
             result.push(match struct_type.function_table.to_string_function {
                 Some(function) => LabelReference {
-                    label_reference: function.label_index as _,
+                    label_reference: function.function_label as _,
                     span,
                 }
                 .into(),

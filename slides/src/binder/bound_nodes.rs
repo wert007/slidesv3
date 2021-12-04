@@ -531,7 +531,7 @@ impl BoundNode {
     }
 
     pub fn function_declaration(
-        index: usize,
+        label: usize,
         is_main: bool,
         body: BoundNode,
         parameters: Vec<u64>,
@@ -539,7 +539,7 @@ impl BoundNode {
         Self {
             span: body.span,
             kind: BoundNodeKind::FunctionDeclaration(BoundFunctionDeclarationNodeKind {
-                index,
+                label,
                 is_main,
                 body: Box::new(body),
                 parameters,
@@ -658,7 +658,7 @@ pub enum BoundNodeKind {
 
 #[derive(Debug, Clone)]
 pub struct BoundFunctionDeclarationNodeKind {
-    pub index: usize,
+    pub label: usize,
     pub is_main: bool,
     pub body: Box<BoundNode>,
     pub parameters: Vec<u64>,

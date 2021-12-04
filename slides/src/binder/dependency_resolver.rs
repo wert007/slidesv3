@@ -286,7 +286,7 @@ fn load_library_into_binder<'a>(
             binder.register_generated_constant(
                 function.name.clone(),
                 Value::LabelPointer(
-                    function.label_index as usize,
+                    function.function_label as usize,
                     Type::function(function.function_type.clone()),
                 ),
             );
@@ -297,7 +297,7 @@ fn load_library_into_binder<'a>(
                 binder.register_generated_constant(
                     format!("{}.{}", name, function.name),
                     Value::LabelPointer(
-                        function.label_index as usize,
+                        function.function_label as usize,
                         Type::function(function.function_type.clone()),
                     ),
                 );

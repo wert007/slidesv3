@@ -101,7 +101,7 @@ fn print_bound_node_function_declaration_as_code(
     if function_declaration.is_main {
         buffer.push_str("fn main() ");
     } else {
-        buffer.push_str(&format!("fn f{}(...) -> ... ", function_declaration.index));
+        buffer.push_str(&format!("fn f{}(...) -> ... ", function_declaration.label));
     }
     print_bound_node_as_code_with_indent(&function_declaration.body, printer, buffer);
 }
