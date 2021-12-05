@@ -398,8 +398,11 @@ fn evaluate_division(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value();
-    let lhs = state.stack.pop().unwrap_value();
+    // FIXME: As soon as their are generic types for many things, you could
+    // overwrite $equals, and this will only need to compare primitive value, so
+    // that you can use unwrap_value() again.
+    let rhs = state.stack.pop().value;
+    let lhs = state.stack.pop().value;
     state.stack.push((lhs == rhs) as _);
 }
 
