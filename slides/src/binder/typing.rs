@@ -385,6 +385,7 @@ pub struct FunctionType {
     pub this_type: Option<Type>,
     pub return_type: Type,
     pub system_call_kind: Option<SystemCallKind>,
+    pub is_generic: bool,
 }
 
 impl std::fmt::Display for FunctionType {
@@ -413,6 +414,7 @@ impl FunctionType {
             this_type: None,
             return_type: Type::Void,
             system_call_kind: None,
+            is_generic: false,
         }
     }
 
@@ -423,36 +425,42 @@ impl FunctionType {
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
+                is_generic: false,
             },
             SystemCallKind::ToString => Self {
                 parameter_types: vec![Type::Any],
                 this_type: None,
                 return_type: Type::String,
                 system_call_kind: Some(system_call_kind),
+                is_generic: false,
             },
             SystemCallKind::ArrayLength => Self {
                 parameter_types: vec![],
                 this_type: Some(Type::Any),
                 return_type: Type::Integer,
                 system_call_kind: Some(system_call_kind),
+                is_generic: false,
             },
             SystemCallKind::DebugHeapDump => Self {
                 parameter_types: vec![Type::String],
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
+                is_generic: false,
             },
             SystemCallKind::Break => Self {
                 parameter_types: vec![],
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
+                is_generic: false,
             },
             SystemCallKind::Reallocate => Self {
                 parameter_types: vec![Type::Pointer, Type::Integer],
                 this_type: None,
                 return_type: Type::Pointer,
                 system_call_kind: Some(system_call_kind),
+                is_generic: false,
             },
         }
     }
@@ -461,12 +469,14 @@ impl FunctionType {
         parameter_types: Vec<Type>,
         this_type: Option<Type>,
         return_type: Type,
+        is_generic: bool,
     ) -> Self {
         Self {
             parameter_types,
             this_type,
             return_type,
             system_call_kind: None,
+            is_generic,
         }
     }
 

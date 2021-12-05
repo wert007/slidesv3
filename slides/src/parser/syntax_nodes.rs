@@ -581,6 +581,10 @@ pub struct FunctionDeclarationNodeKind<'a> {
 
 #[derive(Debug, Clone)]
 pub struct FunctionTypeNode<'a> {
+    // NOTE: Normally the type of a function comes after the identifier, but
+    // generic comes before the func keyword. So this is just a flag and not the
+    // token.
+    pub is_generic: bool,
     pub lparen: SyntaxToken<'a>,
     pub parameters: Vec<ParameterNode<'a>>,
     pub comma_tokens: Vec<SyntaxToken<'a>>,
@@ -590,6 +594,7 @@ pub struct FunctionTypeNode<'a> {
 
 impl<'a> FunctionTypeNode<'a> {
     pub fn new(
+        is_generic: bool,
         lparen: SyntaxToken<'a>,
         parameters: Vec<ParameterNode<'a>>,
         comma_tokens: Vec<SyntaxToken<'a>>,
@@ -597,6 +602,7 @@ impl<'a> FunctionTypeNode<'a> {
         return_type: Option<ReturnTypeNode<'a>>,
     ) -> Self {
         Self {
+            is_generic,
             lparen,
             parameters,
             comma_tokens,
