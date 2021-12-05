@@ -78,6 +78,13 @@ struct FunctionDeclarationBody<'a> {
 }
 
 #[derive(Clone, Debug)]
+struct GenericFunction {
+    function_label: u64,
+    function_type: FunctionType,
+    body: BoundNode,
+}
+
+#[derive(Clone, Debug)]
 struct StructDeclarationBody<'a> {
     name: Cow<'a, str>,
     id: u64,
@@ -303,6 +310,8 @@ struct BindingState<'a, 'b> {
     /// of the variable. Is struct and is main is used in some places to
     /// differentiate them.
     functions: Vec<FunctionDeclarationBody<'a>>,
+    generic_functions: Vec<FunctionDeclarationBody<'a>>,
+    bound_generic_functions: Vec<GenericFunction>,
     bound_functions: Vec<BoundNode>,
     /// This is equal to the amount of labels used by the referenced libraries
     /// and will ensure, that all labels will be unique per bound program.
@@ -752,6 +761,18 @@ impl<'a> BindingState<'a, '_> {
         self.label_offset += 1;
         result
     }
+
+    fn find_generic_function_by_function_type(&self, function_type: &FunctionType) -> Option<&GenericFunction> {
+        self.bound_generic_functions.iter().find(|f| &f.function_type == function_type)
+    }
+
+    pub fn add_function_declaration(&mut self, function_declaration: FunctionDeclarationBody<'a>) {
+        if function_declaration.is_generic {
+            self.generic_functions.push(function_declaration);
+        } else {
+            self.functions.push(function_declaration);
+        }
+    }
 }
 
 fn print_variable_table(variable_table: &[BoundVariableName]) {
@@ -882,6 +903,8 @@ fn bind<'a>(
         struct_table: vec![],
         generic_struct_table: vec![],
         functions: vec![],
+        generic_functions: vec![],
+        bound_generic_functions: vec![],
         bound_functions: vec![],
         label_offset: 0,
         structs: vec![],
@@ -935,15 +958,28 @@ fn bind<'a>(
     }
 
     let fixed_variable_count = binder.variable_table.len();
-    while let Some(node) = binder.functions.pop() {
-        let base_struct = node.base_struct;
-        let is_generic = node.is_generic;
-        let function = bind_function_declaration_body(node, &mut binder);
-        if is_generic {
-            binder.get_generic_struct_type_by_id_mut(base_struct.unwrap()).unwrap().body.push(function);
+    while let Some(node) = binder.generic_functions.pop() {
+        let function = bind_function_declaration_body(node.clone(), &mut binder);
+        if let Some(base_struct) = node.base_struct {
+            binder.get_generic_struct_type_by_id_mut(base_struct).unwrap().body.push(function);
         } else {
-            binder.bound_functions.push(function);
+            let body = if let BoundNodeKind::FunctionDeclaration(function_declaration) = function.kind {
+                *function_declaration.body
+            } else {
+                unreachable!("The function was not a function declaration!");
+            };
+            binder.bound_generic_functions.push(
+                GenericFunction {
+                    function_label: node.function_label,
+                    function_type: node.function_type,
+                    body,
+                }
+            )
         }
+    }
+    while let Some(node) = binder.functions.pop() {
+        let function = bind_function_declaration_body(node, &mut binder);
+        binder.bound_functions.push(function);	
     }
 
     if !is_library {
@@ -1163,14 +1199,14 @@ fn bind_function_declaration<'a, 'b>(
     let type_ = Type::Function(Box::new(function_type.clone()));
     let is_main = function_declaration.identifier.lexeme == "main";
     let is_generic = function_declaration.optional_generic_keyword.is_some();
-    assert!(is_generic == false);
+    // assert!(is_generic == false);
     // FIXME: Turn into usize
     let function_label = binder.generate_label() as u64;
     binder.register_constant(
         function_declaration.identifier.lexeme,
         Value::LabelPointer(function_label as _, type_),
     );
-    binder.functions.push(FunctionDeclarationBody {
+    binder.add_function_declaration(FunctionDeclarationBody {
         header_span,
         function_name: function_declaration.identifier.lexeme.into(),
         body: *function_declaration.body,
@@ -1226,7 +1262,6 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         .unwrap();
     // FIXME: implement getter for generic structs.
     let is_generic = binder.get_generic_struct_type_by_id(base_struct).is_some();
-    dbg!(&function_name, is_generic);
     match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
         Ok(struct_function_kind) => {
             match struct_function_kind {
@@ -1288,7 +1323,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                     }
                 }
             }
-            binder.functions.push(FunctionDeclarationBody {
+            binder.add_function_declaration(FunctionDeclarationBody {
                 header_span,
                 function_name: function_name.clone().into(),
                 body: *function_declaration.body,
@@ -1326,7 +1361,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                     function_name.clone(),
                     Value::LabelPointer(function_label as usize, type_.clone()),
                 );
-                binder.functions.push(FunctionDeclarationBody {
+                binder.add_function_declaration(FunctionDeclarationBody {
                     header_span,
                     function_name: function_name.into(),
                     body: *function_declaration.body,
@@ -1392,6 +1427,7 @@ fn bind_function_type<'a>(
             this_type,
             return_type,
             system_call_kind: None,
+            is_generic: function_type.is_generic,
         },
         parameters,
     )
