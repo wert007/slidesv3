@@ -763,8 +763,8 @@ impl<'a> BindingState<'a, '_> {
         result
     }
 
-    fn find_generic_function_by_function_type(&self, function_type: &FunctionType) -> Option<&GenericFunction> {
-        self.bound_generic_functions.iter().find(|f| &f.function_type == function_type)
+    fn find_generic_function_by_label(&self, label: usize) -> Option<&GenericFunction> {
+        self.bound_generic_functions.iter().find(|f| f.function_label == label as u64)
     }
 
     pub fn add_function_declaration(&mut self, function_declaration: FunctionDeclarationBody<'a>) {
@@ -2138,9 +2138,11 @@ fn bind_function_call<'a, 'b>(
     }
     let function_type = function_type(&function.type_);
     if function_type.is_generic {
+        let old_label = function.constant_value.unwrap().value.as_label_pointer().unwrap().0;
         let (mut tmp_arguments, label) = bind_arguments_for_generic_function(
             argument_span,
             function_call.arguments,
+            old_label,
             &function_type,
             binder,
         );
@@ -2500,11 +2502,12 @@ fn bind_arguments_for_function<'a, 'b>(
 fn bind_arguments_for_generic_function<'a, 'b>(
     span: TextSpan,
     arguments: Vec<SyntaxNode<'a>>,
+    label: usize,
     function_type: &FunctionType,
     binder: &mut BindingState<'a, 'b>,
 ) -> (Vec<BoundNode>, usize) {
     let mut result = vec![];
-    let mut label = 0;
+    let mut changed_label = 0;
     if function_type.parameter_types.len() != arguments.len() {
         binder.diagnostic_bag.report_unexpected_argument_count(
             span,
@@ -2527,13 +2530,13 @@ fn bind_arguments_for_generic_function<'a, 'b>(
         let parameter_type = if matches!(parameter_type, Type::GenericType) {
             if binder.generic_type.is_none() {
                 binder.generic_type = Some(argument.type_.clone());
-                let generic_function = binder.find_generic_function_by_function_type(function_type).unwrap();
+                let generic_function = binder.find_generic_function_by_label(label).unwrap();
                 let body = type_replacer::replace_generic_type_with(generic_function.body.clone(), &argument.type_);
-                label = binder.generate_label();
+                changed_label = binder.generate_label();
                 // FIXME: Do NOT use just a stupid range here, if parameters
                 // will ever not be the first register (like with local
                 // functions or lambdas), then this will fail tragically!
-                let function = BoundNode::function_declaration(label, false, body, (0..function_type.parameter_types.len() as u64).collect());
+                let function = BoundNode::function_declaration(changed_label, false, body, (0..function_type.parameter_types.len() as u64).collect());
                 binder.bound_functions.push(function);
             }
             binder.generic_type.clone().unwrap()
@@ -2558,7 +2561,7 @@ fn bind_arguments_for_generic_function<'a, 'b>(
         result.push(argument);
     }
     binder.generic_type = None;
-    (result, label)
+    (result, changed_label)
 }
 
 fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> BoundNode {
