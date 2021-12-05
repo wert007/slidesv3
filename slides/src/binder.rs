@@ -2114,7 +2114,7 @@ fn bind_function_call<'a, 'b>(
     let function = bind_node(*function_call.base, binder);
     let mut arguments = vec![];
     let mut more_arguments = vec![];
-    let function = if let BoundNodeKind::Closure(mut closure) = function.kind {
+    let mut function = if let BoundNodeKind::Closure(mut closure) = function.kind {
         more_arguments.append(&mut closure.arguments);
         let type_ = if let Type::Closure(closure_type) = function.type_ {
             Type::Function(Box::new(closure_type.base_function_type))
@@ -2137,12 +2137,23 @@ fn bind_function_call<'a, 'b>(
         return BoundNode::error(span);
     }
     let function_type = function_type(&function.type_);
-    arguments.append(&mut bind_arguments_for_function(
-        argument_span,
-        function_call.arguments,
-        &function_type,
-        binder,
-    ));
+    if function_type.is_generic {
+        let (mut tmp_arguments, label) = bind_arguments_for_generic_function(
+            argument_span,
+            function_call.arguments,
+            &function_type,
+            binder,
+        );
+        function = BoundNode::label_reference(label, function.type_);
+        arguments.append(&mut tmp_arguments);
+    } else {
+        arguments.append(&mut bind_arguments_for_function(
+            argument_span,
+            function_call.arguments,
+            &function_type,
+            binder,
+        ));
+    }
     arguments.append(&mut more_arguments);
     match &function.type_ {
         Type::Error => BoundNode::error(span),
@@ -2465,6 +2476,7 @@ fn bind_arguments_for_function<'a, 'b>(
             result.push(BoundNode::error(argument.span));
             continue;
         }
+        assert_ne!(parameter_type, &Type::GenericType);
         // FIXME: This ensures that print prints the same as to string would. In
         // the long run you could probably say, that print accepts type any, but
         // during binding all types will be actually turned into strings and the
@@ -2483,6 +2495,70 @@ fn bind_arguments_for_function<'a, 'b>(
         result.push(argument);
     }
     result
+}
+
+fn bind_arguments_for_generic_function<'a, 'b>(
+    span: TextSpan,
+    arguments: Vec<SyntaxNode<'a>>,
+    function_type: &FunctionType,
+    binder: &mut BindingState<'a, 'b>,
+) -> (Vec<BoundNode>, usize) {
+    let mut result = vec![];
+    let mut label = 0;
+    if function_type.parameter_types.len() != arguments.len() {
+        binder.diagnostic_bag.report_unexpected_argument_count(
+            span,
+            arguments.len(),
+            function_type.parameter_types.len(),
+        );
+    }
+    for (argument, parameter_type) in arguments
+        .into_iter()
+        .zip(function_type.parameter_types.iter())
+    {
+        let mut argument = bind_node(argument, binder);
+        if matches!(argument.type_, Type::Void) {
+            binder
+                .diagnostic_bag
+                .report_invalid_void_expression(argument.span);
+            result.push(BoundNode::error(argument.span));
+            continue;
+        }
+        let parameter_type = if matches!(parameter_type, Type::GenericType) {
+            if binder.generic_type.is_none() {
+                binder.generic_type = Some(argument.type_.clone());
+                let generic_function = binder.find_generic_function_by_function_type(function_type).unwrap();
+                let body = type_replacer::replace_generic_type_with(generic_function.body.clone(), &argument.type_);
+                label = binder.generate_label();
+                // FIXME: Do NOT use just a stupid range here, if parameters
+                // will ever not be the first register (like with local
+                // functions or lambdas), then this will fail tragically!
+                let function = BoundNode::function_declaration(label, false, body, (0..function_type.parameter_types.len() as u64).collect());
+                binder.bound_functions.push(function);
+            }
+            binder.generic_type.clone().unwrap()
+        } else {
+            parameter_type.clone()
+        };
+        // FIXME: This ensures that print prints the same as to string would. In
+        // the long run you could probably say, that print accepts type any, but
+        // during binding all types will be actually turned into strings and the
+        // print implementation only accepts strings.
+        if let Some(SystemCallKind::Print) = function_type.system_call_kind {
+            argument = call_to_string(argument, binder);
+        }
+        argument = bind_conversion(argument, &parameter_type, binder);
+        if let Type::Function(_) = argument.type_ {
+            if let Some(SystemCallKind::Print) = function_type.system_call_kind {
+                binder
+                    .diagnostic_bag
+                    .report_cannot_print_type(argument.span, &argument.type_);
+            }
+        }
+        result.push(argument);
+    }
+    binder.generic_type = None;
+    (result, label)
 }
 
 fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> BoundNode {
