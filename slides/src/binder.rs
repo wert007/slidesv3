@@ -1510,9 +1510,7 @@ fn bind_struct_body<'a>(
             SyntaxNodeKind::StructField(struct_field) => {
                 is_function = false;
                 let (name, type_) = bind_parameter(struct_field.field, binder);
-                let field_offset = if struct_body.is_generic {
-                    0
-                } else {
+                let field_offset = {
                     offset += type_.size_in_bytes();
                     offset - type_.size_in_bytes()
                 };
@@ -1828,7 +1826,11 @@ fn bind_constructor_call<'a>(
             // HACK: We somehow get functions in our fields, if we use generic
             // structs, so we filter them out, since user can not declare
             // functions as fields of the time being.
-            let fields : Vec<_> = struct_type.fields.iter().filter(|f| !matches!(f.type_, Type::Function(_))).collect();
+            let fields: Vec<_> = struct_type
+                .fields
+                .iter()
+                .filter(|f| !matches!(f.type_, Type::Function(_)))
+                .collect();
             if constructor_call.arguments.len() != fields.len() {
                 binder.diagnostic_bag.report_unexpected_argument_count(
                     span,
@@ -1866,6 +1868,10 @@ fn bind_constructor_call<'a>(
                                 resolved_struct_type = Some(bind_generic_struct_type_for_type(
                                     struct_id, &type_, binder,
                                 ));
+                            } else {
+                                // We know this is wrong, but hey, im sure there
+                                // will be a compile time error somewhere.
+                                binder.generic_type = Some(argument.type_.clone());
                             }
                         }
                         argument.type_.clone()
@@ -1912,13 +1918,49 @@ fn bind_generic_struct_type_for_type(
         for function in &generic_struct.functions {
             let old_label = function.function_label;
             let new_label = bind_generic_function_for_type(function, true, type_, binder) as u64;
-            let function_name = format!("{}::{}", struct_name, function.function_name.split_once("::").unwrap().1);
+            let function_name = format!(
+                "{}::{}",
+                struct_name,
+                function.function_name.split_once("::").unwrap().1
+            );
+            let function_type = FunctionType {
+                parameter_types: function
+                    .function_type
+                    .parameter_types
+                    .iter()
+                    .map(|t| {
+                        if t == &Type::GenericType {
+                            type_.clone()
+                        } else {
+                            t.clone()
+                        }
+                    })
+                    .collect(),
+                this_type: function
+                    .function_type
+                    .this_type
+                    .iter()
+                    .map(|t| {
+                        if t == &Type::GenericType {
+                            type_.clone()
+                        } else {
+                            t.clone()
+                        }
+                    })
+                    .next(),
+                return_type: if function.function_type.return_type == Type::GenericType {
+                    type_.clone()
+                } else {
+                    function.function_type.return_type.clone()
+                },
+                system_call_kind: function.function_type.system_call_kind,
+                is_generic: false,
+            };
             binder.register_generated_constant(
                 function_name,
                 Value::LabelPointer(
                     new_label as usize,
-                    // FIXME: Change the GenericType here as well???
-                    Type::function(function.function_type.clone()),
+                    Type::function(function_type),
                 ),
             );
             function_labels.push((old_label, new_label));
