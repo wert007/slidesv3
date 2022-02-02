@@ -93,6 +93,19 @@ fn replace_type_with_other_type_in_field_access(field_access: &mut BoundFieldAcc
     if &field_access.type_ == type_ {
         field_access.type_ = replacement_type.clone();
     }
+    if let Type::Function(function_type) = &mut field_access.type_ {
+        for it in function_type.parameter_types.iter_mut() {
+            if it == type_ {
+                *it = replacement_type.clone();
+            }
+        }
+        if &function_type.return_type == type_ {
+            function_type.return_type = replacement_type.clone();
+        }
+        if function_type.this_type.as_ref() == Some(type_) {
+            function_type.this_type = Some(replacement_type.clone());
+        }
+    }
 }
 
 fn replace_type_with_other_type_in_array_index(array_index: &mut BoundArrayIndexNodeKind, type_: &Type, replacement_type: &Type) {

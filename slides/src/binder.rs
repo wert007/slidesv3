@@ -2643,7 +2643,6 @@ fn bind_arguments_for_function<'a, 'b>(
             result.push(BoundNode::error(argument.span));
             continue;
         }
-        assert_ne!(parameter_type, &Type::GenericType);
         // FIXME: This ensures that print prints the same as to string would. In
         // the long run you could probably say, that print accepts type any, but
         // during binding all types will be actually turned into strings and the

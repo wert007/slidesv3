@@ -21,9 +21,9 @@
 generic struct Value {
     value: $Type;
 
-    // func set(value: $Type) {
-    //     this.replace(value);
-    // }
+    func set(value: $Type) {
+        this.replace(value);
+    }
 
     func replace(value: $Type) -> $Type {
         let old = this.value;
