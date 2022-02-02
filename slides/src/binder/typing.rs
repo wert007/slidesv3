@@ -250,7 +250,6 @@ impl Type {
     pub fn size_in_bytes(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
-            Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
@@ -266,6 +265,7 @@ impl Type {
             | Type::Noneable(_)
             | Type::Pointer
             | Type::PointerOf(_)
+            | Type::GenericType
             | Type::String => WORD_SIZE_IN_BYTES,
         }
     }
