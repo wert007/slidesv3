@@ -236,7 +236,7 @@ impl StructFunctionTable {
         }
     }
 
-    fn function_symbols_iter_mut(&mut self) -> impl Iterator<Item = &mut FunctionSymbol> {
+    pub fn function_symbols_iter_mut(&mut self) -> impl Iterator<Item = &mut FunctionSymbol> {
         self.constructor_function
             .iter_mut()
             .chain(self.to_string_function.iter_mut())
