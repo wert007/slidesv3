@@ -291,6 +291,7 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
 #[derive(Clone, Debug)]
 pub struct GenericFunction {
     pub function_label: u64,
+    pub function_name: String,
     pub function_type: FunctionType,
     pub body: BoundNode,
 }

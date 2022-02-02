@@ -985,6 +985,7 @@ fn bind<'a>(
         };
         let generic_function = GenericFunction {
             function_label: node.function_label,
+            function_name: node.function_name.into_owned(),
             function_type: node.function_type,
             body,
         };
@@ -1911,17 +1912,12 @@ fn bind_generic_struct_type_for_type(
         for function in &generic_struct.functions {
             let old_label = function.function_label;
             let new_label = bind_generic_function_for_type(function, true, type_, binder) as u64;
-            // TODO: Get function name!
-            let function_name = if function.function_type.parameter_types.len() == 0 {
-                "to$string"
-            } else {
-                "replace"
-            };
-            let function_name = format!("{}::{}", struct_name, function_name);
+            let function_name = format!("{}::{}", struct_name, function.function_name.split_once("::").unwrap().1);
             binder.register_generated_constant(
                 function_name,
                 Value::LabelPointer(
                     new_label as usize,
+                    // FIXME: Change the GenericType here as well???
                     Type::function(function.function_type.clone()),
                 ),
             );
