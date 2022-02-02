@@ -174,7 +174,7 @@ fn parse_struct_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     };
     let struct_keyword = parser.match_token(SyntaxTokenKind::StructKeyword);
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
-    let body = parse_struct_body(parser);
+    let body = parse_struct_body(optional_generic_keyword.is_some(), parser);
 
     SyntaxNode::struct_declaration(optional_generic_keyword, struct_keyword, identifier, body)
 }
@@ -214,7 +214,7 @@ fn parse_function_type<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> Fun
     FunctionTypeNode::new(is_generic, lparen, parameters, comma_tokens, rparen, return_type)
 }
 
-fn parse_struct_body<'a>(parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
+fn parse_struct_body<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
     let lbrace = parser.match_token(SyntaxTokenKind::LBrace);
     let mut statements = vec![];
     while !matches!(
@@ -246,7 +246,7 @@ fn parse_struct_body<'a>(parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
     }
     let rbrace = parser.match_token(SyntaxTokenKind::RBrace);
 
-    StructBodyNode::new(lbrace, statements, rbrace)
+    StructBodyNode::new(is_generic, lbrace, statements, rbrace)
 }
 
 fn parse_parameter<'a>(parser: &mut Parser<'a, '_>) -> ParameterNode<'a> {

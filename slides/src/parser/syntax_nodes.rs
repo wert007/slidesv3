@@ -622,6 +622,7 @@ pub struct StructDeclarationNodeKind<'a> {
 
 #[derive(Debug, Clone)]
 pub struct StructBodyNode<'a> {
+    pub is_generic: bool,
     pub lbrace: SyntaxToken<'a>,
     pub statements: Vec<SyntaxNode<'a>>,
     pub rbrace: SyntaxToken<'a>,
@@ -630,12 +631,14 @@ pub struct StructBodyNode<'a> {
 
 impl<'a> StructBodyNode<'a> {
     pub fn new(
+        is_generic: bool,
         lbrace: SyntaxToken<'a>,
         statements: Vec<SyntaxNode<'a>>,
         rbrace: SyntaxToken<'a>,
     ) -> Self {
         let span = TextSpan::bounds(lbrace.span(), rbrace.span());
         Self {
+            is_generic,
             lbrace,
             statements,
             rbrace,
