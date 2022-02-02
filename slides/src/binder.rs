@@ -1910,10 +1910,6 @@ fn bind_generic_struct_type_for_type(
             .register_generated_struct_name(struct_name.clone())
             .unwrap();
         let mut fields = generic_struct.struct_type.fields.clone();
-        fields
-            .iter_mut()
-            .filter(|f| f.type_ == Type::GenericType)
-            .for_each(|f| f.type_ = type_.clone());
         let mut function_labels = Vec::with_capacity(generic_struct.functions.len());
         for function in &generic_struct.functions {
             let old_label = function.function_label;
@@ -1923,71 +1919,33 @@ fn bind_generic_struct_type_for_type(
                 struct_name,
                 function.function_name.split_once("::").unwrap().1
             );
-            let function_type = FunctionType {
-                parameter_types: function
-                    .function_type
-                    .parameter_types
-                    .iter()
-                    .map(|t| {
-                        if t == &Type::GenericType {
-                            type_.clone()
-                        } else {
-                            t.clone()
-                        }
-                    })
-                    .collect(),
-                this_type: function
-                    .function_type
-                    .this_type
-                    .iter()
-                    .map(|t| {
-                        if t == &Type::GenericType {
-                            type_.clone()
-                        } else {
-                            t.clone()
-                        }
-                    })
-                    .next(),
-                return_type: if function.function_type.return_type == Type::GenericType {
-                    type_.clone()
-                } else {
-                    function.function_type.return_type.clone()
-                },
-                system_call_kind: function.function_type.system_call_kind,
-                is_generic: false,
-            };
+            let mut function_type = function.function_type.clone();
+            type_replacer::replace_type_with_other_type_in_function_type(
+                &mut function_type,
+                &Type::GenericType,
+                type_,
+            );
             binder.register_generated_constant(
                 function_name,
-                Value::LabelPointer(
-                    new_label as usize,
-                    Type::function(function_type),
-                ),
+                Value::LabelPointer(new_label as usize, Type::function(function_type)),
             );
             function_labels.push((old_label, new_label));
         }
-        fields
-            .iter_mut()
-            .filter(|f| matches!(f.type_, Type::Function(_)))
-            .for_each(|f| {
-                if let Type::Function(function_type) = &mut f.type_ {
-                    function_type
-                        .parameter_types
-                        .iter_mut()
-                        .filter(|p| p == &&Type::GenericType)
-                        .for_each(|p| *p = type_.clone());
-                    function_type.this_type = Some(Type::StructReference(id));
-                    if function_type.return_type == Type::GenericType {
-                        function_type.return_type = type_.clone();
-                    }
-                } else {
-                    unreachable!();
-                }
-            });
-        let function_table = generic_struct
+        fields.iter_mut().for_each(|f| {
+            type_replacer::replace_type_with_other_type(&mut f.type_, &Type::GenericType, type_);
+        });
+        let mut function_table = generic_struct
             .struct_type
             .function_table
             .clone()
             .replace_labels(&function_labels);
+        function_table.function_symbols_iter_mut().for_each(|s| {
+            type_replacer::replace_type_with_other_type_in_function_type(
+                &mut s.function_type,
+                &Type::GenericType,
+                type_,
+            )
+        });
         binder.register_struct(id, fields, function_table);
         id
     };

@@ -23,17 +23,7 @@ pub fn replace_type_with_other_type(
         replace_type_with_other_type(input_type, compares_to, replacement_type);
     }
     if let Type::Function(function_type) = input_type {
-        for it in function_type.parameter_types.iter_mut() {
-            replace_type_with_other_type(it, compares_to, replacement_type);
-        }
-        replace_type_with_other_type(
-            &mut function_type.return_type,
-            compares_to,
-            replacement_type,
-        );
-        if let Some(it) = &mut function_type.this_type {
-            replace_type_with_other_type(it, compares_to, replacement_type);
-        }
+        replace_type_with_other_type_in_function_type(function_type, compares_to, replacement_type);
     }
     if let Type::Struct(struct_type) = input_type {
         for it in struct_type.fields.iter_mut() {
@@ -42,6 +32,20 @@ pub fn replace_type_with_other_type(
         for it in struct_type.functions.iter_mut() {
             replace_type_with_other_type(it, compares_to, replacement_type);
         }
+    }
+}
+
+pub fn replace_type_with_other_type_in_function_type(function_type: &mut super::typing::FunctionType, type_: &Type, replacement_type: &Type) {
+    for it in function_type.parameter_types.iter_mut() {
+        replace_type_with_other_type(it, type_, replacement_type);
+    }
+    replace_type_with_other_type(
+        &mut function_type.return_type,
+        type_,
+        replacement_type,
+    );
+    if let Some(it) = &mut function_type.this_type {
+        replace_type_with_other_type(it, type_, replacement_type);
     }
 }
 
