@@ -224,6 +224,7 @@ pub struct StructFunctionTable {
     pub to_string_function: Option<FunctionSymbol>,
     pub get_function: Option<FunctionSymbol>,
     pub set_function: Option<FunctionSymbol>,
+    pub element_count_function: Option<FunctionSymbol>,
 }
 
 impl StructFunctionTable {
@@ -233,6 +234,7 @@ impl StructFunctionTable {
             StructFunctionKind::ToString => self.to_string_function = Some(function),
             StructFunctionKind::Get => self.get_function = Some(function),
             StructFunctionKind::Set => self.set_function = Some(function),
+            StructFunctionKind::ElementCount => self.element_count_function = Some(function),
         }
     }
 
@@ -272,6 +274,7 @@ pub enum StructFunctionKind {
     ToString,
     Get,
     Set,
+    ElementCount,
 }
 
 impl<'a> TryFrom<&'a str> for StructFunctionKind {
@@ -283,6 +286,7 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
             "$toString" => Ok(Self::ToString),
             "$get" => Ok(Self::Get),
             "$set" => Ok(Self::Set),
+            "$elementCount" => Ok(Self::ElementCount),
             _ => Err(value),
         }
     }

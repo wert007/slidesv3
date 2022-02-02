@@ -1093,7 +1093,7 @@ fn bind_function_declaration_body<'a, 'b>(
                     );
             }
         }
-        Some(StructFunctionKind::ToString | StructFunctionKind::Get | StructFunctionKind::Set)
+        Some(StructFunctionKind::ToString | StructFunctionKind::Get | StructFunctionKind::Set | StructFunctionKind::ElementCount)
         | None => {}
     }
     binder.assigned_fields.clear();
@@ -1417,6 +1417,22 @@ fn type_check_struct_function_kind(
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.parameter_types[0],
+                    &Type::Integer,
+                );
+            }
+        }
+        StructFunctionKind::ElementCount => {
+            if function_type.parameter_types.len() != 0 {
+                binder.diagnostic_bag.report_unexpected_parameter_count(
+                    span,
+                    function_type.parameter_types.len(),
+                    0,
+                );
+            }
+            if !function_type.return_type.can_be_converted_to(&Type::Integer) {
+                binder.diagnostic_bag.report_cannot_convert(
+                    span,
+                    &function_type.return_type,
                     &Type::Integer,
                 );
             }
