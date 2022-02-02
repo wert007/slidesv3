@@ -250,37 +250,21 @@ fn lexer_error() {
     lex_helper_errors("-99999999999999999999", |token, diagnostics| {
         assert_eq!(token.len(), 3);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            format!("{}", diagnostics[0]),
-            "Error at 1-21: '99999999999999999999' is no valid u64 integer."
-        );
     });
 
     lex_helper_errors(" %", |token, diagnostics| {
         assert_eq!(token.len(), 1);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            format!("{}", diagnostics[0]),
-            "Error at 1-2: Bad character in input: %"
-        );
     });
 
     lex_helper_errors("/* this is a comment", |token, diagnostics| {
         assert_eq!(token.len(), 1);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            format!("{}", diagnostics[0]),
-            "Error at 0-20: Unterminated comment found here."
-        );
     });
 
     lex_helper_errors("1 /* 2", |token, diagnostics| {
         assert_eq!(token.len(), 2);
         assert_eq!(diagnostics.len(), 1);
-        assert_eq!(
-            format!("{}", diagnostics[0]),
-            "Error at 2-6: Unterminated comment found here."
-        );
     });
 }
 

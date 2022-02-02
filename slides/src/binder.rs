@@ -1010,6 +1010,17 @@ fn bind<'a>(
             println!("  {}: {:#?}", id, entry);
         }
     }
+
+    let mut type_names = binder
+        .type_table
+        .iter()
+        .map(|b| b.identifier.as_ref().to_owned())
+        .collect();
+    binder
+        .diagnostic_bag
+        .registered_types
+        .append(&mut type_names);
+
     let program = BoundProgram {
         startup,
         functions,
