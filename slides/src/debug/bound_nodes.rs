@@ -1,4 +1,4 @@
-use crate::{binder::bound_nodes::*, parser::syntax_nodes::LiteralNodeKind};
+use crate::binder::bound_nodes::*;
 
 use super::DebugPrinter;
 

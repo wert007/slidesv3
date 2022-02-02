@@ -1,4 +1,4 @@
-use crate::{parser::syntax_nodes::LiteralNodeKind, text::TextSpan, value::Value};
+use crate::{text::TextSpan, value::Value};
 
 use super::{
     operators::{BoundBinaryOperator, BoundUnaryOperator},

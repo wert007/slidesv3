@@ -798,7 +798,7 @@ fn print_variable_table(variable_table: &[BoundVariableName]) {
     println!();
 }
 
-fn print_constant_table(constant_table: &[BoundConstant]) {
+fn _print_constant_table(constant_table: &[BoundConstant]) {
     let mut constant_table: Vec<_> = constant_table.iter().enumerate().collect();
     constant_table.sort_unstable_by_key(|f| f.0);
     for (index, constant) in constant_table {

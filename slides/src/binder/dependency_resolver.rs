@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
-    binder::{symbols::Library, typing::Type, BindingState, StructDeclarationBody},
+    binder::{symbols::Library, typing::Type, BindingState},
     parser::syntax_nodes::{
         CompilationUnitNodeKind, ImportStatementNodeKind, SyntaxNode, SyntaxNodeKind,
     },
@@ -9,7 +9,7 @@ use crate::{
     value::Value,
 };
 
-use super::{symbols::GenericStructSymbol, BoundGenericStructSymbol, BoundStructSymbol};
+use super::{BoundGenericStructSymbol, BoundStructSymbol};
 
 #[derive(Debug, Clone)]
 pub struct BoundImportStatement<'a> {
@@ -246,7 +246,7 @@ fn load_library_into_binder<'a>(
         binder.label_offset += lib.program.label_count;
     }
     for generic_struct in &lib.generic_structs {
-        let struct_id = binder
+        let _struct_id = binder
             .register_generated_struct_name(generic_struct.name.clone())
             .unwrap();
         binder.generic_struct_table.push(BoundGenericStructSymbol {

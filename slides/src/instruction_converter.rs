@@ -25,7 +25,6 @@ use crate::{
     debug::DebugFlags,
     diagnostics::DiagnosticBag,
     evaluator::memory::{self, bytes_to_word, static_memory::StaticMemory, WORD_SIZE_IN_BYTES},
-    parser::syntax_nodes::LiteralNodeKind,
     text::{SourceText, TextSpan},
     value::Value,
 };
