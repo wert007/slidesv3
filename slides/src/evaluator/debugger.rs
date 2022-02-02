@@ -12,6 +12,10 @@ pub fn create_session(state: &mut EvaluatorState) -> bool {
                 Command::Quit => return false,
                 Command::NextInstruction => return true,
                 Command::Stack => print_stack(&state.stack),
+                Command::Replace(new_value) => {
+                    let flags = state.stack.pop().flags;
+                    state.stack.push_flagged_word(FlaggedWord::value(new_value).flags(flags));
+                }
                 Command::Registers => print_registers(&state.registers),
                 Command::Pointer(address) => read_pointer(state, address),
             },
@@ -72,6 +76,7 @@ enum Command {
     Stack,
     Registers,
     Pointer(usize),
+    Replace(u64),
 }
 
 fn parse_command(input: &str) -> Option<Command> {
@@ -81,6 +86,13 @@ fn parse_command(input: &str) -> Option<Command> {
                 Some(Command::Pointer(usize::from_str_radix(arg, 16).ok()?))
             } else {
                 Some(Command::Pointer(arg.parse().ok()?))
+            }
+        }
+        ["replace", arg] => {
+            if let Some(arg) = arg.strip_prefix("0x") {
+                Some(Command::Replace(u64::from_str_radix(arg, 16).ok()?))
+            } else {
+                Some(Command::Replace(arg.parse().ok()?))
             }
         }
         ["stack"] => Some(Command::Stack),
