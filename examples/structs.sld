@@ -54,6 +54,11 @@ struct Square {
     }
 }
 
+struct A {
+    // Maybe this should be illegal.
+    this : int;
+}
+
 func main() {
     let p = new Point(43, 87);
     let r = new Rect(10, 10, 200, 300);
