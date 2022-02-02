@@ -184,16 +184,16 @@ pub struct GenericStructSymbol {
     pub name: String,
     pub fields: Vec<StructFieldSymbol>,
     pub function_table: StructFunctionTable,
-    pub body: Vec<BoundNode>,
+    pub functions: Vec<GenericFunction>,
 }
 
 impl From<BoundGenericStructSymbol<'_>> for GenericStructSymbol {
     fn from(it: BoundGenericStructSymbol<'_>) -> Self {
         Self {
-            name: it.name.into(),
-            fields: it.fields.into_iter().map(Into::into).collect(),
-            function_table: it.function_table,
-            body: it.body,
+            name: it.struct_type.name.into(),
+            fields: it.struct_type.fields.into_iter().map(Into::into).collect(),
+            function_table: it.struct_type.function_table,
+            functions: it.functions,
         }
     }
 }
@@ -256,6 +256,14 @@ impl StructFunctionTable {
         self.function_symbols_iter_mut()
             .for_each(|f| f.relocate_structs(struct_offset));
     }
+
+    pub fn replace_labels(mut self, label_replacer: &[(u64, u64)]) -> Self {
+        let find_label = |lbl: &mut u64| {
+            *lbl = *label_replacer.iter().find(|(old, _)| *old == *lbl).map(|(_, new)| new).unwrap();
+        };
+        self.function_symbols_iter_mut().for_each(|c|find_label(&mut c.function_label));
+        self
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -278,4 +286,11 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
             _ => Err(value),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct GenericFunction {
+    pub function_label: u64,
+    pub function_type: FunctionType,
+    pub body: BoundNode,
 }

@@ -516,6 +516,7 @@ pub struct StructType {
     pub fields: Vec<Type>,
     pub functions: Vec<Type>,
     pub function_table: StructFunctionTable,
+    pub is_generic: bool,
 }
 
 impl StructType {

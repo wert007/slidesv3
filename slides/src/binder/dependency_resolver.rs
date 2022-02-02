@@ -9,7 +9,7 @@ use crate::{
     value::Value,
 };
 
-use super::{symbols::GenericStructSymbol, BoundGenericStructSymbol};
+use super::{symbols::GenericStructSymbol, BoundGenericStructSymbol, BoundStructSymbol};
 
 #[derive(Debug, Clone)]
 pub struct BoundImportStatement<'a> {
@@ -211,7 +211,9 @@ fn load_library_into_binder<'a>(
     path: Option<String>,
     binder: &mut BindingState<'a, '_>,
 ) {
-    binder.max_used_variables = binder.max_used_variables.max(lib.program.max_used_variables);
+    binder.max_used_variables = binder
+        .max_used_variables
+        .max(lib.program.max_used_variables);
     if lib.has_errors {
         binder
             .diagnostic_bag
@@ -247,37 +249,35 @@ fn load_library_into_binder<'a>(
         let struct_id = binder
             .register_generated_struct_name(generic_struct.name.clone())
             .unwrap();
-        binder.generic_struct_table.push(
-            BoundGenericStructSymbol {
+        binder.generic_struct_table.push(BoundGenericStructSymbol {
+            struct_type: BoundStructSymbol {
                 name: generic_struct.name.clone().into(),
-                fields: generic_struct.fields
-                .iter()
-                .map(ToOwned::to_owned)
-                .map(Into::into)
-                .collect(),
+                fields: generic_struct
+                    .fields
+                    .iter()
+                    .map(ToOwned::to_owned)
+                    .map(Into::into)
+                    .collect(),
                 function_table: generic_struct.function_table.clone(),
-                body: generic_struct.body.clone(),
-            }
-        );
-
+                is_generic: true,
+            },
+            functions: generic_struct.functions.clone(),
+        });
     }
     for strct in &lib.structs {
+        let fields: Vec<_> = strct
+            .fields
+            .iter()
+            .map(ToOwned::to_owned)
+            .map(Into::into)
+            .collect();
         match &path {
             Some(empty) if empty.is_empty() => {
                 assert!(lib.name.is_empty());
                 let struct_id = binder
                     .register_generated_struct_name(strct.name.clone())
                     .unwrap();
-                binder.register_struct(
-                    struct_id,
-                    strct
-                        .fields
-                        .iter()
-                        .map(ToOwned::to_owned)
-                        .map(Into::into)
-                        .collect(),
-                    strct.function_table.clone(),
-                );
+                binder.register_struct(struct_id, fields, strct.function_table.clone());
             }
             Some(path) => {
                 let old_name = format!("{}.{}", path, strct.name);
@@ -292,16 +292,7 @@ fn load_library_into_binder<'a>(
                     binder.register_generated_struct_name(format!("{}.{}", name, strct.name))
                 }
                 .unwrap();
-                binder.register_struct(
-                    struct_id,
-                    strct
-                        .fields
-                        .iter()
-                        .map(ToOwned::to_owned)
-                        .map(Into::into)
-                        .collect(),
-                    strct.function_table.clone(),
-                );
+                binder.register_struct(struct_id, fields, strct.function_table.clone());
             }
         }
     }
