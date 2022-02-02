@@ -1934,6 +1934,9 @@ fn bind_generic_struct_type_for_type(
                         .filter(|p| p == &&Type::GenericType)
                         .for_each(|p| *p = type_.clone());
                     function_type.this_type = Some(Type::StructReference(id));
+                    if function_type.return_type == Type::GenericType {
+                        function_type.return_type = type_.clone();
+                    }
                 } else {
                     unreachable!();
                 }

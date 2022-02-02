@@ -21,8 +21,14 @@
 generic struct Value {
     value: $Type;
 
-    func replace(value: $Type) {
+    // func set(value: $Type) {
+    //     this.replace(value);
+    // }
+
+    func replace(value: $Type) -> $Type {
+        let old = this.value;
         this.value = value;
+        return old;
     }
 
     func $toString() -> string {
@@ -55,7 +61,7 @@ func main() {
     // This does and should not compile
     // printIfEqualGeneric(true, 0);
     let v = new Value(99);
-    v.replace(true);
+    print(v.replace(12));
     print(v);
     // let arrayLength = 3;
     // let arrayPtr : &int = reallocate(none, arrayLength * 8);
