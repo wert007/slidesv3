@@ -635,8 +635,8 @@ impl<'a> BindingState<'a, '_> {
             .map(|v| v.identifier.as_ref())
     }
 
-    fn look_up_std_type(&self, kind: StdTypeKind) -> Type {
-        self.look_up_type_by_name(kind.name())
+    fn look_up_std_struct_id(&self, kind: StdTypeKind) -> u64 {
+        self.look_up_struct_id_by_name(kind.name())
             .unwrap_or_else(|| panic!("Could not load std type {}.", kind.name()))
     }
 
@@ -719,6 +719,12 @@ impl<'a> BindingState<'a, '_> {
             .enumerate()
             .find(|(_, s)| s.name == name)
             .map(|(i, _)| (i + type_table().len()) as u64)
+            .or(self
+                .generic_struct_table
+                .iter()
+                .enumerate()
+                .find(|(_, s)| s.struct_type.name == name)
+                .map(|(i, _)| (i + type_table().len()) as u64))
     }
 
     pub fn rename_struct_by_id(&mut self, struct_id: u64, new_name: String) {
@@ -2067,13 +2073,9 @@ fn bind_binary_insertion<'a>(
                 )
             };
             if bound_binary.op == BoundBinaryOperator::Range {
-                let base_type = if let Type::StructReference(id) =
-                    binder.look_up_std_type(StdTypeKind::Range)
-                {
-                    binder.get_struct_by_id(id).unwrap()
-                } else {
-                    unreachable!()
-                };
+                let base_type = binder
+                    .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
+                    .unwrap();
                 let function = base_type
                     .function_table
                     .constructor_function
@@ -2209,7 +2211,9 @@ fn bind_binary_operator<'a, 'b>(
             rhs_type.clone(),
         )),
         (Type::Integer, BoundBinaryOperator::Range, Type::Integer) => {
-            let range_type = binder.look_up_std_type(StdTypeKind::Range);
+            let range_type = binder.look_up_std_struct_id(StdTypeKind::Range);
+            let range_type = binder.get_struct_by_id(range_type).unwrap();
+            let range_type = Type::Struct(Box::new(range_type));
             Some(BoundBinary::same_input(&Type::Integer, result, range_type))
         }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
