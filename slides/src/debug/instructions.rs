@@ -70,28 +70,45 @@ pub fn output_instructions_with_source_code_to_sldasm_skip(
 }
 
 pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
-    skip_start: usize,
-    skip_end: usize,
     instructions: &[InstructionOrLabelReference],
     source: &SourceText,
 ) {
-    let mut contents =
-        instructions_or_labels_with_source_code_to_string(0, &instructions[..skip_start], source);
-    contents += "> Foreign instructions start\n";
-    contents += &instructions_or_labels_to_string(skip_start, &instructions[skip_start..skip_end]);
-    contents += "> Foreign instructions end\n";
-    contents += &instructions_or_labels_with_source_code_to_string(
-        skip_end,
-        &instructions[skip_end..],
-        source,
-    );
+    let mut is_foreign = false;
+    let mut current_span = None;
+    let mut buffer = String::new();
+    for (index, instruction) in instructions.iter().enumerate() {
+        let new_is_foreign = instruction.span().map(|s| s.is_foreign()).unwrap_or_default();
+        if !new_is_foreign && instruction.span() != current_span {
+            current_span = instruction.span();
+            buffer.push_str("> { ");
+            buffer.push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer.push_str(" }\n");
+        }
+        buffer.push_str("  ");
+        match instruction {
+            InstructionOrLabelReference::Instruction(instruction) => {
+                if instruction.op_code == OpCode::Label {
+                    buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
+                } else {
+                    buffer.push_str(&format!("{:3X}: ", index));
+                    buffer.push_str(&instruction_or_label_to_string(*instruction, true));
+                }
+            }
+            InstructionOrLabelReference::LabelReference(label) => {
+                buffer.push_str(&format!("{:3X}: ", index));
+                buffer.push_str(&label_reference_to_string(*label));
+            }
+        }
+        buffer.push('\n');
+        is_foreign = new_is_foreign;
+    }
     let output_path = PathBuf::from("../debug-out").join(
         Path::new(source.file_name)
             .with_extension("sldasm")
             .file_name()
             .unwrap(),
     );
-    std::fs::write(output_path, contents).unwrap();
+    std::fs::write(output_path, buffer).unwrap();
 }
 
 pub fn output_instructions_or_labels_with_source_code_to_sldasm(

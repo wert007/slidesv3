@@ -138,12 +138,12 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_bad_input(&mut self, start: usize, character: char) {
         let message = format!("Bad character in input: {}", character);
-        let span = TextSpan::new(start, 1);
+        let span = TextSpan::new(start, 1, true);
         self.report(message.into(), span)
     }
     pub fn report_bad_integer(&mut self, start: usize, text: &str) {
         let message = format!("'{}' is no valid u64 integer.", text);
-        let span = TextSpan::new(start, text.len());
+        let span = TextSpan::new(start, text.len(), true);
         self.report(message.into(), span)
     }
 
@@ -288,7 +288,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_unterminated_comment(&mut self, start: usize, text: &str) {
-        let span = TextSpan::new(start, text.len());
+        let span = TextSpan::new(start, text.len(), true);
         let message = "Unterminated comment found here.".into();
         self.report(message, span);
     }

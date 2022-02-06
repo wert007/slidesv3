@@ -179,8 +179,6 @@ pub fn convert<'a>(
     }
     if debug_flags.output_instructions_and_labels_to_sldasm {
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm_skip(
-            foreign_instruction_start,
-            foreign_instruction_end,
             &instructions,
             source_text,
         );

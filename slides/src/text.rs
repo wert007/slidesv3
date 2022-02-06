@@ -144,6 +144,7 @@ impl std::fmt::Display for TextLocation<'_> {
 pub struct TextSpan {
     start: usize,
     length: usize,
+    is_foreign: bool,
 }
 
 #[allow(dead_code)]
@@ -152,18 +153,21 @@ impl TextSpan {
         Self {
             start: 0,
             length: 0,
+            is_foreign: true,
         }
     }
 
     pub fn bounds(start: Self, end: Self) -> Self {
+        let is_foreign = start.is_foreign || end.is_foreign;
         Self {
             start: start.start,
             length: end.end() - start.start,
+            is_foreign,
         }
     }
 
-    pub fn new(start: usize, length: usize) -> Self {
-        Self { start, length }
+    pub fn new(start: usize, length: usize, is_foreign: bool) -> Self {
+        Self { start, length, is_foreign }
     }
 
     /// Get a reference to the text span's start.
@@ -179,5 +183,9 @@ impl TextSpan {
     /// Get a reference to the text span's end.
     pub fn end(&self) -> usize {
         self.start + self.length
+    }
+
+    pub fn is_foreign(&self) -> bool {
+        self.is_foreign
     }
 }

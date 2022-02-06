@@ -170,7 +170,7 @@ pub fn lex<'a>(
                         state = State::Default;
                         if c == '\n' {
                             let span =
-                                TextSpan::new(start.char_index, char_index - start.char_index);
+                                TextSpan::new(start.char_index, char_index - start.char_index, false);
                             diagnostic_bag
                                 .report_unterminated_string(span, string_state.enclosing_char);
                         }
@@ -234,7 +234,7 @@ pub fn lex<'a>(
             ));
         }
         State::String(start, string_state) => {
-            let span = TextSpan::new(start.char_index, char_len - start.char_index);
+            let span = TextSpan::new(start.char_index, char_len - start.char_index, false);
             diagnostic_bag.report_unterminated_string(span, string_state.enclosing_char);
             result.push_back(SyntaxToken::string_literal(
                 start.char_index,

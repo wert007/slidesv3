@@ -89,7 +89,7 @@ impl<'a> SyntaxToken<'a> {
     }
 
     pub fn span(&self) -> TextSpan {
-        TextSpan::new(self.start, self.lexeme.chars().count())
+        TextSpan::new(self.start, self.lexeme.chars().count(), false)
     }
 }
 
