@@ -2,15 +2,23 @@ use crate::evaluator::memory;
 
 use super::{EvaluatorState, memory::FlaggedWord};
 
-pub fn create_session(state: &mut EvaluatorState) -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionState {
+    Continue,
+    Quit,
+    SkipFunction,
+}
+
+pub fn create_session(state: &mut EvaluatorState) -> SessionState {
     println!("This is the debugger. Type :q to exit the debugger.");
     let mut line = String::new();
     loop {
         std::io::stdin().read_line(&mut line).unwrap();
         match parse_command(line.trim()) {
             Some(command) => match command {
-                Command::Quit => return false,
-                Command::NextInstruction => return true,
+                Command::Quit => return SessionState::Quit,
+                Command::NextInstruction => return SessionState::Continue,
+                Command::Skip => return SessionState::SkipFunction,
                 Command::Stack => print_stack(&state.stack),
                 Command::Replace(new_value) => {
                     let flags = state.stack.pop().flags;
@@ -73,6 +81,7 @@ fn print_stack(stack: &super::memory::stack::Stack) {
 enum Command {
     Quit,
     NextInstruction,
+    Skip,
     Stack,
     Registers,
     Pointer(usize),
@@ -99,6 +108,7 @@ fn parse_command(input: &str) -> Option<Command> {
         ["registers"] => Some(Command::Registers),
         ["q" | "quit"] => Some(Command::Quit),
         ["n" | "next"] => Some(Command::NextInstruction),
+        ["s" | "skip"] => Some(Command::Skip),
         _ => None,
     }
 }

@@ -43,7 +43,7 @@ pub struct EvaluatorState<'a> {
     is_main_call: bool,
     runtime_diagnostics: DiagnosticBag<'a>,
     runtime_error_happened: bool,
-    debug_mode: bool,
+    debug_mode: debugger::SessionState,
 }
 
 impl EvaluatorState<'_> {
@@ -104,7 +104,7 @@ pub fn evaluate(
     let mut state = EvaluatorState {
         debug_flags,
         stack,
-        heap: Allocator::new(64 * 1024, debug_flags),
+        heap: Allocator::new(128 * 1024, debug_flags),
         registers: vec![FlaggedWord::default(); program.max_used_variables],
         protected_registers: program.protected_variables,
         pc: 0,
@@ -112,7 +112,7 @@ pub fn evaluate(
         is_main_call: true,
         runtime_diagnostics: DiagnosticBag::new(source_text),
         runtime_error_happened: false,
-        debug_mode: false,
+        debug_mode: debugger::SessionState::Quit,
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
@@ -148,6 +148,7 @@ fn execute_function(
         state.stack.push_flagged_word(*argument);
     }
     let mut nestedness = 0;
+    let mut debug_nestedness = 0;
     while state.pc < state.instructions.len() {
         let pc = state.pc;
         if state.debug_flags.print_current_instruction() {
@@ -172,8 +173,22 @@ fn execute_function(
             break;
         }
         execute_instruction(state, state.instructions[pc]);
-        if state.debug_mode {
-            state.debug_mode = debugger::create_session(state);
+        match state.debug_mode {
+            debugger::SessionState::Continue => {
+                state.debug_mode = debugger::create_session(state);
+                if state.debug_mode == debugger::SessionState::SkipFunction {
+                    debug_nestedness = nestedness;
+                }
+            }
+            debugger::SessionState::SkipFunction => {
+                if nestedness == debug_nestedness {
+                    state.debug_mode = debugger::create_session(state);
+                    if state.debug_mode == debugger::SessionState::SkipFunction {
+                        debug_nestedness = nestedness;
+                    }
+                }
+            }
+            debugger::SessionState::Quit => {}
         }
         if state.runtime_error_happened {
             println!("Unusual termination.");
@@ -246,7 +261,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_breakpoint(state: &mut EvaluatorState, _: Instruction) {
-    state.debug_mode = true;
+    state.debug_mode = debugger::SessionState::Continue;
 }
 
 fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction) {
