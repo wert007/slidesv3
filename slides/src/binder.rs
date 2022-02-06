@@ -3015,12 +3015,26 @@ fn bind_for_statement<'a, 'b>(
     for_statement: ForStatementNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode {
-    let range_type = binder.look_up_std_type(StdTypeKind::Range);
     let variable_count = binder.variable_table.len();
     let collection = bind_node(*for_statement.collection, binder);
     let is_array = matches!(collection.type_, Type::Array(_));
-    let is_range = collection.type_.can_be_converted_to(&range_type);
-    if !is_array && !is_range {
+    let (is_iterable, struct_type) = if let Type::Struct(struct_type) =
+        binder.convert_struct_reference_to_struct(collection.type_.clone())
+    {
+        let is_iterable = struct_type.function_table.get_function.is_some()
+            && struct_type.function_table.element_count_function.is_some();
+        (
+            is_iterable,
+            if is_iterable {
+                Some(*struct_type)
+            } else {
+                None
+            },
+        )
+    } else {
+        (false, None)
+    };
+    if !is_array && !is_iterable {
         binder.diagnostic_bag.report_cannot_convert(
             collection.span,
             &collection.type_,
@@ -3031,9 +3045,18 @@ fn bind_for_statement<'a, 'b>(
     // collection.type_ is either an array or a range. So if it has no array
     // base type it must be a range.
     let variable_type = if is_array {
-        collection.type_.array_base_type().unwrap()
+        collection.type_.array_base_type().unwrap().clone()
     } else {
-        &Type::Integer
+        struct_type
+            .as_ref()
+            .unwrap()
+            .function_table
+            .get_function
+            .as_ref()
+            .unwrap()
+            .function_type
+            .return_type
+            .clone()
     };
     let variable =
         binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
@@ -3071,7 +3094,7 @@ fn bind_for_statement<'a, 'b>(
         )
         .unwrap();
     let body = bind_node(*for_statement.body, binder);
-    let variable = BoundNode::variable(span, variable, variable_type.clone());
+    let variable = BoundNode::variable(span, variable, variable_type);
     let result = if is_array {
         BoundNode::for_statement_array(
             span,
@@ -3082,19 +3105,14 @@ fn bind_for_statement<'a, 'b>(
             body,
         )
     } else {
-        let range_has_next_value_function_base = BoundNode::literal_from_value(
-            binder
-                .look_up_constant_by_name("Range::hasNextValue")
-                .unwrap(),
-        );
-        BoundNode::for_statement_range(
+        BoundNode::for_statement_iterator(
             span,
             index_variable,
             collection_variable,
             variable,
             collection,
             body,
-            range_has_next_value_function_base,
+            struct_type.unwrap().function_table,
         )
     };
     binder.delete_variables_until(variable_count);

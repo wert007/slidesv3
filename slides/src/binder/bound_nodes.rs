@@ -2,6 +2,7 @@ use crate::{text::TextSpan, value::Value};
 
 use super::{
     operators::{BoundBinaryOperator, BoundUnaryOperator},
+    symbols::StructFunctionTable,
     typing::{FunctionKind, StructType, SystemCallKind, Type},
 };
 
@@ -337,44 +338,76 @@ impl BoundNode {
         )
     }
 
-    /// for i in range {
+    /// for i in iterator {
     ///     body
     /// }
     ///
-    /// i = range.start;
     /// i$index = 0;
-    /// while range.hasNextValue(i) {
+    /// while i$index < iterator.$elementCount() {
+    ///     i = iterator.$get(i$index);
     ///     {
     ///         body
     ///     }
-    ///     i += range.step_by;
     ///     i$index += 1;
     /// }
 
-    pub fn for_statement_range(
+    pub fn for_statement_iterator(
         span: TextSpan,
         index_variable: u64,
         collection_variable: u64,
         variable: BoundNode,
         collection: BoundNode,
         body: BoundNode,
-        range_has_next_value_function_base: BoundNode,
+        function_table: StructFunctionTable,
     ) -> Self {
-        let while_condition = BoundNode::function_call(
+        let while_condition = BoundNode::binary(
             span,
-            range_has_next_value_function_base,
-            vec![
-                variable.clone(),
-                BoundNode::variable(span, collection_variable, collection.type_.clone()),
-            ],
-            // FIXME: Actually true, but the this argument is normally not in
-            // the parameter list.
-            false,
+            BoundNode::variable(span, index_variable, Type::Integer),
+            BoundBinaryOperator::LessThan,
+            BoundNode::function_call(
+                span,
+                BoundNode::label_reference(
+                    function_table
+                        .element_count_function
+                        .as_ref()
+                        .unwrap()
+                        .function_label as usize,
+                    Type::function(function_table.element_count_function.as_ref().unwrap().function_type.clone()),
+                ),
+                vec![BoundNode::variable(
+                    span,
+                    collection_variable,
+                    collection.type_.clone(),
+                )],
+                false,
+                Type::Integer,
+            ),
             Type::Boolean,
         );
         let while_body = BoundNode::block_statement(
             span,
             vec![
+                BoundNode::assignment(
+                    span,
+                    variable.clone(),
+                    BoundNode::function_call(
+                        span,
+                        BoundNode::label_reference(
+                            function_table.get_function.as_ref().unwrap().function_label as usize,
+                            Type::function(function_table.get_function.as_ref().unwrap().function_type.clone()),
+                        ),
+                        vec![
+                            BoundNode::variable(span, index_variable, Type::Integer),
+                            BoundNode::variable(
+                                span,
+                                collection_variable,
+                                collection.type_.clone(),
+                            ),
+                        ],
+                        false,
+                        variable.type_.clone(),
+                    ),
+                ),
                 // {
                 body,
                 // }
@@ -390,27 +423,6 @@ impl BoundNode {
                         Type::Integer,
                     ),
                 ),
-                // variable = variable + $collection.step_by;
-                BoundNode::assignment(
-                    span,
-                    variable.clone(),
-                    BoundNode::binary(
-                        span,
-                        variable.clone(),
-                        BoundBinaryOperator::ArithmeticAddition,
-                        BoundNode::field_access(
-                            span,
-                            BoundNode::variable(
-                                span,
-                                collection_variable,
-                                collection.type_.clone(),
-                            ),
-                            16,
-                            Type::Integer,
-                        ),
-                        Type::Integer,
-                    ),
-                ),
             ],
         );
         BoundNode::block_statement(
@@ -422,16 +434,6 @@ impl BoundNode {
                     collection.clone(),
                     None,
                 ), // let $collection = collection;
-                BoundNode::assignment(
-                    span,
-                    variable,
-                    BoundNode::field_access(
-                        span,
-                        BoundNode::variable(span, collection_variable, collection.type_.clone()),
-                        0,
-                        Type::Integer,
-                    ),
-                ),
                 BoundNode::variable_declaration(
                     span,
                     index_variable,

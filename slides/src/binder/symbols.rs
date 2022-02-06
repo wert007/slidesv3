@@ -244,6 +244,7 @@ impl StructFunctionTable {
             .chain(self.to_string_function.iter_mut())
             .chain(self.get_function.iter_mut())
             .chain(self.set_function.iter_mut())
+            .chain(self.element_count_function.iter_mut())
     }
 
     fn relocate_labels(&mut self, label_offset: usize) {
