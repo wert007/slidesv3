@@ -216,7 +216,7 @@ fn instructions_to_string(start_index: usize, instructions: &[Instruction]) -> S
 }
 
 fn label_reference_to_string(label: LabelReference) -> String {
-    format!("ldlbl L{:X}", label.label_reference)
+    format!("ldlbl L{:02X}", label.label_reference)
 }
 
 pub fn instruction_to_string(instruction: Instruction) -> String {
