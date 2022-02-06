@@ -14,62 +14,37 @@ use crate::{
 };
 
 pub fn print_instructions_with_source_code(
-    start_index: usize,
     instructions: &[Instruction],
     source: &SourceText,
 ) {
-    let output = instructions_with_source_code_to_string(start_index, instructions, source);
-    println!("{}", output)
-}
-
-pub fn print_instructions_or_labels_with_source_code(
-    start_index: usize,
-    instructions: &[InstructionOrLabelReference],
-    source: &SourceText,
-) {
-    let output =
-        instructions_or_labels_with_source_code_to_string(start_index, instructions, source);
+    let output = instructions_with_source_code_to_string(instructions, source);
     println!("{}", output)
 }
 
 pub fn output_instructions_with_source_code_to_sldasm(
-    start_index: usize,
     instructions: &[Instruction],
     source: &SourceText,
 ) {
-    let contents = instructions_with_source_code_to_string(start_index, instructions, source);
+    let output = instructions_with_source_code_to_string(instructions, source);
     let output_path = PathBuf::from("../debug-out").join(
         Path::new(source.file_name)
             .with_extension("sldasm")
             .file_name()
             .unwrap(),
     );
-    std::fs::write(output_path, contents).unwrap();
+    std::fs::write(output_path, output).unwrap();
 }
 
-pub fn output_instructions_with_source_code_to_sldasm_skip(
-    skip_start: usize,
-    skip_end: usize,
-    instructions: &[Instruction],
+pub fn print_instructions_or_labels_with_source_code(
+    instructions: &[InstructionOrLabelReference],
     source: &SourceText,
 ) {
-    let mut contents =
-        instructions_with_source_code_to_string(0, &instructions[..skip_start], source);
-    contents += "> Foreign instructions start\n";
-    contents += &instructions_to_string(skip_start, &instructions[skip_start..skip_end]);
-    contents += "> Foreign instructions end\n";
-    contents +=
-        &instructions_with_source_code_to_string(skip_end, &instructions[skip_end..], source);
-    let output_path = PathBuf::from("../debug-out").join(
-        Path::new(source.file_name)
-            .with_extension("sldasm")
-            .file_name()
-            .unwrap(),
-    );
-    std::fs::write(output_path, contents).unwrap();
+    let output =
+        instructions_or_labels_with_source_code_to_string(instructions, source);
+    println!("{}", output)
 }
 
-pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
+pub fn output_instructions_or_labels_with_source_code_to_sldasm(
     instructions: &[InstructionOrLabelReference],
     source: &SourceText,
 ) {
@@ -77,7 +52,7 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
     let mut current_span = None;
     let mut buffer = String::new();
     for (index, instruction) in instructions.iter().enumerate() {
-        let new_is_foreign = instruction.span().map(|s| s.is_foreign()).unwrap_or_default();
+        let new_is_foreign = instruction.span().map(|s| s.is_foreign()).unwrap_or(true);
         if new_is_foreign != is_foreign {
             buffer.push_str("> Foreign instructions ");
             if new_is_foreign {
@@ -85,6 +60,7 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
             } else {
                 buffer.push_str("end\n");
             }
+            is_foreign = new_is_foreign;
         }
         if !new_is_foreign && instruction.span() != current_span {
             current_span = instruction.span();
@@ -108,7 +84,6 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
             }
         }
         buffer.push('\n');
-        is_foreign = new_is_foreign;
     }
     let output_path = PathBuf::from("../debug-out").join(
         Path::new(source.file_name)
@@ -119,84 +94,80 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
     std::fs::write(output_path, buffer).unwrap();
 }
 
-pub fn output_instructions_or_labels_with_source_code_to_sldasm(
-    start_index: usize,
-    instructions: &[InstructionOrLabelReference],
-    source: &SourceText,
-) {
-    let contents =
-        instructions_or_labels_with_source_code_to_string(start_index, instructions, source);
-    let output_path = PathBuf::from("../debug-out").join(
-        Path::new(source.file_name)
-            .with_extension("sldasm")
-            .file_name()
-            .unwrap(),
-    );
-    std::fs::write(output_path, contents).unwrap();
-}
-
 fn instructions_with_source_code_to_string(
-    start_index: usize,
     instructions: &[Instruction],
     source: &SourceText,
 ) -> String {
+    let mut is_foreign = false;
     let mut current_span = None;
-    let mut result = String::new();
-    let mut index = start_index;
-    for instruction in instructions {
-        if instruction.span != current_span {
-            current_span = instruction.span;
-            if let Some(span) = current_span {
-                result.push_str("> { ");
-                result.push_str(&source.text[span.start()..span.end()]);
-                result.push_str(" }\n");
+    let mut buffer = String::new();
+    for (index, instruction) in instructions.iter().enumerate() {
+        let new_is_foreign = instruction.span.map(|s| s.is_foreign()).unwrap_or(true);
+        if new_is_foreign != is_foreign {
+            buffer.push_str("> Foreign instructions ");
+            if new_is_foreign {
+                buffer.push_str("start\n");
+            } else {
+                buffer.push_str("end\n");
             }
+            is_foreign = new_is_foreign;
         }
-        result.push_str("  ");
-        result.push_str(&format!("{:3X}: ", index));
-        result.push_str(&instruction_to_string(*instruction));
-        result.push('\n');
-        index += 1;
+        if !new_is_foreign && instruction.span != current_span {
+            current_span = instruction.span;
+            buffer.push_str("> { ");
+            buffer.push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer.push_str(" }\n");
+        }
+        buffer.push_str("  ");
+        buffer.push_str(&format!("{:3X}: ", index));
+        buffer.push_str(&instruction_to_string(*instruction));
+        buffer.push('\n');
     }
-    result
+    buffer
 }
 
 fn instructions_or_labels_with_source_code_to_string(
-    start_index: usize,
     instructions: &[InstructionOrLabelReference],
     source: &SourceText,
 ) -> String {
+    let mut is_foreign = false;
     let mut current_span = None;
-    let mut result = String::new();
-    let mut index = start_index;
-    for instruction in instructions {
-        if instruction.span() != current_span {
-            current_span = instruction.span();
-            if let Some(span) = current_span {
-                result.push_str("> { ");
-                result.push_str(&source.text[span.start()..span.end()]);
-                result.push_str(" }\n");
+    let mut buffer = String::new();
+    for (index, instruction) in instructions.iter().enumerate() {
+        let new_is_foreign = instruction.span().map(|s| s.is_foreign()).unwrap_or(true);
+        if new_is_foreign != is_foreign {
+            buffer.push_str("> Foreign instructions ");
+            if new_is_foreign {
+                buffer.push_str("start\n");
+            } else {
+                buffer.push_str("end\n");
             }
+            is_foreign = new_is_foreign;
         }
-        result.push_str("  ");
+        if !new_is_foreign && instruction.span() != current_span {
+            current_span = instruction.span();
+            buffer.push_str("> { ");
+            buffer.push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer.push_str(" }\n");
+        }
+        buffer.push_str("  ");
         match instruction {
             InstructionOrLabelReference::Instruction(instruction) => {
                 if instruction.op_code == OpCode::Label {
-                    result.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
+                    buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
-                    result.push_str(&format!("{:3X}: ", index));
-                    result.push_str(&instruction_or_label_to_string(*instruction, true));
+                    buffer.push_str(&format!("{:3X}: ", index));
+                    buffer.push_str(&instruction_or_label_to_string(*instruction, true));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
-                result.push_str(&format!("{:3X}: ", index));
-                result.push_str(&label_reference_to_string(*label));
+                buffer.push_str(&format!("{:3X}: ", index));
+                buffer.push_str(&label_reference_to_string(*label));
             }
         }
-        index += 1;
-        result.push('\n');
+        buffer.push('\n');
     }
-    result
+    buffer
 }
 
 fn instructions_or_labels_to_string(

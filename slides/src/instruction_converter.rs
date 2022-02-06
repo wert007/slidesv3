@@ -167,7 +167,6 @@ pub fn convert<'a>(
         }
     }
     let mut instructions = bound_program.startup;
-    let foreign_instruction_start = instructions.len();
     let mut foreign_instructions: Vec<_> = bound_program
         .referenced_libraries
         .into_iter()
@@ -180,7 +179,6 @@ pub fn convert<'a>(
         }
     });
     instructions.append(&mut foreign_instructions);
-    let foreign_instruction_end = instructions.len();
     let entry_point = 0;
     instructions.append(&mut convert_node(bound_node, &mut converter));
     if debug_flags.print_instructions_and_labels {
@@ -189,7 +187,7 @@ pub fn convert<'a>(
         }
     }
     if debug_flags.output_instructions_and_labels_to_sldasm {
-        crate::debug::output_instructions_or_labels_with_source_code_to_sldasm_skip(
+        crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &instructions,
             source_text,
         );
@@ -198,21 +196,12 @@ pub fn convert<'a>(
     let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.print_instructions() {
         crate::debug::print_instructions_with_source_code(
-            0,
-            &instructions[..foreign_instruction_start],
-            source_text,
-        );
-        println!("> Skipping library code right now, their code will be emitted extra.");
-        crate::debug::print_instructions_with_source_code(
-            foreign_instruction_end,
-            &instructions[foreign_instruction_end..],
+            &instructions,
             source_text,
         );
     }
     if debug_flags.output_instructions_to_sldasm {
-        crate::debug::output_instructions_with_source_code_to_sldasm_skip(
-            foreign_instruction_start,
-            foreign_instruction_end,
+        crate::debug::output_instructions_with_source_code_to_sldasm(
             &instructions,
             source_text,
         );
@@ -281,11 +270,10 @@ pub fn convert_library<'a>(
 
     // let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.print_instructions() {
-        crate::debug::print_instructions_or_labels_with_source_code(0, &instructions, source_text);
+        crate::debug::print_instructions_or_labels_with_source_code(&instructions, source_text);
     }
     if debug_flags.output_instructions_to_sldasm {
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
-            0,
             &instructions,
             source_text,
         );
