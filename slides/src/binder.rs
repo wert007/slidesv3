@@ -1840,18 +1840,27 @@ fn bind_constructor_call<'a>(
     {
         Some(function) => {
             if struct_type.is_generic {
-                todo!("Constructor Calls not implemented for generic types!");
-            }
-            (
-                bind_arguments_for_function(
+                let (arguments, label, struct_type) = bind_arguments_for_generic_constructor_on_struct(
                     span,
                     constructor_call.arguments,
+                    function.function_label as usize,
                     &function.function_type,
+                    struct_id,
                     binder,
-                ),
-                Some(function.function_label),
-                binder.get_struct_by_id(struct_id).unwrap(),
-            )
+                );
+                (arguments, Some(label as u64), struct_type)
+            } else {
+                (
+                    bind_arguments_for_function(
+                        span,
+                        constructor_call.arguments,
+                        &function.function_type,
+                        binder,
+                    ),
+                    Some(function.function_label),
+                    binder.get_struct_by_id(struct_id).unwrap(),
+                )
+            }
         }
         None => {
             // HACK: We somehow get functions in our fields, if we use generic
@@ -1888,8 +1897,9 @@ fn bind_constructor_call<'a>(
                             resolved_struct_type = Some(bind_generic_struct_type_for_type(
                                 struct_id,
                                 &argument.type_,
+                                None,
                                 binder,
-                            ));
+                            ).0);
                         }
                         argument.type_.clone()
                     } else if parameter_type == &Type::PointerOf(Box::new(Type::GenericType)) {
@@ -1897,8 +1907,8 @@ fn bind_constructor_call<'a>(
                             if let Type::PointerOf(type_) = argument.type_.clone() {
                                 binder.generic_type = Some(*type_.clone());
                                 resolved_struct_type = Some(bind_generic_struct_type_for_type(
-                                    struct_id, &type_, binder,
-                                ));
+                                    struct_id, &type_, None, binder,
+                                ).0);
                             } else {
                                 // We know this is wrong, but hey, im sure there
                                 // will be a compile time error somewhere.
@@ -1926,13 +1936,15 @@ fn bind_constructor_call<'a>(
 fn bind_generic_struct_type_for_type(
     struct_id: u64,
     type_: &Type,
+    constructor_label: Option<usize>,
     binder: &mut BindingState,
-) -> StructType {
+) -> (StructType, Option<usize>) {
     let generic_struct = binder
         .get_generic_struct_type_by_id(struct_id)
         .unwrap()
         .clone();
     let struct_name = format!("{}<{}>", generic_struct.struct_type.name, type_);
+    let mut changed_constructor_label = None;
 
     let id = if let Some(id) = binder.look_up_struct_id_by_name(&struct_name) {
         id
@@ -1945,6 +1957,9 @@ fn bind_generic_struct_type_for_type(
         for function in &generic_struct.functions {
             let old_label = function.function_label;
             let new_label = bind_generic_function_for_type(function, true, type_, binder) as u64;
+            if Some(old_label as usize) == constructor_label {
+                changed_constructor_label = Some(new_label as usize);
+            }
             let function_name = format!(
                 "{}::{}",
                 struct_name,
@@ -1980,7 +1995,7 @@ fn bind_generic_struct_type_for_type(
         binder.register_struct(id, fields, function_table);
         id
     };
-    binder.get_struct_by_id(id).unwrap()
+    (binder.get_struct_by_id(id).unwrap(), changed_constructor_label)
 }
 
 fn bind_variable<'a, 'b>(
@@ -2759,6 +2774,72 @@ fn bind_arguments_for_generic_function<'a, 'b>(
     }
     binder.generic_type = None;
     (result, changed_label)
+}
+
+fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
+    span: TextSpan,
+    arguments: Vec<SyntaxNode<'a>>,
+    label: usize,
+    function_type: &FunctionType,
+    struct_id: u64,
+    binder: &mut BindingState<'a, 'b>,
+) -> (Vec<BoundNode>, usize, StructType) {
+    let mut result = vec![];
+    let mut changed_label = 0;
+    if function_type.parameter_types.len() != arguments.len() {
+        binder.diagnostic_bag.report_unexpected_argument_count(
+            span,
+            arguments.len(),
+            function_type.parameter_types.len(),
+        );
+    }
+
+    let mut struct_type = None;
+
+    for (argument, parameter_type) in arguments
+        .into_iter()
+        .zip(function_type.parameter_types.iter())
+    {
+        let mut argument = bind_node(argument, binder);
+        if matches!(argument.type_, Type::Void) {
+            binder
+                .diagnostic_bag
+                .report_invalid_void_expression(argument.span);
+            result.push(BoundNode::error(argument.span));
+            continue;
+        }
+        let parameter_type = if matches!(parameter_type, Type::GenericType) {
+            struct_type = if binder.generic_type.is_none() {
+                let (struct_type, new_label) = bind_generic_struct_type_for_type(struct_id, &argument.type_, Some(label), binder);
+                binder.generic_type = Some(argument.type_.clone());
+                changed_label = new_label.unwrap();
+                Some(struct_type)
+            } else {
+                struct_type
+            };
+            binder.generic_type.clone().unwrap()
+        } else {
+            parameter_type.clone()
+        };
+        // FIXME: This ensures that print prints the same as to string would. In
+        // the long run you could probably say, that print accepts type any, but
+        // during binding all types will be actually turned into strings and the
+        // print implementation only accepts strings.
+        if let Some(SystemCallKind::Print) = function_type.system_call_kind {
+            argument = call_to_string(argument, binder);
+        }
+        argument = bind_conversion(argument, &parameter_type, binder);
+        if let Type::Function(_) = argument.type_ {
+            if let Some(SystemCallKind::Print) = function_type.system_call_kind {
+                binder
+                    .diagnostic_bag
+                    .report_cannot_print_type(argument.span, &argument.type_);
+            }
+        }
+        result.push(argument);
+    }
+    binder.generic_type = None;
+    (result, changed_label, struct_type.unwrap())
 }
 
 fn bind_generic_function_for_type(
