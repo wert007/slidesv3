@@ -154,12 +154,7 @@ impl BoundNode {
         }
     }
 
-    pub fn array_index(
-        span: TextSpan,
-        base: BoundNode,
-        index: BoundNode,
-        type_: Type,
-    ) -> Self {
+    pub fn array_index(span: TextSpan, base: BoundNode, index: BoundNode, type_: Type) -> Self {
         Self {
             span,
             kind: BoundNodeKind::ArrayIndex(BoundArrayIndexNodeKind {
@@ -673,12 +668,10 @@ pub struct BoundJumpNodeKind {
     pub jump_if_true: bool,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct BoundLiteralNodeKind {
     pub value: Value,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct BoundArrayLiteralNodeKind {

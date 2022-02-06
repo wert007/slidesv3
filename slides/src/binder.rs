@@ -756,7 +756,11 @@ impl<'a> BindingState<'a, '_> {
             Type::Array(base_type) => {
                 Type::array(self.convert_struct_reference_to_struct(*base_type))
             }
-            Type::StructReference(id) => Type::Struct(Box::new(self.get_struct_by_id(id).unwrap())),
+            Type::StructReference(id) => {
+                debug_assert!(self.generic_structs.is_empty());
+                debug_assert!(self.structs.is_empty());
+                Type::Struct(Box::new(self.get_struct_by_id(id).unwrap()))
+            }
             Type::PointerOf(base_type) => {
                 Type::pointer_of(self.convert_struct_reference_to_struct(*base_type))
             }
@@ -1093,7 +1097,12 @@ fn bind_function_declaration_body<'a, 'b>(
                     );
             }
         }
-        Some(StructFunctionKind::ToString | StructFunctionKind::Get | StructFunctionKind::Set | StructFunctionKind::ElementCount)
+        Some(
+            StructFunctionKind::ToString
+            | StructFunctionKind::Get
+            | StructFunctionKind::Set
+            | StructFunctionKind::ElementCount,
+        )
         | None => {}
     }
     binder.assigned_fields.clear();
@@ -1429,7 +1438,10 @@ fn type_check_struct_function_kind(
                     0,
                 );
             }
-            if !function_type.return_type.can_be_converted_to(&Type::Integer) {
+            if !function_type
+                .return_type
+                .can_be_converted_to(&Type::Integer)
+            {
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.return_type,
