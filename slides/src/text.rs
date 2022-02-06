@@ -188,4 +188,8 @@ impl TextSpan {
     pub fn is_foreign(&self) -> bool {
         self.is_foreign
     }
+
+    pub fn set_is_foreign(&mut self, is_foreign: bool) {
+        self.is_foreign = is_foreign;
+    }
 }

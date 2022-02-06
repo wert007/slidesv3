@@ -67,6 +67,13 @@ impl InstructionOrLabelReference {
             InstructionOrLabelReference::LabelReference(label) => Some(label.span),
         }
     }
+
+    pub fn span_mut(&mut self) -> Option<&mut TextSpan> {
+        match self {
+            InstructionOrLabelReference::Instruction(instruction) => instruction.span.as_mut(),
+            InstructionOrLabelReference::LabelReference(label) => Some(&mut label.span),
+        }
+    }
 }
 
 impl From<Instruction> for InstructionOrLabelReference {
@@ -161,14 +168,18 @@ pub fn convert<'a>(
     }
     let mut instructions = bound_program.startup;
     let foreign_instruction_start = instructions.len();
-    instructions.append(
-        &mut bound_program
-            .referenced_libraries
-            .into_iter()
-            .map(|l| l.instructions)
-            .flatten()
-            .collect(),
-    );
+    let mut foreign_instructions: Vec<_> = bound_program
+        .referenced_libraries
+        .into_iter()
+        .map(|l| l.instructions)
+        .flatten()
+        .collect();
+    foreign_instructions.iter_mut().for_each(|i| {
+        if let Some(span) = i.span_mut() {
+            span.set_is_foreign(true);
+        }
+    });
+    instructions.append(&mut foreign_instructions);
     let foreign_instruction_end = instructions.len();
     let entry_point = 0;
     instructions.append(&mut convert_node(bound_node, &mut converter));

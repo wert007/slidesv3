@@ -78,6 +78,14 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm_skip(
     let mut buffer = String::new();
     for (index, instruction) in instructions.iter().enumerate() {
         let new_is_foreign = instruction.span().map(|s| s.is_foreign()).unwrap_or_default();
+        if new_is_foreign != is_foreign {
+            buffer.push_str("> Foreign instructions ");
+            if new_is_foreign {
+                buffer.push_str("start\n");
+            } else {
+                buffer.push_str("end\n");
+            }
+        }
         if !new_is_foreign && instruction.span() != current_span {
             current_span = instruction.span();
             buffer.push_str("> { ");

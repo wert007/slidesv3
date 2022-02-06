@@ -59,6 +59,9 @@ fn replace_type_with_other_type_on_node(
     replacement_type: &Type,
 ) -> BoundNode {
     replace_type_with_other_type(&mut node.type_, type_, replacement_type);
+    // FIXME: This is actually in no way implied by calling this function. It is
+    // just practical at the moment.
+    node.span.set_is_foreign(true);
     match &mut node.kind {
         BoundNodeKind::FunctionDeclaration(function_declaration) => {
             replace_type_with_other_type_in_function_declaration(
