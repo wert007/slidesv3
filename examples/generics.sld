@@ -50,31 +50,6 @@ generic struct Value {
 //     }
 // }
 
-generic struct Array {
-    length: int;
-    buffer: &$Type;
-
-    // func $constructor(basis: $Type, length: int) {
-    //     this.length = length;
-    //     this.buffer = reallocate(none, 8 * length);
-    //     for i in 0..length {
-    //         this[i] = basis;
-    //     }
-    // }
-
-    func $get(index: int) -> $Type {
-        return this.buffer[index];
-    }
-
-    func $set(index: int, value: $Type) {
-        this.buffer[index] = value;
-    }
-
-    func $elementCount() -> int {
-        return this.length;
-    }
-}
-
 func main() {
     // This does and should not compile
     // printIfEqualGeneric(true, 0);
@@ -82,13 +57,11 @@ func main() {
     print('Value generics:');
     print(v.replace(12));
     print(v);
-    let arrayLength = 3;
-    let arrayPtr : &int = reallocate(none, arrayLength * 8);
-    let array = new Array(arrayLength, arrayPtr);
-    array[0] = 42;
-    array[1] = v.replace(array[0]);
-    print('Generic Array for-loop:');
-    for i in array {
-        print(i);
-    }
+    // let array = new Array(0, 3);
+    // array[0] = 42;
+    // array[1] = v.replace(array[0]);
+    // print('Generic Array for-loop:');
+    // for i in array {
+    //     print(i);
+    // }
 }

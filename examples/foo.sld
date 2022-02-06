@@ -1,4 +1,6 @@
-
 func main() {
-    print('Hello World!');
+    let a = ['hy', 'yo', 'ho', 'ar', 'yu'];
+    for e in a {
+        print(e);
+    }
 }
