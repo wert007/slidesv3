@@ -277,7 +277,9 @@ fn flatten_closure(
         arguments.push(flatten_expression(argument, flattener));
     }
     match closure.function {
-        super::typing::FunctionKind::FunctionId(id) => BoundNode::closure(span, arguments, id, type_),
+        super::typing::FunctionKind::FunctionId(id) => {
+            BoundNode::closure(span, arguments, id, type_)
+        }
         super::typing::FunctionKind::SystemCall(system_call_kind) => {
             BoundNode::system_call_closure(span, arguments, system_call_kind, type_)
         }

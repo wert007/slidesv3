@@ -1850,14 +1850,15 @@ fn bind_constructor_call<'a>(
     {
         Some(function) => {
             if struct_type.is_generic {
-                let (arguments, label, struct_type) = bind_arguments_for_generic_constructor_on_struct(
-                    span,
-                    constructor_call.arguments,
-                    function.function_label as usize,
-                    &function.function_type,
-                    struct_id,
-                    binder,
-                );
+                let (arguments, label, struct_type) =
+                    bind_arguments_for_generic_constructor_on_struct(
+                        span,
+                        constructor_call.arguments,
+                        function.function_label as usize,
+                        &function.function_type,
+                        struct_id,
+                        binder,
+                    );
                 (arguments, Some(label as u64), struct_type)
             } else {
                 (
@@ -1904,21 +1905,27 @@ fn bind_constructor_call<'a>(
                     if parameter_type == &Type::GenericType {
                         if binder.generic_type.is_none() {
                             binder.generic_type = Some(argument.type_.clone());
-                            resolved_struct_type = Some(bind_generic_struct_type_for_type(
-                                struct_id,
-                                &argument.type_,
-                                None,
-                                binder,
-                            ).0);
+                            resolved_struct_type = Some(
+                                bind_generic_struct_type_for_type(
+                                    struct_id,
+                                    &argument.type_,
+                                    None,
+                                    binder,
+                                )
+                                .0,
+                            );
                         }
                         argument.type_.clone()
                     } else if parameter_type == &Type::PointerOf(Box::new(Type::GenericType)) {
                         if binder.generic_type.is_none() {
                             if let Type::PointerOf(type_) = argument.type_.clone() {
                                 binder.generic_type = Some(*type_.clone());
-                                resolved_struct_type = Some(bind_generic_struct_type_for_type(
-                                    struct_id, &type_, None, binder,
-                                ).0);
+                                resolved_struct_type = Some(
+                                    bind_generic_struct_type_for_type(
+                                        struct_id, &type_, None, binder,
+                                    )
+                                    .0,
+                                );
                             } else {
                                 // We know this is wrong, but hey, im sure there
                                 // will be a compile time error somewhere.
@@ -2005,7 +2012,10 @@ fn bind_generic_struct_type_for_type(
         binder.register_struct(id, fields, function_table);
         id
     };
-    (binder.get_struct_by_id(id).unwrap(), changed_constructor_label)
+    (
+        binder.get_struct_by_id(id).unwrap(),
+        changed_constructor_label,
+    )
 }
 
 fn bind_variable<'a, 'b>(
@@ -2820,7 +2830,12 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
         }
         let parameter_type = if matches!(parameter_type, Type::GenericType) {
             struct_type = if binder.generic_type.is_none() {
-                let (struct_type, new_label) = bind_generic_struct_type_for_type(struct_id, &argument.type_, Some(label), binder);
+                let (struct_type, new_label) = bind_generic_struct_type_for_type(
+                    struct_id,
+                    &argument.type_,
+                    Some(label),
+                    binder,
+                );
                 binder.generic_type = Some(argument.type_.clone());
                 changed_label = new_label.unwrap();
                 Some(struct_type)
