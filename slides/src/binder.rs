@@ -1003,7 +1003,10 @@ fn bind<'a>(
             binder.bound_generic_functions.push(generic_function);
         }
     }
+
+    let mut exported_functions = Vec::with_capacity(binder.functions.len());
     while let Some(node) = binder.functions.pop() {
+        exported_functions.push(node.clone());
         let function = bind_function_declaration_body(node, &mut binder);
         binder.bound_functions.push(function);
     }
@@ -1042,7 +1045,7 @@ fn bind<'a>(
     };
     BoundLibrary {
         program,
-        exported_functions: binder.functions.into_iter().map(Into::into).collect(),
+        exported_functions: exported_functions.into_iter().map(Into::into).collect(),
         exported_structs: binder.struct_table.into_iter().map(Into::into).collect(),
         exported_generic_structs: binder
             .generic_struct_table
