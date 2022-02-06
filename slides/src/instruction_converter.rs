@@ -14,9 +14,10 @@ use crate::{
             BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
             BoundConstructorCallNodeKind, BoundConversionNodeKind,
             BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind,
-            BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundNode, BoundNodeKind,
-            BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
-            BoundVariableDeclarationNodeKind, BoundVariableNodeKind, ConversionKind, BoundLiteralNodeKind,
+            BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundLiteralNodeKind, BoundNode,
+            BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind,
+            BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind,
+            ConversionKind,
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
@@ -454,21 +455,13 @@ fn convert_array_literal(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let element_count = array_literal.children.len();
-    let length_in_bytes = element_count as u64 * WORD_SIZE_IN_BYTES;
+    let element_count = array_literal.children.len() as _;
     for child in array_literal.children.into_iter().rev() {
         result.append(&mut convert_node(child, converter));
     }
-    result.push(
-        Instruction::load_immediate(length_in_bytes)
-            .span(span)
-            .into(),
-    );
-    result.push(
-        Instruction::write_to_heap((element_count + 1) as _)
-            .span(span)
-            .into(),
-    );
+    result.push(Instruction::write_to_heap(element_count).span(span).into());
+    result.push(Instruction::load_immediate(element_count).span(span).into());
+    result.push(Instruction::write_to_heap(2).span(span).into());
     result
 }
 
@@ -495,19 +488,14 @@ fn convert_array_index_for_assignment(
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let (needs_array_check, base_type_size) = match &array_index.base.type_ {
-        Type::Array(base_type) => (true, base_type.array_element_size_in_bytes()),
-        Type::PointerOf(base_type) => (false, base_type.array_element_size_in_bytes()),
+    let base_type_size = match &array_index.base.type_ {
+        Type::PointerOf(base_type) => base_type.size_in_bytes(),
         error => unreachable!("unexpected access type {}", error),
     };
     // array
     let mut result = convert_node(*array_index.base, converter);
     // index
     result.append(&mut convert_node(*array_index.index, converter));
-    if needs_array_check {
-        result.push(Instruction::load_immediate(1).span(span).into());
-        result.push(Instruction::addition().span(span).into());
-    }
     result.push(
         Instruction::load_immediate(base_type_size)
             .span(span)
@@ -515,9 +503,6 @@ fn convert_array_index_for_assignment(
     );
     result.push(Instruction::multiplication().span(span).into());
 
-    if needs_array_check {
-        result.push(Instruction::check_array_bounds().span(span).into());
-    }
     result.push(Instruction::store_in_memory().span(span).into());
     result
 }
@@ -573,9 +558,7 @@ fn convert_binary(
         BoundBinaryOperator::ArithmeticDivision => Instruction::division(),
         BoundBinaryOperator::Equals => {
             match (&binary.lhs.type_, &binary.rhs.type_) {
-                (Type::Array(_) | Type::String, Type::Array(_) | Type::String) => {
-                    Instruction::array_equals()
-                }
+                (Type::String, Type::String) => Instruction::array_equals(),
                 (Type::Noneable(base_type), Type::Noneable(_)) if !base_type.is_pointer() => {
                     Instruction::noneable_equals(base_type.size_in_bytes())
                 }
@@ -593,8 +576,7 @@ fn convert_binary(
             }
         }
         BoundBinaryOperator::NotEquals => {
-            if matches!(binary.lhs.type_, Type::Array(_) | Type::String)
-                && matches!(binary.rhs.type_, Type::Array(_) | Type::String)
+            if matches!(binary.lhs.type_, Type::String) && matches!(binary.rhs.type_, Type::String)
             {
                 Instruction::array_not_equals()
             } else {
@@ -762,8 +744,7 @@ fn convert_array_index(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let base_type_size = match &array_index.base.type_ {
-        Type::Array(base_type) => base_type.array_element_size_in_bytes(),
-        Type::PointerOf(base_type) => base_type.array_element_size_in_bytes(),
+        Type::PointerOf(base_type) => base_type.size_in_bytes(),
         error => unreachable!("unexpected access type {}", error),
     };
 
@@ -911,21 +892,6 @@ fn convert_type_identifier(
     let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
     let type_identifier_kind = base_type.type_identifier_kind();
     let type_word_count = match base_type {
-        Type::Array(base_type) => {
-            let mut base_type = *base_type;
-            let mut dimension_count = 0;
-            while let Type::Array(inner) = base_type {
-                base_type = *inner;
-                dimension_count += 1;
-            }
-            let type_word_count = convert_type_identifier(base_type, span, result) + 3;
-            result.push(
-                Instruction::load_immediate(dimension_count)
-                    .span(span)
-                    .into(),
-            );
-            type_word_count
-        }
         Type::Noneable(base_type) => convert_type_identifier(*base_type, span, result) + 2,
         Type::PointerOf(base_type) => convert_type_identifier(*base_type, span, result) + 2,
         Type::Function(function_type) => {

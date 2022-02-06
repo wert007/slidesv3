@@ -239,12 +239,14 @@ impl From<StructFieldSymbol> for BoundStructFieldSymbol<'_> {
 
 enum StdTypeKind {
     Range,
+    Array,
 }
 
 impl StdTypeKind {
     pub fn name(&self) -> &str {
         match self {
             StdTypeKind::Range => "Range",
+            StdTypeKind::Array => "Array",
         }
     }
 }
@@ -758,9 +760,6 @@ impl<'a> BindingState<'a, '_> {
             | Type::SystemCall(_) => type_,
             Type::Noneable(base_type) => {
                 Type::noneable(self.convert_struct_reference_to_struct(*base_type))
-            }
-            Type::Array(base_type) => {
-                Type::array(self.convert_struct_reference_to_struct(*base_type))
             }
             Type::StructReference(id) => {
                 debug_assert!(self.generic_structs.is_empty());
@@ -1624,7 +1623,8 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
         result = Type::pointer_of(result);
     }
     for _ in &type_.brackets {
-        result = Type::array(result);
+        todo!("Support array type declarations!");
+        // result = Type::array(result);
     }
     result
 }
@@ -1716,11 +1716,13 @@ fn bind_array_literal<'a, 'b>(
     mut array_literal: ArrayLiteralNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode {
-    let expected_type = if let Some(Type::Array(base_type)) = &binder.expected_type {
-        Some(*base_type.clone())
-    } else {
-        None
-    };
+    let array_type = binder.look_up_std_struct_id(StdTypeKind::Array);
+    // let expected_type = if let Some(Type::Array(base_type)) = &binder.expected_type {
+    //     Some(*base_type.clone())
+    // } else {
+    //     None
+    // };
+    let expected_type = None;
     let first_child = array_literal.children.remove(0);
     let (type_, mut children) = bind_array_literal_first_child(first_child, expected_type, binder);
     for child in array_literal.children {
@@ -1747,7 +1749,9 @@ fn bind_array_literal<'a, 'b>(
             children.push(child.clone());
         }
     }
-    BoundNode::array_literal(span, children, Type::array(type_.clone()))
+    let type_ = bind_generic_struct_type_for_type(array_type, &type_, None, binder).0;
+    let type_ = Type::Struct(Box::new(type_));
+    BoundNode::array_literal(span, children, type_)
 }
 
 fn bind_array_literal_first_child<'a>(
@@ -2404,7 +2408,6 @@ fn bind_array_index<'a, 'b>(
     let base_span = array_index.base.span;
     let base = bind_node(*array_index.base, binder);
     let type_ = match binder.convert_struct_reference_to_struct(base.type_.clone()) {
-        Type::Array(base_type) => *base_type,
         Type::PointerOf(base_type) => *base_type,
         Type::Struct(struct_type) => match struct_type.function_table.get_function {
             Some(get_function) => {
@@ -2421,21 +2424,23 @@ fn bind_array_index<'a, 'b>(
                 );
             }
             None => {
-                binder.diagnostic_bag.report_cannot_convert(
-                    base_span,
-                    &base.type_,
-                    &Type::array(base.type_.clone()),
-                );
-                Type::Error
+                todo!("Create diagnostic for type without $get function!");
+                // binder.diagnostic_bag.report_cannot_convert(
+                //     base_span,
+                //     &base.type_,
+                //     &Type::array(base.type_.clone()),
+                // );
+                // Type::Error
             }
         },
         error => {
-            binder.diagnostic_bag.report_cannot_convert(
-                base_span,
-                &base.type_,
-                &Type::array(error),
-            );
-            Type::Error
+            todo!("Create diagnostic for type without $get function!");
+            // binder.diagnostic_bag.report_cannot_convert(
+            //     base_span,
+            //     &base.type_,
+            //     &Type::array(error),
+            // );
+            // Type::Error
         }
     };
     BoundNode::array_index(span, base, index, type_)
@@ -2451,7 +2456,6 @@ fn bind_array_index_for_assignment<'a, 'b>(
     let base_span = array_index.base.span;
     let base = bind_node(*array_index.base, binder);
     let type_ = match base.type_.clone() {
-        Type::Array(base_type) => *base_type,
         Type::PointerOf(base_type) => *base_type,
         Type::Struct(struct_type) => match struct_type.function_table.set_function {
             Some(set_function) => {
@@ -2464,21 +2468,23 @@ fn bind_array_index_for_assignment<'a, 'b>(
                 );
             }
             None => {
-                binder.diagnostic_bag.report_cannot_convert(
-                    base_span,
-                    &base.type_,
-                    &Type::array(base.type_.clone()),
-                );
-                Type::Error
+                todo!("Create diagnostic for type without $set function!");
+                // binder.diagnostic_bag.report_cannot_convert(
+                //     base_span,
+                //     &base.type_,
+                //     &Type::array(base.type_.clone()),
+                // );
+                // Type::Error
             }
         },
         error => {
-            binder.diagnostic_bag.report_cannot_convert(
-                base_span,
-                &base.type_,
-                &Type::array(error),
-            );
-            Type::Error
+            todo!("Create diagnostic for type without $set function!");
+            // binder.diagnostic_bag.report_cannot_convert(
+            //     base_span,
+            //     &base.type_,
+            //     &Type::array(error),
+            // );
+            // Type::Error
         }
     };
     BoundNode::array_index(span, base, index, type_)
@@ -2573,7 +2579,7 @@ fn bind_field_access<'a, 'b>(
                 .report_no_fields_on_type(base_span, &base.type_);
             BoundNode::error(span)
         }
-        Type::Array(_) | Type::String => {
+        Type::String => {
             if field.lexeme == "length" {
                 let base = bind_conversion(base, &Type::Any, binder);
                 let function_type = FunctionType::system_call(SystemCallKind::ArrayLength);
@@ -2658,7 +2664,7 @@ fn bind_field_access_for_assignment<'a>(
                 .report_no_fields_on_type(base.span, &base.type_);
             BoundNode::error(span)
         }
-        Type::Array(_) | Type::String | Type::Library(_) => {
+        Type::String | Type::Library(_) => {
             binder.diagnostic_bag.report_cannot_assign_to(span);
             BoundNode::error(span)
         }
@@ -2874,7 +2880,6 @@ fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> Bou
         | Type::Boolean
         | Type::None
         | Type::SystemCall(_)
-        | Type::Array(_)
         | Type::Function(_)
         | Type::Closure(_)
         | Type::Pointer
@@ -2898,7 +2903,6 @@ fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> Bou
             | Type::Boolean
             | Type::None
             | Type::SystemCall(_)
-            | Type::Array(_)
             | Type::String
             | Type::Function(_)
             | Type::Pointer
@@ -3022,7 +3026,6 @@ fn bind_condition_conversion<'a>(
         | Type::Any
         | Type::Integer
         | Type::SystemCall(_)
-        | Type::Array(_)
         | Type::String
         | Type::Function(_)
         | Type::Closure(_)
@@ -3117,7 +3120,6 @@ fn bind_for_statement<'a, 'b>(
 ) -> BoundNode {
     let variable_count = binder.variable_table.len();
     let collection = bind_node(*for_statement.collection, binder);
-    let is_array = matches!(collection.type_, Type::Array(_));
     let (is_iterable, struct_type) = if let Type::Struct(struct_type) =
         binder.convert_struct_reference_to_struct(collection.type_.clone())
     {
@@ -3134,32 +3136,29 @@ fn bind_for_statement<'a, 'b>(
     } else {
         (false, None)
     };
-    if !is_array && !is_iterable {
+    if !is_iterable {
         if collection.type_ != Type::Error {
-            binder.diagnostic_bag.report_cannot_convert(
-                collection.span,
-                &collection.type_,
-                &Type::array(collection.type_.clone()),
-            );
+            todo!("Create diagnostic for type without $get and $elementCount function!");
+            // binder.diagnostic_bag.report_cannot_convert(
+            //     collection.span,
+            //     &collection.type_,
+            //     &Type::array(collection.type_.clone()),
+            // );
         }
         return BoundNode::error(span);
     }
     // collection.type_ is either an array or a range. So if it has no array
     // base type it must be a range.
-    let variable_type = if is_array {
-        collection.type_.array_base_type().unwrap().clone()
-    } else {
-        struct_type
-            .as_ref()
-            .unwrap()
-            .function_table
-            .get_function
-            .as_ref()
-            .unwrap()
-            .function_type
-            .return_type
-            .clone()
-    };
+    let variable_type = struct_type
+        .as_ref()
+        .unwrap()
+        .function_table
+        .get_function
+        .as_ref()
+        .unwrap()
+        .function_type
+        .return_type
+        .clone();
     let variable =
         binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
     if variable.is_none() {
@@ -3197,26 +3196,15 @@ fn bind_for_statement<'a, 'b>(
         .unwrap();
     let body = bind_node(*for_statement.body, binder);
     let variable = BoundNode::variable(span, variable, variable_type);
-    let result = if is_array {
-        BoundNode::for_statement_array(
-            span,
-            index_variable,
-            collection_variable,
-            variable,
-            collection,
-            body,
-        )
-    } else {
-        BoundNode::for_statement_iterator(
-            span,
-            index_variable,
-            collection_variable,
-            variable,
-            collection,
-            body,
-            struct_type.unwrap().function_table,
-        )
-    };
+    let result = BoundNode::for_statement_iterator(
+        span,
+        index_variable,
+        collection_variable,
+        variable,
+        collection,
+        body,
+        struct_type.unwrap().function_table,
+    );
     binder.delete_variables_until(variable_count);
 
     result

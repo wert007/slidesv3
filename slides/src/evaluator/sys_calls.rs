@@ -33,16 +33,6 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64, 
         return (type_, address, 0);
     }
     match type_identifier_kind {
-        Type::TYPE_IDENTIFIER_ARRAY => {
-            let array_count = state.read_pointer(address).unwrap_value();
-            let address = address + WORD_SIZE_IN_BYTES;
-            let (mut base_type, address, to_string_function) =
-                decode_type(FlaggedWord::pointer(address), state);
-            for _ in 0..=array_count {
-                base_type = Type::array(base_type);
-            }
-            (base_type, address, to_string_function)
-        }
         Type::TYPE_IDENTIFIER_NONEABLE => {
             let (base_type, address, to_string_function) =
                 decode_type(FlaggedWord::pointer(address), state);
@@ -181,37 +171,8 @@ fn to_string_native(
         Type::SystemCall(kind) => format!("system call {}", kind),
         Type::Function(kind) => format!("fn {}", kind),
         Type::Closure(closure) => format!("fn {}", closure.base_function_type),
-        Type::Array(base_type) => {
-            array_to_string_native(*base_type, to_string_function, argument, state)
-        }
         Type::String => string_to_string_native(argument, state),
     }
-}
-
-fn array_to_string_native(
-    base_type: Type,
-    to_string_function: usize,
-    argument: FlaggedWord,
-    state: &mut EvaluatorState,
-) -> String {
-    let argument = argument.unwrap_pointer();
-    let array_length_in_bytes = state.read_pointer(argument).unwrap_value();
-    let array_length_in_words = bytes_to_word(array_length_in_bytes);
-    let array_start = argument + WORD_SIZE_IN_BYTES;
-    let array_end = array_start + array_length_in_words * WORD_SIZE_IN_BYTES;
-    let mut result: String = "[ ".into();
-    for address in (array_start..array_end).step_by(WORD_SIZE_IN_BYTES as _) {
-        let value = state.read_pointer(address);
-        result.push_str(&to_string_native(
-            base_type.clone(),
-            to_string_function,
-            value,
-            state,
-        ));
-        result.push_str(", ");
-    }
-    result.push(']');
-    result
 }
 
 fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) -> String {

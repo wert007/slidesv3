@@ -16,7 +16,6 @@ pub enum Type {
     Boolean,
     None,
     SystemCall(SystemCallKind),
-    Array(Box<Type>),
     Noneable(Box<Type>),
     String,
     Function(Box<FunctionType>),
@@ -30,10 +29,6 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn array(base_type: Type) -> Self {
-        Self::Array(Box::new(base_type))
-    }
-
     pub fn function(function_type: FunctionType) -> Self {
         Self::Function(Box::new(function_type))
     }
@@ -61,7 +56,6 @@ impl Type {
             (Type::None, Type::Pointer) => true,
             (Type::None, Type::Noneable(_)) => true,
             (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
-            (Type::Array(base_type), Type::Array(other)) => base_type.can_be_converted_to(other),
             (Type::Struct(id), Type::StructReference(other_id)) if id.id == *other_id => true,
             (Type::StructReference(id), Type::Struct(other)) if *id == other.id => true,
             _ => false,
@@ -76,14 +70,6 @@ impl Type {
             (Type::PointerOf(inner), Type::Noneable(other)) => inner.can_be_converted_to(other),
             (Type::Noneable(base_type), other) => base_type.can_be_converted_to(other),
             _ => false,
-        }
-    }
-
-    pub fn array_base_type(&self) -> Option<&Type> {
-        if let Self::Array(v) = self {
-            Some(v)
-        } else {
-            None
         }
     }
 
@@ -109,13 +95,6 @@ impl Type {
             Type::SystemCall(_) => 1,
             Type::Pointer => 1,
             Type::PointerOf(base_type) => base_type.type_identifier_size_in_words() + 1,
-            Type::Array(inner) => {
-                let mut base_type = inner;
-                while let Type::Array(inner) = base_type.as_ref() {
-                    base_type = inner;
-                }
-                base_type.type_identifier_size_in_words() + 2
-            }
             Type::Noneable(base_type) => base_type.type_identifier_size_in_words() + 1,
             Type::Function(function_type) => {
                 let mut result = 2;
@@ -158,7 +137,6 @@ impl Type {
     pub const TYPE_IDENTIFIER_INTEGER: u64 = 3;
     pub const TYPE_IDENTIFIER_BOOLEAN: u64 = 4;
     pub const TYPE_IDENTIFIER_NONE: u64 = 5;
-    pub const TYPE_IDENTIFIER_ARRAY: u64 = 6;
     pub const TYPE_IDENTIFIER_NONEABLE: u64 = 7;
     pub const TYPE_IDENTIFIER_STRING: u64 = 8;
     pub const TYPE_IDENTIFIER_FUNCTION: u64 = 9;
@@ -190,7 +168,6 @@ impl Type {
             Type::Integer => Self::TYPE_IDENTIFIER_INTEGER,
             Type::Boolean => Self::TYPE_IDENTIFIER_BOOLEAN,
             Type::None => Self::TYPE_IDENTIFIER_NONE,
-            Type::Array(_) => Self::TYPE_IDENTIFIER_ARRAY,
             Type::Noneable(_) => Self::TYPE_IDENTIFIER_NONEABLE,
             Type::String => Self::TYPE_IDENTIFIER_STRING,
             Type::Function(_) => Self::TYPE_IDENTIFIER_FUNCTION,
@@ -222,7 +199,6 @@ impl Type {
             Self::TYPE_IDENTIFIER_INTEGER => Some(Type::Integer),
             Self::TYPE_IDENTIFIER_BOOLEAN => Some(Type::Boolean),
             Self::TYPE_IDENTIFIER_NONE => Some(Type::None),
-            Self::TYPE_IDENTIFIER_ARRAY => None,
             Self::TYPE_IDENTIFIER_NONEABLE => None,
             Self::TYPE_IDENTIFIER_STRING => Some(Type::String),
             Self::TYPE_IDENTIFIER_FUNCTION => None,
@@ -261,7 +237,6 @@ impl Type {
             | Type::Integer
             | Type::Boolean
             | Type::SystemCall(_)
-            | Type::Array(_)
             | Type::Noneable(_)
             | Type::Pointer
             | Type::PointerOf(_)
@@ -280,7 +255,6 @@ impl Type {
             | Type::Boolean
             | Type::None
             | Type::SystemCall(_)
-            | Type::Array(_)
             | Type::Noneable(_)
             | Type::Function(_)
             | Type::Closure(_)
@@ -306,7 +280,6 @@ impl Type {
             | Type::Boolean => false,
             // A none Pointer should never be dereferenced.
             Type::None
-            | Type::Array(_)
             | Type::Noneable(_)
             | Type::String
             | Type::Closure(_)
@@ -330,7 +303,6 @@ impl std::fmt::Display for Type {
             Type::Boolean => write!(f, "bool"),
             Type::None => Type::noneable(Type::Any).fmt(f),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
-            Type::Array(base) => write!(f, "{}[]", base),
             Type::Noneable(base) => write!(f, "{}?", base),
             Type::String => write!(f, "string"),
             Type::Function(function_type) => {
