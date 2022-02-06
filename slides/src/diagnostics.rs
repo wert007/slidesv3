@@ -475,6 +475,21 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
+    pub fn report_cannot_index_get(&mut self, span: TextSpan, type_: &Type) {
+        let message = message_format!("Type ", type_, " cannot be accessed with [], maybe it is missing a $get function?");
+        self.report(message, span);
+    }
+
+    pub fn report_cannot_index_set(&mut self, span: TextSpan, type_: &Type) {
+        let message = message_format!("Type ", type_, " cannot be accessed with [], maybe it is missing a $set function?");
+        self.report(message, span);
+    }
+
+    pub fn report_cannot_iterate(&mut self, span: TextSpan, type_: &Type) {
+        let message = message_format!("Type ", type_, " cannot be for a `for`-loop, maybe it is missing a $get and $elementCount function?");
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
         let message = format!(

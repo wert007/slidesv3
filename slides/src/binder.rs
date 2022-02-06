@@ -2434,23 +2434,19 @@ fn bind_array_index<'a, 'b>(
                 );
             }
             None => {
-                todo!("Create diagnostic for type without $get function!");
-                // binder.diagnostic_bag.report_cannot_convert(
-                //     base_span,
-                //     &base.type_,
-                //     &Type::array(base.type_.clone()),
-                // );
-                // Type::Error
+                binder.diagnostic_bag.report_cannot_index_get(
+                    base_span,
+                    &base.type_,
+                );
+                Type::Error
             }
         },
         error => {
-            todo!("Create diagnostic for type without $get function!");
-            // binder.diagnostic_bag.report_cannot_convert(
-            //     base_span,
-            //     &base.type_,
-            //     &Type::array(error),
-            // );
-            // Type::Error
+            binder.diagnostic_bag.report_cannot_index_get(
+                base_span,
+                &error,
+            );
+            Type::Error
         }
     };
     BoundNode::array_index(span, base, index, type_)
@@ -2478,23 +2474,19 @@ fn bind_array_index_for_assignment<'a, 'b>(
                 );
             }
             None => {
-                todo!("Create diagnostic for type without $set function!");
-                // binder.diagnostic_bag.report_cannot_convert(
-                //     base_span,
-                //     &base.type_,
-                //     &Type::array(base.type_.clone()),
-                // );
-                // Type::Error
+                binder.diagnostic_bag.report_cannot_index_set(
+                    base_span,
+                    &base.type_,
+                );
+                Type::Error
             }
         },
         error => {
-            todo!("Create diagnostic for type without $set function!");
-            // binder.diagnostic_bag.report_cannot_convert(
-            //     base_span,
-            //     &base.type_,
-            //     &Type::array(error),
-            // );
-            // Type::Error
+            binder.diagnostic_bag.report_cannot_index_get(
+                base_span,
+                &error,
+            );
+            Type::Error
         }
     };
     BoundNode::array_index(span, base, index, type_)
@@ -3153,12 +3145,10 @@ fn bind_for_statement<'a, 'b>(
     };
     if !is_iterable {
         if collection.type_ != Type::Error {
-            todo!("Create diagnostic for type without $get and $elementCount function!");
-            // binder.diagnostic_bag.report_cannot_convert(
-            //     collection.span,
-            //     &collection.type_,
-            //     &Type::array(collection.type_.clone()),
-            // );
+            binder.diagnostic_bag.report_cannot_iterate(
+                collection.span,
+                &collection.type_,
+            );
         }
         return BoundNode::error(span);
     }
