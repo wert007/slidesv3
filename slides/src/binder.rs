@@ -3047,11 +3047,13 @@ fn bind_for_statement<'a, 'b>(
         (false, None)
     };
     if !is_array && !is_iterable {
-        binder.diagnostic_bag.report_cannot_convert(
-            collection.span,
-            &collection.type_,
-            &Type::array(collection.type_.clone()),
-        );
+        if collection.type_ != Type::Error {
+            binder.diagnostic_bag.report_cannot_convert(
+                collection.span,
+                &collection.type_,
+                &Type::array(collection.type_.clone()),
+            );
+        }
         return BoundNode::error(span);
     }
     // collection.type_ is either an array or a range. So if it has no array
