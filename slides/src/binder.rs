@@ -1964,6 +1964,16 @@ fn bind_generic_struct_type_for_type(
     let mut changed_constructor_label = None;
 
     let id = if let Some(id) = binder.look_up_struct_id_by_name(&struct_name) {
+        if let Some(constructor_label) = constructor_label {
+            changed_constructor_label = binder
+                .get_struct_type_by_id(id)
+                .unwrap()
+                .function_table
+                .label_relocation
+                .iter()
+                .find(|(old, _)| *old == constructor_label as u64)
+                .map(|(_, new)| *new as usize);
+        }
         id
     } else {
         let id = binder
@@ -2001,7 +2011,7 @@ fn bind_generic_struct_type_for_type(
             .struct_type
             .function_table
             .clone()
-            .replace_labels(&function_labels);
+            .replace_labels(function_labels);
         function_table.function_symbols_iter_mut().for_each(|s| {
             type_replacer::replace_type_with_other_type_in_function_type(
                 &mut s.function_type,
