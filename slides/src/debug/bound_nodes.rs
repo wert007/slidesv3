@@ -111,7 +111,7 @@ fn print_bound_node_error_expression_as_code(_: DebugPrinter, buffer: &mut Strin
 }
 
 fn print_bound_node_label_as_code(label_address: &usize, _: DebugPrinter, buffer: &mut String) {
-    buffer.push_str(&format!("l#{}:\n", label_address));
+    buffer.push_str(&format!("L{:X}:\n", label_address));
 }
 
 fn print_bound_node_label_reference_as_code(
@@ -119,7 +119,7 @@ fn print_bound_node_label_reference_as_code(
     _: DebugPrinter,
     buffer: &mut String,
 ) {
-    buffer.push_str(&format!("l#{}", label_reference));
+    buffer.push_str(&format!("L{:X}", label_reference));
 }
 
 fn print_bound_node_literal_expression_as_code(
