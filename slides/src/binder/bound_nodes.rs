@@ -30,7 +30,7 @@ pub struct BoundNode {
 }
 
 impl BoundNode {
-    pub fn for_each_child_mut(&mut self, function: impl FnMut(&mut BoundNode) + Copy) {
+    pub fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         self.kind.for_each_child_mut(function);
     }
 
@@ -588,7 +588,7 @@ pub enum BoundNodeKind {
 }
 
 impl BoundNodeKind {
-    pub fn for_each_child_mut(&mut self, function: impl FnMut(&mut BoundNode) + Copy) {
+    pub fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         match self {
             BoundNodeKind::FunctionDeclaration(base) => base.for_each_child_mut(function),
             BoundNodeKind::ErrorExpression => {}
@@ -627,7 +627,7 @@ pub struct BoundFunctionDeclarationNodeKind {
 }
 
 impl BoundFunctionDeclarationNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.body);
         self.body.for_each_child_mut(function);
     }
@@ -641,11 +641,13 @@ pub struct BoundJumpNodeKind {
 }
 
 impl BoundJumpNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         if let Some(condition) = self.condition.as_mut() {
             function(condition);
             condition.for_each_child_mut(function);
         }
+        function(&mut self.target);
+        self.target.for_each_child_mut(function);
     }
 }
 
@@ -660,7 +662,7 @@ pub struct BoundArrayLiteralNodeKind {
 }
 
 impl BoundArrayLiteralNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         for child in self.children.iter_mut() {
             function(child);
             child.for_each_child_mut(function);
@@ -676,7 +678,7 @@ pub struct BoundConstructorCallNodeKind {
 }
 
 impl BoundConstructorCallNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         for arg in self.arguments.iter_mut() {
             function(arg);
             arg.for_each_child_mut(function);
@@ -696,7 +698,7 @@ pub struct BoundUnaryNodeKind {
 }
 
 impl BoundUnaryNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.operand);
         self.operand.for_each_child_mut(function);
     }
@@ -710,7 +712,7 @@ pub struct BoundBinaryNodeKind {
 }
 
 impl BoundBinaryNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.lhs);
         self.lhs.for_each_child_mut(function);
         function(&mut self.rhs);
@@ -726,7 +728,7 @@ pub struct BoundFunctionCallNodeKind {
 }
 
 impl BoundFunctionCallNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.base);
         self.base.for_each_child_mut(function);
         for arg in self.arguments.iter_mut() {
@@ -743,7 +745,7 @@ pub struct BoundSystemCallNodeKind {
 }
 
 impl BoundSystemCallNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         for arg in self.arguments.iter_mut() {
             function(arg);
             arg.for_each_child_mut(function);
@@ -758,7 +760,7 @@ pub struct BoundArrayIndexNodeKind {
 }
 
 impl BoundArrayIndexNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.base);
         self.base.for_each_child_mut(function);
         function(&mut self.index);
@@ -774,7 +776,7 @@ pub struct BoundFieldAccessNodeKind {
 }
 
 impl BoundFieldAccessNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.base);
         self.base.for_each_child_mut(function);
     }
@@ -787,7 +789,7 @@ pub struct BoundClosureNodeKind {
 }
 
 impl BoundClosureNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         for arg in self.arguments.iter_mut() {
             function(arg);
             arg.for_each_child_mut(function);
@@ -838,7 +840,7 @@ impl BoundConversionNodeKind {
         }
     }
 
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.base);
         self.base.for_each_child_mut(function);
     }
@@ -852,7 +854,7 @@ pub struct BoundIfStatementNodeKind {
 }
 
 impl BoundIfStatementNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.condition);
         self.condition.for_each_child_mut(function);
         function(&mut self.body);
@@ -872,7 +874,7 @@ pub struct BoundVariableDeclarationNodeKind {
 }
 
 impl BoundVariableDeclarationNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.initializer);
         self.initializer.for_each_child_mut(function);
     }
@@ -885,7 +887,7 @@ pub struct BoundWhileStatementNodeKind {
 }
 
 impl BoundWhileStatementNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.condition);
         self.condition.for_each_child_mut(function);
         function(&mut self.body);
@@ -900,7 +902,7 @@ pub struct BoundAssignmentNodeKind {
 }
 
 impl BoundAssignmentNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.variable);
         self.variable.for_each_child_mut(function);
         function(&mut self.expression);
@@ -914,7 +916,7 @@ pub struct BoundBlockStatementNodeKind {
 }
 
 impl BoundBlockStatementNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         for statement in self.statements.iter_mut() {
             function(statement);
             statement.for_each_child_mut(function);
@@ -928,7 +930,7 @@ pub struct BoundExpressionStatementNodeKind {
 }
 
 impl BoundExpressionStatementNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         function(&mut self.expression);
         self.expression.for_each_child_mut(function);
     }
@@ -941,7 +943,7 @@ pub struct BoundReturnStatementNodeKind {
 }
 
 impl BoundReturnStatementNodeKind {
-    fn for_each_child_mut(&mut self, mut function: impl FnMut(&mut BoundNode) + Copy) {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
         if let Some(expression) = &mut self.expression {
             function(expression);
             expression.for_each_child_mut(function);
