@@ -162,9 +162,6 @@ fn execute_function(
         if state.debug_flags.slow_mode {
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        if state.instructions[pc].op_code == OpCode::FunctionCall {
-            nestedness += 1;
-        }
         match state.instructions[pc].op_code {
             OpCode::FunctionCall => nestedness += 1,
             OpCode::Return => nestedness -= 1,
