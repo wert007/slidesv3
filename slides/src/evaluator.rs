@@ -153,8 +153,9 @@ fn execute_function(
         let pc = state.pc;
         if state.debug_flags.print_current_instruction() {
             println!(
-                "  CI {:X}: {}",
+                "  CI {:X}*{}: {}",
                 pc,
+                nestedness,
                 crate::debug::instruction_to_string(state.instructions[pc])
             );
         }
