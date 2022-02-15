@@ -245,26 +245,8 @@ fn load_library_into_binder<'a>(
         lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
         binder.label_offset += lib.program.label_count;
     }
-    for generic_struct in &lib.generic_structs {
-        let _struct_id = binder
-            .register_generated_struct_name(generic_struct.name.clone())
-            .unwrap();
-        binder.generic_struct_table.push(BoundGenericStructSymbol {
-            struct_type: BoundStructSymbol {
-                name: generic_struct.name.clone().into(),
-                fields: generic_struct
-                    .fields
-                    .iter()
-                    .map(ToOwned::to_owned)
-                    .map(Into::into)
-                    .collect(),
-                function_table: generic_struct.function_table.clone(),
-                is_generic: true,
-            },
-            functions: generic_struct.functions.clone(),
-        });
-    }
     for strct in &lib.structs {
+        assert!(!strct.name.is_empty());
         let fields: Vec<_> = strct
             .fields
             .iter()
@@ -295,6 +277,29 @@ fn load_library_into_binder<'a>(
                 binder.register_struct(struct_id, fields, strct.function_table.clone());
             }
         }
+    }
+    // FIXME: This only works by chance and needs to be fixed!
+    for generic_struct in &lib.generic_structs {
+        if generic_struct.name.is_empty() {
+            continue;
+        }
+        let _struct_id = binder
+            .register_generated_struct_name(generic_struct.name.clone())
+            .unwrap();
+        binder.generic_struct_table.push(BoundGenericStructSymbol {
+            struct_type: BoundStructSymbol {
+                name: generic_struct.name.clone().into(),
+                fields: generic_struct
+                    .fields
+                    .iter()
+                    .map(ToOwned::to_owned)
+                    .map(Into::into)
+                    .collect(),
+                function_table: generic_struct.function_table.clone(),
+                is_generic: true,
+            },
+            functions: generic_struct.functions.clone(),
+        });
     }
     if name.is_empty() {
         for function in &lib.functions {
