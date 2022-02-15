@@ -2444,18 +2444,16 @@ fn bind_array_index<'a, 'b>(
                 );
             }
             None => {
-                binder.diagnostic_bag.report_cannot_index_get(
-                    base_span,
-                    &base.type_,
-                );
+                binder
+                    .diagnostic_bag
+                    .report_cannot_index_get(base_span, &base.type_);
                 Type::Error
             }
         },
         error => {
-            binder.diagnostic_bag.report_cannot_index_get(
-                base_span,
-                &error,
-            );
+            binder
+                .diagnostic_bag
+                .report_cannot_index_get(base_span, &error);
             Type::Error
         }
     };
@@ -2484,18 +2482,16 @@ fn bind_array_index_for_assignment<'a, 'b>(
                 );
             }
             None => {
-                binder.diagnostic_bag.report_cannot_index_set(
-                    base_span,
-                    &base.type_,
-                );
+                binder
+                    .diagnostic_bag
+                    .report_cannot_index_set(base_span, &base.type_);
                 Type::Error
             }
         },
         error => {
-            binder.diagnostic_bag.report_cannot_index_get(
-                base_span,
-                &error,
-            );
+            binder
+                .diagnostic_bag
+                .report_cannot_index_get(base_span, &error);
             Type::Error
         }
     };
@@ -3139,10 +3135,9 @@ fn bind_for_statement<'a, 'b>(
     };
     if !is_iterable {
         if collection.type_ != Type::Error {
-            binder.diagnostic_bag.report_cannot_iterate(
-                collection.span,
-                &collection.type_,
-            );
+            binder
+                .diagnostic_bag
+                .report_cannot_iterate(collection.span, &collection.type_);
         }
         return BoundNode::error(span);
     }

@@ -301,7 +301,14 @@ impl BoundNode {
                         .as_ref()
                         .unwrap()
                         .function_label as usize,
-                    Type::function(function_table.element_count_function.as_ref().unwrap().function_type.clone()),
+                    Type::function(
+                        function_table
+                            .element_count_function
+                            .as_ref()
+                            .unwrap()
+                            .function_type
+                            .clone(),
+                    ),
                 ),
                 vec![BoundNode::variable(
                     span,
@@ -323,7 +330,14 @@ impl BoundNode {
                         span,
                         BoundNode::label_reference(
                             function_table.get_function.as_ref().unwrap().function_label as usize,
-                            Type::function(function_table.get_function.as_ref().unwrap().function_type.clone()),
+                            Type::function(
+                                function_table
+                                    .get_function
+                                    .as_ref()
+                                    .unwrap()
+                                    .function_type
+                                    .clone(),
+                            ),
                         ),
                         vec![
                             BoundNode::variable(span, index_variable, Type::Integer),
