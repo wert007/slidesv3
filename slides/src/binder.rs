@@ -2711,21 +2711,7 @@ fn bind_arguments_for_function<'a, 'b>(
             result.push(BoundNode::error(argument.span));
             continue;
         }
-        // FIXME: This ensures that print prints the same as to string would. In
-        // the long run you could probably say, that print accepts type any, but
-        // during binding all types will be actually turned into strings and the
-        // print implementation only accepts strings.
-        if let Some(SystemCallKind::Print) = function_type.system_call_kind {
-            argument = call_to_string(argument, binder);
-        }
         argument = bind_conversion(argument, parameter_type, binder);
-        if let Type::Function(_) = argument.type_ {
-            if let Some(SystemCallKind::Print) = function_type.system_call_kind {
-                binder
-                    .diagnostic_bag
-                    .report_cannot_print_type(argument.span, &argument.type_);
-            }
-        }
         result.push(argument);
     }
     result
@@ -2777,21 +2763,7 @@ fn bind_arguments_for_generic_function<'a, 'b>(
         } else {
             parameter_type.clone()
         };
-        // FIXME: This ensures that print prints the same as to string would. In
-        // the long run you could probably say, that print accepts type any, but
-        // during binding all types will be actually turned into strings and the
-        // print implementation only accepts strings.
-        if let Some(SystemCallKind::Print) = function_type.system_call_kind {
-            argument = call_to_string(argument, binder);
-        }
         argument = bind_conversion(argument, &parameter_type, binder);
-        if let Type::Function(_) = argument.type_ {
-            if let Some(SystemCallKind::Print) = function_type.system_call_kind {
-                binder
-                    .diagnostic_bag
-                    .report_cannot_print_type(argument.span, &argument.type_);
-            }
-        }
         result.push(argument);
     }
     binder.generic_type = None;
@@ -2848,21 +2820,7 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
         } else {
             parameter_type.clone()
         };
-        // FIXME: This ensures that print prints the same as to string would. In
-        // the long run you could probably say, that print accepts type any, but
-        // during binding all types will be actually turned into strings and the
-        // print implementation only accepts strings.
-        if let Some(SystemCallKind::Print) = function_type.system_call_kind {
-            argument = call_to_string(argument, binder);
-        }
         argument = bind_conversion(argument, &parameter_type, binder);
-        if let Type::Function(_) = argument.type_ {
-            if let Some(SystemCallKind::Print) = function_type.system_call_kind {
-                binder
-                    .diagnostic_bag
-                    .report_cannot_print_type(argument.span, &argument.type_);
-            }
-        }
         result.push(argument);
     }
     binder.generic_type = None;
