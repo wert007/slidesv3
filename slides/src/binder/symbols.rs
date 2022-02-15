@@ -115,6 +115,19 @@ impl Library {
             }
             strct.function_table.relocate_structs(struct_offset);
         }
+        for strct in self.generic_structs.iter_mut() {
+            for field in strct.fields.iter_mut() {
+                match &mut field.type_ {
+                    Type::Function(function_type) => function_type.relocate_structs(struct_offset),
+                    Type::Struct(_) => {
+                        unreachable!("relocate_structs currently only works for StructReferences")
+                    }
+                    Type::StructReference(index) => *index += struct_offset as u64,
+                    _ => {}
+                }
+            }
+            strct.function_table.relocate_structs(struct_offset);
+        }
     }
 }
 
