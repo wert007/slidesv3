@@ -45,7 +45,7 @@ use self::{
     operators::BoundBinaryOperator,
     symbols::{
         FunctionSymbol, GenericFunction, Library, StructFieldSymbol,
-        StructFunctionTable, MaybeGenericStructSymbol,
+        StructFunctionTable, MaybeGenericStructSymbol, StructSymbol, GenericStructSymbol,
     },
     typing::{FunctionType, StructType, SystemCallKind},
 };
@@ -229,6 +229,15 @@ impl<'a> From<BoundGenericStructSymbol<'a>> for BoundMaybeGenericStructSymbol<'a
     }
 }
 
+impl From<MaybeGenericStructSymbol> for BoundMaybeGenericStructSymbol<'_> {
+    fn from(value: MaybeGenericStructSymbol) -> Self {
+        match value {
+            MaybeGenericStructSymbol::Struct(it) => BoundStructSymbol::from(it).into(),
+            MaybeGenericStructSymbol::GenericStruct(it) => BoundGenericStructSymbol::from(it).into(),
+        }
+    }
+}
+
 /// This is quite similiar to symbols::StructSymbol, the only difference being,
 /// that this version does not need an allocation. They can be easily converted
 /// into each other. This version is only used during binding, while the other
@@ -276,6 +285,17 @@ impl BoundStructSymbol<'_> {
     }
 }
 
+impl From<StructSymbol> for BoundStructSymbol<'_> {
+    fn from(it: StructSymbol) -> Self {
+        Self {
+            name: it.name.into(),
+            fields: it.fields.into_iter().map(Into::into).collect(),
+            function_table: it.function_table,
+            is_generic: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BoundGenericStructSymbol<'a> {
     pub struct_type: BoundStructSymbol<'a>,
@@ -287,6 +307,20 @@ impl BoundGenericStructSymbol<'_> {
         Self {
             struct_type: BoundStructSymbol::empty(),
             functions: vec![],
+        }
+    }
+}
+
+impl From<GenericStructSymbol> for BoundGenericStructSymbol<'_> {
+    fn from(it: GenericStructSymbol) -> Self {
+        Self {
+            struct_type: BoundStructSymbol {
+                name: it.name.into(),
+                fields: it.fields.into_iter().map(Into::into).collect(),
+                function_table: it.function_table,
+                is_generic: true,
+            },
+            functions: it.functions,
         }
     }
 }
@@ -558,11 +592,14 @@ impl<'a> BindingState<'a, '_> {
         };
         self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
 
-        self.insert_into_struct_table(
-            id,
-            fields.into_iter().map(Into::into).collect(),
-            function_table,
-        );
+        let struct_id = id as usize - type_table().len();
+        while struct_id >= self.struct_table.len() {
+            self.struct_table.push(BoundMaybeGenericStructSymbol::Empty);
+        }
+
+        assert!(self.struct_table[struct_id].is_empty());
+        self.struct_table[struct_id] = maybe_generic_struct.to_owned().into();
+
         Some(id)
     }
 
