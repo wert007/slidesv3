@@ -1740,9 +1740,12 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     if type_.optional_ampersand_token.is_some() {
         result = Type::pointer_of(result);
     }
-    for _ in &type_.brackets {
-        todo!("Support array type declarations!");
-        // result = Type::array(result);
+    if !type_.brackets.is_empty() {
+        let array_base_type = binder.look_up_std_struct_id(StdTypeKind::Array);
+        for _ in &type_.brackets {
+            let (new_type, _) = bind_generic_struct_type_for_type(array_base_type, &result, None, binder);
+            result = Type::Struct(Box::new(new_type));
+        }
     }
     result
 }
