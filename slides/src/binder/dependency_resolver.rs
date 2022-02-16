@@ -9,8 +9,6 @@ use crate::{
     value::Value,
 };
 
-use super::{BoundGenericStructSymbol, BoundStructSymbol};
-
 #[derive(Debug, Clone)]
 pub struct BoundImportStatement<'a> {
     pub span: TextSpan,
@@ -246,60 +244,26 @@ fn load_library_into_binder<'a>(
         binder.label_offset += lib.program.label_count;
     }
     for strct in &lib.structs {
-        assert!(!strct.name.is_empty());
-        let fields: Vec<_> = strct
-            .fields
-            .iter()
-            .map(ToOwned::to_owned)
-            .map(Into::into)
-            .collect();
         match &path {
             Some(empty) if empty.is_empty() => {
                 assert!(lib.name.is_empty());
-                let struct_id = binder
-                    .register_generated_struct_name(strct.name.clone())
-                    .unwrap();
-                binder.register_struct(struct_id, fields, strct.function_table.clone());
+                binder.register_maybe_generic_struct_as(strct.name(), strct);
             }
             Some(path) => {
-                let old_name = format!("{}.{}", path, strct.name);
-                let new_name = format!("{}.{}", name, strct.name);
+                let old_name = format!("{}.{}", path, strct.name());
+                let new_name = format!("{}.{}", name, strct.name());
                 let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
                 binder.rename_struct_by_id(struct_id, new_name);
             }
             None => {
-                let struct_id = if lib.name.is_empty() {
-                    binder.register_generated_struct_name(strct.name.clone())
+                let struct_name = if lib.name.is_empty() {
+                    strct.name().to_owned()
                 } else {
-                    binder.register_generated_struct_name(format!("{}.{}", name, strct.name))
-                }
-                .unwrap();
-                binder.register_struct(struct_id, fields, strct.function_table.clone());
+                    format!("{}.{}", name, strct.name())
+                };
+                binder.register_maybe_generic_struct_as(&struct_name, strct);
             }
         }
-    }
-    // FIXME: This only works by chance and needs to be fixed!
-    for generic_struct in &lib.generic_structs {
-        if generic_struct.name.is_empty() {
-            continue;
-        }
-        let _struct_id = binder
-            .register_generated_struct_name(generic_struct.name.clone())
-            .unwrap();
-        binder.generic_struct_table.push(BoundGenericStructSymbol {
-            struct_type: BoundStructSymbol {
-                name: generic_struct.name.clone().into(),
-                fields: generic_struct
-                    .fields
-                    .iter()
-                    .map(ToOwned::to_owned)
-                    .map(Into::into)
-                    .collect(),
-                function_table: generic_struct.function_table.clone(),
-                is_generic: true,
-            },
-            functions: generic_struct.functions.clone(),
-        });
     }
     if name.is_empty() {
         for function in &lib.functions {

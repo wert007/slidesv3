@@ -44,8 +44,8 @@ use self::{
     bound_nodes::BoundNode,
     operators::BoundBinaryOperator,
     symbols::{
-        FunctionSymbol, GenericFunction, GenericStructSymbol, Library, StructFieldSymbol,
-        StructFunctionTable, StructSymbol,
+        FunctionSymbol, GenericFunction, Library, StructFieldSymbol,
+        StructFunctionTable, MaybeGenericStructSymbol,
     },
     typing::{FunctionType, StructType, SystemCallKind},
 };
@@ -150,6 +150,83 @@ enum VariableOrConstantKind {
     None,
     Variable(u64),
     Constant(Value),
+}
+
+#[derive(Debug)]
+pub enum BoundMaybeGenericStructSymbol<'a> {
+    Struct(BoundStructSymbol<'a>),
+    GenericStruct(BoundGenericStructSymbol<'a>),
+    Empty,
+}
+
+impl<'a> BoundMaybeGenericStructSymbol<'a> {
+    /// Returns `true` if the bound maybe generic struct symbol is [`Empty`].
+    ///
+    /// [`Empty`]: BoundMaybeGenericStructSymbol::Empty
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    pub fn as_struct(&self) -> Option<&BoundStructSymbol<'a>> {
+        if let Self::Struct(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_generic_struct(&self) -> Option<&BoundGenericStructSymbol<'a>> {
+        if let Self::GenericStruct(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_struct_mut(&mut self) -> Option<&mut BoundStructSymbol<'a>> {
+        if let Self::Struct(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_generic_struct_mut(&mut self) -> Option<&mut BoundGenericStructSymbol<'a>> {
+        if let Self::GenericStruct(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
+    fn name(&self) -> &str {
+        match self {
+            BoundMaybeGenericStructSymbol::Struct(it) => &it.name,
+            BoundMaybeGenericStructSymbol::GenericStruct(it) => &it.struct_type.name,
+            BoundMaybeGenericStructSymbol::Empty => "",
+        }
+    }
+
+    fn set_name(&mut self, name: impl Into<Cow<'a, str>>) {
+        let name = name.into();
+        match self {
+            BoundMaybeGenericStructSymbol::Struct(it) => it.name = name,
+            BoundMaybeGenericStructSymbol::GenericStruct(it) => it.struct_type.name = name,
+            BoundMaybeGenericStructSymbol::Empty => unreachable!("Tried setting name of empty slot to {}", name),
+        }
+    }
+}
+
+impl<'a> From<BoundStructSymbol<'a>> for BoundMaybeGenericStructSymbol<'a> {
+    fn from(value: BoundStructSymbol<'a>) -> Self {
+        Self::Struct(value)
+    }
+}
+
+impl<'a> From<BoundGenericStructSymbol<'a>> for BoundMaybeGenericStructSymbol<'a> {
+    fn from(value: BoundGenericStructSymbol<'a>) -> Self {
+        Self::GenericStruct(value)
+    }
 }
 
 /// This is quite similiar to symbols::StructSymbol, the only difference being,
@@ -287,20 +364,7 @@ struct BindingState<'a, 'b> {
     /// read only, even though this is currently (12.10.2021) only used for
     /// functions on structs since they are also fields in some way. But
     /// functions on structs are still registered in the functions table.
-    struct_table: Vec<BoundStructSymbol<'a>>,
-    /// When registering a type for the type table, it is also registered in the
-    /// struct table if it is a struct. The struct table is used to access field
-    /// information on a struct. Since the type of a struct only has the types
-    /// of the fields and their offset into the struct it cannot be used to
-    /// check if a struct has a field with a certain name. This is what this is
-    /// used for. So this is used by constructors or field accesses. Fields can
-    /// also be read only, even though this is currently (12.10.2021) only used
-    /// for functions on structs since they are also fields in some way. But
-    /// functions on structs are still registered in the functions table.
-    ///
-    /// These only holds generic structs, which still need to be replaced with
-    /// the correct type.
-    generic_struct_table: Vec<BoundGenericStructSymbol<'a>>,
+    struct_table: Vec<BoundMaybeGenericStructSymbol<'a>>,
     /// This contains all function declarations the binder found while walking
     /// the top level statements and after that the struct fields. The function
     /// declaration body contains the necessary information for the function
@@ -433,15 +497,12 @@ impl<'a> BindingState<'a, '_> {
             functions: vec![],
         };
         let struct_id = id as usize - type_table().len();
-        while struct_id >= self.generic_struct_table.len() {
-            self.generic_struct_table
-                .push(BoundGenericStructSymbol::empty());
+        while struct_id >= self.struct_table.len() {
+            self.struct_table
+                .push(BoundMaybeGenericStructSymbol::Empty);
         }
-        assert!(self.generic_struct_table[struct_id]
-            .struct_type
-            .name
-            .is_empty());
-        self.generic_struct_table[struct_id] = bound_struct_type;
+        assert!(self.struct_table[struct_id].is_empty());
+        self.struct_table[struct_id] = bound_struct_type.into();
         id
     }
 
@@ -476,6 +537,35 @@ impl<'a> BindingState<'a, '_> {
         id
     }
 
+    pub fn register_maybe_generic_struct_as(&mut self, name: &str, maybe_generic_struct: &MaybeGenericStructSymbol) -> Option<u64> {
+        let id = self.register_generated_struct_name(name.to_owned())?;
+        let fields = maybe_generic_struct.fields().to_vec();
+        let function_table = maybe_generic_struct.function_table().clone();
+        let struct_type = StructType {
+            id,
+            fields: fields
+                .iter()
+                .filter(|f| !matches!(f.type_, Type::Function(_)))
+                .map(|f| f.type_.clone())
+                .collect(),
+            functions: fields
+                .iter()
+                .filter(|f| matches!(f.type_, Type::Function(_)))
+                .map(|f| f.type_.clone())
+                .collect(),
+            function_table: function_table.clone(),
+            is_generic: false,
+        };
+        self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
+
+        self.insert_into_struct_table(
+            id,
+            fields.into_iter().map(Into::into).collect(),
+            function_table,
+        );
+        Some(id)
+    }
+
     pub fn insert_into_struct_table(
         &mut self,
         id: u64,
@@ -491,11 +581,11 @@ impl<'a> BindingState<'a, '_> {
         };
         let struct_id = id as usize - type_table().len();
         while struct_id >= self.struct_table.len() {
-            self.struct_table.push(BoundStructSymbol::empty());
+            self.struct_table.push(BoundMaybeGenericStructSymbol::Empty);
         }
 
-        assert!(self.struct_table[struct_id].name.is_empty());
-        self.struct_table[struct_id] = bound_struct_type;
+        assert!(self.struct_table[struct_id].is_empty());
+        self.struct_table[struct_id] = bound_struct_type.into();
     }
 
     fn register_type(&mut self, name: &'a str, type_: Type) -> Option<u64> {
@@ -678,21 +768,26 @@ impl<'a> BindingState<'a, '_> {
 
         self.struct_table
             .get(index)
-            .filter(|e| !e.name.is_empty())
-            .or(self.generic_struct_table.get(index).map(|e| &e.struct_type))
+            .filter(|e| !e.is_empty())
+            .map(|e| e
+                .as_struct()
+                .or(e
+                    .as_generic_struct()
+                    .map(|e| &e.struct_type)))
+            .flatten()
     }
 
     fn get_generic_struct_type_by_id(&self, id: u64) -> Option<&BoundGenericStructSymbol<'a>> {
-        self.generic_struct_table
-            .get(id as usize - type_table().len())
+        self.struct_table
+            .get(id as usize - type_table().len()).map(|e| e.as_generic_struct()).flatten()
     }
 
     fn get_generic_struct_type_by_id_mut(
         &mut self,
         id: u64,
     ) -> Option<&mut BoundGenericStructSymbol<'a>> {
-        self.generic_struct_table
-            .get_mut(id as usize - type_table().len())
+        self.struct_table
+            .get_mut(id as usize - type_table().len()).map(|e| e.as_generic_struct_mut()).flatten()
     }
 
     fn get_struct_by_id(&self, id: u64) -> Option<StructType> {
@@ -719,18 +814,12 @@ impl<'a> BindingState<'a, '_> {
         self.struct_table
             .iter()
             .enumerate()
-            .find(|(_, s)| s.name == name)
+            .find(|(_, s)| s.name() == name)
             .map(|(i, _)| (i + type_table().len()) as u64)
-            .or(self
-                .generic_struct_table
-                .iter()
-                .enumerate()
-                .find(|(_, s)| s.struct_type.name == name)
-                .map(|(i, _)| (i + type_table().len()) as u64))
     }
 
     pub fn rename_struct_by_id(&mut self, struct_id: u64, new_name: String) {
-        self.struct_table[struct_id as usize - type_table().len()].name = new_name.clone().into();
+        self.struct_table[struct_id as usize - type_table().len()].set_name(new_name.clone());
         self.type_table
             .iter_mut()
             .find(|t| match &t.type_ {
@@ -846,8 +935,7 @@ impl BoundProgram {
 pub struct BoundLibrary {
     pub program: BoundProgram,
     pub exported_functions: Vec<FunctionSymbol>,
-    pub exported_structs: Vec<StructSymbol>,
-    pub exported_generic_structs: Vec<GenericStructSymbol>,
+    pub exported_structs: Vec<MaybeGenericStructSymbol>,
 }
 
 impl BoundLibrary {
@@ -856,7 +944,6 @@ impl BoundLibrary {
             program: BoundProgram::error(),
             exported_functions: vec![],
             exported_structs: vec![],
-            exported_generic_structs: vec![],
         }
     }
 }
@@ -933,7 +1020,6 @@ fn bind<'a>(
         type_table: type_table(),
         generic_type: None,
         struct_table: vec![],
-        generic_struct_table: vec![],
         functions: vec![],
         generic_functions: vec![],
         bound_generic_functions: vec![],
@@ -1052,11 +1138,6 @@ fn bind<'a>(
         program,
         exported_functions: exported_functions.into_iter().map(Into::into).collect(),
         exported_structs: binder.struct_table.into_iter().map(Into::into).collect(),
-        exported_generic_structs: binder
-            .generic_struct_table
-            .into_iter()
-            .map(Into::into)
-            .collect(),
     }
 }
 

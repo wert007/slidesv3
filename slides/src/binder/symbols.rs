@@ -10,7 +10,7 @@ use crate::instruction_converter::{
 
 use super::{
     typing::{FunctionType, Type},
-    BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, bound_nodes::BoundNode, BoundGenericStructSymbol,
+    BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, bound_nodes::BoundNode, BoundGenericStructSymbol, BoundMaybeGenericStructSymbol,
 };
 
 #[derive(Debug, Clone)]
@@ -20,8 +20,7 @@ pub struct Library {
     pub startup: Vec<InstructionOrLabelReference>,
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
-    pub structs: Vec<StructSymbol>,
-    pub generic_structs: Vec<GenericStructSymbol>,
+    pub structs: Vec<MaybeGenericStructSymbol>,
     pub has_errors: bool,
     pub path: PathBuf,
     pub referenced_libraries: Vec<Library>,
@@ -37,7 +36,6 @@ impl Library {
             program: Program::error(),
             functions: vec![],
             structs: vec![],
-            generic_structs: vec![],
             has_errors: true,
             path: PathBuf::new(),
             referenced_libraries: vec![],
@@ -76,7 +74,7 @@ impl Library {
             function.function_label += label_offset as u64;
         }
         for strct in self.structs.iter_mut() {
-            strct.function_table.relocate_labels(label_offset);
+            strct.function_table_mut().relocate_labels(label_offset);
         }
         for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
@@ -103,7 +101,7 @@ impl Library {
             function.relocate_structs(struct_offset);
         }
         for strct in self.structs.iter_mut() {
-            for field in strct.fields.iter_mut() {
+            for field in strct.fields_mut() {
                 match &mut field.type_ {
                     Type::Function(function_type) => function_type.relocate_structs(struct_offset),
                     Type::Struct(_) => {
@@ -113,20 +111,7 @@ impl Library {
                     _ => {}
                 }
             }
-            strct.function_table.relocate_structs(struct_offset);
-        }
-        for strct in self.generic_structs.iter_mut() {
-            for field in strct.fields.iter_mut() {
-                match &mut field.type_ {
-                    Type::Function(function_type) => function_type.relocate_structs(struct_offset),
-                    Type::Struct(_) => {
-                        unreachable!("relocate_structs currently only works for StructReferences")
-                    }
-                    Type::StructReference(index) => *index += struct_offset as u64,
-                    _ => {}
-                }
-            }
-            strct.function_table.relocate_structs(struct_offset);
+            strct.function_table_mut().relocate_structs(struct_offset);
         }
     }
 }
@@ -167,6 +152,72 @@ impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum MaybeGenericStructSymbol {
+    Struct(StructSymbol),
+    GenericStruct(GenericStructSymbol),
+}
+
+impl MaybeGenericStructSymbol {
+    pub fn name(&self) -> &str {
+        match self {
+            MaybeGenericStructSymbol::Struct(it) => &it.name,
+            MaybeGenericStructSymbol::GenericStruct(it) => &it.name,
+        }
+    }
+
+    pub fn fields(&self) -> &[StructFieldSymbol] {
+        match self {
+            MaybeGenericStructSymbol::Struct(it) => &it.fields,
+            MaybeGenericStructSymbol::GenericStruct(it) => &it.fields,
+        }
+    }
+
+    pub fn fields_mut(&mut self) -> core::slice::IterMut<StructFieldSymbol> {
+        match self {
+            MaybeGenericStructSymbol::Struct(it) => it.fields.iter_mut(),
+            MaybeGenericStructSymbol::GenericStruct(it) => it.fields.iter_mut(),
+        }
+    }
+
+    pub fn function_table(&self) -> &StructFunctionTable {
+        match self {
+            MaybeGenericStructSymbol::Struct(it) => &it.function_table,
+            MaybeGenericStructSymbol::GenericStruct(it) => &it.function_table,
+        }
+    }
+
+    pub fn function_table_mut(&mut self) -> &mut StructFunctionTable {
+        match self {
+            MaybeGenericStructSymbol::Struct(it) => &mut it.function_table,
+            MaybeGenericStructSymbol::GenericStruct(it) => &mut it.function_table,
+        }
+    }
+}
+
+impl From<StructSymbol> for MaybeGenericStructSymbol {
+    fn from(it: StructSymbol) -> Self {
+        Self::Struct(it)
+    }
+}
+
+impl From<GenericStructSymbol> for MaybeGenericStructSymbol {
+    fn from(it: GenericStructSymbol) -> Self {
+        Self::GenericStruct(it)
+    }
+}
+
+impl From<BoundMaybeGenericStructSymbol<'_>> for MaybeGenericStructSymbol {
+    fn from(it: BoundMaybeGenericStructSymbol) -> Self {
+        match it {
+            BoundMaybeGenericStructSymbol::Struct(it) => StructSymbol::from(it).into(),
+            BoundMaybeGenericStructSymbol::GenericStruct(it) => GenericStructSymbol::from(it).into(),
+            BoundMaybeGenericStructSymbol::Empty => unreachable!("Tried to convert/export an empty symbol"),
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub struct StructSymbol {
