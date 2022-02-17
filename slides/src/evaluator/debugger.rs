@@ -19,7 +19,7 @@ pub fn create_session(state: &mut EvaluatorState) -> SessionState {
                 Command::Quit => return SessionState::Quit,
                 Command::NextInstruction => return SessionState::Continue,
                 Command::Skip => return SessionState::SkipFunction,
-                Command::Stack => print_stack(&state.stack),
+                Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words),
                 Command::Replace(new_value) => {
                     let flags = state.stack.pop().flags;
                     state.stack.push_flagged_word(FlaggedWord::value(new_value).flags(flags));
@@ -66,9 +66,9 @@ fn _print_heap_at(heap: &memory::allocator::Allocator, address: usize) {
     }
 }
 
-fn print_stack(stack: &super::memory::stack::Stack) {
-    println!("{} Entries in stack:", stack.len());
-    for i in 0..stack.len() {
+fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
+    println!("{} Entries in stack:", stack.len() - skip);
+    for i in skip..stack.len() {
         let entry = stack.read_flagged_word(i as u64 * memory::WORD_SIZE_IN_BYTES);
         if entry.is_pointer() {
             println!("#{:x}", entry.unwrap_pointer());

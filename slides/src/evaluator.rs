@@ -35,6 +35,7 @@ type ResultType = Value;
 pub struct EvaluatorState<'a> {
     debug_flags: DebugFlags,
     stack: Stack,
+    static_memory_size_in_words: usize,
     heap: Allocator,
     registers: Vec<FlaggedWord>,
     protected_registers: usize,
@@ -103,6 +104,7 @@ pub fn evaluate(
     stack.push_static_memory(program.static_memory);
     let mut state = EvaluatorState {
         debug_flags,
+        static_memory_size_in_words: stack.len(),
         stack,
         heap: Allocator::new(1024 * 1024, debug_flags),
         registers: vec![FlaggedWord::default(); program.max_used_variables],
