@@ -44,7 +44,7 @@ pub struct EvaluatorState<'a> {
     is_main_call: bool,
     runtime_diagnostics: DiagnosticBag<'a>,
     runtime_error_happened: bool,
-    debug_mode: debugger::SessionState,
+    debugger_state: debugger::DebuggerState,
 }
 
 impl EvaluatorState<'_> {
@@ -114,7 +114,7 @@ pub fn evaluate(
         is_main_call: true,
         runtime_diagnostics: DiagnosticBag::new(source_text),
         runtime_error_happened: false,
-        debug_mode: debugger::SessionState::Quit,
+        debugger_state: debugger::DebuggerState::default(),
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
@@ -173,17 +173,17 @@ fn execute_function(
             break;
         }
         execute_instruction(state, state.instructions[pc]);
-        match state.debug_mode {
+        match state.debugger_state.session_state {
             debugger::SessionState::Continue => {
-                state.debug_mode = debugger::create_session(state);
-                if state.debug_mode == debugger::SessionState::SkipFunction {
+                debugger::create_session(state);
+                if state.debugger_state.skip_function() {
                     debug_nestedness = nestedness;
                 }
             }
             debugger::SessionState::SkipFunction => {
                 if nestedness == debug_nestedness {
-                    state.debug_mode = debugger::create_session(state);
-                    if state.debug_mode == debugger::SessionState::SkipFunction {
+                    debugger::create_session(state);
+                    if state.debugger_state.skip_function() {
                         debug_nestedness = nestedness;
                     }
                 }
@@ -260,7 +260,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_breakpoint(state: &mut EvaluatorState, _: Instruction) {
-    state.debug_mode = debugger::SessionState::Continue;
+    state.debugger_state.session_state = debugger::SessionState::Continue;
 }
 
 fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction) {

@@ -9,16 +9,43 @@ pub enum SessionState {
     SkipFunction,
 }
 
-pub fn create_session(state: &mut EvaluatorState) -> SessionState {
+impl Default for SessionState {
+    fn default() -> Self {
+        Self::Quit
+    }
+}
+
+#[derive(Default, Debug)]
+pub struct DebuggerState {
+    register_names: Vec<Option<String>>,
+    pub session_state: SessionState,
+}
+
+impl DebuggerState {
+    pub fn skip_function(&self) -> bool {
+        self.session_state == SessionState::SkipFunction
+    }
+}
+
+pub fn create_session(state: &mut EvaluatorState) {
     println!("This is the debugger. Type :q to exit the debugger.");
     let mut line = String::new();
     loop {
         std::io::stdin().read_line(&mut line).unwrap();
         match parse_command(line.trim()) {
             Some(command) => match command {
-                Command::Quit => return SessionState::Quit,
-                Command::NextInstruction => return SessionState::Continue,
-                Command::Skip => return SessionState::SkipFunction,
+                Command::Quit => {
+                    state.debugger_state.session_state = SessionState::Quit;
+                    return;
+                }
+                Command::NextInstruction => {
+                    state.debugger_state.session_state = SessionState::Continue;
+                    return;
+                }
+                Command::Skip => {
+                    state.debugger_state.session_state = SessionState::SkipFunction;
+                    return;
+                }
                 Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words),
                 Command::Replace(new_value) => {
                     let flags = state.stack.pop().flags;
