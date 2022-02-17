@@ -218,3 +218,10 @@ pub fn reallocate(pointer: FlaggedWord, size: FlaggedWord, state: &mut Evaluator
     let result = state.reallocate(pointer, size);
     state.stack.push_flagged_word(FlaggedWord::pointer(result));
 }
+
+pub fn runtime_error(argument: FlaggedWord, state: &mut EvaluatorState) {
+    let argument = string_to_string_native(argument, state);
+    let argument = argument.replace('\0', "");
+    println!("Runtime error happened: {}", argument);
+    state.runtime_error_happened = true;
+}

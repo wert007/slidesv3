@@ -686,6 +686,7 @@ fn convert_system_call(
         SystemCallKind::Print
         | SystemCallKind::ToString
         | SystemCallKind::DebugHeapDump
+        | SystemCallKind::RuntimeError
         | SystemCallKind::Reallocate => {
             let mut result = vec![];
             let argument_count = match system_call.base {
@@ -693,6 +694,7 @@ fn convert_system_call(
                 | SystemCallKind::ToString
                 | SystemCallKind::ArrayLength
                 | SystemCallKind::DebugHeapDump => 1,
+                | SystemCallKind::RuntimeError => 1,
                 SystemCallKind::Reallocate => 2,
                 SystemCallKind::Break => unreachable!(),
             };

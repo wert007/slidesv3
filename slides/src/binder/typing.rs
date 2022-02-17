@@ -157,6 +157,8 @@ impl Type {
         (1 + SystemCallKind::Break as u8 as u64) << 8;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE: u64 =
         (1 + SystemCallKind::Reallocate as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR: u64 =
+        (1 + SystemCallKind::RuntimeError as u8 as u64) << 8;
 
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
@@ -188,6 +190,7 @@ impl Type {
             }
             Type::SystemCall(SystemCallKind::Break) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_BREAK,
             Type::SystemCall(SystemCallKind::Reallocate) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE,
+            Type::SystemCall(SystemCallKind::RuntimeError) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR,
         }
     }
 
@@ -218,6 +221,12 @@ impl Type {
             }
             Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP => {
                 Some(Type::SystemCall(SystemCallKind::DebugHeapDump))
+            }
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE => {
+                Some(Type::SystemCall(SystemCallKind::Reallocate))
+            }
+            Self::TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR => {
+                Some(Type::SystemCall(SystemCallKind::RuntimeError))
             }
             _ => None,
         }
@@ -332,6 +341,7 @@ pub enum SystemCallKind {
     DebugHeapDump,
     Break,
     Reallocate,
+    RuntimeError,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -346,6 +356,7 @@ impl std::fmt::Display for SystemCallKind {
                 SystemCallKind::DebugHeapDump => "debug$heap$dump",
                 SystemCallKind::Break => "break",
                 SystemCallKind::Reallocate => "reallocate",
+                SystemCallKind::RuntimeError => "runtimeError",
             }
         )
     }
@@ -429,6 +440,13 @@ impl FunctionType {
             },
             SystemCallKind::Reallocate => Self {
                 parameter_types: vec![Type::Pointer, Type::Integer],
+                this_type: None,
+                return_type: Type::Pointer,
+                system_call_kind: Some(system_call_kind),
+                is_generic: false,
+            },
+            SystemCallKind::RuntimeError => Self {
+                parameter_types: vec![Type::String],
                 this_type: None,
                 return_type: Type::Pointer,
                 system_call_kind: Some(system_call_kind),

@@ -634,6 +634,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::ToString => sys_calls::to_string(arguments[0], state),
         SystemCallKind::DebugHeapDump => sys_calls::heap_dump(arguments[0], state),
         SystemCallKind::Reallocate => sys_calls::reallocate(arguments[1], arguments[0], state),
+        SystemCallKind::RuntimeError => sys_calls::runtime_error(arguments[0], state),
         SystemCallKind::Break => unreachable!(),
     }
 }

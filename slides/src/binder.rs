@@ -1265,6 +1265,7 @@ fn default_statements(binder: &mut BindingState) {
     binder.register_constant("heapdump", Value::SystemCall(SystemCallKind::DebugHeapDump));
     binder.register_constant("break", Value::SystemCall(SystemCallKind::Break));
     binder.register_constant("reallocate", Value::SystemCall(SystemCallKind::Reallocate));
+    binder.register_constant("runtimeError", Value::SystemCall(SystemCallKind::RuntimeError));
 }
 
 fn std_imports(binder: &mut BindingState) {
