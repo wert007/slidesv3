@@ -1,6 +1,6 @@
 use crate::evaluator::memory;
 
-use super::{EvaluatorState, memory::FlaggedWord};
+use super::{memory::FlaggedWord, EvaluatorState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionState {
@@ -19,6 +19,7 @@ impl Default for SessionState {
 pub struct DebuggerState {
     register_names: Vec<Option<String>>,
     pub session_state: SessionState,
+    last_command: Command,
 }
 
 impl DebuggerState {
@@ -33,27 +34,37 @@ pub fn create_session(state: &mut EvaluatorState) {
     loop {
         std::io::stdin().read_line(&mut line).unwrap();
         match parse_command(line.trim()) {
-            Some(command) => match command {
-                Command::Quit => {
-                    state.debugger_state.session_state = SessionState::Quit;
-                    return;
+            Some(command) => {
+                let command = if command == Command::Repeat {
+                    state.debugger_state.last_command
+                } else {
+                    command
+                };
+                match command {
+                    Command::Quit => {
+                        state.debugger_state.session_state = SessionState::Quit;
+                        return;
+                    }
+                    Command::NextInstruction => {
+                        state.debugger_state.session_state = SessionState::Continue;
+                        return;
+                    }
+                    Command::Skip => {
+                        state.debugger_state.session_state = SessionState::SkipFunction;
+                        return;
+                    }
+                    Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words),
+                    Command::Replace(new_value) => {
+                        let flags = state.stack.pop().flags;
+                        state
+                            .stack
+                            .push_flagged_word(FlaggedWord::value(new_value).flags(flags));
+                    }
+                    Command::Registers => print_registers(&state.registers),
+                    Command::Pointer(address) => read_pointer(state, address),
+                    Command::Repeat => unreachable!(),
                 }
-                Command::NextInstruction => {
-                    state.debugger_state.session_state = SessionState::Continue;
-                    return;
-                }
-                Command::Skip => {
-                    state.debugger_state.session_state = SessionState::SkipFunction;
-                    return;
-                }
-                Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words),
-                Command::Replace(new_value) => {
-                    let flags = state.stack.pop().flags;
-                    state.stack.push_flagged_word(FlaggedWord::value(new_value).flags(flags));
-                }
-                Command::Registers => print_registers(&state.registers),
-                Command::Pointer(address) => read_pointer(state, address),
-            },
+            }
             None => {
                 println!("Unknown command {}", line);
             }
@@ -105,7 +116,9 @@ fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Command {
+    Repeat,
     Quit,
     NextInstruction,
     Skip,
@@ -113,6 +126,12 @@ enum Command {
     Registers,
     Pointer(usize),
     Replace(u64),
+}
+
+impl Default for Command {
+    fn default() -> Self {
+        Self::NextInstruction
+    }
 }
 
 fn parse_command(input: &str) -> Option<Command> {
@@ -136,6 +155,7 @@ fn parse_command(input: &str) -> Option<Command> {
         ["q" | "quit"] => Some(Command::Quit),
         ["n" | "next"] => Some(Command::NextInstruction),
         ["s" | "skip"] => Some(Command::Skip),
+        [""] => Some(Command::Repeat),
         _ => None,
     }
 }
