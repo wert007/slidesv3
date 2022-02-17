@@ -399,15 +399,6 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_cannot_print_type(&mut self, span: TextSpan, type_: &Type) {
-        let message : &[Message] = &[
-            "Cannot print values of type ".into(),
-            type_.into(),
-            ".".into(),
-        ];
-        self.report(message.into(), span);
-    }
-
     pub fn report_invalid_variable_type_none(&mut self, span: TextSpan) {
         let message = "Variables cannot be assigned none, without type information. Try adding a : TypeDeclaration.".into();
         self.report(message, span);
