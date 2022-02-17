@@ -482,14 +482,6 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     // Runtime Errors
-    pub fn index_out_of_bounds(&mut self, span: Option<TextSpan>, index: i64, length: u64) {
-        let message = format!(
-            "Index out of Bounds. Index was {} and length was {}.",
-            index, length
-        );
-        self.report_runtime(message.into(), span);
-    }
-
     pub fn no_heap_memory_left(&mut self, span: Option<TextSpan>, needed_memory_in_bytes: u64) {
         let message = format!(
             "Out of memory. No heap memory for {} bytes left.",

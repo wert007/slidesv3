@@ -275,7 +275,6 @@ fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) ->
         OpCode::DecodeClosure => {
             instruction_decode_closure_arg_to_string("decclosure", instruction.arg)
         }
-        OpCode::CheckArrayBounds => instruction_no_arg_to_string("chkarraybounds"),
         OpCode::Breakpoint => instruction_no_arg_to_string("brk"),
     }
 }

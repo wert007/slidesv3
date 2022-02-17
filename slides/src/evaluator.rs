@@ -254,7 +254,6 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::FunctionCall => evaluate_function_call(state, instruction),
         OpCode::Return => evaluate_return(state, instruction),
         OpCode::DecodeClosure => evaluate_decode_closure(state, instruction),
-        OpCode::CheckArrayBounds => evaluate_check_array_bounds(state, instruction),
     }
 }
 
@@ -734,20 +733,4 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
         state.stack.push_pointer(function_pointer);
     }
     state.stack.push(argument_count);
-}
-
-fn evaluate_check_array_bounds(state: &mut EvaluatorState, instruction: Instruction) {
-    let index = state.stack.pop().unwrap_value();
-    let array = state.stack.pop().unwrap_pointer();
-    let array_length_in_bytes = state.read_pointer(array).unwrap_value();
-    if index - WORD_SIZE_IN_BYTES >= array_length_in_bytes {
-        let array_length_in_words = memory::bytes_to_word(array_length_in_bytes);
-        let index = (index - WORD_SIZE_IN_BYTES) as _;
-        runtime_error!(
-            state,
-            index_out_of_bounds(instruction.span, index, array_length_in_words)
-        );
-    }
-    state.stack.push_pointer(array);
-    state.stack.push(index);
 }

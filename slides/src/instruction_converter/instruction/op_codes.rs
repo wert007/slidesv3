@@ -47,5 +47,4 @@ pub enum OpCode {
     DecodeClosure = 66,
     Breakpoint = 67,
     // Trivia
-    CheckArrayBounds = 90,
 }
