@@ -158,7 +158,7 @@ fn execute_function(
                 "  CI {:X}*{}: {}",
                 pc,
                 nestedness,
-                crate::debug::instruction_to_string(state.instructions[pc])
+                crate::debug::instruction_to_string(state.instructions[pc], None)
             );
         }
         if state.debug_flags.slow_mode {

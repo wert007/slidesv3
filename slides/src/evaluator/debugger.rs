@@ -29,16 +29,29 @@ impl DebuggerState {
 }
 
 pub fn create_session(state: &mut EvaluatorState) {
-    println!("This is the debugger. Type :q to exit the debugger.");
+    if state.pc >= state.instructions.len() {
+        return;
+    }
+    let current_instruction = state.instructions[state.pc];
+    let reg_name = if current_instruction.arg < state.debugger_state.register_names.len() as u64 {
+        if let Some(it) = &state.debugger_state.register_names[current_instruction.arg as usize] {
+            Some(it.as_str())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    println!("{:5X}: {}", state.pc, crate::debug::instruction_to_string(current_instruction, reg_name));
     let mut line = String::new();
     loop {
         std::io::stdin().read_line(&mut line).unwrap();
         match parse_command(line.trim()) {
             Some(command) => {
                 let command = if command == Command::Repeat {
-                    state.debugger_state.last_command
+                    &state.debugger_state.last_command
                 } else {
-                    command
+                    &command
                 };
                 match command {
                     Command::Quit => {
@@ -58,11 +71,15 @@ pub fn create_session(state: &mut EvaluatorState) {
                         let flags = state.stack.pop().flags;
                         state
                             .stack
-                            .push_flagged_word(FlaggedWord::value(new_value).flags(flags));
+                            .push_flagged_word(FlaggedWord::value(*new_value).flags(flags));
                     }
-                    Command::Registers => print_registers(&state.registers),
-                    Command::Pointer(address) => read_pointer(state, address),
+                    Command::Registers => print_registers(&state.registers, &state.debugger_state.register_names),
+                    Command::Pointer(address) => read_pointer(state, *address),
                     Command::Repeat => unreachable!(),
+                    Command::RenameRegister(register, name) => {
+                        state.debugger_state.register_names.resize_with(*register + 1, Default::default);
+                        state.debugger_state.register_names[*register] = Some(name.clone());
+                    }
                 }
             }
             None => {
@@ -73,9 +90,13 @@ pub fn create_session(state: &mut EvaluatorState) {
     }
 }
 
-fn print_registers(registers: &[FlaggedWord]) {
+fn print_registers(registers: &[FlaggedWord], register_names: &[Option<String>]) {
     for (index, value) in registers.iter().enumerate() {
-        print!("r#{}: ", index);
+        if let Some(Some(name)) = register_names.get(index) {
+            print!("{}: ", name);
+        } else {
+            print!("r#{}: ", index);
+        }
         if value.is_pointer() {
             println!("#{:x}", value.unwrap_pointer());
         } else {
@@ -116,7 +137,7 @@ fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum Command {
     Repeat,
     Quit,
@@ -126,6 +147,7 @@ enum Command {
     Registers,
     Pointer(usize),
     Replace(u64),
+    RenameRegister(usize, String),
 }
 
 impl Default for Command {
@@ -152,6 +174,14 @@ fn parse_command(input: &str) -> Option<Command> {
         }
         ["stack"] => Some(Command::Stack),
         ["registers"] => Some(Command::Registers),
+        ["rename", register, name] => {
+            if let Some(register) = register.strip_prefix("r#") {
+                let register = register.parse().ok()?;
+                Some(Command::RenameRegister(register, name.into()))
+            } else {
+                None
+            }
+        }
         ["q" | "quit"] => Some(Command::Quit),
         ["n" | "next"] => Some(Command::NextInstruction),
         ["s" | "skip"] => Some(Command::Skip),

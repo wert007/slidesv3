@@ -75,7 +75,7 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
                     buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     buffer.push_str(&format!("{:3X}: ", index));
-                    buffer.push_str(&instruction_or_label_to_string(*instruction, true));
+                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, None));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -120,7 +120,7 @@ fn instructions_with_source_code_to_string(
         }
         buffer.push_str("  ");
         buffer.push_str(&format!("{:3X}: ", index));
-        buffer.push_str(&instruction_to_string(*instruction));
+        buffer.push_str(&instruction_to_string(*instruction, None));
         buffer.push('\n');
     }
     buffer
@@ -157,7 +157,7 @@ fn instructions_or_labels_with_source_code_to_string(
                     buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     buffer.push_str(&format!("{:3X}: ", index));
-                    buffer.push_str(&instruction_or_label_to_string(*instruction, true));
+                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, None));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -184,7 +184,7 @@ fn instructions_or_labels_to_string(
                     result.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     result.push_str(&format!("{:3X}: ", index));
-                    result.push_str(&instruction_or_label_to_string(*instruction, true));
+                    result.push_str(&instruction_or_label_to_string(*instruction, true, None));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -198,13 +198,18 @@ fn instructions_or_labels_to_string(
     result
 }
 
-fn instructions_to_string(start_index: usize, instructions: &[Instruction]) -> String {
+fn instructions_to_string(start_index: usize, instructions: &[Instruction], reg_names: &[Option<&str>]) -> String {
     let mut result = String::new();
     let mut index = start_index;
     for instruction in instructions {
         result.push_str("  ");
         result.push_str(&format!("{:3X}: ", index));
-        result.push_str(&instruction_to_string(*instruction));
+        let reg_name = if (reg_names.len() as u64) < instruction.arg {
+            reg_names[instruction.arg as usize]
+        } else {
+            None
+        };
+        result.push_str(&instruction_to_string(*instruction, reg_name));
         index += 1;
         result.push('\n');
     }
@@ -215,19 +220,19 @@ fn label_reference_to_string(label: LabelReference) -> String {
     format!("ldlbl L{:02X}", label.label_reference)
 }
 
-pub fn instruction_to_string(instruction: Instruction) -> String {
-    instruction_or_label_to_string(instruction, false)
+pub fn instruction_to_string(instruction: Instruction, reg_name: Option<&str>) -> String {
+    instruction_or_label_to_string(instruction, false, reg_name)
 }
 
-fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool) -> String {
+fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool, reg_name: Option<&str>) -> String {
     match instruction.op_code {
         OpCode::NoOp => instruction_no_arg_to_string("noop"),
         OpCode::LoadImmediate => instruction_dec_signed_arg_to_string("ldimm", instruction.arg),
         OpCode::LoadPointer => instruction_ptr_unsigned_arg_to_string("ldptr", instruction.arg),
         OpCode::DuplicateOver => instruction_word_count_arg_to_string("dupover", instruction.arg),
         OpCode::Pop => instruction_no_arg_to_string("pop"),
-        OpCode::LoadRegister => instruction_reg_arg_to_string("ldreg", instruction.arg),
-        OpCode::StoreInRegister => instruction_reg_arg_to_string("streg", instruction.arg),
+        OpCode::LoadRegister => instruction_reg_arg_name_to_string("ldreg", instruction.arg, reg_name),
+        OpCode::StoreInRegister => instruction_reg_arg_name_to_string("streg", instruction.arg, reg_name),
         OpCode::StoreInMemory => instruction_ptr_unsigned_arg_to_string("stm", instruction.arg),
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
         OpCode::WriteToHeap => instruction_word_count_arg_to_string("wrtheap", instruction.arg),
@@ -293,7 +298,15 @@ fn instruction_ptr_unsigned_arg_to_string(name: &str, arg: u64) -> String {
 }
 
 fn instruction_reg_arg_to_string(name: &str, arg: u64) -> String {
-    format!("{} r#{}", name, arg)
+    instruction_reg_arg_name_to_string(name, arg, None)
+}
+
+fn instruction_reg_arg_name_to_string(name: &str, arg: u64, reg_name: Option<&str>) -> String {
+    if let Some(reg_name) = reg_name {
+        format!("{} {}", name, reg_name)
+    } else {
+        format!("{} r#{}", name, arg)
+    }
 }
 
 fn instruction_label_arg_to_string(name: &str, arg: u64) -> String {
