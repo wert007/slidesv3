@@ -448,7 +448,7 @@ impl FunctionType {
             SystemCallKind::RuntimeError => Self {
                 parameter_types: vec![Type::String],
                 this_type: None,
-                return_type: Type::Pointer,
+                return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },
