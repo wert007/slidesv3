@@ -1433,7 +1433,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         function_declaration.function_type,
         binder,
     );
-    variables.push(("this", struct_type));
+    variables.push(("this", struct_type.clone()));
     let type_ = Type::Function(Box::new(function_type.clone()));
     // FIXME: Turn into usize
     let function_name = format!(
@@ -1448,6 +1448,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 header_span,
                 struct_function_kind,
                 &function_type,
+                &struct_type,
                 binder,
             );
             binder.add_function_declaration(FunctionDeclarationBody {
@@ -1515,6 +1516,7 @@ fn type_check_struct_function_kind(
     span: TextSpan,
     struct_function_kind: StructFunctionKind,
     function_type: &FunctionType,
+    struct_type: &Type,
     binder: &mut BindingState,
 ) {
     match struct_function_kind {
@@ -1594,14 +1596,19 @@ fn type_check_struct_function_kind(
                 );
             }
         }
-        // FIXME: Make it possible to actually check, that the parameter type is
-        // the same type as the struct itself.
         StructFunctionKind::Equals => {
             if function_type.parameter_types.len() != 1 {
                 binder.diagnostic_bag.report_unexpected_parameter_count(
                     span,
                     function_type.parameter_types.len(),
                     1,
+                );
+            }
+            if !function_type.parameter_types[0].can_be_converted_to(struct_type) {
+                binder.diagnostic_bag.report_cannot_convert(
+                    span,
+                    &function_type.parameter_types[0],
+                    struct_type,
                 );
             }
             if !function_type
