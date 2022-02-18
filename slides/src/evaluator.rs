@@ -143,6 +143,7 @@ fn execute_function(
     arguments: &[FlaggedWord],
 ) -> Result<Option<FlaggedWord>, ()> {
     let old_pc = state.pc;
+    let old_registers = state.registers.clone();
     state.pc = entry_point;
     state.runtime_error_happened = false;
     let min_stack_count = state.stack.len();
@@ -203,6 +204,7 @@ fn execute_function(
         state.pc += 1;
     }
     state.pc = old_pc;
+    state.registers = old_registers;
     Ok(
         if !state.runtime_error_happened && state.stack.len() > min_stack_count {
             Some(state.stack.pop())
