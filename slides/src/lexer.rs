@@ -290,12 +290,12 @@ fn is_operator(character: char) -> bool {
 }
 
 fn is_multi_char_operator(character: char) -> bool {
-    matches!(character, '=' | '<' | '>' | '-' | '?' | '.' | '&' )
+    matches!(character, '=' | '<' | '>' | '-' | '?' | '.' | '&' | '|')
 }
 
 fn is_valid_operator(operator: &str) -> bool {
     matches!(
         operator,
-        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-" | "?" | "??" | "." | ".." | "&" | "&&"
+        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-" | "?" | "??" | "." | ".." | "&" | "&&" | "||"
     )
 }

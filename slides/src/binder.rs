@@ -2249,6 +2249,7 @@ fn bind_binary_insertion<'a>(
                     BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
                 }
                 BoundBinaryOperator::LogicalAnd => BoundNode::logical_and(span, lhs, rhs),
+                BoundBinaryOperator::LogicalOr => BoundNode::logical_or(span, lhs, rhs),
                 _ => BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result),
             }
         }
@@ -2277,6 +2278,7 @@ fn bind_binary_operator<'a, 'b>(
         SyntaxTokenKind::QuestionMarkQuestionMark => BoundBinaryOperator::NoneableOrValue,
         SyntaxTokenKind::PeriodPeriod => BoundBinaryOperator::Range,
         SyntaxTokenKind::AmpersandAmpersand => BoundBinaryOperator::LogicalAnd,
+        SyntaxTokenKind::PipePipe => BoundBinaryOperator::LogicalOr,
         _ => unreachable!(),
     };
     match (&lhs.type_, result, &rhs.type_) {
@@ -2333,9 +2335,11 @@ fn bind_binary_operator<'a, 'b>(
             result,
             Type::Boolean,
         )),
-        (Type::Boolean, BoundBinaryOperator::LogicalAnd, Type::Boolean) => {
-            Some(BoundBinary::same_output(result, Type::Boolean))
-        }
+        (
+            Type::Boolean,
+            BoundBinaryOperator::LogicalAnd | BoundBinaryOperator::LogicalOr,
+            Type::Boolean,
+        ) => Some(BoundBinary::same_output(result, Type::Boolean)),
         (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(
             // Currently a call to to$string will be emitted. And for that call
             // both sides need to be of type any. There is an optimization here,

@@ -586,8 +586,13 @@ fn convert_binary(
         BoundBinaryOperator::NoneableOrValue => {
             Instruction::noneable_or_value(!binary.lhs.type_.is_pointer())
         }
-        operator @ (BoundBinaryOperator::LogicalAnd |
-        BoundBinaryOperator::Range) => unreachable!("{} is handled in the binder already!", operator),
+        operator
+        @
+        (BoundBinaryOperator::LogicalAnd
+        | BoundBinaryOperator::LogicalOr
+        | BoundBinaryOperator::Range) => {
+            unreachable!("{} is handled in the binder already!", operator)
+        }
     }
     .span(span);
     let mut result = vec![];

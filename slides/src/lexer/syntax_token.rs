@@ -112,6 +112,7 @@ pub enum SyntaxTokenKind {
     PeriodPeriod,
     Ampersand,
     AmpersandAmpersand,
+    PipePipe,
     QuestionMark,
     QuestionMarkQuestionMark,
     Plus,
@@ -153,16 +154,17 @@ pub enum SyntaxTokenKind {
 impl SyntaxTokenKind {
     pub fn unary_precedence(&self) -> u32 {
         match self {
-            Self::Plus | Self::Minus | Self::Bang => 8,
+            Self::Plus | Self::Minus | Self::Bang => 9,
             _ => 0,
         }
     }
 
     pub fn binary_precedence(&self) -> u32 {
         match self {
-            Self::Star | Self::Slash => 7,
-            Self::Plus | Self::Minus => 6,
-            Self::AmpersandAmpersand => 5,
+            Self::Star | Self::Slash => 8,
+            Self::Plus | Self::Minus => 7,
+            Self::AmpersandAmpersand => 6,
+            Self::PipePipe => 5,
             Self::QuestionMarkQuestionMark => 4,
             Self::PeriodPeriod => 3,
             Self::EqualsEquals
@@ -230,6 +232,7 @@ impl From<&str> for SyntaxTokenKind {
             ".." => Self::PeriodPeriod,
             "&" => Self::Ampersand,
             "&&" => Self::AmpersandAmpersand,
+            "||" => Self::PipePipe,
             "?" => Self::QuestionMark,
             "??" => Self::QuestionMarkQuestionMark,
             "==" => Self::EqualsEquals,
@@ -258,6 +261,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::PeriodPeriod => write!(f, "Period-Period-Token"),
             SyntaxTokenKind::Ampersand => write!(f, "Ampersand-Token"),
             SyntaxTokenKind::AmpersandAmpersand => write!(f, "Ampersand-Ampersand-Token"),
+            SyntaxTokenKind::PipePipe => write!(f, "Pipe-Pipe-Token"),
             SyntaxTokenKind::QuestionMark => write!(f, "Question-Mark-Token"),
             SyntaxTokenKind::QuestionMarkQuestionMark => {
                 write!(f, "Question-Mark-Question-Mark-Token")
