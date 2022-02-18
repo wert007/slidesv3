@@ -1,13 +1,6 @@
 func main() {
-    let f = [ [ 1 ], [ 2], ];
-    // f[1] = [1, 2, 3];
-    break();
-    print(f);
-    // // print(f[0][0]);
-    // f[2][2] = 999;
-    // f[1] = [ 42, 1337, 876 ];
-    // print(f);
-
-    // let h = [f[0], f[1], f[2], [843, 43], [321, 32]];
-    // print(h);
+    let a = true && false;
+    // let b = true || false;
+    print(a);
+    // print(b);
 }
