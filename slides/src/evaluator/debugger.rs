@@ -75,6 +75,9 @@ pub fn create_session(state: &mut EvaluatorState) {
                     }
                     Command::Registers => print_registers(&state.registers, &state.debugger_state.register_names),
                     Command::Pointer(address) => read_pointer(state, *address),
+                    Command::IndirectPointer(address) => read_indirect_pointer(state, *address),
+                    Command::Register(register, offset) => read_pointer(state, state.registers[*register].value + *offset),
+                    Command::IndirectRegister(register, offset) => read_indirect_pointer(state, state.registers[*register].value + *offset),
                     Command::Repeat => unreachable!(),
                     Command::RenameRegister(register, name) => {
                         state.debugger_state.register_names.resize_with(*register + 1, Default::default);
@@ -105,8 +108,25 @@ fn print_registers(registers: &[FlaggedWord], register_names: &[Option<String>])
     }
 }
 
-fn read_pointer(state: &EvaluatorState, address: usize) {
-    let value = state.read_pointer(address as _);
+fn read_indirect_pointer(state: &EvaluatorState, address: u64) {
+    let value = state.read_pointer(address);
+    let ptr = if value.is_pointer() {
+        value.unwrap_pointer()
+    } else {
+        println!("{} is no pointer", value.unwrap_value());
+        return;
+    };
+    print!("{:x}: ", ptr);
+    let value = state.read_pointer(ptr);
+    if value.is_pointer() {
+        println!("#{:x}", value.unwrap_pointer());
+    } else {
+        println!("{}", value.unwrap_value());
+    }
+}
+
+fn read_pointer(state: &EvaluatorState, address: u64) {
+    let value = state.read_pointer(address);
     if value.is_pointer() {
         println!("#{:x}", value.unwrap_pointer());
     } else {
@@ -145,7 +165,10 @@ enum Command {
     Skip,
     Stack,
     Registers,
-    Pointer(usize),
+    Pointer(u64),
+    IndirectPointer(u64),
+    Register(usize, u64),
+    IndirectRegister(usize, u64),
     Replace(u64),
     RenameRegister(usize, String),
 }
@@ -157,35 +180,78 @@ impl Default for Command {
 }
 
 fn parse_command(input: &str) -> Option<Command> {
+    if input.starts_with("ptr") {
+        parse_ptr_command(input)
+    } else {
+        match input.split(' ').collect::<Vec<_>>()[..] {
+            ["heap", arg] => {
+                let ptr = if let Some(arg) = arg.strip_prefix("0x") {
+                    u64::from_str_radix(arg, 16).ok()?
+                } else {
+                    arg.parse().ok()?
+                };
+                Some(Command::Pointer(ptr | memory::HEAP_POINTER))
+            }
+            ["replace", arg] => {
+                if let Some(arg) = arg.strip_prefix("0x") {
+                    Some(Command::Replace(u64::from_str_radix(arg, 16).ok()?))
+                } else {
+                    Some(Command::Replace(arg.parse().ok()?))
+                }
+            }
+            ["stack"] => Some(Command::Stack),
+            ["registers"] => Some(Command::Registers),
+            ["rename", register, name] => {
+                if let Some(register) = register.strip_prefix("r#") {
+                    let register = register.parse().ok()?;
+                    Some(Command::RenameRegister(register, name.into()))
+                } else {
+                    None
+                }
+            }
+            ["q" | "quit"] => Some(Command::Quit),
+            ["n" | "next"] => Some(Command::NextInstruction),
+            ["s" | "skip"] => Some(Command::Skip),
+            [""] => Some(Command::Repeat),
+            _ => None,
+        }
+    }
+}
+
+fn parse_ptr_command(input: &str) -> Option<Command> {
     match input.split(' ').collect::<Vec<_>>()[..] {
         ["ptr", arg] => {
-            if let Some(arg) = arg.strip_prefix("0x") {
-                Some(Command::Pointer(usize::from_str_radix(arg, 16).ok()?))
+            if let Some(reg) = arg.strip_prefix("r#") {
+                Some(Command::Register(reg.parse().ok()?, 0))
+            } else if let Some(arg) = arg.strip_prefix("0x") {
+                Some(Command::Pointer(u64::from_str_radix(arg, 16).ok()?))
             } else {
                 Some(Command::Pointer(arg.parse().ok()?))
             }
         }
-        ["replace", arg] => {
-            if let Some(arg) = arg.strip_prefix("0x") {
-                Some(Command::Replace(u64::from_str_radix(arg, 16).ok()?))
-            } else {
-                Some(Command::Replace(arg.parse().ok()?))
-            }
-        }
-        ["stack"] => Some(Command::Stack),
-        ["registers"] => Some(Command::Registers),
-        ["rename", register, name] => {
-            if let Some(register) = register.strip_prefix("r#") {
-                let register = register.parse().ok()?;
-                Some(Command::RenameRegister(register, name.into()))
+        ["ptr", reg, "+", offset] => {
+            if let Some(reg) = reg.strip_prefix("r#") {
+                Some(Command::Register(reg.parse().ok()?, offset.parse().ok()?))
             } else {
                 None
             }
         }
-        ["q" | "quit"] => Some(Command::Quit),
-        ["n" | "next"] => Some(Command::NextInstruction),
-        ["s" | "skip"] => Some(Command::Skip),
-        [""] => Some(Command::Repeat),
+        ["ptrptr", arg] => {
+            if let Some(reg) = arg.strip_prefix("r#") {
+                Some(Command::IndirectRegister(reg.parse().ok()?, 0))
+            } else if let Some(arg) = arg.strip_prefix("0x") {
+                Some(Command::IndirectPointer(u64::from_str_radix(arg, 16).ok()?))
+            } else {
+                Some(Command::IndirectPointer(arg.parse().ok()?))
+            }
+        }
+        ["ptrptr", reg, "+", offset] => {
+            if let Some(reg) = reg.strip_prefix("r#") {
+                Some(Command::IndirectRegister(reg.parse().ok()?, offset.parse().ok()?))
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
