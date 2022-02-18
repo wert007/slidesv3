@@ -943,7 +943,7 @@ fn print_variable_table(variable_table: &[BoundVariableName]) {
     println!();
 }
 
-fn _print_constant_table(constant_table: &[BoundConstant]) {
+fn print_constant_table(constant_table: &[BoundConstant]) {
     let mut constant_table: Vec<_> = constant_table.iter().enumerate().collect();
     constant_table.sort_unstable_by_key(|f| f.0);
     for (index, constant) in constant_table {
@@ -1159,8 +1159,11 @@ fn bind<'a>(
     }
     if debug_flags.print_struct_table {
         for (id, entry) in binder.struct_table.iter().enumerate() {
-            println!("  {}: {:#?}", id, entry);
+            println!("  {}: {}", id, entry.name());
         }
+    }
+    if debug_flags.print_constant_table {
+        print_constant_table(&binder.constants);
     }
 
     let mut type_names = binder

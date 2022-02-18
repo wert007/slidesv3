@@ -22,6 +22,9 @@ args:
     - print-bound-variable-table:
         long: dbvt
         help: Prints the variable names and the registers, to which they assign
+    - print-bound-constant-table:
+        long: dbct
+        help: Prints the constant names and their values
     - print-bound-struct-table:
         long: dbst
         help: Prints the struct names and the type indices, to which they belong

@@ -14,6 +14,7 @@ fn main() -> Result<(), std::io::Error> {
         print_instructions_and_labels: matches.is_present("print-instructions-and-labels"),
         print_tokens: matches.is_present("print-tokens"),
         print_variable_table: matches.is_present("print-bound-variable-table"),
+        print_constant_table: matches.is_present("print-bound-constant-table"),
         print_struct_table: matches.is_present("print-bound-struct-table"),
         print_bound_program: matches.is_present("print-bound-program"),
         print_labels: matches.is_present("print-labels"),
