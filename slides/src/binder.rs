@@ -606,6 +606,7 @@ impl<'a> BindingState<'a, '_> {
 
         assert!(self.struct_table[struct_id].is_empty());
         self.struct_table[struct_id] = maybe_generic_struct.to_owned().into();
+        self.struct_table[struct_id].set_name(name.to_owned());
 
         Some(id)
     }
