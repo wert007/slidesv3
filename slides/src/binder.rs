@@ -2279,7 +2279,6 @@ fn bind_binary_insertion<'a>(
                 }
                 BoundBinaryOperator::LogicalAnd => BoundNode::logical_and(span, lhs, rhs),
                 BoundBinaryOperator::LogicalOr => BoundNode::logical_or(span, lhs, rhs),
-                // TODO: Use also $equals function for not equals
                 BoundBinaryOperator::Equals => {
                     let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
                     if let Type::Struct(struct_type) = type_ {
@@ -2293,6 +2292,33 @@ fn bind_binary_insertion<'a>(
                                 base,
                                 vec![lhs, rhs],
                                 false,
+                                Type::Boolean,
+                            )
+                        } else {
+                            BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                        }
+                    } else {
+                        BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                    }
+                }
+                BoundBinaryOperator::NotEquals => {
+                    let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
+                    if let Type::Struct(struct_type) = type_ {
+                        if let Some(equals_function) = struct_type.function_table.equals_function {
+                            let base = BoundNode::label_reference(
+                                equals_function.function_label as usize,
+                                Type::function(equals_function.function_type),
+                            );
+                            BoundNode::unary(
+                                span,
+                                BoundUnaryOperator::LogicalNegation,
+                                BoundNode::function_call(
+                                    span,
+                                    base,
+                                    vec![lhs, rhs],
+                                    false,
+                                    Type::Boolean,
+                                ),
                                 Type::Boolean,
                             )
                         } else {
