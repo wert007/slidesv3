@@ -122,6 +122,17 @@ impl BoundNode {
         }
     }
 
+    pub fn logical_and(span: TextSpan, lhs: BoundNode, rhs: BoundNode) -> Self {
+        let false_span = lhs.span;
+        Self::if_expression(
+            span,
+            lhs,
+            rhs,
+            Some(Self::literal(false_span, Value::Boolean(false))),
+            Type::Boolean,
+        )
+    }
+
     pub fn unary(
         span: TextSpan,
         operator_token: BoundUnaryOperator,

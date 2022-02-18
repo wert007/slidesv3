@@ -2248,12 +2248,8 @@ fn bind_binary_insertion<'a>(
                         .map(|c| c.function_label);
                     BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
                 }
-                BoundBinaryOperator::LogicalAnd => {
-                    todo!()
-                }
-                _ => {
-                    BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
-                }
+                BoundBinaryOperator::LogicalAnd => BoundNode::logical_and(span, lhs, rhs),
+                _ => BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result),
             }
         }
         None => BoundNode::error(span),
@@ -2337,11 +2333,9 @@ fn bind_binary_operator<'a, 'b>(
             result,
             Type::Boolean,
         )),
-        (
-            Type::Boolean,
-            BoundBinaryOperator::LogicalAnd,
-            Type::Boolean,
-        ) => Some(BoundBinary::same_output(result, Type::Boolean)),
+        (Type::Boolean, BoundBinaryOperator::LogicalAnd, Type::Boolean) => {
+            Some(BoundBinary::same_output(result, Type::Boolean))
+        }
         (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(
             // Currently a call to to$string will be emitted. And for that call
             // both sides need to be of type any. There is an optimization here,
