@@ -163,16 +163,16 @@ impl SyntaxTokenKind {
         match self {
             Self::Star | Self::Slash => 8,
             Self::Plus | Self::Minus => 7,
-            Self::AmpersandAmpersand => 6,
-            Self::PipePipe => 5,
-            Self::QuestionMarkQuestionMark => 4,
-            Self::PeriodPeriod => 3,
+            Self::QuestionMarkQuestionMark => 6,
+            Self::PeriodPeriod => 5,
             Self::EqualsEquals
             | Self::BangEquals
             | Self::LessThan
             | Self::LessThanEquals
             | Self::GreaterThan
-            | Self::GreaterThanEquals => 2,
+            | Self::GreaterThanEquals => 4,
+            Self::AmpersandAmpersand => 3,
+            Self::PipePipe => 2,
             Self::Equals => 1,
             _ => 0,
         }
