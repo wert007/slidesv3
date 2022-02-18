@@ -195,16 +195,10 @@ pub fn convert<'a>(
 
     let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.print_instructions() {
-        crate::debug::print_instructions_with_source_code(
-            &instructions,
-            source_text,
-        );
+        crate::debug::print_instructions_with_source_code(&instructions, source_text);
     }
     if debug_flags.output_instructions_to_sldasm {
-        crate::debug::output_instructions_with_source_code_to_sldasm(
-            &instructions,
-            source_text,
-        );
+        crate::debug::output_instructions_with_source_code_to_sldasm(&instructions, source_text);
     }
     if debug_flags.print_static_memory_as_string {
         memory::static_memory::print_static_memory_as_string(&converter.static_memory);
@@ -700,7 +694,7 @@ fn convert_system_call(
                 | SystemCallKind::ToString
                 | SystemCallKind::ArrayLength
                 | SystemCallKind::DebugHeapDump => 1,
-                | SystemCallKind::RuntimeError => 1,
+                SystemCallKind::RuntimeError => 1,
                 SystemCallKind::Reallocate => 2,
                 SystemCallKind::Break => unreachable!(),
             };
