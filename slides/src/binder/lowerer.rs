@@ -428,8 +428,14 @@ fn flatten_if_statement(
     } else {
         (end_label.clone(), end_label_ref.clone())
     };
+    let condition_span = if_statement.condition.span;
+    let condition_type = if_statement.condition.type_.clone();
     result.push(BoundNode::jump_if_false(
-        *if_statement.condition,
+        BoundNode::block_expression(
+            condition_span,
+            flatten_node(*if_statement.condition, flattener),
+            condition_type,
+        ),
         else_label_ref,
     ));
     result.append(&mut flatten_node(*if_statement.body, flattener));
