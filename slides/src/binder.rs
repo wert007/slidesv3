@@ -2236,18 +2236,24 @@ fn bind_binary_insertion<'a>(
                     bind_conversion(rhs, &bound_binary.rhs, binder),
                 )
             };
-            if bound_binary.op == BoundBinaryOperator::Range {
-                let base_type = binder
-                    .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
-                    .unwrap();
-                let function = base_type
-                    .function_table
-                    .constructor_function
-                    .as_ref()
-                    .map(|c| c.function_label);
-                BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
-            } else {
-                BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+            match bound_binary.op {
+                BoundBinaryOperator::Range => {
+                    let base_type = binder
+                        .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
+                        .unwrap();
+                    let function = base_type
+                        .function_table
+                        .constructor_function
+                        .as_ref()
+                        .map(|c| c.function_label);
+                    BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
+                }
+                BoundBinaryOperator::LogicalAnd => {
+                    todo!()
+                }
+                _ => {
+                    BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                }
             }
         }
         None => BoundNode::error(span),
@@ -2274,6 +2280,7 @@ fn bind_binary_operator<'a, 'b>(
         SyntaxTokenKind::GreaterThanEquals => BoundBinaryOperator::GreaterThanEquals,
         SyntaxTokenKind::QuestionMarkQuestionMark => BoundBinaryOperator::NoneableOrValue,
         SyntaxTokenKind::PeriodPeriod => BoundBinaryOperator::Range,
+        SyntaxTokenKind::AmpersandAmpersand => BoundBinaryOperator::LogicalAnd,
         _ => unreachable!(),
     };
     match (&lhs.type_, result, &rhs.type_) {
@@ -2330,6 +2337,11 @@ fn bind_binary_operator<'a, 'b>(
             result,
             Type::Boolean,
         )),
+        (
+            Type::Boolean,
+            BoundBinaryOperator::LogicalAnd,
+            Type::Boolean,
+        ) => Some(BoundBinary::same_output(result, Type::Boolean)),
         (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(
             // Currently a call to to$string will be emitted. And for that call
             // both sides need to be of type any. There is an optimization here,
