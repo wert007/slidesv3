@@ -44,8 +44,8 @@ use self::{
     bound_nodes::BoundNode,
     operators::BoundBinaryOperator,
     symbols::{
-        FunctionSymbol, GenericFunction, Library, StructFieldSymbol,
-        StructFunctionTable, MaybeGenericStructSymbol, StructSymbol, GenericStructSymbol,
+        FunctionSymbol, GenericFunction, GenericStructSymbol, Library, MaybeGenericStructSymbol,
+        StructFieldSymbol, StructFunctionTable, StructSymbol,
     },
     typing::{FunctionType, StructType, SystemCallKind},
 };
@@ -212,7 +212,9 @@ impl<'a> BoundMaybeGenericStructSymbol<'a> {
         match self {
             BoundMaybeGenericStructSymbol::Struct(it) => it.name = name,
             BoundMaybeGenericStructSymbol::GenericStruct(it) => it.struct_type.name = name,
-            BoundMaybeGenericStructSymbol::Empty => unreachable!("Tried setting name of empty slot to {}", name),
+            BoundMaybeGenericStructSymbol::Empty => {
+                unreachable!("Tried setting name of empty slot to {}", name)
+            }
         }
     }
 }
@@ -233,7 +235,9 @@ impl From<MaybeGenericStructSymbol> for BoundMaybeGenericStructSymbol<'_> {
     fn from(value: MaybeGenericStructSymbol) -> Self {
         match value {
             MaybeGenericStructSymbol::Struct(it) => BoundStructSymbol::from(it).into(),
-            MaybeGenericStructSymbol::GenericStruct(it) => BoundGenericStructSymbol::from(it).into(),
+            MaybeGenericStructSymbol::GenericStruct(it) => {
+                BoundGenericStructSymbol::from(it).into()
+            }
         }
     }
 }
@@ -532,8 +536,7 @@ impl<'a> BindingState<'a, '_> {
         };
         let struct_id = id as usize - type_table().len();
         while struct_id >= self.struct_table.len() {
-            self.struct_table
-                .push(BoundMaybeGenericStructSymbol::Empty);
+            self.struct_table.push(BoundMaybeGenericStructSymbol::Empty);
         }
         assert!(self.struct_table[struct_id].is_empty());
         self.struct_table[struct_id] = bound_struct_type.into();
@@ -571,7 +574,11 @@ impl<'a> BindingState<'a, '_> {
         id
     }
 
-    pub fn register_maybe_generic_struct_as(&mut self, name: &str, maybe_generic_struct: &MaybeGenericStructSymbol) -> Option<u64> {
+    pub fn register_maybe_generic_struct_as(
+        &mut self,
+        name: &str,
+        maybe_generic_struct: &MaybeGenericStructSymbol,
+    ) -> Option<u64> {
         let id = self.register_generated_struct_name(name.to_owned())?;
         let fields = maybe_generic_struct.fields().to_vec();
         let function_table = maybe_generic_struct.function_table().clone();
@@ -806,17 +813,18 @@ impl<'a> BindingState<'a, '_> {
         self.struct_table
             .get(index)
             .filter(|e| !e.is_empty())
-            .map(|e| e
-                .as_struct()
-                .or(e
-                    .as_generic_struct()
-                    .map(|e| &e.struct_type)))
+            .map(|e| {
+                e.as_struct()
+                    .or(e.as_generic_struct().map(|e| &e.struct_type))
+            })
             .flatten()
     }
 
     fn get_generic_struct_type_by_id(&self, id: u64) -> Option<&BoundGenericStructSymbol<'a>> {
         self.struct_table
-            .get(id as usize - type_table().len()).map(|e| e.as_generic_struct()).flatten()
+            .get(id as usize - type_table().len())
+            .map(|e| e.as_generic_struct())
+            .flatten()
     }
 
     fn get_generic_struct_type_by_id_mut(
@@ -824,7 +832,9 @@ impl<'a> BindingState<'a, '_> {
         id: u64,
     ) -> Option<&mut BoundGenericStructSymbol<'a>> {
         self.struct_table
-            .get_mut(id as usize - type_table().len()).map(|e| e.as_generic_struct_mut()).flatten()
+            .get_mut(id as usize - type_table().len())
+            .map(|e| e.as_generic_struct_mut())
+            .flatten()
     }
 
     fn get_struct_by_id(&self, id: u64) -> Option<StructType> {
@@ -1265,7 +1275,10 @@ fn default_statements(binder: &mut BindingState) {
     binder.register_constant("heapdump", Value::SystemCall(SystemCallKind::DebugHeapDump));
     binder.register_constant("break", Value::SystemCall(SystemCallKind::Break));
     binder.register_constant("reallocate", Value::SystemCall(SystemCallKind::Reallocate));
-    binder.register_constant("runtimeError", Value::SystemCall(SystemCallKind::RuntimeError));
+    binder.register_constant(
+        "runtimeError",
+        Value::SystemCall(SystemCallKind::RuntimeError),
+    );
 }
 
 fn std_imports(binder: &mut BindingState) {
@@ -1744,7 +1757,8 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
     if !type_.brackets.is_empty() {
         let array_base_type = binder.look_up_std_struct_id(StdTypeKind::Array);
         for _ in &type_.brackets {
-            let (new_type, _) = bind_generic_struct_type_for_type(array_base_type, &result, None, binder);
+            let (new_type, _) =
+                bind_generic_struct_type_for_type(array_base_type, &result, None, binder);
             result = Type::Struct(Box::new(new_type));
         }
     }
@@ -2647,10 +2661,12 @@ fn bind_field_access<'a, 'b>(
                 let type_ = Type::closure(*function_type.clone());
                 let variable = binder.look_up_variable_or_constant_by_name(&function_name);
                 match variable.kind {
-                    VariableOrConstantKind::None => unreachable!(
-                        "The binder missed a function on a struct somehow ({})",
-                        function_name
-                    ),
+                    VariableOrConstantKind::None => {
+                        unreachable!(
+                            "The binder missed a function on a struct somehow ({})",
+                            function_name
+                        )
+                    }
                     VariableOrConstantKind::Variable(variable_id) => {
                         BoundNode::closure(span, vec![base], variable_id, type_)
                     }
@@ -2953,14 +2969,14 @@ fn bind_generic_function_for_type(
 ) -> usize {
     let mut body = type_replacer::replace_generic_type_with(generic_function.body.clone(), type_);
     let mut labels = std::collections::HashMap::new();
-    body.for_each_child_mut(&mut |child : &mut BoundNode| {
+    body.for_each_child_mut(&mut |child: &mut BoundNode| {
         // child.span.set_is_foreign(true);
         match &mut child.kind {
             BoundNodeKind::Label(old_label) => {
                 let new_label = binder.generate_label();
                 labels.insert(*old_label, new_label);
                 *old_label = new_label;
-            },
+            }
             BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
                 *old_label = labels[old_label];
             }
@@ -2969,7 +2985,7 @@ fn bind_generic_function_for_type(
     });
     // Needs to be executed a second time, since we might have missed some
     // labels before.
-    body.for_each_child_mut(&mut |child : &mut BoundNode| {
+    body.for_each_child_mut(&mut |child: &mut BoundNode| {
         // child.span.set_is_foreign(true);
         match &mut child.kind {
             BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
