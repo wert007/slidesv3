@@ -289,6 +289,7 @@ pub struct StructFunctionTable {
     pub get_function: Option<FunctionSymbol>,
     pub set_function: Option<FunctionSymbol>,
     pub element_count_function: Option<FunctionSymbol>,
+    pub equals_function: Option<FunctionSymbol>,
     pub label_relocation: Vec<(u64, u64)>,
 }
 
@@ -300,6 +301,7 @@ impl StructFunctionTable {
             StructFunctionKind::Get => self.get_function = Some(function),
             StructFunctionKind::Set => self.set_function = Some(function),
             StructFunctionKind::ElementCount => self.element_count_function = Some(function),
+            StructFunctionKind::Equals => self.equals_function = Some(function),
         }
     }
 
@@ -310,6 +312,7 @@ impl StructFunctionTable {
             .chain(self.get_function.iter_mut())
             .chain(self.set_function.iter_mut())
             .chain(self.element_count_function.iter_mut())
+            .chain(self.equals_function.iter_mut())
     }
 
     fn relocate_labels(&mut self, label_offset: usize) {
@@ -342,6 +345,7 @@ pub enum StructFunctionKind {
     Get,
     Set,
     ElementCount,
+    Equals,
 }
 
 impl<'a> TryFrom<&'a str> for StructFunctionKind {
@@ -354,6 +358,7 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
             "$get" => Ok(Self::Get),
             "$set" => Ok(Self::Set),
             "$elementCount" => Ok(Self::ElementCount),
+            "$equals" => Ok(Self::Equals),
             _ => Err(value),
         }
     }

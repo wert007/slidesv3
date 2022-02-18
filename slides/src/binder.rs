@@ -1241,7 +1241,8 @@ fn bind_function_declaration_body<'a, 'b>(
             StructFunctionKind::ToString
             | StructFunctionKind::Get
             | StructFunctionKind::Set
-            | StructFunctionKind::ElementCount,
+            | StructFunctionKind::ElementCount
+            | StructFunctionKind::Equals,
         )
         | None => {}
     }
@@ -1590,6 +1591,27 @@ fn type_check_struct_function_kind(
                     span,
                     &function_type.return_type,
                     &Type::Integer,
+                );
+            }
+        }
+        // FIXME: Make it possible to actually check, that the parameter type is
+        // the same type as the struct itself.
+        StructFunctionKind::Equals => {
+            if function_type.parameter_types.len() != 1 {
+                binder.diagnostic_bag.report_unexpected_parameter_count(
+                    span,
+                    function_type.parameter_types.len(),
+                    1,
+                );
+            }
+            if !function_type
+                .return_type
+                .can_be_converted_to(&Type::Boolean)
+            {
+                binder.diagnostic_bag.report_cannot_convert(
+                    span,
+                    &function_type.return_type,
+                    &Type::Boolean,
                 );
             }
         }
