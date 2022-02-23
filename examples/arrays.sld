@@ -55,11 +55,10 @@ func main() {
     let h = [a, c, f[0], f[1], f[2], [843, 43], [321, 32]];
     print(h);
 
-    // let list = new List<int>();
-    // list.add(1);
-    // list.add([1, 2, 3]);
+    let list = new List([1, 2]);
+    list.add(3);
+    // list.add([4, 5, 6]);
+    print(list);
     // list.concat(list);
     // let length = list.length();
-    // let list2 = new List([1, 2, 3, 4]);
-    // let list3 = new List(list2);
 }

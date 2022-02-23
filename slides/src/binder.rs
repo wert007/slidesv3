@@ -3059,33 +3059,35 @@ fn bind_generic_function_for_type(
     type_: &Type,
     binder: &mut BindingState,
 ) -> usize {
+    // TODO: Add new stage to compiler
+    // let body = bind_node(generic_function.body, binder);
     let mut body = type_replacer::replace_generic_type_with(generic_function.body.clone(), type_);
-    let mut labels = std::collections::HashMap::new();
-    body.for_each_child_mut(&mut |child: &mut BoundNode| {
-        // child.span.set_is_foreign(true);
-        match &mut child.kind {
-            BoundNodeKind::Label(old_label) => {
-                let new_label = binder.generate_label();
-                labels.insert(*old_label, new_label);
-                *old_label = new_label;
-            }
-            BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
-                *old_label = labels[old_label];
-            }
-            _ => {}
-        }
-    });
-    // Needs to be executed a second time, since we might have missed some
-    // labels before.
-    body.for_each_child_mut(&mut |child: &mut BoundNode| {
-        // child.span.set_is_foreign(true);
-        match &mut child.kind {
-            BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
-                *old_label = labels[old_label];
-            }
-            _ => {}
-        }
-    });
+    // let mut labels = std::collections::HashMap::new();
+    // body.for_each_child_mut(&mut |child: &mut BoundNode| {
+    //     // child.span.set_is_foreign(true);
+    //     match &mut child.kind {
+    //         BoundNodeKind::Label(old_label) => {
+    //             let new_label = binder.generate_label();
+    //             labels.insert(*old_label, new_label);
+    //             *old_label = new_label;
+    //         }
+    //         BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
+    //             *old_label = labels[old_label];
+    //         }
+    //         _ => {}
+    //     }
+    // });
+    // // Needs to be executed a second time, since we might have missed some
+    // // labels before.
+    // body.for_each_child_mut(&mut |child: &mut BoundNode| {
+    //     // child.span.set_is_foreign(true);
+    //     match &mut child.kind {
+    //         BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
+    //             *old_label = labels[old_label];
+    //         }
+    //         _ => {}
+    //     }
+    // });
     assert!(!matches!(body.kind, BoundNodeKind::FunctionDeclaration(_)));
     let label = binder.generate_label();
     // FIXME: Do NOT use just a stupid range here, if parameters
