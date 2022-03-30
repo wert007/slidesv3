@@ -18,6 +18,9 @@ struct Rect {
 }
 
 struct Cube {
+    // TODO: Arrays of structs do not work, since there is two representations
+    // of structs and each generates a different version of the generic array
+    // struct.
     sides: Rect[];
 }
 
