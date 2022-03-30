@@ -1130,6 +1130,7 @@ fn bind<'a>(
             function_name: node.function_name.into_owned(),
             function_type: node.function_type,
             body,
+            labels: vec![],
         };
         if let Some(base_struct) = node.base_struct {
             binder
@@ -2124,7 +2125,7 @@ fn bind_generic_struct_type_for_type(
     constructor_label: Option<usize>,
     binder: &mut BindingState,
 ) -> (StructType, Option<usize>) {
-    let generic_struct = binder
+    let mut generic_struct = binder
         .get_generic_struct_type_by_id(struct_id)
         .unwrap()
         .clone();
@@ -2149,7 +2150,7 @@ fn bind_generic_struct_type_for_type(
             .unwrap();
         let mut fields = generic_struct.struct_type.fields.clone();
         let mut function_labels = Vec::with_capacity(generic_struct.functions.len());
-        for function in &generic_struct.functions {
+        for function in generic_struct.functions.iter_mut() {
             let old_label = function.function_label;
             let new_label = bind_generic_function_for_type(function, true, type_, binder) as u64;
             if Some(old_label as usize) == constructor_label {
@@ -2973,12 +2974,12 @@ fn bind_arguments_for_generic_function<'a, 'b>(
         let parameter_type = if matches!(parameter_type, Type::GenericType) {
             if binder.generic_type.is_none() {
                 binder.generic_type = Some(argument.type_.clone());
-                let generic_function = binder
+                let mut generic_function = binder
                     .find_generic_function_by_label(label)
                     .unwrap()
                     .clone();
                 changed_label = bind_generic_function_for_type(
-                    &generic_function,
+                    &mut generic_function,
                     function_type.this_type.is_some(),
                     &argument.type_,
                     binder,
@@ -3054,7 +3055,7 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
 
 // TODO: Move this to after the binding.
 fn bind_generic_function_for_type(
-    generic_function: &GenericFunction,
+    generic_function: &mut GenericFunction,
     has_this_parameter: bool,
     type_: &Type,
     binder: &mut BindingState,
@@ -3062,34 +3063,35 @@ fn bind_generic_function_for_type(
     // TODO: Add new stage to compiler
     // let body = bind_node(generic_function.body, binder);
     let mut body = type_replacer::replace_generic_type_with(generic_function.body.clone(), type_);
-    // let mut labels = std::collections::HashMap::new();
-    // body.for_each_child_mut(&mut |child: &mut BoundNode| {
-    //     // child.span.set_is_foreign(true);
-    //     match &mut child.kind {
-    //         BoundNodeKind::Label(old_label) => {
-    //             let new_label = binder.generate_label();
-    //             labels.insert(*old_label, new_label);
-    //             *old_label = new_label;
-    //         }
-    //         BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
-    //             *old_label = labels[old_label];
-    //         }
-    //         _ => {}
-    //     }
-    // });
-    // // Needs to be executed a second time, since we might have missed some
-    // // labels before.
-    // body.for_each_child_mut(&mut |child: &mut BoundNode| {
-    //     // child.span.set_is_foreign(true);
-    //     match &mut child.kind {
-    //         BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
-    //             *old_label = labels[old_label];
-    //         }
-    //         _ => {}
-    //     }
-    // });
+    let mut labels = std::collections::HashMap::new();
+    body.for_each_child_mut(&mut |child: &mut BoundNode| {
+        // child.span.set_is_foreign(true);
+        match &mut child.kind {
+            BoundNodeKind::Label(old_label) => {
+                let new_label = binder.generate_label();
+                labels.insert(*old_label, new_label);
+                *old_label = new_label;
+            }
+            BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
+                *old_label = labels[old_label];
+            }
+            _ => {}
+        }
+    });
+    // Needs to be executed a second time, since we might have missed some
+    // labels before.
+    body.for_each_child_mut(&mut |child: &mut BoundNode| {
+        // child.span.set_is_foreign(true);
+        match &mut child.kind {
+            BoundNodeKind::LabelReference(old_label) if labels.contains_key(old_label) => {
+                *old_label = labels[old_label];
+            }
+            _ => {}
+        }
+    });
     assert!(!matches!(body.kind, BoundNodeKind::FunctionDeclaration(_)));
     let label = binder.generate_label();
+    generic_function.labels.push(label);
     // FIXME: Do NOT use just a stupid range here, if parameters
     // will ever not be the first register (like with local
     // functions or lambdas), then this will fail tragically!

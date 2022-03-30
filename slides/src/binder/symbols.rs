@@ -370,4 +370,5 @@ pub struct GenericFunction {
     pub function_name: String,
     pub function_type: FunctionType,
     pub body: BoundNode,
+    pub labels: Vec<usize>,
 }
