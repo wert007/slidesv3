@@ -956,7 +956,7 @@ fn convert_type_identifier(
                     span,
                 }
                 .into(),
-                None => Instruction::load_pointer(0).into(),
+                None => Instruction::load_pointer(0).span(span).into(),
             });
             result.push(
                 Instruction::load_immediate(struct_type.id)
