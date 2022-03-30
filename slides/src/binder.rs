@@ -2336,6 +2336,16 @@ fn bind_binary_insertion<'a>(
     }
 }
 
+fn call_to_string(lhs: BoundNode, binder: &mut BindingState) -> BoundNode {
+    if lhs.type_ == Type::String {
+        lhs
+    } else {
+        BoundNode::system_call(lhs.span, SystemCallKind::ToString, vec![
+            bind_conversion(lhs, &Type::Any, binder),
+            ], Type::String)
+    }
+}
+
 fn bind_binary_operator<'a, 'b>(
     span: TextSpan,
     lhs: &BoundNode,
