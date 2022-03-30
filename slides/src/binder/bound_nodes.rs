@@ -302,15 +302,24 @@ impl BoundNode {
     ///     i$index += 1;
     /// }
 
-    pub fn for_statement_iterator(
+    pub(super) fn for_statement<'a>(
         span: TextSpan,
+        variable_name: &'a str,
         index_variable: u64,
-        collection_variable: u64,
         variable: BoundNode,
         collection: BoundNode,
         body: BoundNode,
         function_table: StructFunctionTable,
+        binder: &mut super::BindingState<'a, '_>,
     ) -> Self {
+        let collection_variable = binder
+            .register_generated_variable(
+                format!("{}$collection", variable_name),
+                collection.type_.clone(),
+                true,
+            )
+            .unwrap();
+
         let while_condition = BoundNode::binary(
             span,
             BoundNode::variable(span, index_variable, Type::Integer),

@@ -3272,64 +3272,55 @@ fn bind_for_statement<'a, 'b>(
         }
         return BoundNode::error(span);
     };
-    let variable_type = struct_type
-        .as_ref()
-        .unwrap()
-        .function_table
+    let variable_type = struct_type.as_ref().unwrap().function_table
         .get_function
         .as_ref()
         .unwrap()
         .function_type
         .return_type
         .clone();
-    // TODO: Maybe move this into bound_nodes.rs
+    let variable_name = for_statement.variable.lexeme;
+    let variable_span = for_statement.variable.span();
     let variable =
-        binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
+        binder.register_variable(variable_name, variable_type.clone(), true);
     if variable.is_none() {
         binder.diagnostic_bag.report_cannot_declare_variable(
-            for_statement.variable.span(),
-            for_statement.variable.lexeme,
+            variable_span,
+            variable_name,
         );
         return BoundNode::error(span);
     }
     let variable = variable.unwrap();
-    // TODO: Maybe move this into bound_nodes.rs
-    let index_variable = match for_statement.optional_index_variable {
+    let variable = BoundNode::variable(span, variable, variable_type);
+    let index_variable = match for_statement.optional_index_variable.map(|i| i.lexeme) {
         Some(index_variable) => {
-            binder.register_variable(index_variable.lexeme, Type::Integer, true)
+            binder.register_variable(index_variable, Type::Integer, true)
         }
         None => binder.register_generated_variable(
-            format!("{}$index", for_statement.variable.lexeme),
+            format!("{}$index", variable_name),
             Type::Integer,
             true,
         ),
     };
     if index_variable.is_none() {
         binder.diagnostic_bag.report_cannot_declare_variable(
-            for_statement.variable.span(),
-            for_statement.variable.lexeme,
+            variable_span,
+            variable_name,
         );
         return BoundNode::error(span);
     }
     let index_variable = index_variable.unwrap();
-    // TODO: Maybe move this into bound_nodes.rs
-    let collection_variable = binder
-        .register_generated_variable(
-            format!("{}$collection", for_statement.variable.lexeme),
-            collection.type_.clone(),
-            true,
-        )
-        .unwrap();
+
     let body = bind_node(*for_statement.body, binder);
-    let variable = BoundNode::variable(span, variable, variable_type);
-    let result = BoundNode::for_statement_iterator(
+    let result = BoundNode::for_statement(
         span,
+        variable_name,
         index_variable,
-        collection_variable,
         variable,
         collection,
         body,
         struct_type.unwrap().function_table,
+        binder,
     );
     binder.delete_variables_until(variable_count);
 
