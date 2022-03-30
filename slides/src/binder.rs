@@ -3252,37 +3252,26 @@ fn bind_for_statement<'a, 'b>(
 ) -> BoundNode {
     let variable_count = binder.variable_table.len();
     let collection = bind_node(*for_statement.collection, binder);
-    let (is_iterable, struct_type) = if let Type::Struct(struct_type) =
+    let struct_type = if let Type::Struct(struct_type) =
         binder.convert_struct_reference_to_struct(collection.type_.clone())
     {
         let is_iterable = struct_type.function_table.get_function.is_some()
             && struct_type.function_table.element_count_function.is_some();
-        (
-            is_iterable,
-            if is_iterable {
-                Some(*struct_type)
-            } else {
-                None
-            },
-        )
+        if !is_iterable {
+            binder
+                .diagnostic_bag
+                .report_cannot_iterate(collection.span, &collection.type_);
+            return BoundNode::error(span);
+        }
+        Some(*struct_type)
     } else {
-        // TODO: This should actually be already unreachable, since arrays are
-        // already implemented as generic struct.
-        //
-        // unreachable!();
-        //
-        // So if the user tries this, we can just early return and report an error.
-        (false, None)
-    };
-    // This can be moved to the TODO above.
-    if !is_iterable {
         if collection.type_ != Type::Error {
             binder
                 .diagnostic_bag
                 .report_cannot_iterate(collection.span, &collection.type_);
         }
         return BoundNode::error(span);
-    }
+    };
     let variable_type = struct_type
         .as_ref()
         .unwrap()
