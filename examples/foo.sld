@@ -1,13 +1,21 @@
-struct A {
-    value: int;
+struct B {
+    values: A[];
+
+    func $toString() -> string {
+        return this.values + '';
+    }
 }
 
-// struct B {
-//     values: A[];
-// }
+struct A {
+    value: int;
+
+    func $toString() -> string {
+        return 'A(' + this.value + ')';
+    }
+}
 
 func main() {
-    // let b = new B([new A(1)]);
-    print('A' + 3);
+    let b = new B([new A(1)]);
+    print(b);
     // print('A(42) = ' + new A(42));
 }

@@ -82,6 +82,14 @@ impl Type {
         }
     }
 
+    pub fn as_struct_id(&self) -> Option<u64> {
+        match self {
+            Type::Struct(struct_type) => Some(struct_type.id),
+            Type::StructReference(id) => Some(*id),
+            _ => None,
+        }
+    }
+
     pub fn type_identifier_size_in_words(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),

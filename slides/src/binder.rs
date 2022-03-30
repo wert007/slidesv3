@@ -2130,7 +2130,11 @@ fn bind_generic_struct_type_for_type(
         .get_generic_struct_type_by_id(struct_id)
         .unwrap()
         .clone();
-    let struct_name = format!("{}<{}>", generic_struct.struct_type.name, type_);
+    let struct_name = if let Some(struct_id) = type_.as_struct_id() {
+        format!("{}<struct#{}>", generic_struct.struct_type.name, struct_id)
+    } else {
+        format!("{}<{}>", generic_struct.struct_type.name, type_)
+    };
     let mut changed_constructor_label = None;
 
     let id = if let Some(id) = binder.look_up_struct_id_by_name(&struct_name) {
