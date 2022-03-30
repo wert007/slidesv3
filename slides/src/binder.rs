@@ -3491,15 +3491,11 @@ fn bind_assignment<'a, 'b>(
             assert!(closure.arguments.is_empty());
             BoundNode::function_call(span, base, arguments, false, Type::Void)
         } else {
-            // TODO: Isn't lhs.type of type Closure? Why would we want to
-            // convert the expression to a closure? It does not make any sense
-            // to assign clousres to each other, since closures are just
-            // functions, with arguments already applied. They should be pretty
-            // immutable, tbh.
-            //
-            // Maybe use unreachable!() instead.
-            let expression = bind_conversion(expression, &lhs.type_, binder);
-            BoundNode::assignment(span, lhs, expression)
+            // TODO: This is untested and it is actually expected, that this
+            // will fail. The order of the arguments will probably be wrong..
+            unimplemented!("Found a closure in assignment, which could not be called directly!");
+            // let expression = bind_conversion(expression, &lhs.type_, binder);
+            // BoundNode::function_call(span, lhs, vec![expression], false, Type::Void)
         }
     } else {
         let expression = bind_conversion(expression, &lhs.type_, binder);
