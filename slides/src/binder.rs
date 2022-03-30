@@ -1,14 +1,13 @@
 pub mod bound_nodes;
+pub mod control_flow_analyzer;
 mod dependency_resolver;
+mod lowerer;
 pub mod operators;
 pub mod symbols;
 #[cfg(test)]
 mod tests;
 mod type_replacer;
 pub mod typing;
-
-pub mod control_flow_analyzer;
-mod lowerer;
 
 use std::{borrow::Cow, convert::TryFrom, path::Path};
 
@@ -3053,6 +3052,7 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
     (result, changed_label, struct_type.unwrap())
 }
 
+// TODO: Move this to after the binding.
 fn bind_generic_function_for_type(
     generic_function: &GenericFunction,
     has_this_parameter: bool,
@@ -3163,6 +3163,8 @@ fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> Bou
     }
 }
 
+// TODO: Premature optimization, which does not need to happen during binding!
+// It can happen later, in an optimization stage.
 fn call_to_string_on_noneable_struct<'a>(
     base: BoundNode,
     base_type: Type,
@@ -3191,6 +3193,7 @@ fn call_to_string_on_noneable_struct<'a>(
     )
 }
 
+// TODO: Premature optimization, which does not need to happen during binding!
 fn call_to_string_on_struct<'a>(
     base: BoundNode,
     struct_id: u64,
@@ -3363,8 +3366,15 @@ fn bind_for_statement<'a, 'b>(
             },
         )
     } else {
+        // TODO: This should actually be already unreachable, since arrays are
+        // already implemented as generic struct.
+        //
+        // unreachable!();
+        //
+        // So if the user tries this, we can just early return and report an error.
         (false, None)
     };
+    // This can be moved to the TODO above.
     if !is_iterable {
         if collection.type_ != Type::Error {
             binder
@@ -3373,8 +3383,6 @@ fn bind_for_statement<'a, 'b>(
         }
         return BoundNode::error(span);
     }
-    // collection.type_ is either an array or a range. So if it has no array
-    // base type it must be a range.
     let variable_type = struct_type
         .as_ref()
         .unwrap()
@@ -3385,6 +3393,7 @@ fn bind_for_statement<'a, 'b>(
         .function_type
         .return_type
         .clone();
+    // TODO: Maybe move this into bound_nodes.rs
     let variable =
         binder.register_variable(for_statement.variable.lexeme, variable_type.clone(), true);
     if variable.is_none() {
@@ -3395,6 +3404,7 @@ fn bind_for_statement<'a, 'b>(
         return BoundNode::error(span);
     }
     let variable = variable.unwrap();
+    // TODO: Maybe move this into bound_nodes.rs
     let index_variable = match for_statement.optional_index_variable {
         Some(index_variable) => {
             binder.register_variable(index_variable.lexeme, Type::Integer, true)
@@ -3413,6 +3423,7 @@ fn bind_for_statement<'a, 'b>(
         return BoundNode::error(span);
     }
     let index_variable = index_variable.unwrap();
+    // TODO: Maybe move this into bound_nodes.rs
     let collection_variable = binder
         .register_generated_variable(
             format!("{}$collection", for_statement.variable.lexeme),
@@ -3442,6 +3453,12 @@ fn bind_if_statement<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode {
     let condition = bind_node(*if_statement.condition, binder);
+    // NOTE: In a very far future, you could do part of this before the binder,
+    // by analyzing the syntax tree and marking all if conditions and their
+    // occurrences later in the then statements and else statements. Then you
+    // would not have to compare every bound node in a if statement with the
+    // condition. But this is a very far future, and will only be a performance
+    // improvement, I think.
     let (condition, safe_node) = bind_condition_conversion(condition, binder);
     let optional_index = if let SafeNodeInCondition::IfBody(node, safe_type) = safe_node.clone() {
         Some(binder.register_safe_node(node, safe_type))
@@ -3552,6 +3569,11 @@ fn bind_assignment<'a, 'b>(
         }
     }
     let expression = bind_node(*assignment.expression, binder);
+    // NOTE: Maybe this could be moved to another stage, since this is not
+    // directly checking types and variables, but deconstructing a closure and
+    // changing its argument order. On the other hand, we still need to check,
+    // that the closure takes the correct type of our expression, otherwise we
+    // could call functions with incorrect types.
     if let Type::Closure(closure) = &lhs.type_ {
         let function_type = &closure.base_function_type;
         if let BoundNodeKind::Closure(mut closure) = lhs.kind {
@@ -3580,6 +3602,13 @@ fn bind_assignment<'a, 'b>(
             assert!(closure.arguments.is_empty());
             BoundNode::function_call(span, base, arguments, false, Type::Void)
         } else {
+            // TODO: Isn't lhs.type of type Closure? Why would we want to
+            // convert the expression to a closure? It does not make any sense
+            // to assign clousres to each other, since closures are just
+            // functions, with arguments already applied. They should be pretty
+            // immutable, tbh.
+            //
+            // Maybe use unreachable!() instead.
             let expression = bind_conversion(expression, &lhs.type_, binder);
             BoundNode::assignment(span, lhs, expression)
         }
