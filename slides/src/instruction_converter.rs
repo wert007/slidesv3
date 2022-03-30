@@ -965,8 +965,16 @@ fn convert_type_identifier(
             );
             4
         }
-        Type::StructReference(_) => {
-            unimplemented!("TypeBoxing needs the struct table and a struct reference just does not have this information!");
+        Type::StructReference(id) => {
+            // This seems to be code which would never be executed, at the time
+            // being. But it is still an error and should still be investigated.
+            // But for the time being the breakpoint is good enough.
+            //
+            // unimplemented!("TypeBoxing needs the struct table and a struct reference just does not have this information!");
+            result.push(Instruction::load_pointer(0).span(span).into());
+            result.push(Instruction::load_immediate(id).span(span).into());
+            result.push(Instruction::breakpoint().span(span).into());
+            4
         }
         _ => 2,
     };
