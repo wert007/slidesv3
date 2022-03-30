@@ -892,6 +892,7 @@ impl<'a> BindingState<'a, '_> {
             | Type::Library(_)
             | Type::GenericType
             | Type::Struct(_)
+            | Type::TypedGenericStruct(_)
             | Type::Pointer
             | Type::SystemCall(_) => type_,
             Type::Noneable(base_type) => {
@@ -2783,6 +2784,7 @@ fn bind_field_access<'a, 'b>(
         Type::Error => base,
         Type::StructReference(id) => struct_handler(*id, base),
         Type::Struct(struct_type) => struct_handler(struct_type.id, base),
+        Type::TypedGenericStruct(typed_generic_struct) => struct_handler(typed_generic_struct.id, base),
         Type::Library(index) => {
             let library = &binder.libraries[*index];
             let function_name = field.lexeme;
@@ -2908,6 +2910,7 @@ fn bind_field_access_for_assignment<'a>(
         }
         Type::StructReference(id) => struct_handler(*id, base),
         Type::Struct(struct_type) => struct_handler(struct_type.id, base),
+        Type::TypedGenericStruct(typed_generic_struct) => struct_handler(typed_generic_struct.id, base),
     }
 }
 
@@ -3155,6 +3158,10 @@ fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> Bou
                 let base_type = *base_type.clone();
                 call_to_string_on_noneable_struct(base, base_type, id, binder)
             }
+            Type::TypedGenericStruct(typed_generic_struct) => {
+                let base_type = *base_type.clone();
+                call_to_string_on_noneable_struct(base, base_type, typed_generic_struct.id, binder)
+            }
         },
         Type::String => base,
         Type::Struct(struct_type) => {
@@ -3162,6 +3169,7 @@ fn call_to_string<'a>(base: BoundNode, binder: &mut BindingState<'a, '_>) -> Bou
             call_to_string_on_struct(base, id, binder)
         }
         &Type::StructReference(id) => call_to_string_on_struct(base, id, binder),
+        Type::TypedGenericStruct(typed_generic_struct) => call_to_string_on_struct(base, typed_generic_struct.id, binder),
     }
 }
 
@@ -3264,9 +3272,10 @@ fn bind_condition_conversion<'a>(
         | Type::Function(_)
         | Type::Closure(_)
         | Type::Struct(_)
+        | Type::StructReference(_)
+        | Type::TypedGenericStruct(_)
         | Type::Pointer
-        | Type::PointerOf(_)
-        | Type::StructReference(_) => (
+        | Type::PointerOf(_) => (
             bind_conversion(base, &Type::Boolean, binder),
             SafeNodeInCondition::None,
         ),

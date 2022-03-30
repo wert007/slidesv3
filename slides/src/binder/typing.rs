@@ -26,6 +26,7 @@ pub enum Type {
     Pointer,
     PointerOf(Box<Type>),
     GenericType,
+    TypedGenericStruct(Box<TypedGenericStructType>),
 }
 
 impl Type {
@@ -128,6 +129,7 @@ impl Type {
             }
             Type::Struct(_) => 1,
             Type::StructReference(_) => 1,
+            Type::TypedGenericStruct(_) => 1,
         }
     }
 
@@ -143,8 +145,9 @@ impl Type {
     pub const TYPE_IDENTIFIER_CLOSURE: u64 = 10;
     pub const TYPE_IDENTIFIER_STRUCT: u64 = 11;
     pub const TYPE_IDENTIFIER_STRUCT_REFERENCE: u64 = 12;
-    pub const TYPE_IDENTIFIER_POINTER: u64 = 13;
-    pub const TYPE_IDENTIFIER_POINTER_OF: u64 = 14;
+    pub const TYPE_IDENTIFIER_TYPED_GENERIC_STRUCT: u64 = 13;
+    pub const TYPE_IDENTIFIER_POINTER: u64 = 14;
+    pub const TYPE_IDENTIFIER_POINTER_OF: u64 = 15;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_PRINT: u64 =
         (1 + SystemCallKind::Print as u8 as u64) << 8;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING: u64 =
@@ -176,6 +179,7 @@ impl Type {
             Type::Closure(_) => Self::TYPE_IDENTIFIER_CLOSURE,
             Type::Struct(_) => Self::TYPE_IDENTIFIER_STRUCT,
             Type::StructReference(_) => Self::TYPE_IDENTIFIER_STRUCT_REFERENCE,
+            Type::TypedGenericStruct(_) => Self::TYPE_IDENTIFIER_TYPED_GENERIC_STRUCT,
             Type::Pointer => Self::TYPE_IDENTIFIER_POINTER,
             Type::PointerOf(_) => Self::TYPE_IDENTIFIER_POINTER_OF,
             Type::SystemCall(SystemCallKind::Print) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT,
@@ -241,6 +245,7 @@ impl Type {
             Type::None
             | Type::Struct(_)
             | Type::StructReference(_)
+            | Type::TypedGenericStruct(_)
             | Type::Function(_)
             | Type::Closure(_)
             | Type::Integer
@@ -268,9 +273,10 @@ impl Type {
             | Type::Function(_)
             | Type::Closure(_)
             | Type::Struct(_)
+            | Type::StructReference(_)
+            | Type::TypedGenericStruct(_)
             | Type::Pointer
-            | Type::PointerOf(_)
-            | Type::StructReference(_) => WORD_SIZE_IN_BYTES,
+            | Type::PointerOf(_) => WORD_SIZE_IN_BYTES,
         }
     }
 
@@ -293,9 +299,10 @@ impl Type {
             | Type::String
             | Type::Closure(_)
             | Type::Struct(_)
+            | Type::StructReference(_)
+            | Type::TypedGenericStruct(_)
             | Type::Pointer
-            | Type::PointerOf(_)
-            | Type::StructReference(_) => true,
+            | Type::PointerOf(_) => true,
         }
     }
 }
@@ -325,6 +332,9 @@ impl std::fmt::Display for Type {
             }
             Type::StructReference(struct_id) => {
                 write!(f, "struct#{}", struct_id)
+            }
+            Type::TypedGenericStruct(typed_generic_struct_type) => {
+                write!(f, "struct<{}> {}", typed_generic_struct_type.type_, typed_generic_struct_type.struct_type)
             }
             Type::Pointer => write!(f, "pointer"),
             Type::PointerOf(base) => write!(f, "&{}", base),
@@ -528,6 +538,14 @@ impl std::fmt::Display for StructType {
         }
         write!(f, "}}")
     }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct TypedGenericStructType {
+    pub id: u64,
+    pub type_: Type,
+    pub struct_type: StructType,
+    pub function_table: StructFunctionTable,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
