@@ -3315,16 +3315,23 @@ fn bind_for_statement<'a, 'b>(
     }
     let index_variable = index_variable.unwrap();
 
+    let collection_variable = binder
+        .register_generated_variable(
+            format!("{}$collection", variable_name),
+            collection.type_.clone(),
+            true,
+        )
+        .unwrap();
+
     let body = bind_node(*for_statement.body, binder);
     let result = BoundNode::for_statement(
         span,
-        variable_name,
         index_variable,
+        collection_variable,
         variable,
         collection,
         body,
         struct_type.unwrap().function_table,
-        binder,
     );
     binder.delete_variables_until(variable_count);
 
