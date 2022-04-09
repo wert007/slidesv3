@@ -370,7 +370,7 @@ impl BoundNode {
                             ),
                         ],
                         false,
-                        variable.type_.clone(),
+                        variable.type_,
                     ),
                 ),
                 // {
@@ -393,12 +393,7 @@ impl BoundNode {
         BoundNode::block_statement(
             span,
             vec![
-                BoundNode::variable_declaration(
-                    span,
-                    collection_variable,
-                    collection.clone(),
-                    None,
-                ), // let $collection = collection;
+                BoundNode::variable_declaration(span, collection_variable, collection, None), // let $collection = collection;
                 BoundNode::variable_declaration(
                     span,
                     index_variable,

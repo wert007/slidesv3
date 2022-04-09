@@ -23,7 +23,8 @@ fn main() -> Result<(), std::io::Error> {
         print_stack: matches.is_present("print-stack"),
         output_basic_blocks_to_dot: matches.is_present("output-basic-blocks-to-dot"),
         output_instructions_to_sldasm: matches.is_present("output-instructions-to-sldasm"),
-        output_instructions_and_labels_to_sldasm: matches.is_present("output-instructions-and-labels-to-sldasm"),
+        output_instructions_and_labels_to_sldasm: matches
+            .is_present("output-instructions-and-labels-to-sldasm"),
         run_program: !matches.is_present("no-run"),
         slow_mode: matches.is_present("slow"),
         use_debugger: matches.is_present("debugger"),

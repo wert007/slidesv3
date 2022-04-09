@@ -65,7 +65,13 @@ impl<'a> SyntaxNode<'a> {
         function_type: FunctionTypeNode<'a>,
         body: SyntaxNode<'a>,
     ) -> Self {
-        let span = TextSpan::bounds(optional_generic_keyword.as_ref().unwrap_or(&func_keyword).span(), body.span());
+        let span = TextSpan::bounds(
+            optional_generic_keyword
+                .as_ref()
+                .unwrap_or(&func_keyword)
+                .span(),
+            body.span(),
+        );
         Self {
             span,
             kind: SyntaxNodeKind::FunctionDeclaration(Box::new(FunctionDeclarationNodeKind {
@@ -85,7 +91,13 @@ impl<'a> SyntaxNode<'a> {
         identifier: SyntaxToken<'a>,
         body: StructBodyNode<'a>,
     ) -> Self {
-        let span = TextSpan::bounds(optional_generic_keyword.as_ref().unwrap_or(&struct_keyword).span(), body.span);
+        let span = TextSpan::bounds(
+            optional_generic_keyword
+                .as_ref()
+                .unwrap_or(&struct_keyword)
+                .span(),
+            body.span,
+        );
         Self {
             span,
             kind: SyntaxNodeKind::StructDeclaration(StructDeclarationNodeKind {
@@ -485,8 +497,14 @@ impl<'a> SyntaxNode<'a> {
 
     pub fn compilation_unit(statements: Vec<SyntaxNode<'a>>, eoi: SyntaxToken<'a>) -> Self {
         let span = TextSpan::bounds(
-            statements.first().map(|s|s.span()).unwrap_or(TextSpan::zero()),
-            statements.last().map(|s|s.span()).unwrap_or(TextSpan::zero()),
+            statements
+                .first()
+                .map(|s| s.span())
+                .unwrap_or_else(TextSpan::zero),
+            statements
+                .last()
+                .map(|s| s.span())
+                .unwrap_or_else(TextSpan::zero),
         );
         Self {
             kind: SyntaxNodeKind::CompilationUnit(CompilationUnitNodeKind { statements, eoi }),
@@ -710,7 +728,10 @@ impl<'a> TypeNode<'a> {
 
     pub fn span(&self) -> TextSpan {
         TextSpan::bounds(
-            self.optional_ampersand_token.as_ref().map(|t| t.span()).unwrap_or_else(|| self.type_name.span()),
+            self.optional_ampersand_token
+                .as_ref()
+                .map(|t| t.span())
+                .unwrap_or_else(|| self.type_name.span()),
             self.brackets.last().unwrap_or(&self.type_name).span(),
         )
     }

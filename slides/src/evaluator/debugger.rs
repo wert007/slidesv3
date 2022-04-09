@@ -34,15 +34,15 @@ pub fn create_session(state: &mut EvaluatorState) {
     }
     let current_instruction = state.instructions[state.pc];
     let reg_name = if current_instruction.arg < state.debugger_state.register_names.len() as u64 {
-        if let Some(it) = &state.debugger_state.register_names[current_instruction.arg as usize] {
-            Some(it.as_str())
-        } else {
-            None
-        }
+        state.debugger_state.register_names[current_instruction.arg as usize].as_deref()
     } else {
         None
     };
-    println!("{:5X}: {}", state.pc, crate::debug::instruction_to_string(current_instruction, reg_name));
+    println!(
+        "{:5X}: {}",
+        state.pc,
+        crate::debug::instruction_to_string(current_instruction, reg_name)
+    );
     let mut line = String::new();
     loop {
         std::io::stdin().read_line(&mut line).unwrap();
@@ -73,14 +73,23 @@ pub fn create_session(state: &mut EvaluatorState) {
                             .stack
                             .push_flagged_word(FlaggedWord::value(*new_value).flags(flags));
                     }
-                    Command::Registers => print_registers(&state.registers, &state.debugger_state.register_names),
+                    Command::Registers => {
+                        print_registers(&state.registers, &state.debugger_state.register_names)
+                    }
                     Command::Pointer(address) => read_pointer(state, *address),
                     Command::IndirectPointer(address) => read_indirect_pointer(state, *address),
-                    Command::Register(register, offset) => read_pointer(state, state.registers[*register].value + *offset),
-                    Command::IndirectRegister(register, offset) => read_indirect_pointer(state, state.registers[*register].value + *offset),
+                    Command::Register(register, offset) => {
+                        read_pointer(state, state.registers[*register].value + *offset)
+                    }
+                    Command::IndirectRegister(register, offset) => {
+                        read_indirect_pointer(state, state.registers[*register].value + *offset)
+                    }
                     Command::Repeat => unreachable!(),
                     Command::RenameRegister(register, name) => {
-                        state.debugger_state.register_names.resize_with(*register + 1, Default::default);
+                        state
+                            .debugger_state
+                            .register_names
+                            .resize_with(*register + 1, Default::default);
                         state.debugger_state.register_names[*register] = Some(name.clone());
                     }
                 }
@@ -247,7 +256,10 @@ fn parse_ptr_command(input: &str) -> Option<Command> {
         }
         ["ptrptr", reg, "+", offset] => {
             if let Some(reg) = reg.strip_prefix("r#") {
-                Some(Command::IndirectRegister(reg.parse().ok()?, offset.parse().ok()?))
+                Some(Command::IndirectRegister(
+                    reg.parse().ok()?,
+                    offset.parse().ok()?,
+                ))
             } else {
                 None
             }

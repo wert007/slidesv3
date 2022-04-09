@@ -213,10 +213,7 @@ fn collect_basic_blocks<'a>(statements: &[BoundNode]) -> Vec<BasicBlock<'a>> {
     result
 }
 
-fn connect_basic_blocks<'a>(
-    basic_blocks: &mut Vec<BasicBlock<'a>>,
-    statements: &'a [BoundNode],
-) {
+fn connect_basic_blocks<'a>(basic_blocks: &mut Vec<BasicBlock<'a>>, statements: &'a [BoundNode]) {
     let end_index = basic_blocks.last().unwrap().index;
     let mut incoming_connections = vec![];
     let label_index_to_basic_block_index: HashMap<usize, usize> = basic_blocks

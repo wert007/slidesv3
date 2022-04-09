@@ -169,8 +169,11 @@ pub fn lex<'a>(
                     if c == '\n' || c == string_state.enclosing_char {
                         state = State::Default;
                         if c == '\n' {
-                            let span =
-                                TextSpan::new(start.char_index, char_index - start.char_index, false);
+                            let span = TextSpan::new(
+                                start.char_index,
+                                char_index - start.char_index,
+                                false,
+                            );
                             diagnostic_bag
                                 .report_unterminated_string(span, string_state.enclosing_char);
                         }
@@ -296,6 +299,20 @@ fn is_multi_char_operator(character: char) -> bool {
 fn is_valid_operator(operator: &str) -> bool {
     matches!(
         operator,
-        "!=" | "==" | "=" | "<=" | ">=" | "<" | ">" | "->" | "-" | "?" | "??" | "." | ".." | "&" | "&&" | "||"
+        "!=" | "=="
+            | "="
+            | "<="
+            | ">="
+            | "<"
+            | ">"
+            | "->"
+            | "-"
+            | "?"
+            | "??"
+            | "."
+            | ".."
+            | "&"
+            | "&&"
+            | "||"
     )
 }

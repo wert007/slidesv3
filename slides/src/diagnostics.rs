@@ -15,11 +15,14 @@ enum Message<'a> {
 }
 
 impl Message<'_> {
-    pub fn to_string_with_struct_table(self, struct_table: &[String]) -> String {
+    pub fn into_string_with_struct_table(self, struct_table: &[String]) -> String {
         match self {
             Message::String(it) => it.into(),
             Message::Type(type_) => type_to_name(struct_table, type_),
-            Message::Composition(composition) => composition.into_iter().map(|m|m.to_string_with_struct_table(struct_table)).collect(),
+            Message::Composition(composition) => composition
+                .into_iter()
+                .map(|m| m.into_string_with_struct_table(struct_table))
+                .collect(),
         }
     }
 }
@@ -89,8 +92,12 @@ impl<'a> Diagnostic<'a> {
         }
     }
 
-    pub fn to_string(self, struct_table: &[String]) -> String {
-        format!("Error {}: {}", self.location, self.message.to_string_with_struct_table(struct_table))
+    pub fn into_string(self, struct_table: &[String]) -> String {
+        format!(
+            "Error {}: {}",
+            self.location,
+            self.message.into_string_with_struct_table(struct_table)
+        )
     }
 }
 
@@ -116,7 +123,7 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn flush_to_console(self) {
         for diagnostic in self.diagnostics {
-            println!("{}", diagnostic.to_string(&self.registered_types));
+            println!("{}", diagnostic.into_string(&self.registered_types));
         }
     }
 
@@ -179,11 +186,7 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_no_unary_operator(&mut self, span: TextSpan, operator: &str, type_: &Type) {
         let message = format!("No unary operator {} for type ", operator);
-        let message : &[Message] = &[
-            message.into(),
-            type_.into(),
-            ".".into(),
-        ];
+        let message: &[Message] = &[message.into(), type_.into(), ".".into()];
         self.report(message.into(), span);
     }
 
@@ -194,11 +197,8 @@ impl<'a> DiagnosticBag<'a> {
         operator: &str,
         rhs_type: &Type,
     ) {
-        let message = format!(
-            "No binary operator {} for types ",
-            operator,
-        );
-        let message : &[Message] = &[
+        let message = format!("No binary operator {} for types ", operator,);
+        let message: &[Message] = &[
             message.into(),
             lhs_type.into(),
             " and ".into(),
@@ -302,7 +302,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_no_fields_on_type(&mut self, span: TextSpan, type_: &Type) {
-        let message : &[Message] = &[
+        let message: &[Message] = &[
             "There are no fields on type ".into(),
             type_.into(),
             ".".into(),
@@ -316,15 +316,8 @@ impl<'a> DiagnosticBag<'a> {
         field_name: &str,
         type_: &Type,
     ) {
-        let message = format!(
-            "There are no fields named '{}' on type ",
-            field_name,
-        );
-        let message : &[Message] = &[
-            message.into(),
-            type_.into(),
-            ".".into(),
-        ];
+        let message = format!("There are no fields named '{}' on type ", field_name,);
+        let message: &[Message] = &[message.into(), type_.into(), ".".into()];
         self.report(message.into(), span);
     }
 
@@ -382,7 +375,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_missing_return_value(&mut self, span: TextSpan, expected_return_type: &Type) {
-        let message : &[Message] = &[
+        let message: &[Message] = &[
             "Function returns type ".into(),
             expected_return_type.into(),
             " and needs a value of this type.".into(),
@@ -391,7 +384,7 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_missing_return_statement(&mut self, span: TextSpan, expected_return_type: &Type) {
-        let message : &[Message] = &[
+        let message: &[Message] = &[
             "Not all paths in function return. Every path needs a return value of type".into(),
             expected_return_type.into(),
             ".".into(),
@@ -406,13 +399,29 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_unnecessary_cast(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
         let cast_return_type = &Type::noneable(to_type.clone());
-        let message= message_format!("No cast necessary between types ", from_type, " and ", to_type, ". Remove the unnecessary cast. Note, that cast will return ", cast_return_type, ".",);
+        let message = message_format!(
+            "No cast necessary between types ",
+            from_type,
+            " and ",
+            to_type,
+            ". Remove the unnecessary cast. Note, that cast will return ",
+            cast_return_type,
+            ".",
+        );
         self.report(message, span);
     }
 
     pub fn report_impossible_cast(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
         let cast_return_type = &Type::noneable(to_type.clone());
-        let message = message_format!("No cast possible between types ", from_type, " and ", to_type, ". Note, that cast will return ", cast_return_type, ".");
+        let message = message_format!(
+            "No cast possible between types ",
+            from_type,
+            " and ",
+            to_type,
+            ". Note, that cast will return ",
+            cast_return_type,
+            "."
+        );
         self.report(message, span);
     }
 
@@ -467,17 +476,29 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_cannot_index_get(&mut self, span: TextSpan, type_: &Type) {
-        let message = message_format!("Type ", type_, " cannot be accessed with [], maybe it is missing a $get function?");
+        let message = message_format!(
+            "Type ",
+            type_,
+            " cannot be accessed with [], maybe it is missing a $get function?"
+        );
         self.report(message, span);
     }
 
     pub fn report_cannot_index_set(&mut self, span: TextSpan, type_: &Type) {
-        let message = message_format!("Type ", type_, " cannot be accessed with [], maybe it is missing a $set function?");
+        let message = message_format!(
+            "Type ",
+            type_,
+            " cannot be accessed with [], maybe it is missing a $set function?"
+        );
         self.report(message, span);
     }
 
     pub fn report_cannot_iterate(&mut self, span: TextSpan, type_: &Type) {
-        let message = message_format!("Type ", type_, " cannot be for a `for`-loop, maybe it is missing a $get and $elementCount function?");
+        let message = message_format!(
+            "Type ",
+            type_,
+            " cannot be for a `for`-loop, maybe it is missing a $get and $elementCount function?"
+        );
         self.report(message, span);
     }
 

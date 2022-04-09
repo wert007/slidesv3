@@ -248,7 +248,6 @@ fn print_bound_node_closure_as_code(
             buffer.push_str(", ");
         }
         print_bound_node_as_code_with_indent(argument, printer, buffer);
-
     }
     buffer.push_str(").");
     buffer.push_str(&closure.function.to_string());

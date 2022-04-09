@@ -201,8 +201,12 @@ impl Type {
                 Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP
             }
             Type::SystemCall(SystemCallKind::Break) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_BREAK,
-            Type::SystemCall(SystemCallKind::Reallocate) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE,
-            Type::SystemCall(SystemCallKind::RuntimeError) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR,
+            Type::SystemCall(SystemCallKind::Reallocate) => {
+                Self::TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE
+            }
+            Type::SystemCall(SystemCallKind::RuntimeError) => {
+                Self::TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR
+            }
         }
     }
 
@@ -342,7 +346,11 @@ impl std::fmt::Display for Type {
                 write!(f, "struct#{}", struct_id.id)
             }
             Type::TypedGenericStruct(typed_generic_struct_type) => {
-                write!(f, "struct<{}> {}", typed_generic_struct_type.type_, typed_generic_struct_type.struct_type)
+                write!(
+                    f,
+                    "struct<{}> {}",
+                    typed_generic_struct_type.type_, typed_generic_struct_type.struct_type
+                )
             }
             Type::Pointer => write!(f, "pointer"),
             Type::PointerOf(base) => write!(f, "&{}", base),

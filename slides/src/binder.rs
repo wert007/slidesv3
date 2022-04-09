@@ -46,7 +46,7 @@ use self::{
         FunctionSymbol, GenericFunction, GenericStructSymbol, Library, MaybeGenericStructSymbol,
         StructFieldSymbol, StructFunctionTable, StructSymbol,
     },
-    typing::{FunctionType, StructType, SystemCallKind, StructReferenceType},
+    typing::{FunctionType, StructReferenceType, StructType, SystemCallKind},
 };
 
 #[derive(Debug, Clone)]
@@ -80,7 +80,6 @@ struct FunctionDeclarationBody<'a> {
     struct_function_kind: Option<StructFunctionKind>,
 }
 
-
 // FIXME: Move somewhere sensible!
 #[derive(Default, Clone, Debug, Copy, PartialEq, Eq)]
 pub struct SimpleStructFunctionTable {
@@ -91,7 +90,6 @@ pub struct SimpleStructFunctionTable {
     pub element_count_function: Option<usize>,
     pub equals_function: Option<usize>,
 }
-
 
 impl SimpleStructFunctionTable {
     pub fn set(&mut self, kind: StructFunctionKind, label: usize) {
@@ -120,11 +118,20 @@ impl SimpleStructFunctionTable {
 impl From<&StructFunctionTable> for SimpleStructFunctionTable {
     fn from(it: &StructFunctionTable) -> Self {
         Self {
-            constructor_function: it.constructor_function.as_ref().map(|f| f.function_label as _),
-            to_string_function: it.to_string_function.as_ref().map(|f| f.function_label as _),
+            constructor_function: it
+                .constructor_function
+                .as_ref()
+                .map(|f| f.function_label as _),
+            to_string_function: it
+                .to_string_function
+                .as_ref()
+                .map(|f| f.function_label as _),
             get_function: it.get_function.as_ref().map(|f| f.function_label as _),
             set_function: it.set_function.as_ref().map(|f| f.function_label as _),
-            element_count_function: it.element_count_function.as_ref().map(|f| f.function_label as _),
+            element_count_function: it
+                .element_count_function
+                .as_ref()
+                .map(|f| f.function_label as _),
             equals_function: it.equals_function.as_ref().map(|f| f.function_label as _),
         }
     }
@@ -135,7 +142,7 @@ struct StructDeclarationBody<'a> {
     name: Cow<'a, str>,
     id: u64,
     body: StructBodyNode<'a>,
-    is_generic: bool,
+    _is_generic: bool,
     struct_function_table: SimpleStructFunctionTable,
 }
 
@@ -558,20 +565,34 @@ impl<'a> BindingState<'a, '_> {
         }
     }
 
-    fn register_struct_name(&mut self, name: &'a str, struct_function_table: SimpleStructFunctionTable) -> Option<u64> {
+    fn register_struct_name(
+        &mut self,
+        name: &'a str,
+        struct_function_table: SimpleStructFunctionTable,
+    ) -> Option<u64> {
         let id = self.type_table.len() as u64;
-        self.register_type(name, Type::StructReference(StructReferenceType {
-            id,
-            simple_function_table: struct_function_table,
-        }))
+        self.register_type(
+            name,
+            Type::StructReference(StructReferenceType {
+                id,
+                simple_function_table: struct_function_table,
+            }),
+        )
     }
 
-    fn register_generated_struct_name(&mut self, name: String, struct_function_table: SimpleStructFunctionTable) -> Option<u64> {
+    fn register_generated_struct_name(
+        &mut self,
+        name: String,
+        struct_function_table: SimpleStructFunctionTable,
+    ) -> Option<u64> {
         let id = self.type_table.len() as u64;
-        self.register_generated_type(name, Type::StructReference(StructReferenceType {
-            id,
-            simple_function_table: struct_function_table,
-        }))
+        self.register_generated_type(
+            name,
+            Type::StructReference(StructReferenceType {
+                id,
+                simple_function_table: struct_function_table,
+            }),
+        )
     }
 
     fn register_generic_struct(
@@ -584,7 +605,7 @@ impl<'a> BindingState<'a, '_> {
         let bound_struct_type = BoundGenericStructSymbol {
             struct_type: BoundStructSymbol {
                 name,
-                fields: fields,
+                fields,
                 function_table,
                 is_generic: true,
             },
@@ -635,7 +656,10 @@ impl<'a> BindingState<'a, '_> {
         name: &str,
         maybe_generic_struct: &MaybeGenericStructSymbol,
     ) -> Option<u64> {
-        let id = self.register_generated_struct_name(name.to_owned(), maybe_generic_struct.function_table().into())?;
+        let id = self.register_generated_struct_name(
+            name.to_owned(),
+            maybe_generic_struct.function_table().into(),
+        )?;
         let fields = maybe_generic_struct.fields().to_vec();
         let function_table = maybe_generic_struct.function_table().clone();
         let struct_type = StructType {
@@ -650,7 +674,7 @@ impl<'a> BindingState<'a, '_> {
                 .filter(|f| matches!(f.type_, Type::Function(_)))
                 .map(|f| f.type_.clone())
                 .collect(),
-            function_table: function_table.clone(),
+            function_table,
             is_generic: false,
         };
         self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
@@ -845,7 +869,7 @@ impl<'a> BindingState<'a, '_> {
                 if let Type::Struct(struct_type) = t {
                     Type::StructReference(StructReferenceType {
                         id: struct_type.id,
-                        simple_function_table: (&struct_type.function_table).into()
+                        simple_function_table: (&struct_type.function_table).into(),
                     })
                 } else {
                     t
@@ -862,7 +886,7 @@ impl<'a> BindingState<'a, '_> {
                 if let Type::Struct(struct_type) = t {
                     Type::StructReference(StructReferenceType {
                         id: struct_type.id,
-                        simple_function_table: (&struct_type.function_table).into()
+                        simple_function_table: (&struct_type.function_table).into(),
                     })
                 } else {
                     t
@@ -878,7 +902,7 @@ impl<'a> BindingState<'a, '_> {
             .filter(|e| !e.is_empty())
             .map(|e| {
                 e.as_struct()
-                    .or(e.as_generic_struct().map(|e| &e.struct_type))
+                    .or_else(|| e.as_generic_struct().map(|e| &e.struct_type))
             })
             .flatten()
     }
@@ -1170,14 +1194,24 @@ fn bind<'a>(
     }
 
     while let Some(node) = binder.generic_structs.pop() {
-        let (fields, function_table) =
-            bind_struct_body(&node.name, node.id, node.body, node.struct_function_table, &mut binder);
+        let (fields, function_table) = bind_struct_body(
+            &node.name,
+            node.id,
+            node.body,
+            node.struct_function_table,
+            &mut binder,
+        );
         binder.register_generic_struct(node.id, fields, function_table);
     }
 
     while let Some(node) = binder.structs.pop() {
-        let (fields, function_table) =
-            bind_struct_body(&node.name, node.id, node.body, node.struct_function_table, &mut binder);
+        let (fields, function_table) = bind_struct_body(
+            &node.name,
+            node.id,
+            node.body,
+            node.struct_function_table,
+            &mut binder,
+        );
         binder.register_struct(node.id, fields, function_table);
     }
 
@@ -1509,7 +1543,9 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     // FIXME: implement getter for generic structs.
     match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
         Ok(struct_function_kind) => {
-            let function_label = simple_struct_function_table.get(struct_function_kind).unwrap() as u64;
+            let function_label = simple_struct_function_table
+                .get(struct_function_kind)
+                .unwrap() as u64;
             type_check_struct_function_kind(
                 header_span,
                 struct_function_kind,
@@ -1645,7 +1681,7 @@ fn type_check_struct_function_kind(
             }
         }
         StructFunctionKind::ElementCount => {
-            if function_type.parameter_types.len() != 0 {
+            if !function_type.parameter_types.is_empty() {
                 binder.diagnostic_bag.report_unexpected_parameter_count(
                     span,
                     function_type.parameter_types.len(),
@@ -1712,7 +1748,7 @@ fn bind_struct_declaration<'a, 'b>(
                         // right now we are only interested in the correctly
                         // named functions for our function table.
                         continue;
-                    },
+                    }
                 };
                 struct_function_table.set(struct_function_kind, binder.generate_label());
             }
@@ -1720,13 +1756,15 @@ fn bind_struct_declaration<'a, 'b>(
             _ => {}
         }
     }
-    if let Some(id) = binder.register_struct_name(struct_declaration.identifier.lexeme, struct_function_table) {
+    if let Some(id) =
+        binder.register_struct_name(struct_declaration.identifier.lexeme, struct_function_table)
+    {
         if struct_declaration.optional_generic_keyword.is_some() {
             binder.generic_structs.push(StructDeclarationBody {
                 name: struct_declaration.identifier.lexeme.into(),
                 id,
                 body: *struct_declaration.body,
-                is_generic: struct_declaration.optional_generic_keyword.is_some(),
+                _is_generic: struct_declaration.optional_generic_keyword.is_some(),
                 struct_function_table,
             });
         } else {
@@ -1734,7 +1772,7 @@ fn bind_struct_declaration<'a, 'b>(
                 name: struct_declaration.identifier.lexeme.into(),
                 id,
                 body: *struct_declaration.body,
-                is_generic: struct_declaration.optional_generic_keyword.is_some(),
+                _is_generic: struct_declaration.optional_generic_keyword.is_some(),
                 struct_function_table,
             });
         }
@@ -2248,7 +2286,11 @@ fn bind_generic_struct_type_for_type(
     } else {
         // todo!("You need to regenerate the simple struct function table, since they will be probably be generic in a generic struct. This does not happen currently..");
         let mut simple_function_table = SimpleStructFunctionTable::default();
-        for kind in generic_struct.struct_type.function_table.available_struct_function_kinds() {
+        for kind in generic_struct
+            .struct_type
+            .function_table
+            .available_struct_function_kinds()
+        {
             simple_function_table.set(kind, binder.generate_label());
         }
         let id = binder
@@ -2258,8 +2300,12 @@ fn bind_generic_struct_type_for_type(
         let mut function_labels = Vec::with_capacity(generic_struct.functions.len());
         for function in generic_struct.functions.iter_mut() {
             let old_label = function.function_label;
-            let target_label = StructFunctionKind::try_from(function.function_name.as_str()).ok().map(|k| simple_function_table.get(k)).flatten();
-            let new_label = bind_generic_function_for_type(function, true, type_, target_label, binder) as u64;
+            let target_label = StructFunctionKind::try_from(function.function_name.as_str())
+                .ok()
+                .map(|k| simple_function_table.get(k))
+                .flatten();
+            let new_label =
+                bind_generic_function_for_type(function, true, type_, target_label, binder) as u64;
             if Some(old_label as usize) == constructor_label {
                 changed_constructor_label = Some(new_label as usize);
             }
@@ -2446,9 +2492,12 @@ fn call_to_string(lhs: BoundNode, binder: &mut BindingState) -> BoundNode {
     if lhs.type_ == Type::String {
         lhs
     } else {
-        BoundNode::system_call(lhs.span, SystemCallKind::ToString, vec![
-            bind_conversion(lhs, &Type::Any, binder),
-            ], Type::String)
+        BoundNode::system_call(
+            lhs.span,
+            SystemCallKind::ToString,
+            vec![bind_conversion(lhs, &Type::Any, binder)],
+            Type::String,
+        )
     }
 }
 
@@ -2785,7 +2834,7 @@ fn bind_array_index<'a, 'b>(
                     function_base,
                     vec![index, base],
                     false,
-                    get_function.function_type.return_type.clone(),
+                    get_function.function_type.return_type,
                 );
             }
             None => {
@@ -2900,7 +2949,9 @@ fn bind_field_access<'a, 'b>(
         Type::Error => base,
         Type::StructReference(id) => struct_handler(id.id, base),
         Type::Struct(struct_type) => struct_handler(struct_type.id, base),
-        Type::TypedGenericStruct(typed_generic_struct) => struct_handler(typed_generic_struct.id, base),
+        Type::TypedGenericStruct(typed_generic_struct) => {
+            struct_handler(typed_generic_struct.id, base)
+        }
         Type::Library(index) => {
             let library = &binder.libraries[*index];
             let function_name = field.lexeme;
@@ -3026,7 +3077,9 @@ fn bind_field_access_for_assignment<'a>(
         }
         Type::StructReference(id) => struct_handler(id.id, base),
         Type::Struct(struct_type) => struct_handler(struct_type.id, base),
-        Type::TypedGenericStruct(typed_generic_struct) => struct_handler(typed_generic_struct.id, base),
+        Type::TypedGenericStruct(typed_generic_struct) => {
+            struct_handler(typed_generic_struct.id, base)
+        }
     }
 }
 
@@ -3214,7 +3267,7 @@ fn bind_generic_function_for_type(
         }
     });
     assert!(!matches!(body.kind, BoundNodeKind::FunctionDeclaration(_)));
-    let label = target_label.unwrap_or(binder.generate_label());
+    let label = target_label.unwrap_or_else(|| binder.generate_label());
     generic_function.labels.push(label);
     // FIXME: Do NOT use just a stupid range here, if parameters
     // will ever not be the first register (like with local
@@ -3383,7 +3436,10 @@ fn bind_for_statement<'a, 'b>(
         }
         return BoundNode::error(span);
     };
-    let variable_type = struct_type.as_ref().unwrap().function_table
+    let variable_type = struct_type
+        .as_ref()
+        .unwrap()
+        .function_table
         .get_function
         .as_ref()
         .unwrap()
@@ -3392,21 +3448,17 @@ fn bind_for_statement<'a, 'b>(
         .clone();
     let variable_name = for_statement.variable.lexeme;
     let variable_span = for_statement.variable.span();
-    let variable =
-        binder.register_variable(variable_name, variable_type.clone(), true);
+    let variable = binder.register_variable(variable_name, variable_type.clone(), true);
     if variable.is_none() {
-        binder.diagnostic_bag.report_cannot_declare_variable(
-            variable_span,
-            variable_name,
-        );
+        binder
+            .diagnostic_bag
+            .report_cannot_declare_variable(variable_span, variable_name);
         return BoundNode::error(span);
     }
     let variable = variable.unwrap();
     let variable = BoundNode::variable(span, variable, variable_type);
     let index_variable = match for_statement.optional_index_variable.map(|i| i.lexeme) {
-        Some(index_variable) => {
-            binder.register_variable(index_variable, Type::Integer, true)
-        }
+        Some(index_variable) => binder.register_variable(index_variable, Type::Integer, true),
         None => binder.register_generated_variable(
             format!("{}$index", variable_name),
             Type::Integer,
@@ -3414,10 +3466,9 @@ fn bind_for_statement<'a, 'b>(
         ),
     };
     if index_variable.is_none() {
-        binder.diagnostic_bag.report_cannot_declare_variable(
-            variable_span,
-            variable_name,
-        );
+        binder
+            .diagnostic_bag
+            .report_cannot_declare_variable(variable_span, variable_name);
         return BoundNode::error(span);
     }
     let index_variable = index_variable.unwrap();

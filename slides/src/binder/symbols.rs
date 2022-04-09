@@ -9,8 +9,10 @@ use crate::instruction_converter::{
 };
 
 use super::{
+    bound_nodes::BoundNode,
     typing::{FunctionType, Type},
-    BoundStructFieldSymbol, BoundStructSymbol, FunctionDeclarationBody, bound_nodes::BoundNode, BoundGenericStructSymbol, BoundMaybeGenericStructSymbol,
+    BoundGenericStructSymbol, BoundMaybeGenericStructSymbol, BoundStructFieldSymbol,
+    BoundStructSymbol, FunctionDeclarationBody,
 };
 
 #[derive(Debug, Clone)]
@@ -212,12 +214,15 @@ impl From<BoundMaybeGenericStructSymbol<'_>> for MaybeGenericStructSymbol {
     fn from(it: BoundMaybeGenericStructSymbol) -> Self {
         match it {
             BoundMaybeGenericStructSymbol::Struct(it) => StructSymbol::from(it).into(),
-            BoundMaybeGenericStructSymbol::GenericStruct(it) => GenericStructSymbol::from(it).into(),
-            BoundMaybeGenericStructSymbol::Empty => unreachable!("Tried to convert/export an empty symbol"),
+            BoundMaybeGenericStructSymbol::GenericStruct(it) => {
+                GenericStructSymbol::from(it).into()
+            }
+            BoundMaybeGenericStructSymbol::Empty => {
+                unreachable!("Tried to convert/export an empty symbol")
+            }
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct StructSymbol {
@@ -242,7 +247,6 @@ impl StructSymbol {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct GenericStructSymbol {
     pub name: String,
@@ -261,7 +265,6 @@ impl From<BoundGenericStructSymbol<'_>> for GenericStructSymbol {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct StructFieldSymbol {
@@ -353,9 +356,14 @@ impl StructFunctionTable {
 
     pub fn replace_labels(mut self, label_relocation: Vec<(u64, u64)>) -> Self {
         let find_label = |lbl: &mut u64| {
-            *lbl = *label_relocation.iter().find(|(old, _)| *old == *lbl).map(|(_, new)| new).unwrap();
+            *lbl = *label_relocation
+                .iter()
+                .find(|(old, _)| *old == *lbl)
+                .map(|(_, new)| new)
+                .unwrap();
         };
-        self.function_symbols_iter_mut().for_each(|c|find_label(&mut c.function_label));
+        self.function_symbols_iter_mut()
+            .for_each(|c| find_label(&mut c.function_label));
         self.label_relocation = label_relocation;
         self
     }

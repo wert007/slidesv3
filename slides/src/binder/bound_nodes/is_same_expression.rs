@@ -201,7 +201,8 @@ impl IsSameExpression for BoundFieldAccessNodeKind {
 
 impl IsSameExpression for BoundClosureNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
-        self.function == other.function && is_iterator_all_same_expression(&self.arguments, &other.arguments)
+        self.function == other.function
+            && is_iterator_all_same_expression(&self.arguments, &other.arguments)
     }
 }
 

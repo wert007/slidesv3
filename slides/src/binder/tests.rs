@@ -1,7 +1,10 @@
 use assert_matches::assert_matches;
 
 use crate::{
-    binder::bound_nodes::{BoundNodeKind, BoundLiteralNodeKind}, diagnostics::Diagnostic, text::SourceText, value::Value,
+    binder::bound_nodes::{BoundLiteralNodeKind, BoundNodeKind},
+    diagnostics::Diagnostic,
+    text::SourceText,
+    value::Value,
 };
 
 use super::*;

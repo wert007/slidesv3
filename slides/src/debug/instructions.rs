@@ -13,10 +13,7 @@ use crate::{
     text::SourceText,
 };
 
-pub fn print_instructions_with_source_code(
-    instructions: &[Instruction],
-    source: &SourceText,
-) {
+pub fn print_instructions_with_source_code(instructions: &[Instruction], source: &SourceText) {
     let output = instructions_with_source_code_to_string(instructions, source);
     println!("{}", output)
 }
@@ -39,8 +36,7 @@ pub fn print_instructions_or_labels_with_source_code(
     instructions: &[InstructionOrLabelReference],
     source: &SourceText,
 ) {
-    let output =
-        instructions_or_labels_with_source_code_to_string(instructions, source);
+    let output = instructions_or_labels_with_source_code_to_string(instructions, source);
     println!("{}", output)
 }
 
@@ -65,7 +61,8 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
         if !new_is_foreign && instruction.span() != current_span {
             current_span = instruction.span();
             buffer.push_str("> { ");
-            buffer.push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer
+                .push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
             buffer.push_str(" }\n");
         }
         buffer.push_str("  ");
@@ -115,7 +112,8 @@ fn instructions_with_source_code_to_string(
         if !new_is_foreign && instruction.span != current_span {
             current_span = instruction.span;
             buffer.push_str("> { ");
-            buffer.push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer
+                .push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
             buffer.push_str(" }\n");
         }
         buffer.push_str("  ");
@@ -147,7 +145,8 @@ fn instructions_or_labels_with_source_code_to_string(
         if !new_is_foreign && instruction.span() != current_span {
             current_span = instruction.span();
             buffer.push_str("> { ");
-            buffer.push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer
+                .push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
             buffer.push_str(" }\n");
         }
         buffer.push_str("  ");
@@ -198,7 +197,11 @@ fn instructions_or_labels_to_string(
     result
 }
 
-fn instructions_to_string(start_index: usize, instructions: &[Instruction], reg_names: &[Option<&str>]) -> String {
+fn instructions_to_string(
+    start_index: usize,
+    instructions: &[Instruction],
+    reg_names: &[Option<&str>],
+) -> String {
     let mut result = String::new();
     let mut index = start_index;
     for instruction in instructions {
@@ -224,15 +227,23 @@ pub fn instruction_to_string(instruction: Instruction, reg_name: Option<&str>) -
     instruction_or_label_to_string(instruction, false, reg_name)
 }
 
-fn instruction_or_label_to_string(instruction: Instruction, has_labels: bool, reg_name: Option<&str>) -> String {
+fn instruction_or_label_to_string(
+    instruction: Instruction,
+    has_labels: bool,
+    reg_name: Option<&str>,
+) -> String {
     match instruction.op_code {
         OpCode::NoOp => instruction_no_arg_to_string("noop"),
         OpCode::LoadImmediate => instruction_dec_signed_arg_to_string("ldimm", instruction.arg),
         OpCode::LoadPointer => instruction_ptr_unsigned_arg_to_string("ldptr", instruction.arg),
         OpCode::DuplicateOver => instruction_word_count_arg_to_string("dupover", instruction.arg),
         OpCode::Pop => instruction_no_arg_to_string("pop"),
-        OpCode::LoadRegister => instruction_reg_arg_name_to_string("ldreg", instruction.arg, reg_name),
-        OpCode::StoreInRegister => instruction_reg_arg_name_to_string("streg", instruction.arg, reg_name),
+        OpCode::LoadRegister => {
+            instruction_reg_arg_name_to_string("ldreg", instruction.arg, reg_name)
+        }
+        OpCode::StoreInRegister => {
+            instruction_reg_arg_name_to_string("streg", instruction.arg, reg_name)
+        }
         OpCode::StoreInMemory => instruction_ptr_unsigned_arg_to_string("stm", instruction.arg),
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
         OpCode::WriteToHeap => instruction_word_count_arg_to_string("wrtheap", instruction.arg),

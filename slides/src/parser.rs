@@ -106,22 +106,20 @@ fn parse_top_level_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> 
         SyntaxTokenKind::ImportKeyword => parse_import_statement(parser),
         SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
         SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
-        SyntaxTokenKind::GenericKeyword => {
-            match parser.peek_n_token(1).kind {
-                SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
-                SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
-                _ => {
-                    let token = parser.next_token();
-                    let span = token.span();
-                    parser.diagnostic_bag.report_unexpected_token_kind(
-                        span,
-                        token.kind,
-                        SyntaxTokenKind::FuncKeyword,
-                    );
-                    SyntaxNode::error(span.start())
-                }
+        SyntaxTokenKind::GenericKeyword => match parser.peek_n_token(1).kind {
+            SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
+            SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
+            _ => {
+                let token = parser.next_token();
+                let span = token.span();
+                parser.diagnostic_bag.report_unexpected_token_kind(
+                    span,
+                    token.kind,
+                    SyntaxTokenKind::FuncKeyword,
+                );
+                SyntaxNode::error(span.start())
             }
-        }
+        },
         _ => {
             let token = parser.next_token();
             let span = token.span();
@@ -163,7 +161,13 @@ fn parse_function_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     let function_type = parse_function_type(optional_generic_keyword.is_some(), parser);
     let body = parse_block_statement(parser);
 
-    SyntaxNode::function_declaration(optional_generic_keyword, func_keyword, identifier, function_type, body)
+    SyntaxNode::function_declaration(
+        optional_generic_keyword,
+        func_keyword,
+        identifier,
+        function_type,
+        body,
+    )
 }
 
 fn parse_struct_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
@@ -211,7 +215,14 @@ fn parse_function_type<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> Fun
         None
     };
 
-    FunctionTypeNode::new(is_generic, lparen, parameters, comma_tokens, rparen, return_type)
+    FunctionTypeNode::new(
+        is_generic,
+        lparen,
+        parameters,
+        comma_tokens,
+        rparen,
+        return_type,
+    )
 }
 
 fn parse_struct_body<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
@@ -223,7 +234,9 @@ fn parse_struct_body<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> Struc
     ) {
         let token_count = parser.token_count();
         let statement = match parser.peek_token().kind {
-            SyntaxTokenKind::FuncKeyword | SyntaxTokenKind::GenericKeyword => parse_function_statement(parser),
+            SyntaxTokenKind::FuncKeyword | SyntaxTokenKind::GenericKeyword => {
+                parse_function_statement(parser)
+            }
             SyntaxTokenKind::Identifier => {
                 let field = parse_parameter(parser);
                 let semicolon_token = parser.match_token(SyntaxTokenKind::Semicolon);
@@ -286,7 +299,13 @@ fn parse_type<'a>(parser: &mut Parser<'a, '_>) -> TypeNode<'a> {
         brackets.push(SyntaxToken::bracket_pair(lbracket, rbracket));
     }
 
-    TypeNode::new(optional_ampersand_token, library_name, type_name, optional_question_mark, brackets)
+    TypeNode::new(
+        optional_ampersand_token,
+        library_name,
+        type_name,
+        optional_question_mark,
+        brackets,
+    )
 }
 
 fn parse_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {

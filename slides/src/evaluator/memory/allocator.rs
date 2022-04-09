@@ -49,7 +49,10 @@ impl Allocator {
     }
 
     fn find_bucket_from_address_mut(&mut self, address: u64) -> Option<&mut Bucket> {
-        self.buckets.iter_mut().filter_map(|b| b.as_bucket_mut()).find(|b| b.address * WORD_SIZE_IN_BYTES == address)
+        self.buckets
+            .iter_mut()
+            .filter_map(|b| b.as_bucket_mut())
+            .find(|b| b.address * WORD_SIZE_IN_BYTES == address)
     }
 
     fn free_buckets(&mut self, min_size: u64) -> Vec<&mut Bucket> {
@@ -127,7 +130,7 @@ impl Allocator {
                     None
                 } else {
                     self.find_bucket_from_address_mut(address)
-                    .filter(|b| b.size_in_words >= size_in_words)
+                        .filter(|b| b.size_in_words >= size_in_words)
                 };
                 match bucket {
                     Some(bucket) => bucket.index,
@@ -138,7 +141,7 @@ impl Allocator {
                             return 0;
                         }
                         free_buckets.remove(0).index
-                    },
+                    }
                 }
             };
 

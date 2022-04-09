@@ -1,5 +1,8 @@
 use crate::{
-    binder::{typing::{FunctionType, Type, StructReferenceType}, SimpleStructFunctionTable},
+    binder::{
+        typing::{FunctionType, StructReferenceType, Type},
+        SimpleStructFunctionTable,
+    },
     evaluator::memory::bytes_to_word,
 };
 

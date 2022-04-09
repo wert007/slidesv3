@@ -167,7 +167,11 @@ impl TextSpan {
     }
 
     pub fn new(start: usize, length: usize, is_foreign: bool) -> Self {
-        Self { start, length, is_foreign }
+        Self {
+            start,
+            length,
+            is_foreign,
+        }
     }
 
     /// Get a reference to the text span's start.
