@@ -1,5 +1,5 @@
 use crate::{
-    binder::typing::{FunctionType, Type},
+    binder::{typing::{FunctionType, Type, StructReferenceType}, SimpleStructFunctionTable},
     evaluator::memory::bytes_to_word,
 };
 
@@ -48,8 +48,12 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64, 
             let address = address + WORD_SIZE_IN_BYTES;
             let to_string_function = state.read_pointer(address).unwrap_pointer();
             let address = address + WORD_SIZE_IN_BYTES;
+            let simple_function_table = SimpleStructFunctionTable::default();
             (
-                Type::StructReference(struct_id),
+                Type::StructReference(StructReferenceType {
+                    id: struct_id,
+                    simple_function_table,
+                }),
                 address,
                 to_string_function,
             )
@@ -139,7 +143,7 @@ fn to_string_native(
                         .unwrap();
                 to_string_native(Type::String, 0, return_value, state)
             } else {
-                format!("type struct id#{}", id)
+                format!("type struct id#{}", id.id)
             }
         }
         Type::Integer => {

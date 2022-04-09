@@ -46,7 +46,7 @@ use self::{
         FunctionSymbol, GenericFunction, GenericStructSymbol, Library, MaybeGenericStructSymbol,
         StructFieldSymbol, StructFunctionTable, StructSymbol,
     },
-    typing::{FunctionType, StructType, SystemCallKind},
+    typing::{FunctionType, StructType, SystemCallKind, StructReferenceType},
 };
 
 #[derive(Debug, Clone)]
@@ -80,8 +80,10 @@ struct FunctionDeclarationBody<'a> {
     struct_function_kind: Option<StructFunctionKind>,
 }
 
-#[derive(Default, Clone, Debug, Copy)]
-struct SimpleStructFunctionTable {
+
+// FIXME: Move somewhere sensible!
+#[derive(Default, Clone, Debug, Copy, PartialEq, Eq)]
+pub struct SimpleStructFunctionTable {
     pub constructor_function: Option<usize>,
     pub to_string_function: Option<usize>,
     pub get_function: Option<usize>,
@@ -111,6 +113,19 @@ impl SimpleStructFunctionTable {
             StructFunctionKind::Set => self.set_function,
             StructFunctionKind::ElementCount => self.element_count_function,
             StructFunctionKind::Equals => self.equals_function,
+        }
+    }
+}
+
+impl From<&StructFunctionTable> for SimpleStructFunctionTable {
+    fn from(it: &StructFunctionTable) -> Self {
+        Self {
+            constructor_function: it.constructor_function.as_ref().map(|f| f.function_label as _),
+            to_string_function: it.to_string_function.as_ref().map(|f| f.function_label as _),
+            get_function: it.get_function.as_ref().map(|f| f.function_label as _),
+            set_function: it.set_function.as_ref().map(|f| f.function_label as _),
+            element_count_function: it.element_count_function.as_ref().map(|f| f.function_label as _),
+            equals_function: it.equals_function.as_ref().map(|f| f.function_label as _),
         }
     }
 }
@@ -543,14 +558,20 @@ impl<'a> BindingState<'a, '_> {
         }
     }
 
-    fn register_struct_name(&mut self, name: &'a str) -> Option<u64> {
+    fn register_struct_name(&mut self, name: &'a str, struct_function_table: SimpleStructFunctionTable) -> Option<u64> {
         let id = self.type_table.len() as u64;
-        self.register_type(name, Type::StructReference(id))
+        self.register_type(name, Type::StructReference(StructReferenceType {
+            id,
+            simple_function_table: struct_function_table,
+        }))
     }
 
-    fn register_generated_struct_name(&mut self, name: String) -> Option<u64> {
+    fn register_generated_struct_name(&mut self, name: String, struct_function_table: SimpleStructFunctionTable) -> Option<u64> {
         let id = self.type_table.len() as u64;
-        self.register_generated_type(name, Type::StructReference(id))
+        self.register_generated_type(name, Type::StructReference(StructReferenceType {
+            id,
+            simple_function_table: struct_function_table,
+        }))
     }
 
     fn register_generic_struct(
@@ -614,7 +635,7 @@ impl<'a> BindingState<'a, '_> {
         name: &str,
         maybe_generic_struct: &MaybeGenericStructSymbol,
     ) -> Option<u64> {
-        let id = self.register_generated_struct_name(name.to_owned())?;
+        let id = self.register_generated_struct_name(name.to_owned(), maybe_generic_struct.function_table().into())?;
         let fields = maybe_generic_struct.fields().to_vec();
         let function_table = maybe_generic_struct.function_table().clone();
         let struct_type = StructType {
@@ -822,7 +843,10 @@ impl<'a> BindingState<'a, '_> {
             .map(|v| v.type_.clone())
             .map(|t| {
                 if let Type::Struct(struct_type) = t {
-                    Type::StructReference(struct_type.id)
+                    Type::StructReference(StructReferenceType {
+                        id: struct_type.id,
+                        simple_function_table: (&struct_type.function_table).into()
+                    })
                 } else {
                     t
                 }
@@ -836,7 +860,10 @@ impl<'a> BindingState<'a, '_> {
             .map(|v| v.type_.clone())
             .map(|t| {
                 if let Type::Struct(struct_type) = t {
-                    Type::StructReference(struct_type.id)
+                    Type::StructReference(StructReferenceType {
+                        id: struct_type.id,
+                        simple_function_table: (&struct_type.function_table).into()
+                    })
                 } else {
                     t
                 }
@@ -907,7 +934,8 @@ impl<'a> BindingState<'a, '_> {
             .iter_mut()
             .find(|t| match &t.type_ {
                 Type::Struct(struct_type) => struct_type.id == struct_id,
-                Type::StructReference(id) if id == &struct_id => true,
+                // NOTE: Is there a reason to format this like it currently is?
+                Type::StructReference(id) if id.id == struct_id => true,
                 _ => false,
             })
             .unwrap()
@@ -937,7 +965,7 @@ impl<'a> BindingState<'a, '_> {
             Type::StructReference(id) => {
                 debug_assert!(self.generic_structs.is_empty());
                 debug_assert!(self.structs.is_empty());
-                Type::Struct(Box::new(self.get_struct_by_id(id).unwrap()))
+                Type::Struct(Box::new(self.get_struct_by_id(id.id).unwrap()))
             }
             Type::PointerOf(base_type) => {
                 Type::pointer_of(self.convert_struct_reference_to_struct(*base_type))
@@ -1668,31 +1696,31 @@ fn bind_struct_declaration<'a, 'b>(
     struct_declaration: StructDeclarationNodeKind<'a>,
     binder: &mut BindingState<'a, 'b>,
 ) {
-    if let Some(id) = binder.register_struct_name(struct_declaration.identifier.lexeme) {
-        let mut struct_function_table = SimpleStructFunctionTable::default();
-        for statement in &struct_declaration.body.statements {
-            match &statement.kind {
-                SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
-                    let function_name = function_declaration.identifier.lexeme;
-                    if !function_name.starts_with('$') {
-                        continue;
-                    }
-                    let struct_function_kind = match StructFunctionKind::try_from(function_name) {
-                        Ok(it) => it,
-                        Err(_) => {
-                            // Note: This error will be reported later, when all
-                            // functions inside the struct are type checked,
-                            // right now we are only interested in the correctly
-                            // named functions for our function table.
-                            continue;
-                        },
-                    };
-                    struct_function_table.set(struct_function_kind, binder.generate_label());
+    let mut struct_function_table = SimpleStructFunctionTable::default();
+    for statement in &struct_declaration.body.statements {
+        match &statement.kind {
+            SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
+                let function_name = function_declaration.identifier.lexeme;
+                if !function_name.starts_with('$') {
+                    continue;
                 }
-                SyntaxNodeKind::StructField(_) => {}
-                _ => {}
+                let struct_function_kind = match StructFunctionKind::try_from(function_name) {
+                    Ok(it) => it,
+                    Err(_) => {
+                        // Note: This error will be reported later, when all
+                        // functions inside the struct are type checked,
+                        // right now we are only interested in the correctly
+                        // named functions for our function table.
+                        continue;
+                    },
+                };
+                struct_function_table.set(struct_function_kind, binder.generate_label());
             }
+            SyntaxNodeKind::StructField(_) => {}
+            _ => {}
         }
+    }
+    if let Some(id) = binder.register_struct_name(struct_declaration.identifier.lexeme, struct_function_table) {
         if struct_declaration.optional_generic_keyword.is_some() {
             binder.generic_structs.push(StructDeclarationBody {
                 name: struct_declaration.identifier.lexeme.into(),
@@ -2073,7 +2101,7 @@ fn bind_constructor_call<'a>(
     );
     let (struct_type, struct_id) = match type_ {
         Type::Struct(it) => (binder.get_struct_type_by_id(it.id).unwrap(), it.id),
-        Type::StructReference(id) => (binder.get_struct_type_by_id(id).unwrap(), id),
+        Type::StructReference(id) => (binder.get_struct_type_by_id(id.id).unwrap(), id.id),
         Type::Error => return BoundNode::error(span),
         _ => {
             binder
@@ -2218,14 +2246,20 @@ fn bind_generic_struct_type_for_type(
         }
         id
     } else {
+        // todo!("You need to regenerate the simple struct function table, since they will be probably be generic in a generic struct. This does not happen currently..");
+        let mut simple_function_table = SimpleStructFunctionTable::default();
+        for kind in generic_struct.struct_type.function_table.available_struct_function_kinds() {
+            simple_function_table.set(kind, binder.generate_label());
+        }
         let id = binder
-            .register_generated_struct_name(struct_name.clone())
+            .register_generated_struct_name(struct_name.clone(), simple_function_table)
             .unwrap();
         let mut fields = generic_struct.struct_type.fields.clone();
         let mut function_labels = Vec::with_capacity(generic_struct.functions.len());
         for function in generic_struct.functions.iter_mut() {
             let old_label = function.function_label;
-            let new_label = bind_generic_function_for_type(function, true, type_, binder) as u64;
+            let target_label = StructFunctionKind::try_from(function.function_name.as_str()).ok().map(|k| simple_function_table.get(k)).flatten();
+            let new_label = bind_generic_function_for_type(function, true, type_, target_label, binder) as u64;
             if Some(old_label as usize) == constructor_label {
                 changed_constructor_label = Some(new_label as usize);
             }
@@ -2864,7 +2898,7 @@ fn bind_field_access<'a, 'b>(
     };
     match &base.type_ {
         Type::Error => base,
-        Type::StructReference(id) => struct_handler(*id, base),
+        Type::StructReference(id) => struct_handler(id.id, base),
         Type::Struct(struct_type) => struct_handler(struct_type.id, base),
         Type::TypedGenericStruct(typed_generic_struct) => struct_handler(typed_generic_struct.id, base),
         Type::Library(index) => {
@@ -2990,7 +3024,7 @@ fn bind_field_access_for_assignment<'a>(
             binder.diagnostic_bag.report_cannot_assign_to(span);
             BoundNode::error(span)
         }
-        Type::StructReference(id) => struct_handler(*id, base),
+        Type::StructReference(id) => struct_handler(id.id, base),
         Type::Struct(struct_type) => struct_handler(struct_type.id, base),
         Type::TypedGenericStruct(typed_generic_struct) => struct_handler(typed_generic_struct.id, base),
     }
@@ -3067,6 +3101,10 @@ fn bind_arguments_for_generic_function<'a, 'b>(
                     &mut generic_function,
                     function_type.this_type.is_some(),
                     &argument.type_,
+                    // Note: this may be wrong if a $ function is compiled. Then
+                    // again, this should not happen, since this gets called by
+                    // function calls and you cannot call al $ function.
+                    None,
                     binder,
                 );
             }
@@ -3143,6 +3181,7 @@ fn bind_generic_function_for_type(
     generic_function: &mut GenericFunction,
     has_this_parameter: bool,
     type_: &Type,
+    target_label: Option<usize>,
     binder: &mut BindingState,
 ) -> usize {
     // TODO: Add new stage to compiler
@@ -3175,7 +3214,7 @@ fn bind_generic_function_for_type(
         }
     });
     assert!(!matches!(body.kind, BoundNodeKind::FunctionDeclaration(_)));
-    let label = binder.generate_label();
+    let label = target_label.unwrap_or(binder.generate_label());
     generic_function.labels.push(label);
     // FIXME: Do NOT use just a stupid range here, if parameters
     // will ever not be the first register (like with local

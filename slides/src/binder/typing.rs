@@ -5,7 +5,7 @@ use num_enum::TryFromPrimitive;
 
 use crate::evaluator::memory::WORD_SIZE_IN_BYTES;
 
-use super::symbols::StructFunctionTable;
+use super::{symbols::StructFunctionTable, SimpleStructFunctionTable};
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Type {
@@ -21,7 +21,7 @@ pub enum Type {
     Function(Box<FunctionType>),
     Closure(Box<ClosureType>),
     Struct(Box<StructType>),
-    StructReference(u64),
+    StructReference(StructReferenceType),
     Library(usize),
     Pointer,
     PointerOf(Box<Type>),
@@ -57,8 +57,8 @@ impl Type {
             (Type::None, Type::Pointer) => true,
             (Type::None, Type::Noneable(_)) => true,
             (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
-            (Type::Struct(id), Type::StructReference(other_id)) if id.id == *other_id => true,
-            (Type::StructReference(id), Type::Struct(other)) if *id == other.id => true,
+            (Type::Struct(id), Type::StructReference(other_id)) if id.id == other_id.id => true,
+            (Type::StructReference(id), Type::Struct(other)) if id.id == other.id => true,
             _ => false,
         }
     }
@@ -85,7 +85,7 @@ impl Type {
     pub fn as_struct_id(&self) -> Option<u64> {
         match self {
             Type::Struct(struct_type) => Some(struct_type.id),
-            Type::StructReference(id) => Some(*id),
+            Type::StructReference(struct_reference_type) => Some(struct_reference_type.id),
             _ => None,
         }
     }
@@ -295,7 +295,7 @@ impl Type {
             Type::Error
             | Type::Void
             | Type::Any
-            // Technically a pointer. But it does not get dereferenced, but
+            // Technically a pointer. But it does not get dereferenced,
             // instead the value itself is assigned to the program counter.
             | Type::Function(_)
             | Type::SystemCall(_)
@@ -339,7 +339,7 @@ impl std::fmt::Display for Type {
                 write!(f, "struct {}", struct_type)
             }
             Type::StructReference(struct_id) => {
-                write!(f, "struct#{}", struct_id)
+                write!(f, "struct#{}", struct_id.id)
             }
             Type::TypedGenericStruct(typed_generic_struct_type) => {
                 write!(f, "struct<{}> {}", typed_generic_struct_type.type_, typed_generic_struct_type.struct_type)
@@ -495,11 +495,11 @@ impl FunctionType {
             .chain(self.this_type.iter_mut())
         {
             if let Type::StructReference(index) = type_ {
-                *index += struct_offset as u64;
+                index.id += struct_offset as u64;
             }
         }
         if let Type::StructReference(index) = &mut self.return_type {
-            *index += struct_offset as u64;
+            index.id += struct_offset as u64;
         }
     }
 }
@@ -546,6 +546,12 @@ impl std::fmt::Display for StructType {
         }
         write!(f, "}}")
     }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub struct StructReferenceType {
+    pub id: u64,
+    pub simple_function_table: SimpleStructFunctionTable,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]

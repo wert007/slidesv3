@@ -107,7 +107,7 @@ impl Library {
                     Type::Struct(_) => {
                         unreachable!("relocate_structs currently only works for StructReferences")
                     }
-                    Type::StructReference(index) => *index += struct_offset as u64,
+                    Type::StructReference(index) => index.id += struct_offset as u64,
                     _ => {}
                 }
             }
@@ -133,11 +133,11 @@ impl FunctionSymbol {
             .chain(self.function_type.this_type.iter_mut())
         {
             if let Type::StructReference(index) = parameter {
-                *index += struct_offset as u64;
+                index.id += struct_offset as u64;
             }
         }
         if let Type::StructReference(index) = &mut self.function_type.return_type {
-            *index += struct_offset as u64;
+            index.id += struct_offset as u64;
         }
     }
 }
@@ -313,6 +313,29 @@ impl StructFunctionTable {
             .chain(self.set_function.iter_mut())
             .chain(self.element_count_function.iter_mut())
             .chain(self.equals_function.iter_mut())
+    }
+
+    pub fn available_struct_function_kinds(&self) -> Vec<StructFunctionKind> {
+        let mut result = Vec::with_capacity(16);
+        if self.constructor_function.is_some() {
+            result.push(StructFunctionKind::Constructor);
+        }
+        if self.to_string_function.is_some() {
+            result.push(StructFunctionKind::ToString);
+        }
+        if self.get_function.is_some() {
+            result.push(StructFunctionKind::Get);
+        }
+        if self.set_function.is_some() {
+            result.push(StructFunctionKind::Set);
+        }
+        if self.element_count_function.is_some() {
+            result.push(StructFunctionKind::ElementCount);
+        }
+        if self.equals_function.is_some() {
+            result.push(StructFunctionKind::Equals);
+        }
+        result
     }
 
     fn relocate_labels(&mut self, label_offset: usize) {

@@ -27,7 +27,7 @@ impl Message<'_> {
 fn type_to_name(struct_table: &[String], type_: Type) -> String {
     match type_ {
         Type::Struct(struct_type) => struct_table[struct_type.id as usize].clone(),
-        Type::StructReference(id) => struct_table[id as usize].clone(),
+        Type::StructReference(id) => struct_table[id.id as usize].clone(),
         Type::Noneable(base_type) => format!("{}?", type_to_name(struct_table, *base_type)),
         _ => type_.to_string(),
     }
