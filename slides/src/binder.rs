@@ -9,7 +9,7 @@ mod tests;
 mod type_replacer;
 pub mod typing;
 
-use std::{borrow::Cow, convert::TryFrom, path::Path};
+use std::{borrow::Cow, convert::TryFrom, path::Path, collections::HashMap};
 
 use crate::{
     binder::{
@@ -2284,14 +2284,14 @@ fn bind_generic_struct_type_for_type(
         }
         id
     } else {
-        // todo!("You need to regenerate the simple struct function table, since they will be probably be generic in a generic struct. This does not happen currently..");
+        let function_labels_map : HashMap<_, _> = generic_struct.functions.iter().map(|f| (f.function_label as usize, binder.generate_label())).collect();
         let mut simple_function_table = SimpleStructFunctionTable::default();
-        for kind in generic_struct
+        for (kind, function) in generic_struct
             .struct_type
             .function_table
-            .available_struct_function_kinds()
+            .available_struct_function_kinds().into_iter().zip(generic_struct.struct_type.function_table.function_symbols_iter_mut()) // TODO: Use a function_symbols_iter instead of iter_mut
         {
-            simple_function_table.set(kind, binder.generate_label());
+            simple_function_table.set(kind, *function_labels_map.get(&(function.function_label as usize)).unwrap());
         }
         let id = binder
             .register_generated_struct_name(struct_name.clone(), simple_function_table)
@@ -2303,9 +2303,9 @@ fn bind_generic_struct_type_for_type(
             let target_label = StructFunctionKind::try_from(function.function_name.as_str())
                 .ok()
                 .map(|k| simple_function_table.get(k))
-                .flatten();
+                .flatten().or(Some(*function_labels_map.get(&(old_label as usize)).unwrap()));
             let new_label =
-                bind_generic_function_for_type(function, true, type_, target_label, binder) as u64;
+                bind_generic_function_for_type(function, true, type_, target_label, function_labels_map.clone(), binder) as u64;
             if Some(old_label as usize) == constructor_label {
                 changed_constructor_label = Some(new_label as usize);
             }
@@ -2755,6 +2755,7 @@ fn bind_function_call<'a, 'b>(
     }
     let function_type = function_type(&function.type_);
     if function_type.is_generic {
+        todo!("Generic functions are not yet supported!");
         let old_label = function
             .constant_value
             .unwrap()
@@ -2767,6 +2768,7 @@ fn bind_function_call<'a, 'b>(
             function_call.arguments,
             old_label,
             &function_type,
+            HashMap::default(),
             binder,
         );
         function = BoundNode::label_reference(label, function.type_);
@@ -3120,6 +3122,7 @@ fn bind_arguments_for_generic_function<'a, 'b>(
     arguments: Vec<SyntaxNode<'a>>,
     label: usize,
     function_type: &FunctionType,
+    function_labels_map: HashMap<usize, usize>,
     binder: &mut BindingState<'a, 'b>,
 ) -> (Vec<BoundNode>, usize) {
     let mut result = vec![];
@@ -3158,6 +3161,7 @@ fn bind_arguments_for_generic_function<'a, 'b>(
                     // again, this should not happen, since this gets called by
                     // function calls and you cannot call al $ function.
                     None,
+                    function_labels_map.clone(),
                     binder,
                 );
             }
@@ -3235,12 +3239,13 @@ fn bind_generic_function_for_type(
     has_this_parameter: bool,
     type_: &Type,
     target_label: Option<usize>,
+    function_labels_map: HashMap<usize, usize>,
     binder: &mut BindingState,
 ) -> usize {
     // TODO: Add new stage to compiler
     // let body = bind_node(generic_function.body, binder);
     let mut body = type_replacer::replace_generic_type_with(generic_function.body.clone(), type_);
-    let mut labels = std::collections::HashMap::new();
+    let mut labels = function_labels_map;
     body.for_each_child_mut(&mut |child: &mut BoundNode| {
         // child.span.set_is_foreign(true);
         match &mut child.kind {
