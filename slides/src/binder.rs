@@ -80,12 +80,48 @@ struct FunctionDeclarationBody<'a> {
     struct_function_kind: Option<StructFunctionKind>,
 }
 
+#[derive(Default, Clone, Debug, Copy)]
+struct SimpleStructFunctionTable {
+    pub constructor_function: Option<usize>,
+    pub to_string_function: Option<usize>,
+    pub get_function: Option<usize>,
+    pub set_function: Option<usize>,
+    pub element_count_function: Option<usize>,
+    pub equals_function: Option<usize>,
+}
+
+
+impl SimpleStructFunctionTable {
+    pub fn set(&mut self, kind: StructFunctionKind, label: usize) {
+        match kind {
+            StructFunctionKind::Constructor => self.constructor_function = Some(label),
+            StructFunctionKind::ToString => self.to_string_function = Some(label),
+            StructFunctionKind::Get => self.get_function = Some(label),
+            StructFunctionKind::Set => self.set_function = Some(label),
+            StructFunctionKind::ElementCount => self.element_count_function = Some(label),
+            StructFunctionKind::Equals => self.equals_function = Some(label),
+        }
+    }
+
+    pub fn get(&self, kind: StructFunctionKind) -> Option<usize> {
+        match kind {
+            StructFunctionKind::Constructor => self.constructor_function,
+            StructFunctionKind::ToString => self.to_string_function,
+            StructFunctionKind::Get => self.get_function,
+            StructFunctionKind::Set => self.set_function,
+            StructFunctionKind::ElementCount => self.element_count_function,
+            StructFunctionKind::Equals => self.equals_function,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct StructDeclarationBody<'a> {
     name: Cow<'a, str>,
     id: u64,
     body: StructBodyNode<'a>,
     is_generic: bool,
+    struct_function_table: SimpleStructFunctionTable,
 }
 
 struct VariableEntry {
@@ -1107,13 +1143,13 @@ fn bind<'a>(
 
     while let Some(node) = binder.generic_structs.pop() {
         let (fields, function_table) =
-            bind_struct_body(&node.name, node.id, node.body, &mut binder);
+            bind_struct_body(&node.name, node.id, node.body, node.struct_function_table, &mut binder);
         binder.register_generic_struct(node.id, fields, function_table);
     }
 
     while let Some(node) = binder.structs.pop() {
         let (fields, function_table) =
-            bind_struct_body(&node.name, node.id, node.body, &mut binder);
+            bind_struct_body(&node.name, node.id, node.body, node.struct_function_table, &mut binder);
         binder.register_struct(node.id, fields, function_table);
     }
 
@@ -1417,6 +1453,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
     struct_is_generic: bool,
     function_declaration: FunctionDeclarationNodeKind<'a>,
     struct_function_table: &mut StructFunctionTable,
+    simple_struct_function_table: SimpleStructFunctionTable,
     binder: &mut BindingState<'a, 'b>,
 ) -> Option<BoundStructFieldSymbol<'a>> {
     let header_span = TextSpan::bounds(
@@ -1441,10 +1478,10 @@ fn bind_function_declaration_for_struct<'a, 'b>(
         "{}::{}",
         struct_name, function_declaration.identifier.lexeme
     );
-    let function_label = binder.generate_label() as u64;
     // FIXME: implement getter for generic structs.
     match StructFunctionKind::try_from(function_declaration.identifier.lexeme) {
         Ok(struct_function_kind) => {
+            let function_label = simple_struct_function_table.get(struct_function_kind).unwrap() as u64;
             type_check_struct_function_kind(
                 header_span,
                 struct_function_kind,
@@ -1486,6 +1523,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 );
                 None
             } else {
+                let function_label = binder.generate_label() as u64;
                 binder.register_generated_constant(
                     function_name.clone(),
                     Value::LabelPointer(function_label as usize, type_.clone()),
@@ -1631,12 +1669,37 @@ fn bind_struct_declaration<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) {
     if let Some(id) = binder.register_struct_name(struct_declaration.identifier.lexeme) {
+        let mut struct_function_table = SimpleStructFunctionTable::default();
+        for statement in &struct_declaration.body.statements {
+            match &statement.kind {
+                SyntaxNodeKind::FunctionDeclaration(function_declaration) => {
+                    let function_name = function_declaration.identifier.lexeme;
+                    if !function_name.starts_with('$') {
+                        continue;
+                    }
+                    let struct_function_kind = match StructFunctionKind::try_from(function_name) {
+                        Ok(it) => it,
+                        Err(_) => {
+                            // Note: This error will be reported later, when all
+                            // functions inside the struct are type checked,
+                            // right now we are only interested in the correctly
+                            // named functions for our function table.
+                            continue;
+                        },
+                    };
+                    struct_function_table.set(struct_function_kind, binder.generate_label());
+                }
+                SyntaxNodeKind::StructField(_) => {}
+                _ => {}
+            }
+        }
         if struct_declaration.optional_generic_keyword.is_some() {
             binder.generic_structs.push(StructDeclarationBody {
                 name: struct_declaration.identifier.lexeme.into(),
                 id,
                 body: *struct_declaration.body,
                 is_generic: struct_declaration.optional_generic_keyword.is_some(),
+                struct_function_table,
             });
         } else {
             binder.structs.push(StructDeclarationBody {
@@ -1644,6 +1707,7 @@ fn bind_struct_declaration<'a, 'b>(
                 id,
                 body: *struct_declaration.body,
                 is_generic: struct_declaration.optional_generic_keyword.is_some(),
+                struct_function_table,
             });
         }
     } else {
@@ -1684,10 +1748,13 @@ fn bind_function_type<'a>(
     )
 }
 
+// FIXME: We already have struct which contains all the struct_ fields, why are
+// not using it directly??
 fn bind_struct_body<'a>(
     struct_name: &str,
     struct_id: u64,
     struct_body: StructBodyNode<'a>,
+    struct_function_table: SimpleStructFunctionTable,
     binder: &mut BindingState<'a, '_>,
 ) -> (Vec<BoundStructFieldSymbol<'a>>, StructFunctionTable) {
     let mut fields: Vec<BoundStructFieldSymbol> = vec![];
@@ -1706,6 +1773,7 @@ fn bind_struct_body<'a>(
                     struct_is_generic,
                     *function_declaration,
                     &mut function_table,
+                    struct_function_table,
                     binder,
                 )
             }
