@@ -13,6 +13,7 @@ pub enum Type {
     Void,
     Any,
     Integer,
+    UnsignedInteger,
     Boolean,
     None,
     SystemCall(SystemCallKind),
@@ -98,6 +99,7 @@ impl Type {
             Type::Void => 1,
             Type::Any => 1,
             Type::Integer => 1,
+            Type::UnsignedInteger => 1,
             Type::Boolean => 1,
             Type::None => 1,
             Type::String => 1,
@@ -145,8 +147,9 @@ impl Type {
     pub const TYPE_IDENTIFIER_VOID: u64 = 1;
     pub const TYPE_IDENTIFIER_ANY: u64 = 2;
     pub const TYPE_IDENTIFIER_INTEGER: u64 = 3;
-    pub const TYPE_IDENTIFIER_BOOLEAN: u64 = 4;
-    pub const TYPE_IDENTIFIER_NONE: u64 = 5;
+    pub const TYPE_IDENTIFIER_UNSIGNED_INTEGER: u64 = 4;
+    pub const TYPE_IDENTIFIER_BOOLEAN: u64 = 5;
+    pub const TYPE_IDENTIFIER_NONE: u64 = 6;
     pub const TYPE_IDENTIFIER_NONEABLE: u64 = 7;
     pub const TYPE_IDENTIFIER_STRING: u64 = 8;
     pub const TYPE_IDENTIFIER_FUNCTION: u64 = 9;
@@ -179,6 +182,7 @@ impl Type {
             Type::Void => Self::TYPE_IDENTIFIER_VOID,
             Type::Any => Self::TYPE_IDENTIFIER_ANY,
             Type::Integer => Self::TYPE_IDENTIFIER_INTEGER,
+            Type::UnsignedInteger => Self::TYPE_IDENTIFIER_UNSIGNED_INTEGER,
             Type::Boolean => Self::TYPE_IDENTIFIER_BOOLEAN,
             Type::None => Self::TYPE_IDENTIFIER_NONE,
             Type::Noneable(_) => Self::TYPE_IDENTIFIER_NONEABLE,
@@ -261,6 +265,7 @@ impl Type {
             | Type::Function(_)
             | Type::Closure(_)
             | Type::Integer
+            | Type::UnsignedInteger
             | Type::Boolean
             | Type::SystemCall(_)
             | Type::Noneable(_)
@@ -278,6 +283,7 @@ impl Type {
             Type::Void | Type::Any | Type::Error => unreachable!(),
             Type::String => 1,
             Type::Integer
+            | Type::UnsignedInteger
             | Type::Boolean
             | Type::None
             | Type::SystemCall(_)
@@ -304,6 +310,7 @@ impl Type {
             | Type::Function(_)
             | Type::SystemCall(_)
             | Type::Integer
+            | Type::UnsignedInteger
             | Type::Boolean => false,
             // A none Pointer should never be dereferenced.
             Type::None
@@ -328,6 +335,7 @@ impl std::fmt::Display for Type {
             Type::Void => write!(f, "void"),
             Type::Any => write!(f, "any"),
             Type::Integer => write!(f, "int"),
+            Type::UnsignedInteger => write!(f, "uint"),
             Type::Boolean => write!(f, "bool"),
             Type::None => Type::noneable(Type::Any).fmt(f),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),

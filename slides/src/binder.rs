@@ -972,6 +972,7 @@ impl<'a> BindingState<'a, '_> {
             | Type::Void
             | Type::Any
             | Type::Integer
+            | Type::UnsignedInteger
             | Type::Boolean
             | Type::None
             | Type::String
@@ -1089,6 +1090,11 @@ fn type_table() -> Vec<BoundVariableName<'static>> {
         BoundVariableName {
             identifier: "int".into(),
             type_: Type::Integer,
+            is_read_only: true,
+        },
+        BoundVariableName {
+            identifier: "uint".into(),
+            type_: Type::UnsignedInteger,
             is_read_only: true,
         },
         BoundVariableName {
@@ -2974,6 +2980,7 @@ fn bind_field_access<'a, 'b>(
         Type::Any
         | Type::Void
         | Type::Integer
+        | Type::UnsignedInteger
         | Type::Boolean
         | Type::None
         | Type::Function(_)
@@ -3059,6 +3066,7 @@ fn bind_field_access_for_assignment<'a>(
         Type::Any
         | Type::Void
         | Type::Integer
+        | Type::UnsignedInteger
         | Type::Boolean
         | Type::None
         | Type::SystemCall(_)
@@ -3325,6 +3333,7 @@ fn bind_condition_conversion<'a>(
         Type::Void
         | Type::Any
         | Type::Integer
+        | Type::UnsignedInteger
         | Type::SystemCall(_)
         | Type::String
         | Type::Function(_)

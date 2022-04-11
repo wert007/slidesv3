@@ -152,6 +152,9 @@ fn to_string_native(
         Type::Integer => {
             format!("{}", argument.unwrap_value() as i64)
         }
+        Type::UnsignedInteger => {
+            format!("{}", argument.unwrap_value() as u64)
+        }
         Type::Pointer => {
             format!("0x{:x}", argument.unwrap_pointer())
         }
