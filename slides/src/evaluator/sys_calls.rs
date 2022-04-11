@@ -235,3 +235,7 @@ pub fn runtime_error(argument: FlaggedWord, state: &mut EvaluatorState) {
     println!("Runtime error happened: {}", argument);
     state.runtime_error_happened = true;
 }
+
+pub fn address_of(argument: FlaggedWord, state: &mut EvaluatorState) {
+    state.stack.push(argument.value);
+}

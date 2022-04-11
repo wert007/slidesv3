@@ -1389,6 +1389,7 @@ fn default_statements(binder: &mut BindingState) {
         "runtimeError",
         Value::SystemCall(SystemCallKind::RuntimeError),
     );
+    binder.register_constant("addressOf", Value::SystemCall(SystemCallKind::AddressOf));
 }
 
 fn std_imports(binder: &mut BindingState) {

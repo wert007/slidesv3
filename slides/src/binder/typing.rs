@@ -173,6 +173,8 @@ impl Type {
         (1 + SystemCallKind::Reallocate as u8 as u64) << 8;
     pub const TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR: u64 =
         (1 + SystemCallKind::RuntimeError as u8 as u64) << 8;
+    pub const TYPE_IDENTIFIER_SYSTEM_CALL_ADDRESS_OF: u64 =
+        (1 + SystemCallKind::AddressOf as u8 as u64) << 8;
 
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
@@ -210,6 +212,9 @@ impl Type {
             }
             Type::SystemCall(SystemCallKind::RuntimeError) => {
                 Self::TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR
+            }
+            Type::SystemCall(SystemCallKind::AddressOf) => {
+                Self::TYPE_IDENTIFIER_SYSTEM_CALL_ADDRESS_OF
             }
         }
     }
@@ -376,6 +381,7 @@ pub enum SystemCallKind {
     Break,
     Reallocate,
     RuntimeError,
+    AddressOf,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -391,6 +397,7 @@ impl std::fmt::Display for SystemCallKind {
                 SystemCallKind::Break => "break",
                 SystemCallKind::Reallocate => "reallocate",
                 SystemCallKind::RuntimeError => "runtimeError",
+                SystemCallKind::AddressOf => "addressOf",
             }
         )
     }
@@ -486,6 +493,13 @@ impl FunctionType {
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },
+            SystemCallKind::AddressOf => Self {
+                parameter_types: vec![Type::Pointer],
+                this_type: None,
+                return_type: Type::UnsignedInteger,
+                system_call_kind: Some(system_call_kind),
+                is_generic: false,
+            }
         }
     }
 
