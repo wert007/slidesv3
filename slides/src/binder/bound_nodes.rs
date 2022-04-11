@@ -858,12 +858,16 @@ impl BoundConversionNodeKind {
             | (Type::Function(_), Type::None)
             | (Type::Function(_), Type::Noneable(_))
             | (Type::Integer(_), Type::None)
-            | (Type::Integer(_), Type::Noneable(_)) => ConversionKind::Unboxing,
+            | (Type::Integer(_), Type::Noneable(_))
+            | (Type::IntegerLiteral, Type::None)
+            | (Type::IntegerLiteral, Type::Noneable(_)) => ConversionKind::Unboxing,
             (Type::None, Type::Integer(_))
+            | (Type::None, Type::IntegerLiteral)
             | (Type::None, Type::Boolean)
             | (Type::None, Type::SystemCall(_))
             | (Type::None, Type::Function(_))
             | (Type::Noneable(_), Type::Integer(_))
+            | (Type::Noneable(_), Type::IntegerLiteral)
             | (Type::Noneable(_), Type::Boolean)
             | (Type::Noneable(_), Type::SystemCall(_))
             | (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,
