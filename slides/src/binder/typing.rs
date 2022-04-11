@@ -295,19 +295,7 @@ impl Type {
             Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::Void | Type::Any | Type::Error => unreachable!(),
             Type::String => 1,
-            Type::Integer(_)
-            | Type::IntegerLiteral
-            | Type::Boolean
-            | Type::None
-            | Type::SystemCall(_)
-            | Type::Noneable(_)
-            | Type::Function(_)
-            | Type::Closure(_)
-            | Type::Struct(_)
-            | Type::StructReference(_)
-            | Type::TypedGenericStruct(_)
-            | Type::Pointer
-            | Type::PointerOf(_) => WORD_SIZE_IN_BYTES,
+            _ => unreachable!("TODO: String should be a struct I think, then this function would not be needed anymore at all!"),
         }
     }
 
