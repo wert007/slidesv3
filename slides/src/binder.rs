@@ -411,6 +411,7 @@ impl From<StructFieldSymbol> for BoundStructFieldSymbol<'_> {
 
 enum StdTypeKind {
     Range,
+    UnsignedRange,
     Array,
 }
 
@@ -418,6 +419,7 @@ impl StdTypeKind {
     pub fn name(&self) -> &str {
         match self {
             StdTypeKind::Range => "Range",
+            StdTypeKind::UnsignedRange => "UnsignedRange",
             StdTypeKind::Array => "Array",
         }
     }
@@ -2432,9 +2434,14 @@ fn bind_binary_insertion<'a>(
             };
             match bound_binary.op {
                 BoundBinaryOperator::Range => {
-                    let base_type = binder
+                    let base_type = if matches!(lhs.type_, Type::Integer(integer_type) if integer_type.is_signed()) {
+                    binder
                         .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
-                        .unwrap();
+                        .unwrap()
+                    } else {
+                        binder.get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::UnsignedRange))
+                        .unwrap()
+                    };
                     let function = base_type
                         .function_table
                         .constructor_function
