@@ -119,7 +119,8 @@ impl Type {
         match (self, other) {
             (a, b) if a == b => false,
             (Type::Any, _) => true,
-            (Type::Pointer, Type::Integer) => true,
+            // FIXME: Can it though?
+            // (Type::Pointer, Type::Integer) => true,
             (Type::PointerOf(inner), Type::Noneable(other)) => inner.can_be_converted_to(other),
             (Type::Noneable(base_type), other) => base_type.can_be_converted_to(other),
             (Type::Integer(signed_type), Type::Integer(unsigned_type)) if signed_type.is_signed() && !unsigned_type.is_signed() && unsigned_type.to_signed() == *signed_type => true,
