@@ -372,6 +372,14 @@ impl BucketEntry {
         }
     }
 
+    pub fn is_used(&self) -> bool {
+        match self {
+            BucketEntry::Bucket(bucket) => bucket.is_used,
+            BucketEntry::Parent(_) => true,
+            BucketEntry::Tombstone => false,
+        }
+    }
+
     fn as_bucket(&self) -> Option<&Bucket> {
         if let Self::Bucket(v) = self {
             Some(v)
@@ -421,8 +429,8 @@ pub struct Bucket {
     index: usize,
     buddy_index: Option<usize>,
     parent_index: Option<usize>,
-    address: u64,
-    size_in_words: u64,
+    pub address: u64,
+    pub size_in_words: u64,
     depth: usize,
     is_used: bool,
 }
