@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn test_type_identifiers() {
-    let t = Type::Integer;
+    let t = Type::Integer(IntegerType::Signed64);
     let tid = t.type_identifier_kind();
     let ct = Type::simple_type_from_type_identifier(tid).unwrap();
     assert_eq!(t, ct);
