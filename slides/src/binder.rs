@@ -2096,6 +2096,11 @@ fn bind_array_literal_first_child<'a>(
         vec![bind_node(first_child, binder)]
     };
     let type_ = expected_type.unwrap_or_else(|| children[0].type_.clone());
+    let type_ = if type_ == Type::IntegerLiteral {
+        Type::Integer(IntegerType::Signed64)
+    } else {
+        type_
+    };
     let children = children
         .into_iter()
         .map(|c| bind_conversion(c, &type_, binder))
