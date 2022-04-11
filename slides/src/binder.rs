@@ -16,7 +16,7 @@ use crate::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         symbols::StructFunctionKind,
-        typing::Type,
+        typing::{Type, IntegerType},
     },
     diagnostics::DiagnosticBag,
     instruction_converter::{self, instruction::Instruction, InstructionOrLabelReference},
@@ -971,8 +971,8 @@ impl<'a> BindingState<'a, '_> {
             Type::Error
             | Type::Void
             | Type::Any
-            | Type::Integer
-            | Type::UnsignedInteger
+            | Type::Integer(_)
+            | Type::IntegerLiteral
             | Type::Boolean
             | Type::None
             | Type::String
@@ -1089,12 +1089,17 @@ fn type_table() -> Vec<BoundVariableName<'static>> {
     vec![
         BoundVariableName {
             identifier: "int".into(),
-            type_: Type::Integer,
+            type_: Type::Integer(IntegerType::Signed64),
+            is_read_only: true,
+        },
+        BoundVariableName {
+            identifier: "byte".into(),
+            type_: Type::Integer(IntegerType::Unsigned8),
             is_read_only: true,
         },
         BoundVariableName {
             identifier: "uint".into(),
-            type_: Type::UnsignedInteger,
+            type_: Type::Integer(IntegerType::Unsigned64),
             is_read_only: true,
         },
         BoundVariableName {
@@ -1663,11 +1668,11 @@ fn type_check_struct_function_kind(
                     1,
                 );
             }
-            if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer) {
+            if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer(IntegerType::Unsigned64)) {
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.parameter_types[0],
-                    &Type::Integer,
+                    &Type::Integer(IntegerType::Unsigned64),
                 );
             }
         }
@@ -1679,11 +1684,11 @@ fn type_check_struct_function_kind(
                     2,
                 );
             }
-            if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer) {
+            if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer(IntegerType::Unsigned64)) {
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.parameter_types[0],
-                    &Type::Integer,
+                    &Type::Integer(IntegerType::Unsigned64),
                 );
             }
         }
@@ -1697,12 +1702,12 @@ fn type_check_struct_function_kind(
             }
             if !function_type
                 .return_type
-                .can_be_converted_to(&Type::Integer)
+                .can_be_converted_to(&Type::Integer(IntegerType::Unsigned64))
             {
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.return_type,
-                    &Type::Integer,
+                    &Type::Integer(IntegerType::Unsigned64),
                 );
             }
         }
@@ -2041,7 +2046,7 @@ fn bind_array_literal<'a, 'b>(
             if let SyntaxNodeKind::RepetitionNode(repetition_node) = child.kind {
                 let base_expression = bind_node(*repetition_node.base_expression, binder);
                 let repetition = bind_node(*repetition_node.repetition, binder);
-                let repetition = bind_conversion(repetition, &Type::Integer, binder);
+                let repetition = bind_conversion(repetition, &Type::Integer(IntegerType::Unsigned64), binder);
                 let repetition = match repetition.constant_value {
                     Some(value) => value.value.as_integer().unwrap(),
                     None => {
@@ -2073,7 +2078,7 @@ fn bind_array_literal_first_child<'a>(
     let children = if let SyntaxNodeKind::RepetitionNode(repetition_node) = first_child.kind {
         let base_expression = bind_node(*repetition_node.base_expression, binder);
         let repetition = bind_node(*repetition_node.repetition, binder);
-        let repetition = bind_conversion(repetition, &Type::Integer, binder);
+        let repetition = bind_conversion(repetition, &Type::Integer(IntegerType::Unsigned64), binder);
         let repetition = match repetition.constant_value {
             Some(value) => value.value.as_integer().unwrap(),
             None => {
@@ -2538,6 +2543,14 @@ fn bind_binary_operator<'a, 'b>(
         {
             Some(BoundBinary::same_input(lhs, result, Type::Boolean))
         }
+        (Type::Integer(lhs), BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, Type::IntegerLiteral) =>
+        {
+            Some(BoundBinary::same_input(&Type::Integer(*lhs), result, Type::Boolean))
+        }
+        (Type::IntegerLiteral, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, Type::Integer(rhs)) =>
+        {
+            Some(BoundBinary::same_input(&Type::Integer(*rhs), result, Type::Boolean))
+        }
         (
             Type::Noneable(inner),
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
@@ -2567,22 +2580,78 @@ fn bind_binary_operator<'a, 'b>(
             Type::Boolean,
         )),
         (
-            Type::Integer,
+            Type::Integer(lhs_integer_type),
             BoundBinaryOperator::ArithmeticAddition
             | BoundBinaryOperator::ArithmeticSubtraction
             | BoundBinaryOperator::ArithmeticMultiplication
             | BoundBinaryOperator::ArithmeticDivision,
-            Type::Integer,
-        ) => Some(BoundBinary::same_output(result, Type::Integer)),
+            Type::Integer(rhs_integer_type),
+        ) if lhs_integer_type == rhs_integer_type => Some(BoundBinary::same_output(result, Type::Integer(*lhs_integer_type))),
         (
-            Type::Integer,
+            Type::Integer(lhs_integer_type),
+            BoundBinaryOperator::ArithmeticAddition
+            | BoundBinaryOperator::ArithmeticSubtraction
+            | BoundBinaryOperator::ArithmeticMultiplication
+            | BoundBinaryOperator::ArithmeticDivision,
+            Type::Integer(rhs_integer_type),
+        ) if lhs_integer_type.equals_ignoring_sign(rhs_integer_type) => Some(BoundBinary::same_output(result, Type::Integer(lhs_integer_type.to_signed()))),
+        (
+            Type::Integer(lhs_integer_type),
+            BoundBinaryOperator::ArithmeticAddition
+            | BoundBinaryOperator::ArithmeticSubtraction
+            | BoundBinaryOperator::ArithmeticMultiplication
+            | BoundBinaryOperator::ArithmeticDivision,
+            Type::IntegerLiteral,
+        ) => Some(BoundBinary::same_output(result, Type::Integer(*lhs_integer_type))),
+        (
+            Type::IntegerLiteral,
+            BoundBinaryOperator::ArithmeticAddition
+            | BoundBinaryOperator::ArithmeticSubtraction
+            | BoundBinaryOperator::ArithmeticMultiplication
+            | BoundBinaryOperator::ArithmeticDivision,
+            Type::Integer(rhs_integer_type),
+        ) => Some(BoundBinary::same_output(result, Type::Integer(*rhs_integer_type))),
+        (
+            Type::IntegerLiteral,
+            BoundBinaryOperator::ArithmeticAddition
+            | BoundBinaryOperator::ArithmeticSubtraction
+            | BoundBinaryOperator::ArithmeticMultiplication
+            | BoundBinaryOperator::ArithmeticDivision,
+            Type::IntegerLiteral,
+        ) => Some(BoundBinary::same_output(result, Type::IntegerLiteral)),
+        (
+            Type::Integer(lhs_integer_type),
             BoundBinaryOperator::LessThan
             | BoundBinaryOperator::GreaterThan
             | BoundBinaryOperator::LessThanEquals
             | BoundBinaryOperator::GreaterThanEquals,
-            Type::Integer,
+            Type::Integer(_) | Type::IntegerLiteral,
         ) => Some(BoundBinary::same_input(
-            &Type::Integer,
+            &Type::Integer(*lhs_integer_type),
+            result,
+            Type::Boolean,
+        )),
+        (
+            Type::IntegerLiteral,
+            BoundBinaryOperator::LessThan
+            | BoundBinaryOperator::GreaterThan
+            | BoundBinaryOperator::LessThanEquals
+            | BoundBinaryOperator::GreaterThanEquals,
+            Type::Integer(rhs_integer_type),
+        ) => Some(BoundBinary::same_input(
+            &Type::Integer(*rhs_integer_type),
+            result,
+            Type::Boolean,
+        )),
+        (
+            Type::IntegerLiteral,
+            BoundBinaryOperator::LessThan
+            | BoundBinaryOperator::GreaterThan
+            | BoundBinaryOperator::LessThanEquals
+            | BoundBinaryOperator::GreaterThanEquals,
+            Type::IntegerLiteral,
+        ) => Some(BoundBinary::same_input(
+            &Type::IntegerLiteral,
             result,
             Type::Boolean,
         )),
@@ -2635,11 +2704,17 @@ fn bind_binary_operator<'a, 'b>(
             rhs_type,
             rhs_type.clone(),
         )),
-        (Type::Integer, BoundBinaryOperator::Range, Type::Integer) => {
+        (Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral, BoundBinaryOperator::Range, Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral) => {
             let range_type = binder.look_up_std_struct_id(StdTypeKind::Range);
             let range_type = binder.get_struct_by_id(range_type).unwrap();
             let range_type = Type::Struct(Box::new(range_type));
-            Some(BoundBinary::same_input(&Type::Integer, result, range_type))
+            Some(BoundBinary::same_input(&Type::Integer(IntegerType::Signed64), result, range_type))
+        }
+        (Type::Integer(IntegerType::Unsigned64) | Type::IntegerLiteral, BoundBinaryOperator::Range, Type::Integer(IntegerType::Unsigned64) | Type::IntegerLiteral) => {
+            let range_type = binder.look_up_std_struct_id(StdTypeKind::Range);
+            let range_type = binder.get_struct_by_id(range_type).unwrap();
+            let range_type = Type::Struct(Box::new(range_type));
+            Some(BoundBinary::same_input(&Type::Integer(IntegerType::Unsigned64), result, range_type))
         }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
@@ -2679,8 +2754,20 @@ fn bind_unary_operator<'a, 'b>(
         _ => unreachable!(),
     };
     match operand.type_ {
-        Type::Integer if result != BoundUnaryOperator::LogicalNegation => {
-            Some((result, Type::Integer))
+        Type::Integer(integer_type) if result != BoundUnaryOperator::LogicalNegation => {
+            if result == BoundUnaryOperator::ArithmeticNegate {
+                Some((result, Type::Integer(integer_type.to_signed())))
+            } else {
+                Some((result, Type::Integer(integer_type)))
+            }
+        }
+        // FIXME: Is there a conversion of the operand needed?
+        Type::IntegerLiteral if result != BoundUnaryOperator::LogicalNegation => {
+            if result == BoundUnaryOperator::ArithmeticNegate {
+                Some((result, Type::Integer(IntegerType::Signed64)))
+            } else {
+                Some((result, Type::IntegerLiteral))
+            }
         }
         Type::Boolean | Type::Noneable(_) if result == BoundUnaryOperator::LogicalNegation => {
             Some((result, Type::Boolean))
@@ -2827,7 +2914,7 @@ fn bind_array_index<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode {
     let index = bind_node(*array_index.index, binder);
-    let index = bind_conversion(index, &Type::Integer, binder);
+    let index = bind_conversion(index, &Type::Integer(IntegerType::Unsigned64), binder);
     let base_span = array_index.base.span;
     let base = bind_node(*array_index.base, binder);
     let type_ = match binder.convert_struct_reference_to_struct(base.type_.clone()) {
@@ -2869,7 +2956,7 @@ fn bind_array_index_for_assignment<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode {
     let index = bind_node(*array_index.index, binder);
-    let index = bind_conversion(index, &Type::Integer, binder);
+    let index = bind_conversion(index, &Type::Integer(IntegerType::Unsigned64), binder);
     let base_span = array_index.base.span;
     let base = bind_node(*array_index.base, binder);
     let type_ = match base.type_.clone() {
@@ -2980,8 +3067,8 @@ fn bind_field_access<'a, 'b>(
         }
         Type::Any
         | Type::Void
-        | Type::Integer
-        | Type::UnsignedInteger
+        | Type::Integer(_)
+        | Type::IntegerLiteral
         | Type::Boolean
         | Type::None
         | Type::Function(_)
@@ -3066,8 +3153,8 @@ fn bind_field_access_for_assignment<'a>(
         Type::Error => base,
         Type::Any
         | Type::Void
-        | Type::Integer
-        | Type::UnsignedInteger
+        | Type::Integer(_)
+        | Type::IntegerLiteral
         | Type::Boolean
         | Type::None
         | Type::SystemCall(_)
@@ -3333,8 +3420,8 @@ fn bind_condition_conversion<'a>(
         }
         Type::Void
         | Type::Any
-        | Type::Integer
-        | Type::UnsignedInteger
+        | Type::Integer(_)
+        | Type::IntegerLiteral
         | Type::SystemCall(_)
         | Type::String
         | Type::Function(_)
@@ -3473,10 +3560,10 @@ fn bind_for_statement<'a, 'b>(
     let variable = variable.unwrap();
     let variable = BoundNode::variable(span, variable, variable_type);
     let index_variable = match for_statement.optional_index_variable.map(|i| i.lexeme) {
-        Some(index_variable) => binder.register_variable(index_variable, Type::Integer, true),
+        Some(index_variable) => binder.register_variable(index_variable, Type::Integer(IntegerType::Unsigned64), true),
         None => binder.register_generated_variable(
             format!("{}$index", variable_name),
-            Type::Integer,
+            Type::Integer(IntegerType::Unsigned64),
             true,
         ),
     };

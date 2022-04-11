@@ -21,7 +21,7 @@ use crate::{
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
-        typing::{FunctionKind, SystemCallKind, Type},
+        typing::{FunctionKind, SystemCallKind, Type, IntegerType},
     },
     debug::DebugFlags,
     diagnostics::DiagnosticBag,

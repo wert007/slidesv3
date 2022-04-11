@@ -3,7 +3,7 @@ use crate::{text::TextSpan, value::Value};
 use super::{
     operators::{BoundBinaryOperator, BoundUnaryOperator},
     symbols::StructFunctionTable,
-    typing::{FunctionKind, StructType, SystemCallKind, Type},
+    typing::{FunctionKind, StructType, SystemCallKind, Type, IntegerType},
 };
 
 pub mod is_same_expression;
@@ -313,7 +313,7 @@ impl BoundNode {
     ) -> Self {
         let while_condition = BoundNode::binary(
             span,
-            BoundNode::variable(span, index_variable, Type::Integer),
+            BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
             BoundBinaryOperator::LessThan,
             BoundNode::function_call(
                 span,
@@ -338,7 +338,7 @@ impl BoundNode {
                     collection.type_.clone(),
                 )],
                 false,
-                Type::Integer,
+                Type::Integer(IntegerType::Unsigned64),
             ),
             Type::Boolean,
         );
@@ -362,7 +362,7 @@ impl BoundNode {
                             ),
                         ),
                         vec![
-                            BoundNode::variable(span, index_variable, Type::Integer),
+                            BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
                             BoundNode::variable(
                                 span,
                                 collection_variable,
@@ -379,13 +379,13 @@ impl BoundNode {
                 // $index = $index + 1;
                 BoundNode::assignment(
                     span,
-                    BoundNode::variable(span, index_variable, Type::Integer),
+                    BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
                     BoundNode::binary(
                         span,
-                        BoundNode::variable(span, index_variable, Type::Integer),
+                        BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
                         BoundBinaryOperator::ArithmeticAddition,
                         BoundNode::literal_from_value(Value::Integer(1)),
-                        Type::Integer,
+                        Type::Integer(IntegerType::Unsigned64),
                     ),
                 ),
             ],
@@ -857,13 +857,13 @@ impl BoundConversionNodeKind {
             | (Type::SystemCall(_), Type::Noneable(_))
             | (Type::Function(_), Type::None)
             | (Type::Function(_), Type::Noneable(_))
-            | (Type::Integer, Type::None)
-            | (Type::Integer, Type::Noneable(_)) => ConversionKind::Unboxing,
-            (Type::None, Type::Integer)
+            | (Type::Integer(_), Type::None)
+            | (Type::Integer(_), Type::Noneable(_)) => ConversionKind::Unboxing,
+            (Type::None, Type::Integer(_))
             | (Type::None, Type::Boolean)
             | (Type::None, Type::SystemCall(_))
             | (Type::None, Type::Function(_))
-            | (Type::Noneable(_), Type::Integer)
+            | (Type::Noneable(_), Type::Integer(_))
             | (Type::Noneable(_), Type::Boolean)
             | (Type::Noneable(_), Type::SystemCall(_))
             | (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,

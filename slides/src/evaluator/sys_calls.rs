@@ -1,6 +1,6 @@
 use crate::{
     binder::{
-        typing::{FunctionType, StructReferenceType, Type},
+        typing::{FunctionType, StructReferenceType, Type, self},
         SimpleStructFunctionTable,
     },
     evaluator::memory::bytes_to_word,
@@ -102,7 +102,7 @@ fn to_string_native(
     state: &mut EvaluatorState,
 ) -> String {
     match type_ {
-        Type::Library(_) | Type::GenericType | Type::TypedGenericStruct(_) => unreachable!(),
+        Type::Library(_) | Type::GenericType | Type::TypedGenericStruct(_) | Type::IntegerLiteral => unreachable!(),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
@@ -149,11 +149,12 @@ fn to_string_native(
                 format!("type struct id#{}", id.id)
             }
         }
-        Type::Integer => {
-            format!("{}", argument.unwrap_value() as i64)
-        }
-        Type::UnsignedInteger => {
-            format!("{}", argument.unwrap_value() as u64)
+        Type::Integer(integer_type) => {
+            match integer_type {
+                typing::IntegerType::Signed64 => format!("{}", argument.unwrap_value() as i64),
+                typing::IntegerType::Unsigned8 => format!("{}", argument.unwrap_value() as u8),
+                typing::IntegerType::Unsigned64 => format!("{}", argument.unwrap_value() as u64),
+            }
         }
         Type::Pointer => {
             format!("0x{:x}", argument.unwrap_pointer())
