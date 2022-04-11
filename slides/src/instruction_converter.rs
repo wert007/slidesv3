@@ -839,6 +839,11 @@ fn convert_conversion(
 ) -> Vec<InstructionOrLabelReference> {
     let conversion_kind = conversion.kind();
     let base_type = conversion.base.type_.clone();
+    let base_type = if base_type == Type::IntegerLiteral {
+        Type::Integer(IntegerType::Signed64)
+    } else {
+        base_type
+    };
     let mut result = convert_node(*conversion.base, converter);
     match conversion_kind {
         ConversionKind::None => {}
