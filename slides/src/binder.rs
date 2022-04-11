@@ -1370,6 +1370,7 @@ fn bind_function_declaration_body<'a, 'b>(
     }
     let body_statements = lowerer::flatten(body, &mut binder.label_offset);
     if !matches!(&binder.function_return_type, Type::Void)
+        && !binder.diagnostic_bag.has_errors()
         && !control_flow_analyzer::check_if_all_paths_return(
             &node.function_name,
             &body_statements,
