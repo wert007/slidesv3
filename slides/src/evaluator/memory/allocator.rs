@@ -123,14 +123,17 @@ impl Allocator {
     }
 
     pub fn reallocate(&mut self, address: u64, size_in_bytes: u64) -> u64 {
+        dbg!(address, size_in_bytes);
         let result = {
             let size_in_words = bytes_to_word(size_in_bytes);
             let expected_size = size_in_words.next_power_of_two();
+            let mut old_bucket = None;
             let bucket_index = {
                 let bucket = if address == 0 {
                     None
                 } else {
-                    self.find_bucket_from_address_mut(address)
+                    old_bucket = self.find_bucket_from_address(address).map(Clone::clone);
+                    old_bucket
                         .filter(|b| b.size_in_words >= size_in_words)
                 };
                 match bucket {
@@ -141,6 +144,10 @@ impl Allocator {
                             // eprintln!("No Memory left!!!!");
                             return 0;
                         }
+                        // TODO: Performance: Do we really need to remove the
+                        // first element, which might copy over all the other
+                        // elements in the array. especially since we are just
+                        // interested in the index..
                         free_buckets.remove(0).index
                     }
                 }
@@ -187,9 +194,17 @@ impl Allocator {
             }
             let result_bucket = self.buckets[bucket_index].as_bucket_mut().unwrap();
             result_bucket.is_used = true;
+            if let Some(old_bucket) = &mut old_bucket {
+                dbg!(&old_bucket);
+                for i in 0..old_bucket.size_in_words {
+                    self.data[(result_bucket.address + i) as usize] = self.data[(old_bucket.address + i) as usize];
+                }
+                old_bucket.is_used = false;
+            }
             result_bucket.address as u64 * WORD_SIZE_IN_BYTES
         };
         let result = result | HEAP_POINTER;
+        dbg!(result);
         if self.debug_heap_as_string {
             print_heap_as_string(&self.data);
         }
