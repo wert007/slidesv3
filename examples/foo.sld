@@ -1,21 +1,17 @@
-struct B {
-    values: A[];
-
-    func $toString() -> string {
-        return this.values + '';
-    }
-}
-
-struct A {
-    value: int;
-
-    func $toString() -> string {
-        return 'A(' + this.value + ')';
-    }
-}
-
 func main() {
-    let b = new B([new A(1)]);
-    print(b);
-    // print('A(42) = ' + new A(42));
+    let a = 42;
+    // TODO:
+    // a = -32 + a;
+
+    print(a);
+
+    // TODO:
+    // let b : int? = 32;
+    // if b == 32 {
+    //     print('yay!');
+    // }
+
+    // TODO:
+    // let c : uint = 3;
+    // let d : uint[] = [1, 2, c];
 }
