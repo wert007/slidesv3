@@ -1,7 +1,6 @@
 func main() {
     let a = 42;
-    // TODO:
-    // a = -32 + a;
+    a = -32 + a;
 
     print(a);
 

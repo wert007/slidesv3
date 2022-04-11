@@ -3668,6 +3668,11 @@ fn bind_variable_declaration<'a, 'b>(
             .diagnostic_bag
             .report_invalid_variable_type_none(span);
     }
+    let type_ = if type_ == Type::IntegerLiteral {
+        Type::Integer(IntegerType::Signed64)
+    } else {
+        type_
+    };
     let initializer = bind_conversion(initializer, &type_, binder);
     let variable_index =
         binder.register_variable(variable_declaration.identifier.lexeme, type_.clone(), false);
