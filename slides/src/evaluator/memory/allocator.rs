@@ -26,26 +26,27 @@ impl Allocator {
     }
 
     // #[cfg(debug_assertions)]
-    fn find_bucket_from_address(&self, address: u64) -> &Bucket {
+    fn find_bucket_from_address(&self, address: u64) -> Option<&Bucket> {
         for bucket in &self.buckets {
             if let BucketEntry::Bucket(bucket) = bucket {
                 if bucket.address * WORD_SIZE_IN_BYTES <= address
                     && (bucket.address + bucket.size_in_words) * WORD_SIZE_IN_BYTES > address
                 {
-                    return bucket;
+                    return Some(bucket);
                 }
             }
         }
-        panic!(
-            "Address 0x{:x} could not be assigned to a bucket! All Buckets ({}):\n\n{:#?}",
-            address,
-            self.buckets.len(),
-            &self
-                .buckets
-                .iter()
-                .filter_map(|b| b.as_bucket())
-                .collect::<Vec<_>>()
-        );
+        // panic!(
+        //     "Address 0x{:x} could not be assigned to a bucket! All Buckets ({}):\n\n{:#?}",
+        //     address,
+        //     self.buckets.len(),
+        //     &self
+        //         .buckets
+        //         .iter()
+        //         .filter_map(|b| b.as_bucket())
+        //         .collect::<Vec<_>>()
+        // );
+        None
     }
 
     fn find_bucket_from_address_mut(&mut self, address: u64) -> Option<&mut Bucket> {
@@ -199,7 +200,7 @@ impl Allocator {
         let address = clear_address(address) as u64;
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address as _).is_used,
+            self.find_bucket_from_address(address as _).unwrap().is_used,
             "address = 0x{:x}",
             address
         );
@@ -223,7 +224,7 @@ impl Allocator {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
                 .is_used
         );
         self.data[address as usize]
@@ -233,7 +234,7 @@ impl Allocator {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
                 .is_used
         );
         FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
@@ -247,7 +248,7 @@ impl Allocator {
     pub fn write_byte(&mut self, address: u64, value: u8) {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).is_used);
+        assert!(self.find_bucket_from_address(address).unwrap().is_used);
         let word_address = address & !(WORD_SIZE_IN_BYTES - 1);
         let old_value = self.read_word_aligned(word_address / WORD_SIZE_IN_BYTES);
         let mut bytes = old_value.to_be_bytes();
@@ -260,7 +261,7 @@ impl Allocator {
         let address = clear_address(address);
 
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).is_used);
+        assert!(self.find_bucket_from_address(address).unwrap().is_used);
         if address % WORD_SIZE_IN_BYTES == 0 {
             self.write_word_aligned(address / WORD_SIZE_IN_BYTES, value)
         } else {
@@ -272,7 +273,7 @@ impl Allocator {
         let address = clear_address(address);
 
         #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).is_used);
+        assert!(self.find_bucket_from_address(address).unwrap().is_used);
         if address % WORD_SIZE_IN_BYTES == 0 {
             self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, value)
         } else {
@@ -283,7 +284,7 @@ impl Allocator {
     fn write_word_aligned(&mut self, address: u64, value: u64) {
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
                 .is_used,
             "bucket = {:#?}, address = 0x{:x}",
             self.find_bucket_from_address(address),
@@ -300,7 +301,7 @@ impl Allocator {
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
                 .is_used,
             "bucket = {:#?}, address = 0x{:x}",
             self.find_bucket_from_address(address),

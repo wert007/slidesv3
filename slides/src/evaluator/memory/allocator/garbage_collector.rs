@@ -17,7 +17,7 @@ pub fn garbage_collect(mut unchecked_pointers: Vec<u64>, heap: &mut Allocator) {
             address,
             size_in_words,
             ..
-        } = heap.find_bucket_from_address(pointer);
+        } = heap.find_bucket_from_address(pointer).unwrap();
         let address = address * WORD_SIZE_IN_BYTES;
         checked_pointers.push(address);
         let mut address = address;
