@@ -28,7 +28,7 @@ func main() {
     let c2 = c;
     print('c == c2?');
     print(c == c2);
-    let check = c[3] == c.length();
+    let check = clampToUnsigned(c[3]) == c.length();
     print('c[3] == c.length()?');
     print(check);
     print('c.length()');
