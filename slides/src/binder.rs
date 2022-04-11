@@ -2573,7 +2573,7 @@ fn bind_binary_operator<'a, 'b>(
             outer,
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
             Type::Noneable(inner),
-        ) if inner.as_ref() == outer && outer != &Type::Void => Some(BoundBinary::same_input(
+        ) if outer.can_be_converted_to(inner) && outer != &Type::Void => Some(BoundBinary::same_input(
             &Type::Noneable(inner.clone()),
             result,
             Type::Boolean,
