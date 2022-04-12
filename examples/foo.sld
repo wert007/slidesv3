@@ -1,3 +1,7 @@
+func printUintArray(array: uint[]) {
+    print(array);
+}
+
 func main() {
     let a = 42;
     a = -32 + a;
@@ -16,6 +20,7 @@ func main() {
     }
 
     // TODO:
-    // let c : uint = 3;
-    // let d : uint[] = [1, 2, c];
+    let d : uint = 3;
+    let e : uint[] = [1, 2, d];
+    printUintArray(e);
 }
