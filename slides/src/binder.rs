@@ -46,7 +46,7 @@ use self::{
         FunctionSymbol, GenericFunction, GenericStructSymbol, Library, MaybeGenericStructSymbol,
         StructFieldSymbol, StructFunctionTable, StructSymbol,
     },
-    typing::{FunctionType, StructReferenceType, StructType, SystemCallKind},
+    typing::{FunctionType, StructReferenceType, StructType, SystemCallKind, TypedGenericStructType},
 };
 
 #[derive(Debug, Clone)]
@@ -1812,7 +1812,7 @@ fn bind_function_type<'a>(
         parameters.push(parameter);
     }
     let return_type = if let Some(it) = function_type.return_type {
-        bind_type(it.return_type, binder)
+        bind_type(it.return_type, binder).convert_typed_generic_struct_to_struct()
     } else {
         Type::Void
     };
@@ -1890,7 +1890,7 @@ fn bind_struct_body<'a>(
 
 fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -> (&'a str, Type) {
     let name = parameter.identifier.lexeme;
-    let type_ = bind_type(parameter.type_declaration.type_, binder);
+    let type_ = bind_type(parameter.type_declaration.type_, binder).convert_typed_generic_struct_to_struct();
     (name, type_)
 }
 
@@ -1942,7 +1942,12 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> Type {
         for _ in &type_.brackets {
             let (new_type, _) =
                 bind_generic_struct_type_for_type(array_base_type, &result, None, binder);
-            result = Type::Struct(Box::new(new_type));
+            result = Type::TypedGenericStruct(Box::new(TypedGenericStructType {
+                id: new_type.id,
+                type_: result.clone(),
+                function_table: new_type.function_table.clone(),
+                struct_type: new_type,
+            }));
         }
     }
     result
@@ -2036,12 +2041,11 @@ fn bind_array_literal<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode {
     let array_type = binder.look_up_std_struct_id(StdTypeKind::Array);
-    // let expected_type = if let Some(Type::Array(base_type)) = &binder.expected_type {
-    //     Some(*base_type.clone())
-    // } else {
-    //     None
-    // };
-    let expected_type = None;
+    let expected_type = if let Some(Type::TypedGenericStruct(typed_generic_struct_type)) = &binder.expected_type {
+        Some(typed_generic_struct_type.type_.clone())
+    } else {
+        None
+    };
     let first_child = array_literal.children.remove(0);
     let (type_, mut children) = bind_array_literal_first_child(first_child, expected_type, binder);
     for child in array_literal.children {
@@ -2114,7 +2118,7 @@ fn bind_cast_expression<'a>(
     binder: &mut BindingState<'a, '_>,
 ) -> BoundNode {
     let expression = bind_node(*cast_expression.expression, binder);
-    let type_ = bind_type(cast_expression.type_, binder);
+    let type_ = bind_type(cast_expression.type_, binder).convert_typed_generic_struct_to_struct();
     // Cast unnecessary and will always return a valid value.
     if expression.type_.can_be_converted_to(&type_) {
         binder
@@ -2156,7 +2160,7 @@ fn bind_constructor_call<'a>(
             brackets: vec![],
         },
         binder,
-    );
+    ).convert_typed_generic_struct_to_struct();
     let (struct_type, struct_id) = match type_ {
         Type::Struct(it) => (binder.get_struct_type_by_id(it.id).unwrap(), it.id),
         Type::StructReference(id) => (binder.get_struct_type_by_id(id.id).unwrap(), id.id),
@@ -3668,10 +3672,10 @@ fn bind_variable_declaration<'a, 'b>(
             .diagnostic_bag
             .report_invalid_variable_type_none(span);
     }
-    let type_ = if type_ == Type::IntegerLiteral {
-        Type::Integer(IntegerType::Signed64)
-    } else {
-        type_
+    let type_ = match type_ {
+        Type::IntegerLiteral => Type::Integer(IntegerType::Signed64),
+        Type::TypedGenericStruct(typed_generic_struct_type) => Type::Struct(Box::new(binder.get_struct_by_id(typed_generic_struct_type.id).unwrap())),
+        _ => type_,
     };
     let initializer = bind_conversion(initializer, &type_, binder);
     let variable_index =

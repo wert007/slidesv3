@@ -75,6 +75,9 @@ pub enum Type {
     Pointer,
     PointerOf(Box<Type>),
     GenericType,
+    // FIXME: This is only used to save the type of the generic array struct
+    // during binding in the variable declaration. If this stays this way there
+    // is probably a better solution to store that type then this type here.
     TypedGenericStruct(Box<TypedGenericStructType>),
 }
 
@@ -95,6 +98,14 @@ impl Type {
         Self::PointerOf(Box::new(base_type))
     }
 
+    pub fn convert_typed_generic_struct_to_struct(self) -> Self {
+        if let Type::TypedGenericStruct(typed_generic_struct_type) = self {
+            Type::Struct(Box::new(typed_generic_struct_type.struct_type	))
+        } else {
+            self
+        }
+    }
+
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         match (self, other) {
             (Type::Library(_), _) | (_, Type::Library(_)) => false,
@@ -108,6 +119,10 @@ impl Type {
             (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
             (Type::Struct(id), Type::StructReference(other_id)) if id.id == other_id.id => true,
             (Type::StructReference(id), Type::Struct(other)) if id.id == other.id => true,
+            (Type::TypedGenericStruct(id), Type::Struct(other)) if id.id == other.id => true,
+            (Type::TypedGenericStruct(id), Type::StructReference(other)) if id.id == other.id => true,
+            (Type::StructReference(id), Type::TypedGenericStruct(other)) if id.id == other.id => true,
+            (Type::Struct(id), Type::TypedGenericStruct(other)) if id.id == other.id => true,
             // FIXME: This means that 9999 would be a valid u8?
             (Type::IntegerLiteral, Type::Integer(_)) => true,
             (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => from_integer_type.to_signed() == *to_integer_type,
