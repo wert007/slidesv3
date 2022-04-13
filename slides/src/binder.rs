@@ -2047,7 +2047,7 @@ fn bind_array_literal<'a, 'b>(
         None
     };
     let first_child = array_literal.children.remove(0);
-    let (type_, mut children) = bind_array_literal_first_child(first_child, expected_type, binder);
+    let (mut type_, mut children) = bind_array_literal_first_child(first_child, expected_type, binder);
     for child in array_literal.children {
         let (child, repetition) =
             if let SyntaxNodeKind::RepetitionNode(repetition_node) = child.kind {
@@ -2067,6 +2067,15 @@ fn bind_array_literal<'a, 'b>(
             } else {
                 (bind_node(child, binder), 1)
             };
+        // If we only read integer literals until now, and the current entry is
+        // not an integer literal, try using it as the element type of the
+        // array.
+        if type_ == Type::IntegerLiteral && child.type_ != Type::IntegerLiteral {
+            if type_.can_be_converted_to(&child.type_) {
+                // FIXME: Do we need to update all children until now??
+                type_ = child.type_.clone();
+            }
+        }
         let child = bind_conversion(child, &type_, binder);
         for _ in 0..repetition {
             children.push(child.clone());
@@ -2100,11 +2109,7 @@ fn bind_array_literal_first_child<'a>(
         vec![bind_node(first_child, binder)]
     };
     let type_ = expected_type.unwrap_or_else(|| children[0].type_.clone());
-    let type_ = if type_ == Type::IntegerLiteral {
-        Type::Integer(IntegerType::Signed64)
-    } else {
-        type_
-    };
+    // If expected_type was None, this would be a noop.
     let children = children
         .into_iter()
         .map(|c| bind_conversion(c, &type_, binder))
