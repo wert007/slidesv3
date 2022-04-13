@@ -21,7 +21,7 @@ use crate::{
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
-        typing::{FunctionKind, SystemCallKind, Type},
+        typing::{FunctionKind, SystemCallKind, Type, IntegerType},
     },
     debug::DebugFlags,
     diagnostics::DiagnosticBag,
@@ -687,14 +687,16 @@ fn convert_system_call(
         | SystemCallKind::ToString
         | SystemCallKind::DebugHeapDump
         | SystemCallKind::RuntimeError
-        | SystemCallKind::Reallocate => {
+        | SystemCallKind::Reallocate
+        | SystemCallKind::AddressOf => {
             let mut result = vec![];
             let argument_count = match system_call.base {
                 SystemCallKind::Print
                 | SystemCallKind::ToString
                 | SystemCallKind::ArrayLength
-                | SystemCallKind::DebugHeapDump => 1,
-                SystemCallKind::RuntimeError => 1,
+                | SystemCallKind::DebugHeapDump
+                | SystemCallKind::RuntimeError
+                | SystemCallKind::AddressOf => 1,
                 SystemCallKind::Reallocate => 2,
                 SystemCallKind::Break => unreachable!(),
             };
@@ -837,6 +839,11 @@ fn convert_conversion(
 ) -> Vec<InstructionOrLabelReference> {
     let conversion_kind = conversion.kind();
     let base_type = conversion.base.type_.clone();
+    let base_type = if base_type == Type::IntegerLiteral {
+        Type::Integer(IntegerType::Signed64)
+    } else {
+        base_type
+    };
     let mut result = convert_node(*conversion.base, converter);
     match conversion_kind {
         ConversionKind::None => {}

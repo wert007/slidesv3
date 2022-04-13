@@ -1,6 +1,6 @@
 use crate::{
     binder::{
-        typing::{FunctionType, StructReferenceType, Type},
+        typing::{FunctionType, StructReferenceType, Type, self},
         SimpleStructFunctionTable,
     },
     evaluator::memory::bytes_to_word,
@@ -102,7 +102,7 @@ fn to_string_native(
     state: &mut EvaluatorState,
 ) -> String {
     match type_ {
-        Type::Library(_) | Type::GenericType | Type::TypedGenericStruct(_) => unreachable!(),
+        Type::Library(_) | Type::GenericType | Type::TypedGenericStruct(_) | Type::IntegerLiteral => unreachable!(),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
@@ -149,8 +149,12 @@ fn to_string_native(
                 format!("type struct id#{}", id.id)
             }
         }
-        Type::Integer => {
-            format!("{}", argument.unwrap_value() as i64)
+        Type::Integer(integer_type) => {
+            match integer_type {
+                typing::IntegerType::Signed64 => format!("{}", argument.unwrap_value() as i64),
+                typing::IntegerType::Unsigned8 => format!("{}", argument.unwrap_value() as u8),
+                typing::IntegerType::Unsigned64 => format!("{}", argument.unwrap_value() as u64),
+            }
         }
         Type::Pointer => {
             format!("0x{:x}", argument.unwrap_pointer())
@@ -231,4 +235,8 @@ pub fn runtime_error(argument: FlaggedWord, state: &mut EvaluatorState) {
     let argument = argument.replace('\0', "");
     println!("Runtime error happened: {}", argument);
     state.runtime_error_happened = true;
+}
+
+pub fn address_of(argument: FlaggedWord, state: &mut EvaluatorState) {
+    state.stack.push(argument.value);
 }

@@ -1,8 +1,10 @@
 func main() {
     let a = [1, 2, 3];
-    print(a[-1]);
+    // Compile time error now
+    // print(a[-1]);
     print(a[99]);
-    a[-1] = 0;
+    // Compile time error now
+    // a[-1] = 0;
     a[99] = -55;
     print(a);
 

@@ -7,12 +7,61 @@ use crate::evaluator::memory::WORD_SIZE_IN_BYTES;
 
 use super::{symbols::StructFunctionTable, SimpleStructFunctionTable};
 
+#[derive(TryFromPrimitive, PartialEq, Eq, Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum IntegerType {
+    Signed64,
+    Unsigned8,
+    Unsigned64,
+}
+
+impl IntegerType {
+    pub fn size_in_bytes(&self) -> u64 {
+        match self {
+            IntegerType::Signed64 => 8,
+            IntegerType::Unsigned8 => 1,
+            IntegerType::Unsigned64 => 8,
+        }
+    }
+
+    pub fn to_signed(&self) -> IntegerType {
+        match self {
+            IntegerType::Signed64 => *self,
+            IntegerType::Unsigned8 => todo!(),
+            IntegerType::Unsigned64 => Self::Signed64,
+        }
+    }
+
+    pub fn is_signed(&self) -> bool {
+        match self {
+            IntegerType::Signed64 => true,
+            IntegerType::Unsigned8 => false,
+            IntegerType::Unsigned64 => false,
+        }
+    }
+
+    pub fn equals_ignoring_sign(&self, other: &Self) -> bool {
+        self.to_signed() == other.to_signed()
+    }
+}
+
+impl std::fmt::Display for IntegerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IntegerType::Signed64 => write!(f, "int"),
+            IntegerType::Unsigned8 => write!(f, "byte"),
+            IntegerType::Unsigned64 => write!(f, "uint"),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Type {
     Error,
     Void,
     Any,
-    Integer,
+    IntegerLiteral,
+    Integer(IntegerType),
     Boolean,
     None,
     SystemCall(SystemCallKind),
@@ -26,6 +75,9 @@ pub enum Type {
     Pointer,
     PointerOf(Box<Type>),
     GenericType,
+    // FIXME: This is only used to save the type of the generic array struct
+    // during binding in the variable declaration. If this stays this way there
+    // is probably a better solution to store that type then this type here.
     TypedGenericStruct(Box<TypedGenericStructType>),
 }
 
@@ -46,6 +98,14 @@ impl Type {
         Self::PointerOf(Box::new(base_type))
     }
 
+    pub fn convert_typed_generic_struct_to_struct(self) -> Self {
+        if let Type::TypedGenericStruct(typed_generic_struct_type) = self {
+            Type::Struct(Box::new(typed_generic_struct_type.struct_type	))
+        } else {
+            self
+        }
+    }
+
     pub fn can_be_converted_to(&self, other: &Type) -> bool {
         match (self, other) {
             (Type::Library(_), _) | (_, Type::Library(_)) => false,
@@ -59,6 +119,13 @@ impl Type {
             (type_, Type::Noneable(other)) => type_.can_be_converted_to(other),
             (Type::Struct(id), Type::StructReference(other_id)) if id.id == other_id.id => true,
             (Type::StructReference(id), Type::Struct(other)) if id.id == other.id => true,
+            (Type::TypedGenericStruct(id), Type::Struct(other)) if id.id == other.id => true,
+            (Type::TypedGenericStruct(id), Type::StructReference(other)) if id.id == other.id => true,
+            (Type::StructReference(id), Type::TypedGenericStruct(other)) if id.id == other.id => true,
+            (Type::Struct(id), Type::TypedGenericStruct(other)) if id.id == other.id => true,
+            // FIXME: This means that 9999 would be a valid u8?
+            (Type::IntegerLiteral, Type::Integer(_)) => true,
+            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => from_integer_type.to_signed() == *to_integer_type,
             _ => false,
         }
     }
@@ -67,9 +134,11 @@ impl Type {
         match (self, other) {
             (a, b) if a == b => false,
             (Type::Any, _) => true,
-            (Type::Pointer, Type::Integer) => true,
+            // FIXME: Can it though?
+            // (Type::Pointer, Type::Integer) => true,
             (Type::PointerOf(inner), Type::Noneable(other)) => inner.can_be_converted_to(other),
             (Type::Noneable(base_type), other) => base_type.can_be_converted_to(other),
+            (Type::Integer(signed_type), Type::Integer(unsigned_type)) if signed_type.is_signed() && !unsigned_type.is_signed() && unsigned_type.to_signed() == *signed_type => true,
             _ => false,
         }
     }
@@ -97,7 +166,8 @@ impl Type {
             Type::Error => 1,
             Type::Void => 1,
             Type::Any => 1,
-            Type::Integer => 1,
+            Type::IntegerLiteral => 1,
+            Type::Integer(_) => 1,
             Type::Boolean => 1,
             Type::None => 1,
             Type::String => 1,
@@ -144,9 +214,8 @@ impl Type {
     pub const TYPE_IDENTIFIER_ERROR: u64 = 0;
     pub const TYPE_IDENTIFIER_VOID: u64 = 1;
     pub const TYPE_IDENTIFIER_ANY: u64 = 2;
-    pub const TYPE_IDENTIFIER_INTEGER: u64 = 3;
-    pub const TYPE_IDENTIFIER_BOOLEAN: u64 = 4;
-    pub const TYPE_IDENTIFIER_NONE: u64 = 5;
+    pub const TYPE_IDENTIFIER_BOOLEAN: u64 = 5;
+    pub const TYPE_IDENTIFIER_NONE: u64 = 6;
     pub const TYPE_IDENTIFIER_NONEABLE: u64 = 7;
     pub const TYPE_IDENTIFIER_STRING: u64 = 8;
     pub const TYPE_IDENTIFIER_FUNCTION: u64 = 9;
@@ -156,29 +225,17 @@ impl Type {
     pub const TYPE_IDENTIFIER_TYPED_GENERIC_STRUCT: u64 = 13;
     pub const TYPE_IDENTIFIER_POINTER: u64 = 14;
     pub const TYPE_IDENTIFIER_POINTER_OF: u64 = 15;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_PRINT: u64 =
-        (1 + SystemCallKind::Print as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING: u64 =
-        (1 + SystemCallKind::ToString as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH: u64 =
-        (1 + SystemCallKind::ArrayLength as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP: u64 =
-        (1 + SystemCallKind::DebugHeapDump as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_BREAK: u64 =
-        (1 + SystemCallKind::Break as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE: u64 =
-        (1 + SystemCallKind::Reallocate as u8 as u64) << 8;
-    pub const TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR: u64 =
-        (1 + SystemCallKind::RuntimeError as u8 as u64) << 8;
+
 
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
+            Type::IntegerLiteral => panic!("Only literals have this type! And they should be bound to a specific type at some point!"),
             Type::Error => Self::TYPE_IDENTIFIER_ERROR,
             Type::Void => Self::TYPE_IDENTIFIER_VOID,
             Type::Any => Self::TYPE_IDENTIFIER_ANY,
-            Type::Integer => Self::TYPE_IDENTIFIER_INTEGER,
+            Type::Integer(integer_type) => (1 + *integer_type as u8 as u64) << 16,
             Type::Boolean => Self::TYPE_IDENTIFIER_BOOLEAN,
             Type::None => Self::TYPE_IDENTIFIER_NONE,
             Type::Noneable(_) => Self::TYPE_IDENTIFIER_NONEABLE,
@@ -190,23 +247,7 @@ impl Type {
             Type::TypedGenericStruct(_) => Self::TYPE_IDENTIFIER_TYPED_GENERIC_STRUCT,
             Type::Pointer => Self::TYPE_IDENTIFIER_POINTER,
             Type::PointerOf(_) => Self::TYPE_IDENTIFIER_POINTER_OF,
-            Type::SystemCall(SystemCallKind::Print) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT,
-            Type::SystemCall(SystemCallKind::ToString) => {
-                Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING
-            }
-            Type::SystemCall(SystemCallKind::ArrayLength) => {
-                Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH
-            }
-            Type::SystemCall(SystemCallKind::DebugHeapDump) => {
-                Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP
-            }
-            Type::SystemCall(SystemCallKind::Break) => Self::TYPE_IDENTIFIER_SYSTEM_CALL_BREAK,
-            Type::SystemCall(SystemCallKind::Reallocate) => {
-                Self::TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE
-            }
-            Type::SystemCall(SystemCallKind::RuntimeError) => {
-                Self::TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR
-            }
+            Type::SystemCall(system_call_kind) => (1 + *system_call_kind as u8 as u64) << 8,
         }
     }
 
@@ -215,7 +256,6 @@ impl Type {
             Self::TYPE_IDENTIFIER_ERROR => Some(Type::Error),
             Self::TYPE_IDENTIFIER_VOID => Some(Type::Void),
             Self::TYPE_IDENTIFIER_ANY => Some(Type::Any),
-            Self::TYPE_IDENTIFIER_INTEGER => Some(Type::Integer),
             Self::TYPE_IDENTIFIER_BOOLEAN => Some(Type::Boolean),
             Self::TYPE_IDENTIFIER_NONE => Some(Type::None),
             Self::TYPE_IDENTIFIER_NONEABLE => None,
@@ -226,25 +266,17 @@ impl Type {
             Self::TYPE_IDENTIFIER_STRUCT_REFERENCE => None,
             Self::TYPE_IDENTIFIER_POINTER => Some(Type::Pointer),
             Self::TYPE_IDENTIFIER_POINTER_OF => None,
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_PRINT => {
-                Some(Type::SystemCall(SystemCallKind::Print))
+            unknown => {
+                if unknown >= 1 << 16 {
+                    let integer_type = (unknown >> 16) - 1;
+                    Some(Type::Integer(IntegerType::try_from_primitive(integer_type as u8).ok()?))
+                } else if unknown >= 1 << 8 {
+                    let system_call_kind = (unknown >> 8) - 1;
+                    Some(Type::SystemCall(SystemCallKind::try_from_primitive(system_call_kind as u8).ok()?))
+                } else {
+                    None
+                }
             }
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_TO_STRING => {
-                Some(Type::SystemCall(SystemCallKind::ToString))
-            }
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_ARRAY_LENGTH => {
-                Some(Type::SystemCall(SystemCallKind::ArrayLength))
-            }
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_DEBUG_HEAP_DUMP => {
-                Some(Type::SystemCall(SystemCallKind::DebugHeapDump))
-            }
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_REALLOCATE => {
-                Some(Type::SystemCall(SystemCallKind::Reallocate))
-            }
-            Self::TYPE_IDENTIFIER_SYSTEM_CALL_RUNTIME_ERROR => {
-                Some(Type::SystemCall(SystemCallKind::RuntimeError))
-            }
-            _ => None,
         }
     }
 
@@ -254,13 +286,14 @@ impl Type {
             Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
+            Type::Integer(integer_type) => integer_type.size_in_bytes(),
             Type::None
             | Type::Struct(_)
             | Type::StructReference(_)
             | Type::TypedGenericStruct(_)
             | Type::Function(_)
             | Type::Closure(_)
-            | Type::Integer
+            | Type::IntegerLiteral
             | Type::Boolean
             | Type::SystemCall(_)
             | Type::Noneable(_)
@@ -277,18 +310,7 @@ impl Type {
             Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::Void | Type::Any | Type::Error => unreachable!(),
             Type::String => 1,
-            Type::Integer
-            | Type::Boolean
-            | Type::None
-            | Type::SystemCall(_)
-            | Type::Noneable(_)
-            | Type::Function(_)
-            | Type::Closure(_)
-            | Type::Struct(_)
-            | Type::StructReference(_)
-            | Type::TypedGenericStruct(_)
-            | Type::Pointer
-            | Type::PointerOf(_) => WORD_SIZE_IN_BYTES,
+            _ => unreachable!("TODO: String should be a struct I think, then this function would not be needed anymore at all!"),
         }
     }
 
@@ -303,7 +325,8 @@ impl Type {
             // instead the value itself is assigned to the program counter.
             | Type::Function(_)
             | Type::SystemCall(_)
-            | Type::Integer
+            | Type::Integer(_)
+            | Type::IntegerLiteral
             | Type::Boolean => false,
             // A none Pointer should never be dereferenced.
             Type::None
@@ -327,7 +350,8 @@ impl std::fmt::Display for Type {
             Type::Error => write!(f, "error"),
             Type::Void => write!(f, "void"),
             Type::Any => write!(f, "any"),
-            Type::Integer => write!(f, "int"),
+            Type::Integer(integer_type) => integer_type.fmt(f),
+            Type::IntegerLiteral => write!(f, "int literal"),
             Type::Boolean => write!(f, "bool"),
             Type::None => Type::noneable(Type::Any).fmt(f),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
@@ -368,6 +392,7 @@ pub enum SystemCallKind {
     Break,
     Reallocate,
     RuntimeError,
+    AddressOf,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -383,6 +408,7 @@ impl std::fmt::Display for SystemCallKind {
                 SystemCallKind::Break => "break",
                 SystemCallKind::Reallocate => "reallocate",
                 SystemCallKind::RuntimeError => "runtimeError",
+                SystemCallKind::AddressOf => "addressOf",
             }
         )
     }
@@ -446,7 +472,7 @@ impl FunctionType {
             SystemCallKind::ArrayLength => Self {
                 parameter_types: vec![],
                 this_type: Some(Type::Any),
-                return_type: Type::Integer,
+                return_type: Type::Integer(IntegerType::Unsigned64),
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },
@@ -465,7 +491,7 @@ impl FunctionType {
                 is_generic: false,
             },
             SystemCallKind::Reallocate => Self {
-                parameter_types: vec![Type::Pointer, Type::Integer],
+                parameter_types: vec![Type::Pointer, Type::Integer(IntegerType::Unsigned64)],
                 this_type: None,
                 return_type: Type::Pointer,
                 system_call_kind: Some(system_call_kind),
@@ -478,6 +504,13 @@ impl FunctionType {
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },
+            SystemCallKind::AddressOf => Self {
+                parameter_types: vec![Type::Pointer],
+                this_type: None,
+                return_type: Type::Integer(IntegerType::Unsigned64),
+                system_call_kind: Some(system_call_kind),
+                is_generic: false,
+            }
         }
     }
 

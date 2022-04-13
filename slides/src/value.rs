@@ -46,7 +46,7 @@ impl Value {
 
     pub fn infer_type(&self) -> Type {
         match self {
-            Value::Integer(_) => Type::Integer,
+            Value::Integer(_) => Type::IntegerLiteral,
             Value::Boolean(_) => Type::Boolean,
             Value::SystemCall(kind) => Type::SystemCall(*kind),
             Value::String(_) => Type::String,
