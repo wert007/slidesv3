@@ -8,7 +8,6 @@ func main() {
 
     print(a);
 
-    // TODO:
     let b : int? = 32;
     if b == 32 {
         print('yay!');
@@ -19,8 +18,10 @@ func main() {
         print('uyay!');
     }
 
-    // TODO:
     let d : uint = 3;
     let e : uint[] = [1, 2, d];
     printUintArray(e);
+
+    let f = [1, 2, d];
+    printUintArray(f);
 }
