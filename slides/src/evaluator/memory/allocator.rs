@@ -27,6 +27,7 @@ impl Allocator {
 
     // #[cfg(debug_assertions)]
     fn find_bucket_from_address(&self, address: u64) -> Option<&Bucket> {
+        let address = clear_address(address);
         for bucket in &self.buckets {
             if let BucketEntry::Bucket(bucket) = bucket {
                 if bucket.address * WORD_SIZE_IN_BYTES <= address
@@ -47,13 +48,6 @@ impl Allocator {
         //         .collect::<Vec<_>>()
         // );
         None
-    }
-
-    fn find_bucket_from_address_mut(&mut self, address: u64) -> Option<&mut Bucket> {
-        self.buckets
-            .iter_mut()
-            .filter_map(|b| b.as_bucket_mut())
-            .find(|b| b.address * WORD_SIZE_IN_BYTES == address)
     }
 
     fn free_buckets(&mut self, min_size: u64) -> Vec<&mut Bucket> {
@@ -123,7 +117,6 @@ impl Allocator {
     }
 
     pub fn reallocate(&mut self, address: u64, size_in_bytes: u64) -> u64 {
-        dbg!(address, size_in_bytes);
         let result = {
             let size_in_words = bytes_to_word(size_in_bytes);
             let expected_size = size_in_words.next_power_of_two();
@@ -133,6 +126,9 @@ impl Allocator {
                     None
                 } else {
                     old_bucket = self.find_bucket_from_address(address).map(Clone::clone);
+                    // If the user can supply arbitrary values as pointer this
+                    // might not be true, but right now this is not the case.
+                    assert!(old_bucket.is_some(), "address = {:#x}", address);
                     old_bucket
                         .filter(|b| b.size_in_words >= size_in_words)
                 };
@@ -195,7 +191,6 @@ impl Allocator {
             let result_bucket = self.buckets[bucket_index].as_bucket_mut().unwrap();
             result_bucket.is_used = true;
             if let Some(old_bucket) = &mut old_bucket {
-                dbg!(&old_bucket);
                 for i in 0..old_bucket.size_in_words {
                     self.data[(result_bucket.address + i) as usize] = self.data[(old_bucket.address + i) as usize];
                 }
@@ -204,7 +199,6 @@ impl Allocator {
             result_bucket.address as u64 * WORD_SIZE_IN_BYTES
         };
         let result = result | HEAP_POINTER;
-        dbg!(result);
         if self.debug_heap_as_string {
             print_heap_as_string(&self.data);
         }
@@ -215,7 +209,7 @@ impl Allocator {
         let address = clear_address(address) as u64;
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address as _).unwrap().is_used,
+            self.find_bucket_from_address(address as _).expect("There is no bucket to read the word from!").is_used,
             "address = 0x{:x}",
             address
         );
