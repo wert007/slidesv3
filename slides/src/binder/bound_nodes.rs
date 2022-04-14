@@ -841,6 +841,7 @@ pub enum ConversionKind {
     Unboxing,
     TypeBoxing,
     TypeUnboxing,
+    IntToUint,
 }
 
 impl BoundConversionNodeKind {
@@ -866,11 +867,21 @@ impl BoundConversionNodeKind {
             | (Type::None, Type::Boolean)
             | (Type::None, Type::SystemCall(_))
             | (Type::None, Type::Function(_))
-            | (Type::Noneable(_), Type::Integer(_))
             | (Type::Noneable(_), Type::IntegerLiteral)
             | (Type::Noneable(_), Type::Boolean)
             | (Type::Noneable(_), Type::SystemCall(_))
             | (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,
+            (Type::Noneable(to), Type::Integer(from)) => {
+                if let Type::Integer(to) = &**to {
+                    if from.is_signed() && !to.is_signed() {
+                        ConversionKind::IntToUint
+                    } else {
+                        ConversionKind::Boxing
+                    }
+                } else {
+                    ConversionKind::Boxing
+                }
+            }
             _ => ConversionKind::None,
         }
     }
