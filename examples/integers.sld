@@ -24,4 +24,10 @@ func main() {
 
     let f = [1, 2, d];
     printUintArray(f);
+
+    let g = cast a : uint;
+    print(g);
+
+    let h = cast -a : uint;
+    print(h);
 }
