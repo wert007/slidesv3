@@ -2602,6 +2602,16 @@ fn bind_binary_operator<'a, 'b>(
             Type::Boolean,
         )),
         (
+            Type::Pointer | Type::PointerOf(_),
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            Type::None,
+        )
+        | (
+            Type::None,
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            Type::Pointer | Type::PointerOf(_),
+        ) => Some(BoundBinary::same_input(&Type::Pointer, result, Type::Boolean)),
+        (
             Type::Integer(lhs_integer_type),
             BoundBinaryOperator::ArithmeticAddition
             | BoundBinaryOperator::ArithmeticSubtraction
