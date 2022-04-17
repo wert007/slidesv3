@@ -6,6 +6,7 @@ pub struct Stack {
     pub data: Vec<u64>,
     pub flags: Vec<Flags>,
     print_stack: bool,
+    static_memory_size: usize,
 }
 
 impl Stack {
@@ -14,6 +15,7 @@ impl Stack {
             data: vec![],
             flags: vec![],
             print_stack: debug_flags.print_stack,
+            static_memory_size: 0,
         }
     }
 
@@ -49,11 +51,14 @@ impl Stack {
     }
 
     pub fn push_static_memory(&mut self, static_memory: StaticMemory) {
+        assert_eq!(self.static_memory_size, 0);
+        let static_memory_size = static_memory.data.len();
         for word in static_memory.data {
             self.data.push(word);
             self.flags.push(Flags::default())
         }
         self.print_maybe_stack();
+        self.static_memory_size = static_memory_size;
     }
 
     pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
@@ -86,7 +91,30 @@ impl Stack {
         if !self.print_stack {
             return;
         }
-        println!("{:?}", self);
+        print!("stack = [");
+        let mut is_first = true;
+        for (value, flags) in self.data.iter().zip(&self.flags).skip(self.static_memory_size) {
+            if !is_first {
+                print!(", ");
+            }
+            is_first = false;
+            if flags.is_pointer {
+                print!("#");
+            }
+            print!("{:x}", value);
+        }
+        println!("]");
+    }
+
+    pub(crate) fn pop_print_stack(&mut self) -> bool {
+        let result = self.print_stack;
+        self.print_stack = false;
+        result
+    }
+
+    pub(crate) fn push_print_stack(&mut self, print_stack_value: bool) {
+        self.print_stack = print_stack_value;
+        self.print_maybe_stack();
     }
 }
 

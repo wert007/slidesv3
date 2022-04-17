@@ -645,6 +645,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
+    let print_stack_value = state.stack.pop_print_stack();
     let argument_count = state.stack.pop().unwrap_value();
     let base = state.stack.pop().unwrap_pointer();
     let return_address = if state.is_main_call {
@@ -666,10 +667,12 @@ fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
     for v in argument_values.into_iter().rev() {
         state.stack.push_flagged_word(v);
     }
+    state.stack.push_print_stack(print_stack_value);
     state.pc = base as _;
 }
 
 fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
+    let print_stack_value = state.stack.pop_print_stack();
     let has_return_value = instruction.arg & 0x1 == 0x1;
     if has_return_value {
         let result = state.stack.pop();
@@ -707,6 +710,7 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         let return_address = state.stack.pop().unwrap_value();
         state.pc = return_address as _;
     }
+    state.stack.push_print_stack(print_stack_value);
 }
 
 fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction) {
