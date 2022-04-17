@@ -92,6 +92,9 @@ pub fn create_session(state: &mut EvaluatorState) {
                             .resize_with(*register + 1, Default::default);
                         state.debugger_state.register_names[*register] = Some(name.clone());
                     }
+                    Command::Heapdump(file_name) => {
+                        crate::debug::output_allocator_to_dot(file_name, &state.heap);
+                    }
                 }
             }
             None => {
@@ -180,6 +183,7 @@ enum Command {
     IndirectRegister(usize, u64),
     Replace(u64),
     RenameRegister(usize, String),
+    Heapdump(String),
 }
 
 impl Default for Command {
@@ -222,6 +226,9 @@ fn parse_command(input: &str) -> Option<Command> {
             ["n" | "next"] => Some(Command::NextInstruction),
             ["s" | "skip"] => Some(Command::Skip),
             [""] => Some(Command::Repeat),
+            ["heapdump", arg] => {
+                Some(Command::Heapdump(arg.into()))
+            }
             _ => None,
         }
     }
