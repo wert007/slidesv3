@@ -388,11 +388,12 @@ pub enum SystemCallKind {
     Print,
     ToString,
     ArrayLength,
-    DebugHeapDump,
+    HeapDump,
     Break,
     Reallocate,
     RuntimeError,
     AddressOf,
+    GarbageCollect,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -402,13 +403,14 @@ impl std::fmt::Display for SystemCallKind {
             "{}",
             match self {
                 SystemCallKind::Print => "print",
-                SystemCallKind::ToString => "to$string",
+                SystemCallKind::ToString => "toString",
                 SystemCallKind::ArrayLength => "array$length",
-                SystemCallKind::DebugHeapDump => "debug$heap$dump",
+                SystemCallKind::HeapDump => "heapDump",
                 SystemCallKind::Break => "break",
                 SystemCallKind::Reallocate => "reallocate",
                 SystemCallKind::RuntimeError => "runtimeError",
                 SystemCallKind::AddressOf => "addressOf",
+                SystemCallKind::GarbageCollect => "garbageCollect",
             }
         )
     }
@@ -476,7 +478,7 @@ impl FunctionType {
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },
-            SystemCallKind::DebugHeapDump => Self {
+            SystemCallKind::HeapDump => Self {
                 parameter_types: vec![Type::String],
                 this_type: None,
                 return_type: Type::Void,
@@ -510,7 +512,14 @@ impl FunctionType {
                 return_type: Type::Integer(IntegerType::Unsigned64),
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
-            }
+            },
+            SystemCallKind::GarbageCollect => Self {
+                parameter_types: vec![],
+                this_type: None,
+                return_type: Type::Void,
+                system_call_kind: Some(system_call_kind),
+                is_generic: false,
+            },
         }
     }
 

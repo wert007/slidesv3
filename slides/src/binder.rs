@@ -1390,7 +1390,7 @@ fn bind_function_declaration_body<'a, 'b>(
 
 fn default_statements(binder: &mut BindingState) {
     binder.register_constant("print", Value::SystemCall(SystemCallKind::Print));
-    binder.register_constant("heapdump", Value::SystemCall(SystemCallKind::DebugHeapDump));
+    binder.register_constant("heapdump", Value::SystemCall(SystemCallKind::HeapDump));
     binder.register_constant("break", Value::SystemCall(SystemCallKind::Break));
     binder.register_constant("reallocate", Value::SystemCall(SystemCallKind::Reallocate));
     binder.register_constant(
@@ -1398,6 +1398,7 @@ fn default_statements(binder: &mut BindingState) {
         Value::SystemCall(SystemCallKind::RuntimeError),
     );
     binder.register_constant("addressOf", Value::SystemCall(SystemCallKind::AddressOf));
+    binder.register_constant("garbageCollect", Value::SystemCall(SystemCallKind::GarbageCollect));
 }
 
 fn std_imports(binder: &mut BindingState) {

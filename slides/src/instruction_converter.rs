@@ -685,16 +685,18 @@ fn convert_system_call(
     match system_call.base {
         SystemCallKind::Print
         | SystemCallKind::ToString
-        | SystemCallKind::DebugHeapDump
+        | SystemCallKind::HeapDump
         | SystemCallKind::RuntimeError
         | SystemCallKind::Reallocate
-        | SystemCallKind::AddressOf => {
+        | SystemCallKind::AddressOf
+        | SystemCallKind::GarbageCollect => {
             let mut result = vec![];
             let argument_count = match system_call.base {
+                SystemCallKind::GarbageCollect => 0,
                 SystemCallKind::Print
                 | SystemCallKind::ToString
                 | SystemCallKind::ArrayLength
-                | SystemCallKind::DebugHeapDump
+                | SystemCallKind::HeapDump
                 | SystemCallKind::RuntimeError
                 | SystemCallKind::AddressOf => 1,
                 SystemCallKind::Reallocate => 2,
