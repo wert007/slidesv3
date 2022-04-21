@@ -18,6 +18,13 @@ func main() {
     print(cast a : bool);
     print(fuzzyAdd(23, a));
     let b = 13;
+
+    let c = -5;
+    print('c (-5) is not uint? ' + (cast c : uint == none));
+    c = 5;
+    print('c (5) is uint and 5? ' + (cast c : uint == 5));
+    c = 0;
+    print('c (0) is uint and 0? ' + (cast c : uint == 0));
     // These are errors
     // print(cast b : int);
     // print(cast b : bool);
@@ -25,3 +32,18 @@ func main() {
     // This could have a better error message
     // let d : int = cast c : int;
 }
+
+/*
+struct Foo {
+    value: int;
+}
+
+cast Foo : int {
+    return this.value;
+}
+
+cast Foo : uint? {
+    return cast this.value : uint?;
+}
+
+*/

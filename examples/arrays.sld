@@ -45,6 +45,7 @@ func main() {
     let f = [ [ 1 ], [ 2, 3 ], [ 4, 5, 6, ], ];
     print(f[2]);
     print(f[2][2]);
+    // TODO: Crashes!
     f[2][2] = 999;
     f[1] = [ 42, 1337, 876 ];
     print(f);
@@ -55,6 +56,13 @@ func main() {
     let h = [a, c, f[0], f[1], f[2], [843, 43], [321, 32]];
     print(h);
 
+    let default = 0;
+    let l = new List(default);
+    for i in 0..5 {
+        l.add(i);
+    }
+    print(l);
+    print(l.length());
     // let list = new List([1, 2]);
     // list.add(3);
     // list.add([4, 5, 6]);

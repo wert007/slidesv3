@@ -53,18 +53,18 @@ func gc() {}
 
 func main() {
     let i = 0;
-    // {
-    //     let list = new ListNode(i, none);
-    //     while i < 95 {
-    //         i = i + 1;
-    //         list.add(i);
-    //     }
-    //     // heapdump('heap_before_print');
-    //     list.print();
-    // }
-    for j in 0..100 {
-    i = 0;
-        let list = new List(0);
+    {
+        let list = new ListNode(i, none);
+        while i < 95 {
+            i = i + 1;
+            list.add(i);
+        }
+        // heapdump('heap_before_print');
+        list.print();
+    }
+    {
+        i = 0;
+        let list = new List(i);
         while i < 95 {
             i = i + 1;
             list.add(i);
