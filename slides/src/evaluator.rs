@@ -607,11 +607,12 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let result = if lhs.unwrap_pointer() == 0 { rhs } else { lhs };
-    let result = if instruction.arg != 0 {
-        state.read_pointer(result.unwrap_pointer())
+    let is_none = lhs.unwrap_pointer() == 0;
+    let needs_dereferencing = instruction.arg != 0;
+    let result = if needs_dereferencing && !is_none {
+        state.read_pointer(lhs.unwrap_pointer())
     } else {
-        result
+        if is_none { rhs } else { lhs }
     };
     state.stack.push_flagged_word(result);
 }

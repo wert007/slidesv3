@@ -597,7 +597,7 @@ fn convert_binary(
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
         BoundBinaryOperator::StringConcat => Instruction::string_concat(),
         BoundBinaryOperator::NoneableOrValue => {
-            Instruction::noneable_or_value(!binary.lhs.type_.is_pointer())
+            Instruction::noneable_or_value(!binary.rhs.type_.is_pointer())
         }
         operator
         @

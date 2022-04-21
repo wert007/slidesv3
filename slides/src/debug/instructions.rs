@@ -272,7 +272,7 @@ fn instruction_or_label_to_string(
         OpCode::LessThanEquals => instruction_no_arg_to_string("lte"),
         OpCode::GreaterThanEquals => instruction_no_arg_to_string("gte"),
         OpCode::StringConcat => instruction_no_arg_to_string("strconcat"),
-        OpCode::NoneableOrValue => instruction_no_arg_to_string("noneableor"),
+        OpCode::NoneableOrValue => instruction_dereference_arg_to_string("noneableor", instruction.arg),
         OpCode::Jump if !has_labels => {
             instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg)
         }
@@ -292,6 +292,15 @@ fn instruction_or_label_to_string(
             instruction_decode_closure_arg_to_string("decclosure", instruction.arg)
         }
         OpCode::Breakpoint => instruction_no_arg_to_string("brk"),
+    }
+}
+
+fn instruction_dereference_arg_to_string(name: &str, dereference: u64) -> String {
+    let dereference = dereference != 0;
+    if dereference {
+        format!("{} with derefence", name)
+    } else {
+        format!("{} no dereference", name)
     }
 }
 
