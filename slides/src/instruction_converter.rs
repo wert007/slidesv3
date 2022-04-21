@@ -882,7 +882,7 @@ fn convert_conversion(
             let label_end_if = converter.generate_label();
             result.push(Instruction::load_immediate(0).span(span).into());
             result.push(Instruction::duplicate_over(1).span(span).into());
-            result.push(Instruction::greater_than_equals().span(span).into());
+            result.push(Instruction::greater_than().span(span).into());
             result.push(Instruction::jump_to_label_conditionally(label_if_is_not_uint, true).span(span).into());
             // If the int is >= 0, it needs to be converted into a noneable
             result.push(Instruction::write_to_heap(1).span(span).into());
