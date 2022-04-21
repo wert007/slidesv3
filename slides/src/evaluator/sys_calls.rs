@@ -15,8 +15,17 @@ pub fn print(argument: FlaggedWord, state: &mut EvaluatorState) {
 pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
     let string = to_string_native(Type::Any, 0, argument, state);
     let string_length = string.len() as u64;
-    let mut pointer = state.heap.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
+    let mut pointer = state.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
+    if result == 0 {
+        state.runtime_diagnostics.no_heap_memory_left(None, WORD_SIZE_IN_BYTES + string_length);
+        state.runtime_diagnostics.clone().flush_to_console();
+        state.runtime_diagnostics.diagnostics.clear();
+        state.runtime_error_happened = true;
+        state.stack.push_pointer(result);
+        return;
+    }
+    // TODO: Clear bucket maybe?
     state.heap.write_word(pointer, string_length);
     pointer += WORD_SIZE_IN_BYTES;
     for &byte in string.as_bytes() {
