@@ -47,6 +47,17 @@ impl IntegerType {
     pub fn equals_ignoring_sign(&self, other: &Self) -> bool {
         self.to_signed() == other.to_signed()
     }
+
+    fn can_be_converted_to(&self, other: IntegerType) -> bool {
+        if self.to_signed() == other.to_signed() {
+            !self.is_signed()
+        }
+        else if self.is_signed() == other.is_signed() {
+            self.size_in_bytes() <= other.size_in_bytes()
+        } else {
+            false
+        }
+    }
 }
 
 impl std::fmt::Display for IntegerType {
@@ -130,7 +141,7 @@ impl Type {
             (Type::Struct(id), Type::TypedGenericStruct(other)) if id.id == other.id => true,
             // FIXME: This means that 9999 would be a valid u8?
             (Type::IntegerLiteral, Type::Integer(_)) => true,
-            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => from_integer_type.to_signed() == *to_integer_type,
+            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => from_integer_type.can_be_converted_to(*to_integer_type),
             _ => false,
         }
     }
