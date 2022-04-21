@@ -212,7 +212,7 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
         let bytes = word.to_be_bytes();
         string_buffer.extend_from_slice(&bytes);
     }
-    String::from_utf8_lossy(&string_buffer).into_owned()
+    String::from_utf8_lossy(&string_buffer[..string_length_in_bytes as usize]).into_owned()
 }
 
 pub fn array_length(argument: FlaggedWord, state: &mut EvaluatorState) {
