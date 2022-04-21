@@ -201,6 +201,7 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
 
     let string_length_in_bytes = pointer;
     let string_length_in_words = bytes_to_word(string_length_in_bytes);
+    // FIXME: Use string_length_in_words instead.
     let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as _);
 
     let range = (string_start + WORD_SIZE_IN_BYTES
