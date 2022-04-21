@@ -140,7 +140,7 @@ pub fn convert<'a>(
     let mut converter = InstructionConverter {
         static_memory: StaticMemory::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
-        next_label_index: bound_program.label_count,
+        next_label_index: bound_program.label_count + 1,
     };
     converter.static_memory.allocate_null();
     let minimum_memory_relocation = converter.static_memory.size_in_bytes();
@@ -201,7 +201,7 @@ pub fn convert<'a>(
         static_memory: converter.static_memory,
         max_used_variables: bound_program.max_used_variables,
         protected_variables: converter.fixed_variable_count,
-        label_count: converter.next_label_index,
+        label_count: converter.next_label_index + 1,
         entry_point,
     }
 }
@@ -279,7 +279,7 @@ pub fn convert_library<'a>(
             static_memory: converter.static_memory,
             max_used_variables: bound_program.max_used_variables,
             protected_variables: converter.fixed_variable_count,
-            label_count: converter.next_label_index,
+            label_count: converter.next_label_index + 1,
             entry_point: !0,
         },
         functions: exported_functions,
