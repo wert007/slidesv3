@@ -45,6 +45,7 @@ pub struct EvaluatorState<'a> {
     runtime_diagnostics: DiagnosticBag<'a>,
     runtime_error_happened: bool,
     debugger_state: debugger::DebuggerState,
+    protected_pointers: Vec<u64>,
 }
 
 impl EvaluatorState<'_> {
@@ -80,7 +81,8 @@ impl EvaluatorState<'_> {
     }
 
     fn garbage_collect(&mut self) {
-        let mut unchecked_pointers = vec![];
+        let mut unchecked_pointers = self.protected_pointers.clone();
+        self.protected_pointers = vec![];
         for (flags, &value) in self.stack.flags.iter().zip(&self.stack.data) {
             if flags.is_pointer {
                 unchecked_pointers.push(value);
@@ -92,6 +94,10 @@ impl EvaluatorState<'_> {
             }
         }
         garbage_collect(unchecked_pointers, &mut self.heap);
+    }
+
+    fn protect_pointer(&mut self, pointer: u64) {
+        self.protected_pointers.push(pointer);
     }
 }
 
@@ -115,6 +121,7 @@ pub fn evaluate(
         runtime_diagnostics: DiagnosticBag::new(source_text),
         runtime_error_happened: false,
         debugger_state: debugger::DebuggerState::default(),
+        protected_pointers: vec![],
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
@@ -555,6 +562,10 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
     let lhs_length = state.read_pointer(lhs).unwrap_value();
     let rhs_length = state.read_pointer(rhs).unwrap_value();
     let result_length = lhs_length + rhs_length;
+    // This protects these strings on the heap, since reallocate may call
+    // garbage_collect, which otherwise would overwrite the string with itself.
+    state.protect_pointer(rhs);
+    state.protect_pointer(lhs);
     let pointer = state.reallocate(0, result_length + WORD_SIZE_IN_BYTES);
     if pointer == 0 {
         runtime_error!(
