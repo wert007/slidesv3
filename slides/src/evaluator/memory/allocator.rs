@@ -192,7 +192,10 @@ impl Allocator {
             result_bucket.is_used = true;
             if let Some(old_bucket) = &mut old_bucket {
                 for i in 0..old_bucket.size_in_words {
-                    self.data[(result_bucket.address + i) as usize] = self.data[(old_bucket.address + i) as usize];
+                    let new_index = (result_bucket.address + i) as usize;
+                    let old_index = (old_bucket.address + i) as usize;
+                    self.data[new_index] = self.data[old_index];
+                    self.flags[new_index] = self.flags[old_index];
                 }
                 old_bucket.is_used = false;
             }
