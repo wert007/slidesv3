@@ -27,28 +27,34 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
         result.push_str(" [shape=box style=filled label = \"\\N\\n");
         match bucket {
             BucketEntry::Bucket(bucket) => {
-                let mut bucket_data = String::new();
-                let potential_str_len = memory::bytes_to_word(heap.data[bucket.address as usize]);
-                if potential_str_len != 0 && potential_str_len < bucket.size_in_words {
-                    match std::str::from_utf8(unsafe {
-                        heap.data[bucket.address as usize + 1..][..potential_str_len as usize].align_to::<u8>().1
-                    }) {
-                        Ok(s) => bucket_data = s.chars().filter(|c| !c.is_control()).collect(),
-                        Err(_) => {}
+                let potential_str_len_bytes = heap.data[bucket.address as usize];
+                let potential_str_len_words = memory::bytes_to_word(potential_str_len_bytes);
+                let potential_str : Option<String> = if potential_str_len_words != 0 && potential_str_len_words < bucket.size_in_words {
+                    let mut data = Vec::with_capacity(potential_str_len_bytes as _);
+                    for word in &heap.data[bucket.address as usize + 1..][..potential_str_len_words as usize] {
+                        data.extend_from_slice(&word.to_be_bytes());
                     }
-                }
-                if bucket_data.is_empty() {
-                    let mut result = String::new();
-                    for word in 0..bucket.size_in_words {
-                        for byte in heap.data[(bucket.address + word) as usize].to_be_bytes() {
-                            write!(result, "{:02X} ", byte).unwrap();
+                    match std::str::from_utf8(&data) {
+                        Ok(s) => {
+                            Some(s.chars().take(potential_str_len_bytes as _).filter(|c| !c.is_control()).collect())
                         }
-                        writeln!(result).unwrap();
+                        Err(_) => None,
                     }
-                    bucket_data = result;
+                } else {
+                    None
+                };
+                let mut bucket_data = String::new();
+                for word in 0..bucket.size_in_words {
+                    for byte in heap.data[(bucket.address + word) as usize].to_be_bytes() {
+                        write!(bucket_data, "{:02X} ", byte).unwrap();
+                    }
+                    writeln!(bucket_data).unwrap();
                 }
 
                 result.push_str(&format!("{:#?}\\lData:\\l{}\\l", bucket, bucket_data).replace('\n', "\\l"));
+                if let Some(str) = potential_str {
+                    write!(result, "String:\\l'{}'\\l", str).unwrap();
+                }
             }
             BucketEntry::Parent(parent) => {
                 result.push_str(&format!("{:#?}\\l", parent).replace('\n', "\\l"))
