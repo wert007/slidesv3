@@ -2083,6 +2083,9 @@ fn bind_array_literal<'a, 'b>(
             children.push(child.clone());
         }
     }
+    if type_ == Type::IntegerLiteral {
+        type_ = Type::Integer(IntegerType::Signed64);
+    }
     let type_ = bind_generic_struct_type_for_type(array_type, &type_, None, binder).0;
     let type_ = Type::Struct(Box::new(type_));
     BoundNode::array_literal(span, children, type_)
