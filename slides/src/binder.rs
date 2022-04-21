@@ -1006,6 +1006,7 @@ impl<'a> BindingState<'a, '_> {
         result
     }
 
+    #[allow(dead_code)]
     fn find_generic_function_by_label(&self, label: usize) -> Option<&GenericFunction> {
         self.bound_generic_functions
             .iter()
@@ -2858,7 +2859,7 @@ fn bind_function_call<'a, 'b>(
     let function = bind_node(*function_call.base, binder);
     let mut arguments = vec![];
     let mut more_arguments = vec![];
-    let mut function = if let BoundNodeKind::Closure(mut closure) = function.kind {
+    let function = if let BoundNodeKind::Closure(mut closure) = function.kind {
         more_arguments.append(&mut closure.arguments);
         let type_ = if let Type::Closure(closure_type) = function.type_ {
             Type::Function(Box::new(closure_type.base_function_type))
@@ -2883,23 +2884,23 @@ fn bind_function_call<'a, 'b>(
     let function_type = function_type(&function.type_);
     if function_type.is_generic {
         todo!("Generic functions are not yet supported!");
-        let old_label = function
-            .constant_value
-            .unwrap()
-            .value
-            .as_label_pointer()
-            .unwrap()
-            .0;
-        let (mut tmp_arguments, label) = bind_arguments_for_generic_function(
-            argument_span,
-            function_call.arguments,
-            old_label,
-            &function_type,
-            HashMap::default(),
-            binder,
-        );
-        function = BoundNode::label_reference(label, function.type_);
-        arguments.append(&mut tmp_arguments);
+        // let old_label = function
+        //     .constant_value
+        //     .unwrap()
+        //     .value
+        //     .as_label_pointer()
+        //     .unwrap()
+        //     .0;
+        // let (mut tmp_arguments, label) = bind_arguments_for_generic_function(
+        //     argument_span,
+        //     function_call.arguments,
+        //     old_label,
+        //     &function_type,
+        //     HashMap::default(),
+        //     binder,
+        // );
+        // function = BoundNode::label_reference(label, function.type_);
+        // arguments.append(&mut tmp_arguments);
     } else {
         arguments.append(&mut bind_arguments_for_function(
             argument_span,
@@ -3246,6 +3247,7 @@ fn bind_arguments_for_function<'a, 'b>(
     result
 }
 
+#[allow(dead_code)]
 fn bind_arguments_for_generic_function<'a, 'b>(
     span: TextSpan,
     arguments: Vec<SyntaxNode<'a>>,
