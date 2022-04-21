@@ -59,7 +59,7 @@ impl Allocator {
                 _ => None,
             })
             .collect();
-        result.sort_by_key(|b| u64::MAX - b.size_in_words);
+        result.sort_by_key(|b| b.size_in_words);
         result
     }
 
