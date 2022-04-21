@@ -157,7 +157,14 @@ pub fn convert<'a>(
                 ..
             }) = inst
             {
-                *arg += static_memory_size;
+                // None pointers are saved as u64::MAX value to not interfere
+                // with the actual static memory, since none gets "allocated"
+                // way later. This fixes all these pointer to point to none.
+                if *arg == u64::MAX {
+                    *arg = 0
+                } else {
+                    *arg += static_memory_size;
+                }
             }
         }
         if !lib.is_already_loaded {
@@ -180,7 +187,23 @@ pub fn convert<'a>(
     });
     instructions.append(&mut foreign_instructions);
     let entry_point = 0;
-    instructions.append(&mut convert_node(bound_node, &mut converter));
+    let mut program_code = convert_node(bound_node, &mut converter);
+    for inst in &mut program_code {
+        if let InstructionOrLabelReference::Instruction(Instruction {
+            op_code: OpCode::LoadPointer,
+            arg,
+            ..
+        }) = inst {
+            // All none pointers are saved as u64::MAX value to not interfere
+            // with the actual static memory, since normally none gets
+            // "allocated" way later. And the converter does not know if none is
+            // allocated or not. This fixes all these pointer to point to none.
+            if *arg == u64::MAX {
+                *arg = 0;
+            }
+        }
+    }
+    instructions.append(&mut program_code);
     if debug_flags.output_instructions_and_labels_to_sldasm {
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &instructions,
@@ -239,7 +262,14 @@ pub fn convert_library<'a>(
                 ..
             }) = inst
             {
-                *arg += static_memory_size;
+                // None pointers are saved as u64::MAX value to not interfere
+                // with the actual static memory, since none gets "allocated"
+                // way later. This fixes all these pointer to point to none.
+                if *arg == u64::MAX {
+                    *arg = 0
+                } else {
+                    *arg += static_memory_size;
+                }
             }
         }
         converter
@@ -406,7 +436,7 @@ pub fn convert_value(
         }
         Value::SystemCall(kind) => kind as u64,
         Value::String(value) => return convert_string_literal(span, value, converter),
-        Value::None => return vec![Instruction::load_pointer(0).span(span).into()],
+        Value::None => return vec![Instruction::load_none_pointer().span(span).into()],
         Value::LabelPointer(label_reference, _) => {
             return vec![LabelReference {
                 label_reference,
@@ -513,7 +543,7 @@ fn convert_unary(
         }
         BoundUnaryOperator::ArithmeticIdentity => {}
         BoundUnaryOperator::LogicalNegation if is_pointer => {
-            result.push(Instruction::load_pointer(0).span(span).into());
+            result.push(Instruction::load_none_pointer().span(span).into());
             result.push(Instruction::noneable_equals(1).span(span).into());
         }
         BoundUnaryOperator::LogicalNegation => {
@@ -889,7 +919,7 @@ fn convert_conversion(
             result.push(Instruction::jump_to_label(label_end_if).span(span).into());
             result.push(Instruction::label(label_if_is_not_uint).span(span).into());
             result.push(Instruction::pop().span(span).into());
-            result.push(Instruction::load_pointer(0).span(span).into());
+            result.push(Instruction::load_none_pointer().span(span).into());
             result.push(Instruction::label(label_end_if).span(span).into());
 
         }
@@ -970,7 +1000,7 @@ fn convert_type_identifier(
                     span,
                 }
                 .into(),
-                None => Instruction::load_pointer(0).span(span).into(),
+                None => Instruction::load_none_pointer().span(span).into(),
             });
             result.push(
                 Instruction::load_immediate(struct_type.id)
@@ -986,7 +1016,7 @@ fn convert_type_identifier(
                     span,
                 }
                 .into(),
-                None => Instruction::load_pointer(0).span(span).into(),
+                None => Instruction::load_none_pointer().span(span).into(),
             });
             result.push(Instruction::load_immediate(id.id).span(span).into());
             4

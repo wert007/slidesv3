@@ -45,6 +45,14 @@ impl Instruction {
         }
     }
 
+    pub const fn load_none_pointer() -> Self {
+        Self {
+            op_code: OpCode::LoadPointer,
+            arg: u64::MAX,
+            span: None,
+        }
+    }
+
     pub const fn duplicate() -> Self {
         Self::duplicate_over(0)
     }
