@@ -10,6 +10,7 @@ use super::{symbols::StructFunctionTable, SimpleStructFunctionTable};
 #[derive(TryFromPrimitive, PartialEq, Eq, Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum IntegerType {
+    Signed8,
     Signed64,
     Unsigned8,
     Unsigned64,
@@ -18,6 +19,7 @@ pub enum IntegerType {
 impl IntegerType {
     pub fn size_in_bytes(&self) -> u64 {
         match self {
+            IntegerType::Signed8 => 1,
             IntegerType::Signed64 => 8,
             IntegerType::Unsigned8 => 1,
             IntegerType::Unsigned64 => 8,
@@ -26,14 +28,16 @@ impl IntegerType {
 
     pub fn to_signed(&self) -> IntegerType {
         match self {
+            IntegerType::Signed8 |
             IntegerType::Signed64 => *self,
-            IntegerType::Unsigned8 => todo!(),
+            IntegerType::Unsigned8 => Self::Signed8,
             IntegerType::Unsigned64 => Self::Signed64,
         }
     }
 
     pub fn is_signed(&self) -> bool {
         match self {
+            IntegerType::Signed8 => true,
             IntegerType::Signed64 => true,
             IntegerType::Unsigned8 => false,
             IntegerType::Unsigned64 => false,
@@ -48,6 +52,7 @@ impl IntegerType {
 impl std::fmt::Display for IntegerType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            IntegerType::Signed8 => write!(f, "int8"),
             IntegerType::Signed64 => write!(f, "int"),
             IntegerType::Unsigned8 => write!(f, "byte"),
             IntegerType::Unsigned64 => write!(f, "uint"),

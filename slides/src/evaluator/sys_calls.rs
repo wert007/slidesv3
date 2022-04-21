@@ -160,6 +160,7 @@ fn to_string_native(
         }
         Type::Integer(integer_type) => {
             match integer_type {
+                typing::IntegerType::Signed8 => format!("{}", argument.unwrap_value() as i8),
                 typing::IntegerType::Signed64 => format!("{}", argument.unwrap_value() as i64),
                 typing::IntegerType::Unsigned8 => format!("{}", argument.unwrap_value() as u8),
                 typing::IntegerType::Unsigned64 => format!("{}", argument.unwrap_value() as u64),

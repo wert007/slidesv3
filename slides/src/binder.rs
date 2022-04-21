@@ -1091,6 +1091,11 @@ impl BoundLibrary {
 fn type_table() -> Vec<BoundVariableName<'static>> {
     vec![
         BoundVariableName {
+            identifier: "int8".into(),
+            type_: Type::Integer(IntegerType::Signed8),
+            is_read_only: true,
+        },
+        BoundVariableName {
             identifier: "int".into(),
             type_: Type::Integer(IntegerType::Signed64),
             is_read_only: true,
