@@ -14,25 +14,25 @@ struct string {
         return true;
     }
 
-    // func $rhsAdd(lhs: any) -> string {
-    //     let lhsString = toString(lhs);
-    //     let length = this.length + lhsString.length;
-    //     let bytes : &byte = reallocate(lhsString.bytes, length);
-    //     for j, i in lhsString.length..length {
-    //         bytes[i] = this.bytes[j];
-    //     }
-    //     return new string(length, bytes);
-    // }
+    func $addTo(lhs: any) -> string {
+        let lhsString = toString(lhs);
+        let length = this.length + lhsString.length;
+        let bytes : &byte = reallocate(lhsString.bytes, length);
+        for j, i in lhsString.length..length {
+            bytes[i] = this.bytes[j];
+        }
+        return new string(length, bytes);
+    }
 
-    // func $lhsAdd(rhs: any) -> string {
-    //     let rhsString = toString(rhs);
-    //     let length = this.length + rhsString.length;
-    //     let bytes : &byte = reallocate(this.bytes, length);
-    //     for j, i in this.length..length {
-    //         bytes[i] = rhsString.bytes[j];
-    //     }
-    //     return new string(length, bytes);
-    // }
+    func $add(rhs: any) -> string {
+        let rhsString = toString(rhs);
+        let length = this.length + rhsString.length;
+        let bytes : &byte = reallocate(this.bytes, length);
+        for j, i in this.length..length {
+            bytes[i] = rhsString.bytes[j];
+        }
+        return new string(length, bytes);
+    }
 
     func length() -> uint {
         // TODO: This crashed the compiler!

@@ -89,6 +89,8 @@ pub struct SimpleStructFunctionTable {
     pub set_function: Option<usize>,
     pub element_count_function: Option<usize>,
     pub equals_function: Option<usize>,
+    pub add_function: Option<usize>,
+    pub add_to_function: Option<usize>,
 }
 
 impl SimpleStructFunctionTable {
@@ -100,6 +102,8 @@ impl SimpleStructFunctionTable {
             StructFunctionKind::Set => self.set_function = Some(label),
             StructFunctionKind::ElementCount => self.element_count_function = Some(label),
             StructFunctionKind::Equals => self.equals_function = Some(label),
+            StructFunctionKind::Add => self.add_function = Some(label),
+            StructFunctionKind::AddTo => self.add_to_function = Some(label),
         }
     }
 
@@ -111,6 +115,8 @@ impl SimpleStructFunctionTable {
             StructFunctionKind::Set => self.set_function,
             StructFunctionKind::ElementCount => self.element_count_function,
             StructFunctionKind::Equals => self.equals_function,
+            StructFunctionKind::Add => self.add_function,
+            StructFunctionKind::AddTo => self.add_to_function,
         }
     }
 }
@@ -133,6 +139,8 @@ impl From<&StructFunctionTable> for SimpleStructFunctionTable {
                 .as_ref()
                 .map(|f| f.function_label as _),
             equals_function: it.equals_function.as_ref().map(|f| f.function_label as _),
+            add_function: it.add_function.as_ref().map(|f| f.function_label as _),
+            add_to_function: it.add_to_function.as_ref().map(|f| f.function_label as _),
         }
     }
 }
@@ -1355,7 +1363,9 @@ fn bind_function_declaration_body<'a, 'b>(
             | StructFunctionKind::Get
             | StructFunctionKind::Set
             | StructFunctionKind::ElementCount
-            | StructFunctionKind::Equals,
+            | StructFunctionKind::Equals
+            | StructFunctionKind::Add
+            | StructFunctionKind::AddTo
         )
         | None => {}
     }
@@ -1745,6 +1755,7 @@ fn type_check_struct_function_kind(
                 );
             }
         }
+        StructFunctionKind::Add | StructFunctionKind::AddTo => {}
     }
 }
 

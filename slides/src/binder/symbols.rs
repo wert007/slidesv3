@@ -293,6 +293,8 @@ pub struct StructFunctionTable {
     pub set_function: Option<FunctionSymbol>,
     pub element_count_function: Option<FunctionSymbol>,
     pub equals_function: Option<FunctionSymbol>,
+    pub add_function: Option<FunctionSymbol>,
+    pub add_to_function: Option<FunctionSymbol>,
     pub label_relocation: Vec<(u64, u64)>,
 }
 
@@ -305,6 +307,8 @@ impl StructFunctionTable {
             StructFunctionKind::Set => self.set_function = Some(function),
             StructFunctionKind::ElementCount => self.element_count_function = Some(function),
             StructFunctionKind::Equals => self.equals_function = Some(function),
+            StructFunctionKind::Add => self.add_function = Some(function),
+            StructFunctionKind::AddTo => self.add_to_function = Some(function),
         }
     }
 
@@ -316,6 +320,8 @@ impl StructFunctionTable {
             .chain(self.set_function.iter_mut())
             .chain(self.element_count_function.iter_mut())
             .chain(self.equals_function.iter_mut())
+            .chain(self.add_function.iter_mut())
+            .chain(self.add_to_function.iter_mut())
     }
 
     pub fn available_struct_function_kinds(&self) -> Vec<StructFunctionKind> {
@@ -337,6 +343,12 @@ impl StructFunctionTable {
         }
         if self.equals_function.is_some() {
             result.push(StructFunctionKind::Equals);
+        }
+        if self.add_function.is_some() {
+            result.push(StructFunctionKind::Add);
+        }
+        if self.add_to_function.is_some() {
+            result.push(StructFunctionKind::AddTo);
         }
         result
     }
@@ -377,6 +389,8 @@ pub enum StructFunctionKind {
     Set,
     ElementCount,
     Equals,
+    Add,
+    AddTo,
 }
 
 impl<'a> TryFrom<&'a str> for StructFunctionKind {
@@ -390,6 +404,8 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
             "$set" => Ok(Self::Set),
             "$elementCount" => Ok(Self::ElementCount),
             "$equals" => Ok(Self::Equals),
+            "$add" => Ok(Self::Add),
+            "$addTo" => Ok(Self::AddTo),
             _ => Err(value),
         }
     }
