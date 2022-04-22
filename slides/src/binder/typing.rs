@@ -83,7 +83,6 @@ pub enum Type {
     None,
     SystemCall(SystemCallKind),
     Noneable(Box<Type>),
-    String,
     Function(Box<FunctionType>),
     Closure(Box<ClosureType>),
     Struct(Box<StructType>),
@@ -190,7 +189,6 @@ impl Type {
             Type::Integer(_) => 1,
             Type::Boolean => 1,
             Type::None => 1,
-            Type::String => 1,
             Type::SystemCall(_) => 1,
             Type::Pointer => 1,
             Type::PointerOf(base_type) => base_type.type_identifier_size_in_words() + 1,
@@ -237,7 +235,6 @@ impl Type {
     pub const TYPE_IDENTIFIER_BOOLEAN: u64 = 5;
     pub const TYPE_IDENTIFIER_NONE: u64 = 6;
     pub const TYPE_IDENTIFIER_NONEABLE: u64 = 7;
-    pub const TYPE_IDENTIFIER_STRING: u64 = 8;
     pub const TYPE_IDENTIFIER_FUNCTION: u64 = 9;
     pub const TYPE_IDENTIFIER_CLOSURE: u64 = 10;
     pub const TYPE_IDENTIFIER_STRUCT: u64 = 11;
@@ -260,7 +257,6 @@ impl Type {
             Type::Boolean => Self::TYPE_IDENTIFIER_BOOLEAN,
             Type::None => Self::TYPE_IDENTIFIER_NONE,
             Type::Noneable(_) => Self::TYPE_IDENTIFIER_NONEABLE,
-            Type::String => Self::TYPE_IDENTIFIER_STRING,
             Type::Function(_) => Self::TYPE_IDENTIFIER_FUNCTION,
             Type::Closure(_) => Self::TYPE_IDENTIFIER_CLOSURE,
             Type::Struct(_) => Self::TYPE_IDENTIFIER_STRUCT,
@@ -280,7 +276,6 @@ impl Type {
             Self::TYPE_IDENTIFIER_BOOLEAN => Some(Type::Boolean),
             Self::TYPE_IDENTIFIER_NONE => Some(Type::None),
             Self::TYPE_IDENTIFIER_NONEABLE => None,
-            Self::TYPE_IDENTIFIER_STRING => Some(Type::String),
             Self::TYPE_IDENTIFIER_FUNCTION => None,
             Self::TYPE_IDENTIFIER_CLOSURE => None,
             Self::TYPE_IDENTIFIER_STRUCT => None,
@@ -321,8 +316,7 @@ impl Type {
             | Type::Noneable(_)
             | Type::Pointer
             | Type::PointerOf(_)
-            | Type::GenericType
-            | Type::String => WORD_SIZE_IN_BYTES,
+            | Type::GenericType => WORD_SIZE_IN_BYTES,
         }
     }
 
@@ -354,7 +348,6 @@ impl Type {
             // A none Pointer should never be dereferenced.
             Type::None
             | Type::Noneable(_)
-            | Type::String
             | Type::Closure(_)
             | Type::Struct(_)
             | Type::StructReference(_)
@@ -380,7 +373,6 @@ impl std::fmt::Display for Type {
             Type::None => Type::noneable(Type::Any).fmt(f),
             Type::SystemCall(system_call) => write!(f, "system call {}", system_call),
             Type::Noneable(base) => write!(f, "{}?", base),
-            Type::String => write!(f, "string"),
             Type::Function(function_type) => {
                 write!(f, "fn {}", function_type)
             }
@@ -481,7 +473,7 @@ impl FunctionType {
         }
     }
 
-    pub fn system_call(system_call_kind: SystemCallKind) -> Self {
+    pub fn system_call(system_call_kind: SystemCallKind, string_type: Type) -> Self {
         match system_call_kind {
             SystemCallKind::Print => Self {
                 parameter_types: vec![Type::Any],
@@ -493,7 +485,7 @@ impl FunctionType {
             SystemCallKind::ToString => Self {
                 parameter_types: vec![Type::Any],
                 this_type: None,
-                return_type: Type::String,
+                return_type: string_type,
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },
@@ -505,7 +497,7 @@ impl FunctionType {
                 is_generic: false,
             },
             SystemCallKind::HeapDump => Self {
-                parameter_types: vec![Type::String],
+                parameter_types: vec![string_type],
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),
@@ -526,7 +518,7 @@ impl FunctionType {
                 is_generic: false,
             },
             SystemCallKind::RuntimeError => Self {
-                parameter_types: vec![Type::String],
+                parameter_types: vec![string_type],
                 this_type: None,
                 return_type: Type::Void,
                 system_call_kind: Some(system_call_kind),

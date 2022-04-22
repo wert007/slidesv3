@@ -12,11 +12,6 @@ fn test_type_identifiers() {
     let ct = Type::simple_type_from_type_identifier(tid).unwrap();
     assert_eq!(t, ct);
 
-    let t = Type::String;
-    let tid = t.type_identifier_kind();
-    let ct = Type::simple_type_from_type_identifier(tid).unwrap();
-    assert_eq!(t, ct);
-
     let t = Type::Any;
     let tid = t.type_identifier_kind();
     let ct = Type::simple_type_from_type_identifier(tid).unwrap();

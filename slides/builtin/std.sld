@@ -1,3 +1,51 @@
+struct string {
+    length: uint;
+    bytes: &byte;
+
+    func $equals(other: string) -> bool {
+        if this.length != other.length {
+            return false;
+        }
+        for i in 0..this.length {
+            if this.bytes[i] != other.bytes[i] {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // func $rhsAdd(lhs: any) -> string {
+    //     let lhsString = toString(lhs);
+    //     let length = this.length + lhsString.length;
+    //     let bytes : &byte = reallocate(lhsString.bytes, length);
+    //     for j, i in lhsString.length..length {
+    //         bytes[i] = this.bytes[j];
+    //     }
+    //     return new string(length, bytes);
+    // }
+
+    // func $lhsAdd(rhs: any) -> string {
+    //     let rhsString = toString(rhs);
+    //     let length = this.length + rhsString.length;
+    //     let bytes : &byte = reallocate(this.bytes, length);
+    //     for j, i in this.length..length {
+    //         bytes[i] = rhsString.bytes[j];
+    //     }
+    //     return new string(length, bytes);
+    // }
+
+    func length() -> uint {
+        // TODO: This crashed the compiler!
+        // return this.length();
+        return this.length;
+    }
+
+    func $toString() -> string {
+        return this;
+    }
+}
+
+
 struct Range {
     start: int;
     end: int;
@@ -282,20 +330,4 @@ generic struct List {
 //     simple_type_identifier: uint;
 //     struct_id: uint?;
 //     struct_function_table: FunctionTable?;
-// }
-
-// struct string {
-//     bytes: byte[];
-
-//     func $equals(other: string) -> bool {
-//         return this.bytes == other.bytes;
-//     }
-
-//     func length() -> uint {
-//         return this.bytes.length();
-//     }
-
-//     func $toString() -> string {
-//         return byteArrayToString(bytes);
-//     }
 // }

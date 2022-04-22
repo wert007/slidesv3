@@ -180,6 +180,14 @@ impl VariableOrConstant {
             kind: VariableOrConstantKind::None,
         }
     }
+
+    pub fn from_value(it: Value, string_type: Type) -> Self {
+        Self {
+            type_: it.infer_type(string_type),
+            is_read_only: true,
+            kind: VariableOrConstantKind::Constant(it),
+        }
+    }
 }
 
 impl From<VariableEntry> for VariableOrConstant {
@@ -188,16 +196,6 @@ impl From<VariableEntry> for VariableOrConstant {
             type_: it.type_,
             is_read_only: it.is_read_only,
             kind: VariableOrConstantKind::Variable(it.id),
-        }
-    }
-}
-
-impl From<Value> for VariableOrConstant {
-    fn from(it: Value) -> Self {
-        Self {
-            type_: it.infer_type(),
-            is_read_only: true,
-            kind: VariableOrConstantKind::Constant(it),
         }
     }
 }
@@ -413,6 +411,7 @@ enum StdTypeKind {
     Range,
     UnsignedRange,
     Array,
+    String,
 }
 
 impl StdTypeKind {
@@ -421,6 +420,7 @@ impl StdTypeKind {
             StdTypeKind::Range => "Range",
             StdTypeKind::UnsignedRange => "UnsignedRange",
             StdTypeKind::Array => "Array",
+            StdTypeKind::String => "string",
         }
     }
 }
@@ -830,7 +830,7 @@ impl<'a> BindingState<'a, '_> {
         match self.look_up_variable_by_name(name) {
             Some(it) => it.into(),
             None => match self.look_up_constant_by_name(name) {
-                Some(it) => it.into(),
+                Some(it) => VariableOrConstant::from_value(it, string_type(self)),
                 None => VariableOrConstant::none(),
             },
         }
@@ -977,7 +977,6 @@ impl<'a> BindingState<'a, '_> {
             | Type::IntegerLiteral
             | Type::Boolean
             | Type::None
-            | Type::String
             | Type::Function(_)
             | Type::Closure(_)
             | Type::Library(_)
@@ -1114,11 +1113,6 @@ fn type_table() -> Vec<BoundVariableName<'static>> {
         BoundVariableName {
             identifier: "bool".into(),
             type_: Type::Boolean,
-            is_read_only: true,
-        },
-        BoundVariableName {
-            identifier: "string".into(),
-            type_: Type::String,
             is_read_only: true,
         },
         BoundVariableName {
@@ -1657,11 +1651,12 @@ fn type_check_struct_function_kind(
             }
         }
         StructFunctionKind::ToString => {
-            if !function_type.return_type.can_be_converted_to(&Type::String) {
+            let string_type = string_type(binder);
+            if !function_type.return_type.can_be_converted_to(&string_type) {
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.return_type,
-                    &Type::String,
+                    &string_type,
                 );
             }
             if !function_type.parameter_types.is_empty() {
@@ -2040,8 +2035,8 @@ fn bind_node_for_assignment<'a, 'b>(
     }
 }
 
-fn bind_literal(span: TextSpan, literal: LiteralNodeKind, _: &mut BindingState) -> BoundNode {
-    BoundNode::literal(span, literal.value)
+fn bind_literal(span: TextSpan, literal: LiteralNodeKind, binder: &mut BindingState) -> BoundNode {
+    BoundNode::literal(span, literal.value, string_type(binder))
 }
 
 fn bind_array_literal<'a, 'b>(
@@ -2409,7 +2404,7 @@ fn bind_variable<'a, 'b>(
             BoundNode::variable(span, variable_index, variable.type_)
         }
         VariableOrConstantKind::Constant(value) => {
-            let mut result = BoundNode::literal_from_value(value);
+            let mut result = BoundNode::literal_from_value(value, string_type(binder));
             result.span = span;
             result
         }
@@ -2452,7 +2447,7 @@ fn bind_binary_insertion<'a>(
     match bind_binary_operator(span, &lhs, operator_token, &rhs, binder) {
         Some(bound_binary) => {
             let (lhs, rhs) = if bound_binary.op == BoundBinaryOperator::StringConcat {
-                (call_to_string(lhs, binder), call_to_string(rhs, binder))
+                todo!("Remove StringConcat operator!")
             } else {
                 (
                     bind_conversion(lhs, &bound_binary.lhs, binder),
@@ -2531,19 +2526,6 @@ fn bind_binary_insertion<'a>(
             }
         }
         None => BoundNode::error(span),
-    }
-}
-
-fn call_to_string(lhs: BoundNode, binder: &mut BindingState) -> BoundNode {
-    if lhs.type_ == Type::String {
-        lhs
-    } else {
-        BoundNode::system_call(
-            lhs.span,
-            SystemCallKind::ToString,
-            vec![bind_conversion(lhs, &Type::Any, binder)],
-            Type::String,
-        )
     }
 }
 
@@ -2704,27 +2686,6 @@ fn bind_binary_operator<'a, 'b>(
             BoundBinaryOperator::LogicalAnd | BoundBinaryOperator::LogicalOr,
             Type::Boolean,
         ) => Some(BoundBinary::same_output(result, Type::Boolean)),
-        (Type::String, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(
-            // Currently a call to to$string will be emitted. And for that call
-            // both sides need to be of type any. There is an optimization here,
-            // where there might be two versions of StringConcat and only one of
-            // those works with to$string.
-            //
-            // BoundBinary::same_output(BoundBinaryOperator::StringConcat, Type::String),
-            BoundBinary::same_input(&Type::Any, BoundBinaryOperator::StringConcat, Type::String),
-        ),
-        (Type::String, BoundBinaryOperator::ArithmeticAddition, _) => Some(BoundBinary::new(
-            &Type::Any,
-            BoundBinaryOperator::StringConcat,
-            &Type::Any,
-            Type::String,
-        )),
-        (_, BoundBinaryOperator::ArithmeticAddition, Type::String) => Some(BoundBinary::new(
-            &Type::Any,
-            BoundBinaryOperator::StringConcat,
-            &Type::Any,
-            Type::String,
-        )),
         (Type::Noneable(lhs_type), BoundBinaryOperator::NoneableOrValue, rhs_type) => {
             if rhs_type.can_be_converted_to(lhs_type) {
                 Some(BoundBinary::new(
@@ -2836,9 +2797,9 @@ fn bind_parenthesized<'a, 'b>(
     bind_node(*parenthesized.expression, binder)
 }
 
-fn function_type(type_: &Type) -> FunctionType {
+fn function_type(type_: &Type, string_type: Type) -> FunctionType {
     match type_ {
-        Type::SystemCall(kind) => FunctionType::system_call(*kind),
+        Type::SystemCall(kind) => FunctionType::system_call(*kind, string_type),
         // Type::SystemCall(SystemCallKind::Print) => FunctionType {
         //     parameter_types: vec![Type::Any],
         //     this_type: None,
@@ -2879,7 +2840,7 @@ fn bind_function_call<'a, 'b>(
         match closure.function {
             typing::FunctionKind::FunctionId(id) => BoundNode::variable(function.span, id, type_),
             typing::FunctionKind::SystemCall(kind) => {
-                BoundNode::literal_from_value(Value::SystemCall(kind))
+                BoundNode::literal_from_value(Value::SystemCall(kind), string_type(binder))
             }
             typing::FunctionKind::LabelReference(label_reference) => {
                 BoundNode::label_reference(label_reference, type_)
@@ -2891,7 +2852,8 @@ fn bind_function_call<'a, 'b>(
     if matches!(function.type_, Type::Error) {
         return BoundNode::error(span);
     }
-    let function_type = function_type(&function.type_);
+    let string_type = string_type(binder);
+    let function_type = function_type(&function.type_, string_type);
     if function_type.is_generic {
         todo!("Generic functions are not yet supported!");
         // let old_label = function
@@ -2950,6 +2912,10 @@ fn bind_function_call<'a, 'b>(
         }
         _ => unreachable!(),
     }
+}
+
+fn string_type(binder: &BindingState) -> Type {
+    binder.look_up_type_by_name(StdTypeKind::String.name()).expect("Could not load std type!")
 }
 
 fn bind_array_index<'a, 'b>(
@@ -3127,24 +3093,6 @@ fn bind_field_access<'a, 'b>(
                 .report_no_fields_on_type(base_span, &base.type_);
             BoundNode::error(span)
         }
-        Type::String => {
-            if field.lexeme == "length" {
-                let base = bind_conversion(base, &Type::Any, binder);
-                let function_type = FunctionType::system_call(SystemCallKind::ArrayLength);
-                BoundNode::system_call_closure(
-                    span,
-                    vec![base],
-                    SystemCallKind::ArrayLength,
-                    Type::closure(function_type),
-                )
-            } else {
-                binder.diagnostic_bag.report_no_field_named_on_type(
-                    span,
-                    field.lexeme,
-                    &base.type_,
-                );
-                BoundNode::error(span)
-            }
         Type::IgnoreTypeChecking => {
             panic!("IgnoreTypeChecking needs to be converted into any other type asap!");
         }
@@ -3215,7 +3163,7 @@ fn bind_field_access_for_assignment<'a>(
                 .report_no_fields_on_type(base.span, &base.type_);
             BoundNode::error(span)
         }
-        Type::String | Type::Library(_) => {
+        Type::Library(_) => {
             binder.diagnostic_bag.report_cannot_assign_to(span);
             BoundNode::error(span)
         }
@@ -3478,7 +3426,6 @@ fn bind_condition_conversion<'a>(
         | Type::Integer(_)
         | Type::IntegerLiteral
         | Type::SystemCall(_)
-        | Type::String
         | Type::Function(_)
         | Type::Closure(_)
         | Type::Struct(_)

@@ -139,7 +139,7 @@ fn to_string_native(
                     super::execute_function(state, to_string_function as usize, &[argument])
                         .unwrap()
                         .unwrap();
-                to_string_native(Type::String, 0, return_value, state)
+                string_to_string_native(return_value, state)
             } else {
                 format!("type struct id#{}", struct_type.id)
             }
@@ -153,7 +153,7 @@ fn to_string_native(
                     super::execute_function(state, to_string_function as usize, &[argument])
                         .unwrap()
                         .unwrap();
-                to_string_native(Type::String, 0, return_value, state)
+                string_to_string_native(return_value, state)
             } else {
                 format!("type struct id#{}", id.id)
             }
@@ -192,7 +192,6 @@ fn to_string_native(
         Type::SystemCall(kind) => format!("system call {}", kind),
         Type::Function(kind) => format!("fn {}", kind),
         Type::Closure(closure) => format!("fn {}", closure.base_function_type),
-        Type::String => string_to_string_native(argument, state),
     }
 }
 
@@ -205,8 +204,9 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
     // FIXME: Use string_length_in_words instead.
     let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as _);
 
-    let range = (string_start + WORD_SIZE_IN_BYTES
-        ..string_start + WORD_SIZE_IN_BYTES + string_length_in_words * WORD_SIZE_IN_BYTES)
+    let string_start = state.read_pointer(string_start + WORD_SIZE_IN_BYTES).unwrap_pointer();
+    let range = (string_start
+        ..string_start + string_length_in_words * WORD_SIZE_IN_BYTES)
         .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {

@@ -131,10 +131,11 @@ fn bind_import_function<'a>(
                     }
                     let path = path.constant_value.unwrap().value;
                     if path.as_string().is_none() {
+                        let string_type = super::string_type(binder);
                         binder.diagnostic_bag.report_cannot_convert(
                             argument_span,
-                            &path.infer_type(),
-                            &Type::String,
+                            &path.infer_type(string_type.clone()),
+                            &string_type,
                         );
                         return None;
                     }

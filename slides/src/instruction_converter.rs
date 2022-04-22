@@ -566,7 +566,6 @@ fn convert_binary(
         BoundBinaryOperator::ArithmeticDivision => Instruction::division(),
         BoundBinaryOperator::Equals => {
             match (&binary.lhs.type_, &binary.rhs.type_) {
-                (Type::String, Type::String) => Instruction::array_equals(),
                 (Type::Noneable(base_type), Type::Noneable(_)) if !base_type.is_pointer() => {
                     Instruction::noneable_equals(base_type.size_in_bytes())
                 }
@@ -584,12 +583,7 @@ fn convert_binary(
             }
         }
         BoundBinaryOperator::NotEquals => {
-            if matches!(binary.lhs.type_, Type::String) && matches!(binary.rhs.type_, Type::String)
-            {
-                Instruction::array_not_equals()
-            } else {
-                Instruction::not_equals()
-            }
+            Instruction::not_equals()
         }
         BoundBinaryOperator::LessThan => Instruction::less_than(),
         BoundBinaryOperator::GreaterThan => Instruction::greater_than(),

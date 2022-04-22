@@ -44,12 +44,12 @@ impl Value {
         }
     }
 
-    pub fn infer_type(&self) -> Type {
+    pub fn infer_type(&self, string_type: Type) -> Type {
         match self {
             Value::Integer(_) => Type::IntegerLiteral,
             Value::Boolean(_) => Type::Boolean,
             Value::SystemCall(kind) => Type::SystemCall(*kind),
-            Value::String(_) => Type::String,
+            Value::String(_) => string_type,
             Value::None => Type::None,
             Value::LabelPointer(_, type_) => type_.clone(),
         }

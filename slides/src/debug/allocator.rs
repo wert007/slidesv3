@@ -27,21 +27,17 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
         result.push_str(" [shape=box style=filled label = \"\\N\\n");
         match bucket {
             BucketEntry::Bucket(bucket) => {
-                let potential_str_len_bytes = heap.data[bucket.address as usize];
-                let potential_str_len_words = memory::bytes_to_word(potential_str_len_bytes);
-                let potential_str : Option<String> = if potential_str_len_words != 0 && potential_str_len_words < bucket.size_in_words {
-                    let mut data = Vec::with_capacity(potential_str_len_bytes as _);
-                    for word in &heap.data[bucket.address as usize + 1..][..potential_str_len_words as usize] {
+                let potential_str : Option<String> = {
+                    let mut data = vec![];
+                    for word in &heap.data[bucket.address as usize..][..bucket.size_in_words as usize] {
                         data.extend_from_slice(&word.to_be_bytes());
                     }
                     match std::str::from_utf8(&data) {
                         Ok(s) => {
-                            Some(s.chars().take(potential_str_len_bytes as _).filter(|c| !c.is_control()).collect())
+                            Some(s.chars().filter(|c| !c.is_control()).collect())
                         }
                         Err(_) => None,
                     }
-                } else {
-                    None
                 };
                 let mut bucket_data = String::new();
                 for word in 0..bucket.size_in_words {

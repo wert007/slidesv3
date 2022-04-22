@@ -43,8 +43,8 @@ impl BoundNode {
         }
     }
 
-    pub fn literal_from_value(value: Value) -> Self {
-        let type_ = value.infer_type();
+    pub fn literal_from_value(value: Value, string_type: Type) -> Self {
+        let type_ = value.infer_type(string_type);
         Self {
             span: TextSpan::zero(),
             kind: BoundNodeKind::LiteralExpression(BoundLiteralNodeKind {
@@ -55,8 +55,8 @@ impl BoundNode {
         }
     }
 
-    pub fn literal(span: TextSpan, value: Value) -> Self {
-        let type_ = value.infer_type();
+    pub fn literal(span: TextSpan, value: Value, string_type: Type) -> Self {
+        let type_ = value.infer_type(string_type);
         Self {
             span,
             kind: BoundNodeKind::LiteralExpression(BoundLiteralNodeKind {
@@ -128,7 +128,9 @@ impl BoundNode {
             span,
             lhs,
             rhs,
-            Some(Self::literal(false_span, Value::Boolean(false))),
+            // Note: Since we know, that string_type is never used, we can put
+            // really anything in there.
+            Some(Self::literal(false_span, Value::Boolean(false), Type::Boolean)),
             Type::Boolean,
         )
     }
@@ -138,7 +140,9 @@ impl BoundNode {
         Self::if_expression(
             span,
             lhs,
-            Self::literal(true_span, Value::Boolean(true)),
+            // Note: Since we know, that string_type is never used, we can put
+            // really anything in there.
+            Self::literal(true_span, Value::Boolean(true), Type::Boolean),
             Some(rhs),
             Type::Boolean,
         )
@@ -384,7 +388,9 @@ impl BoundNode {
                         span,
                         BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
                         BoundBinaryOperator::ArithmeticAddition,
-                        BoundNode::literal_from_value(Value::Integer(1)),
+                        // Note: Since we know, that string_type is never used,
+                        // we can put really anything in there.
+                        BoundNode::literal_from_value(Value::Integer(1), Type::IntegerLiteral),
                         Type::Integer(IntegerType::Unsigned64),
                     ),
                 ),
@@ -397,7 +403,9 @@ impl BoundNode {
                 BoundNode::variable_declaration(
                     span,
                     index_variable,
-                    BoundNode::literal_from_value(Value::Integer(0)),
+                    // Note: Since we know, that string_type is never used, we
+                    // can put really anything in there.
+                    BoundNode::literal_from_value(Value::Integer(0), Type::IntegerLiteral),
                     None,
                 ), // let $index = 0;
                 BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
