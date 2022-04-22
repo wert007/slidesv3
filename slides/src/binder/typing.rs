@@ -320,16 +320,6 @@ impl Type {
         }
     }
 
-    pub fn array_element_size_in_bytes(&self) -> u64 {
-        match self {
-            Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
-            Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
-            Type::Void | Type::Any | Type::Error => unreachable!(),
-            Type::String => 1,
-            _ => unreachable!("TODO: String should be a struct I think, then this function would not be needed anymore at all!"),
-        }
-    }
-
     pub fn is_pointer(&self) -> bool {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
@@ -403,7 +393,6 @@ impl std::fmt::Display for Type {
 pub enum SystemCallKind {
     Print,
     ToString,
-    ArrayLength,
     HeapDump,
     Break,
     Reallocate,
@@ -421,7 +410,6 @@ impl std::fmt::Display for SystemCallKind {
             match self {
                 SystemCallKind::Print => "print",
                 SystemCallKind::ToString => "toString",
-                SystemCallKind::ArrayLength => "array$length",
                 SystemCallKind::HeapDump => "heapDump",
                 SystemCallKind::Break => "break",
                 SystemCallKind::Reallocate => "reallocate",
@@ -486,13 +474,6 @@ impl FunctionType {
                 parameter_types: vec![Type::Any],
                 this_type: None,
                 return_type: string_type,
-                system_call_kind: Some(system_call_kind),
-                is_generic: false,
-            },
-            SystemCallKind::ArrayLength => Self {
-                parameter_types: vec![],
-                this_type: Some(Type::Any),
-                return_type: Type::Integer(IntegerType::Unsigned64),
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },

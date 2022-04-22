@@ -708,7 +708,6 @@ fn convert_system_call(
                 SystemCallKind::GarbageCollect => 0,
                 SystemCallKind::Print
                 | SystemCallKind::ToString
-                | SystemCallKind::ArrayLength
                 | SystemCallKind::HeapDump
                 | SystemCallKind::RuntimeError
                 | SystemCallKind::AddressOf => 1,
@@ -729,25 +728,6 @@ fn convert_system_call(
             result
         }
     }
-}
-
-fn convert_array_length_system_call(
-    span: TextSpan,
-    mut system_call: BoundSystemCallNodeKind,
-    converter: &mut InstructionConverter,
-) -> Vec<InstructionOrLabelReference> {
-    let mut result = vec![];
-    let base = system_call.arguments.pop().unwrap();
-    let is_closure = matches!(base.type_, Type::Closure(_));
-    result.append(&mut convert_node(base, converter));
-    if is_closure {
-        result.push(Instruction::decode_closure(1, false).span(span).into());
-    } else {
-        result.push(Instruction::load_immediate(1).span(span).into());
-    }
-
-    result.push(Instruction::system_call(system_call.base).span(span).into());
-    result
 }
 
 fn convert_array_index(

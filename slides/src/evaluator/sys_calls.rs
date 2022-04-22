@@ -205,27 +205,18 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
     let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as _);
 
     let string_start = state.read_pointer(string_start + WORD_SIZE_IN_BYTES).unwrap_pointer();
+    println!("string_start = {string_start:x}");
     let range = (string_start
         ..string_start + string_length_in_words * WORD_SIZE_IN_BYTES)
         .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {
         let word = state.read_pointer(i).unwrap_value();
+        println!("word = {word:X}");
         let bytes = word.to_be_bytes();
         string_buffer.extend_from_slice(&bytes);
     }
     String::from_utf8_lossy(&string_buffer[..string_length_in_bytes as usize]).into_owned()
-}
-
-pub fn array_length(argument: FlaggedWord, state: &mut EvaluatorState) {
-    let (type_, address, _) = decode_type(argument, state);
-    let argument = state.read_pointer(address);
-    let array_start = argument.unwrap_pointer();
-    let pointer = state.read_pointer(array_start).unwrap_value();
-
-    let array_length = pointer / type_.array_element_size_in_bytes();
-
-    state.stack.push(array_length);
 }
 
 pub fn heap_dump(argument: FlaggedWord, state: &mut EvaluatorState) {

@@ -667,7 +667,6 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
     }
     match sys_call_kind {
         SystemCallKind::Print => sys_calls::print(arguments[0], state),
-        SystemCallKind::ArrayLength => sys_calls::array_length(arguments[0], state),
         SystemCallKind::ToString => sys_calls::to_string(arguments[0], state),
         SystemCallKind::HeapDump => sys_calls::heap_dump(arguments[0], state),
         SystemCallKind::Reallocate => sys_calls::reallocate(arguments[1], arguments[0], state),

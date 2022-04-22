@@ -2896,9 +2896,6 @@ fn bind_function_call<'a, 'b>(
         ),
         Type::Closure(closure) => {
             if let Some(system_call) = closure.base_function_type.system_call_kind {
-                if system_call == SystemCallKind::ArrayLength {
-                    arguments.push(function);
-                }
                 BoundNode::system_call(span, system_call, arguments, function_type.return_type)
             } else {
                 BoundNode::function_call(
