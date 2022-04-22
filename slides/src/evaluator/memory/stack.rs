@@ -53,9 +53,9 @@ impl Stack {
     pub fn push_static_memory(&mut self, static_memory: StaticMemory) {
         assert_eq!(self.static_memory_size, 0);
         let static_memory_size = static_memory.data.len();
-        for word in static_memory.data {
+        for (word, flags) in static_memory.data.into_iter().zip(static_memory.flags.into_iter()) {
             self.data.push(word);
-            self.flags.push(Flags::default())
+            self.flags.push(flags)
         }
         self.print_maybe_stack();
         self.static_memory_size = static_memory_size;
