@@ -985,7 +985,8 @@ impl<'a> BindingState<'a, '_> {
             | Type::Struct(_)
             | Type::TypedGenericStruct(_)
             | Type::Pointer
-            | Type::SystemCall(_) => type_,
+            | Type::SystemCall(_)
+            | Type::IgnoreTypeChecking => type_,
             Type::Noneable(base_type) => {
                 Type::noneable(self.convert_struct_reference_to_struct(*base_type))
             }
@@ -1405,6 +1406,7 @@ fn default_statements(binder: &mut BindingState) {
     );
     binder.register_constant("addressOf", Value::SystemCall(SystemCallKind::AddressOf));
     binder.register_constant("garbageCollect", Value::SystemCall(SystemCallKind::GarbageCollect));
+    binder.register_constant("ignoreTypeChecking", Value::SystemCall(SystemCallKind::IgnoreTypeChecking));
 }
 
 fn std_imports(binder: &mut BindingState) {
@@ -3143,6 +3145,8 @@ fn bind_field_access<'a, 'b>(
                 );
                 BoundNode::error(span)
             }
+        Type::IgnoreTypeChecking => {
+            panic!("IgnoreTypeChecking needs to be converted into any other type asap!");
         }
     }
 }
@@ -3219,6 +3223,9 @@ fn bind_field_access_for_assignment<'a>(
         Type::Struct(struct_type) => struct_handler(struct_type.id, base),
         Type::TypedGenericStruct(typed_generic_struct) => {
             struct_handler(typed_generic_struct.id, base)
+        }
+        Type::IgnoreTypeChecking => {
+            panic!("IgnoreTypeChecking needs to be converted into any other type asap!");
         }
     }
 }
@@ -3460,6 +3467,11 @@ fn bind_condition_conversion<'a>(
         Type::Boolean => {
             let safe_node = register_contained_safe_nodes(&base);
             (base, safe_node)
+        }
+        Type::IgnoreTypeChecking => {
+            let base = bind_conversion(base, &Type::Boolean, binder);
+            // FIXME: This could maybe still contain safe nodes? Then again, this should probably be never called..
+            (base, SafeNodeInCondition::None)
         }
         Type::Void
         | Type::Any

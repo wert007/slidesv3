@@ -653,7 +653,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::RuntimeError => sys_calls::runtime_error(arguments[0], state),
         SystemCallKind::AddressOf => sys_calls::address_of(arguments[0], state),
         SystemCallKind::GarbageCollect => state.garbage_collect(),
-        SystemCallKind::Break => unreachable!(),
+        SystemCallKind::Break | SystemCallKind::IgnoreTypeChecking => unreachable!(),
     }
 }
 

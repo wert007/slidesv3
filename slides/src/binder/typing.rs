@@ -75,6 +75,7 @@ impl std::fmt::Display for IntegerType {
 pub enum Type {
     Error,
     Void,
+    IgnoreTypeChecking,
     Any,
     IntegerLiteral,
     Integer(IntegerType),
@@ -127,6 +128,8 @@ impl Type {
             (Type::Library(_), _) | (_, Type::Library(_)) => false,
             _ if self == other => true,
             (_, Type::Any) => true,
+            (_, Type::IgnoreTypeChecking) => true,
+            (Type::IgnoreTypeChecking, _) => true,
             (Type::Pointer, Type::PointerOf(_)) => true,
             (Type::PointerOf(_), Type::Pointer) => true,
             (Type::None, Type::PointerOf(_)) => true,
@@ -179,6 +182,7 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("GenericTypes should only be accessed during binding!"),
+            Type::IgnoreTypeChecking => panic!("IgnoreTypeChecking should only be accessed during binding!"),
             Type::Error => 1,
             Type::Void => 1,
             Type::Any => 1,
@@ -247,6 +251,7 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
+            Type::IgnoreTypeChecking => panic!("IgnoreTypeChecking should only be accessed during binding!"),
             Type::IntegerLiteral => panic!("Only literals have this type! And they should be bound to a specific type at some point!"),
             Type::Error => Self::TYPE_IDENTIFIER_ERROR,
             Type::Void => Self::TYPE_IDENTIFIER_VOID,
@@ -300,6 +305,7 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Any => unreachable!(),
+            Type::IgnoreTypeChecking => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
             Type::Integer(integer_type) => integer_type.size_in_bytes(),
@@ -334,6 +340,7 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
+            Type::IgnoreTypeChecking => panic!("IgnoreTypeChecking should only be accessed during binding!"),
             Type::Error
             | Type::Void
             | Type::Any
@@ -363,6 +370,7 @@ impl std::fmt::Display for Type {
         match self {
             Type::Library(_) => write!(f, "library"),
             Type::GenericType => write!(f, "$Type"),
+            Type::IgnoreTypeChecking => write!(f, "unsafe any type"),
             Type::Error => write!(f, "error"),
             Type::Void => write!(f, "void"),
             Type::Any => write!(f, "any"),
@@ -410,6 +418,7 @@ pub enum SystemCallKind {
     RuntimeError,
     AddressOf,
     GarbageCollect,
+    IgnoreTypeChecking,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -427,6 +436,7 @@ impl std::fmt::Display for SystemCallKind {
                 SystemCallKind::RuntimeError => "runtimeError",
                 SystemCallKind::AddressOf => "addressOf",
                 SystemCallKind::GarbageCollect => "garbageCollect",
+                SystemCallKind::IgnoreTypeChecking => "ignoreTypeChecking",
             }
         )
     }
@@ -533,6 +543,13 @@ impl FunctionType {
                 parameter_types: vec![],
                 this_type: None,
                 return_type: Type::Void,
+                system_call_kind: Some(system_call_kind),
+                is_generic: false,
+            },
+            SystemCallKind::IgnoreTypeChecking => Self {
+                parameter_types: vec![Type::IgnoreTypeChecking],
+                this_type: None,
+                return_type: Type::IgnoreTypeChecking,
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
             },
