@@ -293,6 +293,20 @@ impl Allocator {
         }
     }
 
+    pub fn write_flagged_byte(&mut self, address: u64, byte: FlaggedWord) {
+        let address = clear_address(address);
+        #[cfg(debug_assertions)]
+        assert!(self.find_bucket_from_address(address).unwrap().is_used);
+        let word_address = address & !(WORD_SIZE_IN_BYTES - 1);
+        let old_value = self.read_flagged_word_aligned(word_address / WORD_SIZE_IN_BYTES);
+
+        let mut bytes = old_value.value.to_be_bytes();
+        bytes[(address % WORD_SIZE_IN_BYTES) as usize] = byte.value as u8;
+        let value = u64::from_be_bytes(bytes);
+        let value = FlaggedWord { value, flags: byte.flags };
+        self.write_flagged_word_aligned(word_address / WORD_SIZE_IN_BYTES, value);
+    }
+
     fn write_word_aligned(&mut self, address: u64, value: u64) {
         #[cfg(debug_assertions)]
         assert!(

@@ -62,11 +62,20 @@ impl EvaluatorState<'_> {
         }
     }
 
-    fn write_pointer(&mut self, address: u64, value: FlaggedWord) {
+    fn write_word(&mut self, address: u64, value: FlaggedWord) {
         if memory::is_heap_pointer(address) {
             self.heap.write_flagged_word(address, value);
         } else {
             self.stack.write_flagged_word(address, value);
+        }
+    }
+
+    fn write_byte(&mut self, address: u64, value: FlaggedWord) {
+        if memory::is_heap_pointer(address) {
+            self.heap.write_flagged_byte(address, value);
+        } else {
+            todo!("Implement byte support for stacks!");
+            // self.stack.write_flagged_byte(address, value);
         }
     }
 
@@ -302,12 +311,24 @@ fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruct
     state.set_variable(instruction.arg, value);
 }
 
-fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
-    let index = state.stack.pop().unwrap_value();
-    let array = state.stack.pop().unwrap_pointer();
-    let value = state.stack.pop();
-    let index = array + index;
-    state.write_pointer(index, value);
+fn evaluate_write_to_memory(state: &mut EvaluatorState, instruction: Instruction) {
+    match instruction.arg {
+        8 => {
+            let index = state.stack.pop().unwrap_value();
+            let array = state.stack.pop().unwrap_pointer();
+            let value = state.stack.pop();
+            let index = array + index;
+            state.write_word(index, value);
+        }
+        1 => {
+            let index = state.stack.pop().unwrap_value();
+            let array = state.stack.pop().unwrap_pointer();
+            let value = state.stack.pop();
+            let index = array + index;
+            state.write_byte(index, value);
+        }
+        _ => unreachable!("instruction = {:#?}", instruction),
+    }
 }
 
 fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
@@ -365,7 +386,7 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
         let src = src + word_index * WORD_SIZE_IN_BYTES;
         let dest = dest + word_index * WORD_SIZE_IN_BYTES;
         let buffer = state.read_pointer(src);
-        state.write_pointer(dest, buffer);
+        state.write_word(dest, buffer);
     }
 }
 

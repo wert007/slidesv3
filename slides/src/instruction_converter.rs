@@ -511,7 +511,7 @@ fn convert_array_index_for_assignment(
     );
     result.push(Instruction::multiplication().span(span).into());
 
-    result.push(Instruction::store_in_memory().span(span).into());
+    result.push(Instruction::store_in_memory(base_type_size).span(span).into());
     result
 }
 
@@ -526,7 +526,7 @@ fn convert_field_access_for_assignment(
             .span(span)
             .into(),
     );
-    result.push(Instruction::store_in_memory().span(span).into());
+    result.push(Instruction::store_in_memory(field_access.type_.size_in_bytes()).span(span).into());
     result
 }
 

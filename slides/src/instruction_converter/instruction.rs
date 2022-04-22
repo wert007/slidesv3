@@ -89,10 +89,11 @@ impl Instruction {
         }
     }
 
-    pub const fn store_in_memory() -> Self {
+    /// byte_size can either be 1 (bytes) or 8 (words).
+    pub const fn store_in_memory(byte_size: u64) -> Self {
         Self {
             op_code: OpCode::StoreInMemory,
-            arg: 0,
+            arg: byte_size,
             span: None,
         }
     }
