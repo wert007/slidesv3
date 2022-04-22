@@ -1401,6 +1401,7 @@ fn default_statements(binder: &mut BindingState) {
     binder.register_constant("addressOf", Value::SystemCall(SystemCallKind::AddressOf));
     binder.register_constant("garbageCollect", Value::SystemCall(SystemCallKind::GarbageCollect));
     binder.register_constant("ignoreTypeChecking", Value::SystemCall(SystemCallKind::IgnoreTypeChecking));
+    binder.register_constant("toString", Value::SystemCall(SystemCallKind::ToString));
 }
 
 fn std_imports(binder: &mut BindingState) {
