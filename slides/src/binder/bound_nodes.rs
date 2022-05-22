@@ -850,6 +850,8 @@ pub enum ConversionKind {
     TypeBoxing,
     TypeUnboxing,
     IntToUint,
+    BiggerIntToSmallerInt(u8),
+    BiggerUintToSmallerUint(u8),
 }
 
 impl BoundConversionNodeKind {
@@ -882,7 +884,15 @@ impl BoundConversionNodeKind {
             (Type::Noneable(to), Type::Integer(from)) => {
                 if let Type::Integer(to) = &**to {
                     if from.is_signed() && !to.is_signed() {
+                        // FIXME: I guess we need to check the size_in_bytes
+                        // here!
                         ConversionKind::IntToUint
+                    } else if from.size_in_bytes() > to.size_in_bytes() {
+                        if from.is_signed() {
+                            ConversionKind::BiggerIntToSmallerInt(to.size_in_bytes() as _)
+                        } else {
+                            ConversionKind::BiggerUintToSmallerUint(to.size_in_bytes() as _)
+                        }
                     } else {
                         ConversionKind::Boxing
                     }

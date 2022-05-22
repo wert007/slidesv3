@@ -892,6 +892,8 @@ fn convert_conversion(
             result.push(Instruction::label(label_end_if).span(span).into());
 
         }
+        ConversionKind::BiggerIntToSmallerInt(target_size_in_bytes) => todo!(),
+        ConversionKind::BiggerUintToSmallerUint(target_size_in_bytes) => todo!(),
     }
     result
 }

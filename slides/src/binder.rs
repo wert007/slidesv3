@@ -3436,6 +3436,28 @@ fn bind_conversion<'a>(
 ) -> BoundNode {
     if &base.type_ == type_ {
         base
+    } else if let (Type::Integer(to), Type::Integer(from)) = (type_, &base.type_) {
+        if to.size_in_bytes() == from.size_in_bytes() {
+            if !to.is_signed() && from.is_signed() {
+                match to.size_in_bytes() {
+                    _ => unreachable!(),
+                }
+            } else {
+                base.type_ = binder.convert_struct_reference_to_struct(base.type_);
+                let type_ = binder.convert_struct_reference_to_struct(type_.clone());
+                BoundNode::conversion(base.span, base, type_)
+            }
+        } else if to.is_signed() == from.is_signed() {
+            if to.size_in_bytes() >= from.size_in_bytes() {
+                base.type_ = binder.convert_struct_reference_to_struct(base.type_);
+                let type_ = binder.convert_struct_reference_to_struct(type_.clone());
+                BoundNode::conversion(base.span, base, type_)
+            } else {
+                todo!("Implement downcast function calls")
+            }
+        } else {
+            unreachable!("type_ was {:#?} and base.type_ was {:#?}", type_, base.type_);
+        }
     } else if base.type_.can_be_converted_to(type_) {
         base.type_ = binder.convert_struct_reference_to_struct(base.type_);
         let type_ = binder.convert_struct_reference_to_struct(type_.clone());

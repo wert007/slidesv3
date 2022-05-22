@@ -58,6 +58,16 @@ impl IntegerType {
             false
         }
     }
+
+    fn can_be_casted_to(&self, other: IntegerType) -> bool {
+        if self.is_signed() && !other.is_signed() && other.to_signed() == *self {
+            true
+        } else if self.is_signed() == other.is_signed() {
+            self.size_in_bytes() > other.size_in_bytes()
+        } else {
+            false
+        }
+    }
 }
 
 impl std::fmt::Display for IntegerType {
@@ -156,7 +166,7 @@ impl Type {
             // (Type::Pointer, Type::Integer) => true,
             (Type::PointerOf(inner), Type::Noneable(other)) => inner.can_be_converted_to(other),
             (Type::Noneable(base_type), other) => base_type.can_be_converted_to(other),
-            (Type::Integer(signed_type), Type::Integer(unsigned_type)) if signed_type.is_signed() && !unsigned_type.is_signed() && unsigned_type.to_signed() == *signed_type => true,
+            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => from_integer_type.can_be_casted_to(*to_integer_type),
             _ => false,
         }
     }
