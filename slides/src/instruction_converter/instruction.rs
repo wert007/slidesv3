@@ -129,6 +129,14 @@ impl Instruction {
         }
     }
 
+    pub const fn read_byte_with_offset(offset: u64) -> Self {
+        Self {
+            op_code: OpCode::ReadByteWithOffset,
+            arg: offset,
+            span: None,
+        }
+    }
+
     pub const fn memory_copy() -> Self {
         Self {
             op_code: OpCode::MemoryCopy,

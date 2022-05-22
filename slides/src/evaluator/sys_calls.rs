@@ -37,9 +37,9 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
 
 fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64, u64) {
     let address = address.unwrap_pointer();
-    let _type_identifier_size_in_bytes = state.read_pointer(address).unwrap_value();
+    let _type_identifier_size_in_bytes = state.read_word(address).unwrap_value();
     let address = address + WORD_SIZE_IN_BYTES;
-    let type_identifier_kind = state.read_pointer(address).unwrap_value();
+    let type_identifier_kind = state.read_word(address).unwrap_value();
     let address = address + WORD_SIZE_IN_BYTES;
     if let Some(type_) = Type::simple_type_from_type_identifier(type_identifier_kind) {
         return (type_, address, 0);
@@ -56,9 +56,9 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64, 
             (Type::noneable(base_type), address, to_string_function)
         }
         Type::TYPE_IDENTIFIER_STRUCT | Type::TYPE_IDENTIFIER_STRUCT_REFERENCE => {
-            let struct_id = state.read_pointer(address).unwrap_value();
+            let struct_id = state.read_word(address).unwrap_value();
             let address = address + WORD_SIZE_IN_BYTES;
-            let to_string_function = state.read_pointer(address).unwrap_pointer();
+            let to_string_function = state.read_word(address).unwrap_pointer();
             let address = address + WORD_SIZE_IN_BYTES;
             let simple_function_table = SimpleStructFunctionTable::default();
             (
@@ -71,7 +71,7 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (Type, u64, 
             )
         }
         Type::TYPE_IDENTIFIER_FUNCTION | Type::TYPE_IDENTIFIER_CLOSURE => {
-            let type_count = state.read_pointer(address).unwrap_value();
+            let type_count = state.read_word(address).unwrap_value();
             let address = address + WORD_SIZE_IN_BYTES;
             let (this_type, address, _to_string_function) =
                 decode_type(FlaggedWord::pointer(address), state);
@@ -116,7 +116,7 @@ fn to_string_native(
         Type::Void => todo!(),
         Type::Any => {
             let (type_, address, to_string_function) = decode_type(argument, state);
-            let argument = state.read_pointer(address);
+            let argument = state.read_word(address);
             to_string_native(type_, to_string_function as _, argument, state)
         }
         Type::None => "none".into(),
@@ -126,7 +126,7 @@ fn to_string_native(
             } else if base_type.is_pointer() {
                 to_string_native(*base_type, to_string_function, argument, state)
             } else {
-                let argument = state.read_pointer(argument.unwrap_pointer());
+                let argument = state.read_word(argument.unwrap_pointer());
                 to_string_native(*base_type, to_string_function, argument, state)
             }
         }
@@ -177,7 +177,7 @@ fn to_string_native(
                 let argument = if base_type.is_pointer() {
                     FlaggedWord::pointer(ptr)
                 } else {
-                    state.read_pointer(ptr)
+                    state.read_word(ptr)
                 };
                 to_string_native(*base_type, to_string_function, argument, state)
             }
@@ -197,22 +197,22 @@ fn to_string_native(
 
 fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) -> String {
     let string_start = argument.unwrap_pointer();
-    let pointer = state.read_pointer(string_start).unwrap_value();
+    let pointer = state.read_word(string_start).unwrap_value();
 
     let string_length_in_bytes = pointer;
     let string_length_in_words = bytes_to_word(string_length_in_bytes);
     // FIXME: Use string_length_in_words instead.
     let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as _);
 
-    let string_start = state.read_pointer(string_start + WORD_SIZE_IN_BYTES).unwrap_pointer();
-    println!("string_start = {string_start:x}");
+
+
+    let string_start = state.read_word(string_start + WORD_SIZE_IN_BYTES).unwrap_pointer();
     let range = (string_start
         ..string_start + string_length_in_words * WORD_SIZE_IN_BYTES)
         .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {
-        let word = state.read_pointer(i).unwrap_value();
-        println!("word = {word:X}");
+        let word = state.read_word(i).unwrap_value();
         let bytes = word.to_be_bytes();
         string_buffer.extend_from_slice(&bytes);
     }

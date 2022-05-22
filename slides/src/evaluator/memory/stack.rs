@@ -69,6 +69,12 @@ impl Stack {
         }
     }
 
+    pub fn read_flagged_byte(&self, address: u64) -> FlaggedWord {
+        let value = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES);
+        let byte = value.value.to_be_bytes()[(address % WORD_SIZE_IN_BYTES) as usize];
+        FlaggedWord { value: byte as _, flags: value.flags }
+    }
+
     fn read_flagged_word_aligned(&self, address: u64) -> FlaggedWord {
         FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
     }
@@ -79,6 +85,14 @@ impl Stack {
         } else {
             unimplemented!("address = 0x{:x}", address);
         }
+    }
+
+    pub fn write_flagged_byte(&mut self, address: u64, value: FlaggedWord) {
+        let old_value = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES).value;
+        let mut bytes = old_value.to_be_bytes();
+        bytes[(address % WORD_SIZE_IN_BYTES) as usize] = value.value as u8;
+        let word = u64::from_be_bytes(bytes);
+        self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, FlaggedWord { value: word, flags: value.flags });
     }
 
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {

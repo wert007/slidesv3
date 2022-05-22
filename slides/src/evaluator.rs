@@ -54,11 +54,19 @@ impl EvaluatorState<'_> {
         self.registers[variable] = value;
     }
 
-    fn read_pointer(&self, address: u64) -> FlaggedWord {
+    fn read_word(&self, address: u64) -> FlaggedWord {
         if memory::is_heap_pointer(address) {
             self.heap.read_flagged_word(address)
         } else {
             self.stack.read_flagged_word(address)
+        }
+    }
+
+    fn read_byte(&self, address: u64) -> FlaggedWord {
+        if memory::is_heap_pointer(address) {
+            self.heap.read_flagged_byte(address)
+        } else {
+            self.stack.read_flagged_byte(address)
         }
     }
 
@@ -74,8 +82,7 @@ impl EvaluatorState<'_> {
         if memory::is_heap_pointer(address) {
             self.heap.write_flagged_byte(address, value);
         } else {
-            todo!("Implement byte support for stacks!");
-            // self.stack.write_flagged_byte(address, value);
+            self.stack.write_flagged_byte(address, value);
         }
     }
 
@@ -247,6 +254,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::WriteToHeap => evaluate_write_to_heap(state, instruction),
         OpCode::Allocate => evaluate_allocate(state, instruction),
         OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction),
+        OpCode::ReadByteWithOffset => evaluate_read_byte_with_offset(state, instruction),
         OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
@@ -366,7 +374,15 @@ fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instr
     let address = state.stack.pop().unwrap_pointer();
     let offset = instruction.arg;
     let address = address + offset;
-    let value = state.read_pointer(address);
+    let value = state.read_word(address);
+    state.stack.push_flagged_word(value);
+}
+
+fn evaluate_read_byte_with_offset(state: &mut EvaluatorState, instruction: Instruction) {
+    let address = state.stack.pop().unwrap_pointer();
+    let offset = instruction.arg;
+    let address = address + offset;
+    let value = state.read_byte(address);
     state.stack.push_flagged_word(value);
 }
 
@@ -385,7 +401,7 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
     for word_index in 0..size_in_words {
         let src = src + word_index * WORD_SIZE_IN_BYTES;
         let dest = dest + word_index * WORD_SIZE_IN_BYTES;
-        let buffer = state.read_pointer(src);
+        let buffer = state.read_word(src);
         state.write_word(dest, buffer);
     }
 }
@@ -461,9 +477,9 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     let rhs = state.stack.pop().unwrap_pointer();
     let lhs = state.stack.pop().unwrap_pointer();
 
-    let lhs_length_in_bytes = state.read_pointer(lhs).unwrap_value();
+    let lhs_length_in_bytes = state.read_word(lhs).unwrap_value();
     let lhs_length_in_words = memory::bytes_to_word(lhs_length_in_bytes);
-    let rhs_length_in_bytes = state.read_pointer(rhs).unwrap_value();
+    let rhs_length_in_bytes = state.read_word(rhs).unwrap_value();
     let _rhs_length_in_words = memory::bytes_to_word(rhs_length_in_bytes);
     // If two arrays are not equal in length, we don't compare their elements.
     // But when we compare their elements we expect a true result and only
@@ -473,8 +489,8 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
         for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
             let lhs_index = lhs + i;
             let rhs_index = rhs + i;
-            let lhs = state.read_pointer(lhs_index).unwrap_value();
-            let rhs = state.read_pointer(rhs_index).unwrap_value();
+            let lhs = state.read_word(lhs_index).unwrap_value();
+            let rhs = state.read_word(rhs_index).unwrap_value();
             if lhs != rhs {
                 result = false;
                 break;
@@ -508,8 +524,8 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
         for offset in 0..size_in_words {
             let rhs_address = rhs.unwrap_pointer() + offset;
             let lhs_address = lhs.unwrap_pointer() + offset;
-            let rhs_value = state.read_pointer(rhs_address);
-            let lhs_value = state.read_pointer(lhs_address);
+            let rhs_value = state.read_word(rhs_address);
+            let lhs_value = state.read_word(lhs_address);
             if rhs_value != lhs_value {
                 result = false;
                 break;
@@ -523,19 +539,19 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
 fn evaluate_type_identifier_equals(state: &mut EvaluatorState, _: Instruction) {
     let rhs = state.stack.pop().unwrap_pointer();
     let lhs = state.stack.pop().unwrap_pointer();
-    let lhs_size_in_bytes = state.read_pointer(lhs).unwrap_value();
+    let lhs_size_in_bytes = state.read_word(lhs).unwrap_value();
     let result = if lhs == rhs {
         true
     } else {
-        let rhs_size_in_bytes = state.read_pointer(rhs).unwrap_value();
+        let rhs_size_in_bytes = state.read_word(rhs).unwrap_value();
         if lhs_size_in_bytes != rhs_size_in_bytes {
             false
         } else {
             let size_in_words = memory::bytes_to_word(lhs_size_in_bytes);
             let mut result = true;
             for offset in 1..=size_in_words {
-                let lhs = state.read_pointer(lhs + offset * memory::WORD_SIZE_IN_BYTES);
-                let rhs = state.read_pointer(rhs + offset * memory::WORD_SIZE_IN_BYTES);
+                let lhs = state.read_word(lhs + offset * memory::WORD_SIZE_IN_BYTES);
+                let rhs = state.read_word(rhs + offset * memory::WORD_SIZE_IN_BYTES);
                 if lhs.value != rhs.value {
                     result = false;
                     break;
@@ -545,7 +561,7 @@ fn evaluate_type_identifier_equals(state: &mut EvaluatorState, _: Instruction) {
         }
     };
     if result {
-        let value = state.read_pointer(lhs + lhs_size_in_bytes + memory::WORD_SIZE_IN_BYTES);
+        let value = state.read_word(lhs + lhs_size_in_bytes + memory::WORD_SIZE_IN_BYTES);
         state.stack.push_flagged_word(value);
     } else {
         state.stack.push_pointer(0);
@@ -581,8 +597,8 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
     let rhs = state.stack.pop().unwrap_pointer();
     let lhs = state.stack.pop().unwrap_pointer();
 
-    let lhs_length = state.read_pointer(lhs).unwrap_value();
-    let rhs_length = state.read_pointer(rhs).unwrap_value();
+    let lhs_length = state.read_word(lhs).unwrap_value();
+    let rhs_length = state.read_word(rhs).unwrap_value();
     let result_length = lhs_length + rhs_length;
     // This protects these strings on the heap, since reallocate may call
     // garbage_collect, which otherwise would overwrite the string with itself.
@@ -603,7 +619,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             let address = address as usize;
             let lhs_byte = {
                 let addr = address as u64 & !(WORD_SIZE_IN_BYTES - 1);
-                let word = state.read_pointer(addr).unwrap_value();
+                let word = state.read_word(addr).unwrap_value();
                 let bytes = word.to_be_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
@@ -615,7 +631,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
             let address = address as usize;
             let rhs_byte = {
                 let addr = address as u64 & !(WORD_SIZE_IN_BYTES - 1);
-                let word = state.read_pointer(addr).unwrap_value();
+                let word = state.read_word(addr).unwrap_value();
                 let bytes = word.to_be_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
@@ -632,7 +648,7 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
     let is_none = lhs.unwrap_pointer() == 0;
     let needs_dereferencing = instruction.arg != 0;
     let result = if needs_dereferencing && !is_none {
-        state.read_pointer(lhs.unwrap_pointer())
+        state.read_word(lhs.unwrap_pointer())
     } else {
         if is_none { rhs } else { lhs }
     };
@@ -751,7 +767,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
     let argument_count = instruction.arg >> 1;
     let mut closure_pointer = state.stack.pop().unwrap_pointer();
 
-    let closure_length_in_bytes = state.read_pointer(closure_pointer).unwrap_value();
+    let closure_length_in_bytes = state.read_word(closure_pointer).unwrap_value();
     let argument_count = memory::bytes_to_word(closure_length_in_bytes) - 1 + argument_count;
     closure_pointer += WORD_SIZE_IN_BYTES;
     let end_address = closure_pointer + closure_length_in_bytes;
@@ -760,7 +776,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
         closure_pointer += WORD_SIZE_IN_BYTES;
         Some(
             state
-                .read_pointer(closure_pointer - WORD_SIZE_IN_BYTES)
+                .read_word(closure_pointer - WORD_SIZE_IN_BYTES)
                 .unwrap_pointer(),
         )
     } else {
@@ -768,7 +784,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
     };
 
     while closure_pointer < end_address {
-        let argument = state.read_pointer(closure_pointer);
+        let argument = state.read_word(closure_pointer);
         state.stack.push_flagged_word(argument);
         closure_pointer += WORD_SIZE_IN_BYTES;
     }

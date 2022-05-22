@@ -208,6 +208,21 @@ impl Allocator {
         result
     }
 
+    pub fn read_flagged_byte(&self, address: u64) -> FlaggedWord {
+        let address = clear_address(address) as u64;
+        #[cfg(debug_assertions)]
+        assert!(
+            self.find_bucket_from_address(address as _).expect("There is no bucket to read the word from!").is_used,
+            "address = 0x{:x}",
+            address
+        );
+        let value = self.read_flagged_word_aligned((address / WORD_SIZE_IN_BYTES) as _);
+        let flags = value.flags;
+        let bytes = value.value.to_be_bytes();
+        let value = bytes[(address % WORD_SIZE_IN_BYTES) as usize];
+        FlaggedWord { value: value as u64, flags }
+    }
+
     pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
         let address = clear_address(address) as u64;
         #[cfg(debug_assertions)]

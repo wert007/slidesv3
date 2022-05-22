@@ -251,6 +251,9 @@ fn instruction_or_label_to_string(
         OpCode::ReadWordWithOffset => {
             instruction_byte_count_arg_to_string("rdwrdoffset", instruction.arg)
         }
+        OpCode::ReadByteWithOffset => {
+            instruction_byte_count_arg_to_string("rdbyteoffset", instruction.arg)
+        }
         OpCode::MemoryCopy => instruction_no_arg_to_string("memcpy"),
         OpCode::TypeIdentifier => instruction_dec_signed_arg_to_string("ldtyp", instruction.arg),
         OpCode::Label => instruction_label_arg_to_string("lbl", instruction.arg),

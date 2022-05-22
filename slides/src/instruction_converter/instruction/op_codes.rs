@@ -14,9 +14,10 @@ pub enum OpCode {
     WriteToHeap = 10,
     Allocate = 11,
     ReadWordWithOffset = 12,
-    MemoryCopy = 13,
-    TypeIdentifier = 14,
-    Label = 15,
+    ReadByteWithOffset = 13,
+    MemoryCopy = 14,
+    TypeIdentifier = 15,
+    Label = 16,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,
