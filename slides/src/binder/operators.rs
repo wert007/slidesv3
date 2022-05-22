@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::typing::Type;
+use super::{typing::Type, symbols::FunctionSymbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundUnaryOperator {
@@ -29,6 +29,8 @@ pub struct BoundBinary {
     pub op: BoundBinaryOperator,
     pub rhs: Type,
     pub result: Type,
+    pub function_symbol: Option<FunctionSymbol>,
+    pub reverse_args: bool,
 }
 
 impl BoundBinary {
@@ -38,6 +40,8 @@ impl BoundBinary {
             op,
             rhs: input.clone(),
             result,
+            function_symbol: None,
+            reverse_args: false,
         }
     }
 
@@ -47,6 +51,8 @@ impl BoundBinary {
             op,
             rhs: type_.clone(),
             result: type_,
+            function_symbol: None,
+            reverse_args: false,
         }
     }
 
@@ -56,6 +62,19 @@ impl BoundBinary {
             op,
             rhs: rhs.clone(),
             result,
+            function_symbol: None,
+            reverse_args: false,
+        }
+    }
+
+    pub fn from_function_symbol(lhs: &Type, op: BoundBinaryOperator, rhs: &Type, function: &FunctionSymbol, reverse_args: bool) -> BoundBinary {
+        Self {
+            lhs: lhs.clone(),
+            op,
+            rhs: rhs.clone(),
+            result: function.function_type.return_type.clone(),
+            function_symbol: Some(function.clone()),
+            reverse_args,
         }
     }
 }

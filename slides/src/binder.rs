@@ -2458,83 +2458,81 @@ fn bind_binary_insertion<'a>(
 ) -> BoundNode {
     match bind_binary_operator(span, &lhs, operator_token, &rhs, binder) {
         Some(bound_binary) => {
-            let (lhs, rhs) = if bound_binary.op == BoundBinaryOperator::StringConcat {
-                todo!("Remove StringConcat operator!")
+            let lhs = bind_conversion(lhs, &bound_binary.lhs, binder);
+            let rhs = bind_conversion(rhs, &bound_binary.rhs, binder);
+            if let Some(function_symbol) = bound_binary.function_symbol {
+                BoundNode::function_call(span, BoundNode::label_reference(function_symbol.function_label as _, Type::Function(Box::new(function_symbol.function_type))), if bound_binary.reverse_args { vec![lhs, rhs] } else { vec![rhs, lhs] }, false, bound_binary.result)
             } else {
-                (
-                    bind_conversion(lhs, &bound_binary.lhs, binder),
-                    bind_conversion(rhs, &bound_binary.rhs, binder),
-                )
-            };
-            match bound_binary.op {
-                BoundBinaryOperator::Range => {
-                    let base_type = if matches!(lhs.type_, Type::Integer(integer_type) if integer_type.is_signed()) {
-                    binder
-                        .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
-                        .unwrap()
-                    } else {
-                        binder.get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::UnsignedRange))
-                        .unwrap()
-                    };
-                    let function = base_type
-                        .function_table
-                        .constructor_function
-                        .as_ref()
-                        .map(|c| c.function_label);
-                    BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
-                }
-                BoundBinaryOperator::LogicalAnd => BoundNode::logical_and(span, lhs, rhs),
-                BoundBinaryOperator::LogicalOr => BoundNode::logical_or(span, lhs, rhs),
-                BoundBinaryOperator::Equals => {
-                    let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
-                    if let Type::Struct(struct_type) = type_ {
-                        if let Some(equals_function) = struct_type.function_table.equals_function {
-                            let base = BoundNode::label_reference(
-                                equals_function.function_label as usize,
-                                Type::function(equals_function.function_type),
-                            );
-                            BoundNode::function_call(
-                                span,
-                                base,
-                                vec![lhs, rhs],
-                                false,
-                                Type::Boolean,
-                            )
+                match bound_binary.op {
+                    BoundBinaryOperator::Range => {
+                        let base_type = if matches!(lhs.type_, Type::Integer(integer_type) if integer_type.is_signed()) {
+                        binder
+                            .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
+                            .unwrap()
                         } else {
-                            BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
-                        }
-                    } else {
-                        BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                            binder.get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::UnsignedRange))
+                            .unwrap()
+                        };
+                        let function = base_type
+                            .function_table
+                            .constructor_function
+                            .as_ref()
+                            .map(|c| c.function_label);
+                        BoundNode::constructor_call(span, vec![lhs, rhs], base_type, function)
                     }
-                }
-                BoundBinaryOperator::NotEquals => {
-                    let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
-                    if let Type::Struct(struct_type) = type_ {
-                        if let Some(equals_function) = struct_type.function_table.equals_function {
-                            let base = BoundNode::label_reference(
-                                equals_function.function_label as usize,
-                                Type::function(equals_function.function_type),
-                            );
-                            BoundNode::unary(
-                                span,
-                                BoundUnaryOperator::LogicalNegation,
+                    BoundBinaryOperator::LogicalAnd => BoundNode::logical_and(span, lhs, rhs),
+                    BoundBinaryOperator::LogicalOr => BoundNode::logical_or(span, lhs, rhs),
+                    BoundBinaryOperator::Equals => {
+                        let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
+                        if let Type::Struct(struct_type) = type_ {
+                            if let Some(equals_function) = struct_type.function_table.equals_function {
+                                let base = BoundNode::label_reference(
+                                    equals_function.function_label as usize,
+                                    Type::function(equals_function.function_type),
+                                );
                                 BoundNode::function_call(
                                     span,
                                     base,
                                     vec![lhs, rhs],
                                     false,
                                     Type::Boolean,
-                                ),
-                                Type::Boolean,
-                            )
+                                )
+                            } else {
+                                BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                            }
                         } else {
                             BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
                         }
-                    } else {
-                        BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
                     }
+                    BoundBinaryOperator::NotEquals => {
+                        let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
+                        if let Type::Struct(struct_type) = type_ {
+                            if let Some(equals_function) = struct_type.function_table.equals_function {
+                                let base = BoundNode::label_reference(
+                                    equals_function.function_label as usize,
+                                    Type::function(equals_function.function_type),
+                                );
+                                BoundNode::unary(
+                                    span,
+                                    BoundUnaryOperator::LogicalNegation,
+                                    BoundNode::function_call(
+                                        span,
+                                        base,
+                                        vec![lhs, rhs],
+                                        false,
+                                        Type::Boolean,
+                                    ),
+                                    Type::Boolean,
+                                )
+                            } else {
+                                BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                            }
+                        } else {
+                            BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                        }
+                    }
+                    _ => BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result),
                 }
-                _ => BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result),
             }
         }
         None => BoundNode::error(span),
@@ -2698,6 +2696,49 @@ fn bind_binary_operator<'a, 'b>(
             BoundBinaryOperator::LogicalAnd | BoundBinaryOperator::LogicalOr,
             Type::Boolean,
         ) => Some(BoundBinary::same_output(result, Type::Boolean)),
+        (
+            lhs_type @ Type::StructReference(lhs), BoundBinaryOperator::ArithmeticAddition, rhs_type @ Type::StructReference(rhs)
+        ) => {
+            let lhs = binder.get_struct_by_id(lhs.id).unwrap();
+            let rhs = binder.get_struct_by_id(rhs.id).unwrap();
+            if let Some(add_function) = &lhs.function_table.add_function {
+                if rhs_type.can_be_converted_to(&add_function.function_type.parameter_types[0]) {
+                    Some(BoundBinary::from_function_symbol(lhs_type, result, &add_function.function_type.parameter_types[0], add_function, false))
+                } else if let Some(add_to_function) = &rhs.function_table.add_to_function {
+                    Some(BoundBinary::from_function_symbol(&add_to_function.function_type.parameter_types[0], result, rhs_type, add_to_function, true))
+                } else {
+                    None
+                }
+            } else if let Some(add_to_function) = &rhs.function_table.add_to_function {
+                Some(BoundBinary::from_function_symbol(&add_to_function.function_type.parameter_types[0], result, rhs_type, add_to_function, true))
+            } else {
+                None
+            }
+        }
+        (lhs_type @ Type::StructReference(lhs), BoundBinaryOperator::ArithmeticAddition, rhs_type) => {
+            let lhs = binder.get_struct_by_id(lhs.id).unwrap();
+            if let Some(add_function) = &lhs.function_table.add_function {
+                if rhs_type.can_be_converted_to(&add_function.function_type.parameter_types[0]) {
+                    Some(BoundBinary::from_function_symbol(lhs_type, result, &add_function.function_type.parameter_types[0], add_function, false))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        (lhs_type, BoundBinaryOperator::ArithmeticAddition, rhs_type @ Type::StructReference(rhs)) => {
+            let rhs = binder.get_struct_by_id(rhs.id).unwrap();
+            if let Some(add_to_function) = &rhs.function_table.add_to_function {
+                if lhs_type.can_be_converted_to(&add_to_function.function_type.parameter_types[0]) {
+                    Some(BoundBinary::from_function_symbol(&add_to_function.function_type.parameter_types[0], result, rhs_type, add_to_function, true))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
         (Type::Noneable(lhs_type), BoundBinaryOperator::NoneableOrValue, rhs_type) => {
             if rhs_type.can_be_converted_to(lhs_type) {
                 Some(BoundBinary::new(
