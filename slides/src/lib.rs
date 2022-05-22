@@ -16,18 +16,14 @@ use crate::{diagnostics::DiagnosticBag, text::SourceText};
 use binder::symbols::Library;
 pub use debug::DebugFlags;
 
-pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags, import_std_libs: bool) -> Library
+pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags, import_std_libs: bool) -> std::io::Result<Library>
 where
     P: AsRef<Path>,
 {
     let path = path.as_ref().to_owned();
-    let source_code = std::fs::read_to_string(&path);
-    if source_code.is_err() {
-        return Library::error();
-    }
-    let source_code = source_code.unwrap();
+    let source_code = std::fs::read_to_string(&path)?;
     let file_name = path.to_string_lossy();
-    load_library(&source_code, &file_name, debug_flags, import_std_libs)
+    Ok(load_library(&source_code, &file_name, debug_flags, import_std_libs))
 }
 
 pub fn load_library(

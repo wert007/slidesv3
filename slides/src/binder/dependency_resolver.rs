@@ -189,9 +189,17 @@ pub(super) fn load_library_from_path<'a>(
         .find_map(|l| l.find_imported_library_by_path(path))
         .map(|(s, l)| (Some(s), l))
         .unwrap_or_else(|| {
+            let lib = crate::load_library_from_path(path, binder.debug_flags, import_std_lib);
+            let lib = match lib {
+                Ok(lib) => lib,
+                Err(_) => {
+                    binder.diagnostic_bag.report_could_not_access(span, path);
+                    Library::error()
+                }
+            };
             (
                 None,
-                crate::load_library_from_path(path, binder.debug_flags, import_std_lib),
+                lib
             )
         });
     // If it is a std library, there is no path to it, but it might still be already loaded.

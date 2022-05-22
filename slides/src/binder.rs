@@ -1198,10 +1198,10 @@ fn bind<'a>(
     let span = node.span();
     let mut startup = vec![];
     default_statements(&mut binder);
-    let node = dependency_resolver::bind_import_statements(node, &mut binder).unwrap();
     if import_std_lib {
         std_imports(&mut binder);
     }
+    let node = dependency_resolver::bind_import_statements(node, &mut binder).unwrap();
     bind_top_level_statements(node, &mut binder);
 
     for lib in binder.libraries.iter_mut() {

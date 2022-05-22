@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, path::Path};
 
 use crate::{
     binder::{typing::Type, BoundStructSymbol},
@@ -455,6 +455,11 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_errors_in_referenced_library(&mut self, span: TextSpan, library_name: &str) {
         let message = format!("Errors in {} found. Fix them and recompile.", library_name);
+        self.report(message.into(), span);
+    }
+
+    pub fn report_could_not_access(&mut self, span: TextSpan, path: &Path) {
+        let message = format!("Could not open path '{}'.", path.display());
         self.report(message.into(), span);
     }
 

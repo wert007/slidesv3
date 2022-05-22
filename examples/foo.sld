@@ -1,3 +1,5 @@
+import lib('does-no-exist.sld') as ha;
+
 func main() {
     // Crashes???
     let l = new List('');
