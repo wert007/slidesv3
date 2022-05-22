@@ -147,7 +147,6 @@ fn read_pointer(state: &EvaluatorState, address: u64) {
 }
 
 fn _print_heap_at(heap: &memory::allocator::Allocator, address: usize) {
-    dbg!(address);
     let address = memory::HEAP_POINTER | address as u64;
     let entry = heap.read_flagged_word(address);
     if entry.is_pointer() {

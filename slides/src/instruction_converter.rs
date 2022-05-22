@@ -771,7 +771,7 @@ fn convert_field_access(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
     match field_access.type_ {
-        Type::SystemCall(_) => {}
+        Type::SystemCall(_) => {unreachable!()}
         Type::Function(_) => {
             result.push(
                 Instruction::load_register(field_access.offset)
