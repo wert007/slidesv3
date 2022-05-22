@@ -347,7 +347,7 @@ fn convert_node(
             convert_system_call(node.span, system_call, converter)
         }
         BoundNodeKind::ArrayIndex(array_index) => {
-            convert_array_index(node.span, array_index, converter)
+            convert_array_index(node.span, array_index, node.type_, converter)
         }
         BoundNodeKind::FieldAccess(field_access) => {
             convert_field_access(node.span, field_access, converter)
@@ -733,6 +733,7 @@ fn convert_system_call(
 fn convert_array_index(
     span: TextSpan,
     array_index: BoundArrayIndexNodeKind,
+    type_: Type,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let base_type_size = match &array_index.base.type_ {
@@ -750,7 +751,16 @@ fn convert_array_index(
     result.push(Instruction::multiplication().span(span).into());
 
     result.push(Instruction::addition().span(span).into());
-    result.push(Instruction::read_word_with_offset(0).span(span).into());
+
+    match type_.size_in_bytes() {
+        1 => {
+            result.push(Instruction::read_byte_with_offset(0).span(span).into());
+        }
+        8 => {
+            result.push(Instruction::read_word_with_offset(0).span(span).into());
+        }
+        _ => unreachable!(),
+    }
     result
 }
 
@@ -769,12 +779,22 @@ fn convert_field_access(
                     .into(),
             );
         }
-        _ => {
-            result.push(
-                Instruction::read_word_with_offset(field_access.offset)
-                    .span(span)
-                    .into(),
-            );
+        type_ => {
+            match type_.size_in_bytes() {
+                1 => {
+                    result.push(
+                        Instruction::read_byte_with_offset(field_access.offset).span(span).into(),
+                    );
+                }
+                8 => {
+                    result.push(
+                        Instruction::read_word_with_offset(field_access.offset)
+                            .span(span)
+                            .into(),
+                    );
+                }
+                _ => unreachable!(),
+            }
         }
     }
     result
