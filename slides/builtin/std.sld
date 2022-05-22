@@ -17,7 +17,22 @@ struct string {
     func $addTo(lhs: any) -> string {
         let lhsString = toString(lhs);
         let length = this.length + lhsString.length;
-        let bytes : &byte = reallocate(lhsString.bytes, length);
+        // FIXME: Reallocate does not work with stack/static memory pointers. So
+        // we create a new pointer in any case. Even if we are already a heap
+        // pointer...
+        // Note: this might not apply here, since toString probably returns
+        // always a heap allocated string, except for other strings, which
+        // should used as a parameter here.
+        // Then again, you probably do not want to change the byte buffer of one
+        // of the supplied strings.
+        let bytes : &byte = reallocate(none, length);
+        if bytes == none {
+            runtimeError('Could not allocate string!');
+            return lhsString;
+        }
+        for i in 0..this.length {
+            bytes[i] = lhsString.bytes[i];
+        }
         for j, i in lhsString.length..length {
             bytes[i] = this.bytes[j];
         }
@@ -27,7 +42,17 @@ struct string {
     func $add(rhs: any) -> string {
         let rhsString = toString(rhs);
         let length = this.length + rhsString.length;
-        let bytes : &byte = reallocate(this.bytes, length);
+        // FIXME: Reallocate does not work with stack/static memory pointers. So
+        // we create a new pointer in any case. Even if we are already a heap
+        // pointer...
+        let bytes : &byte = reallocate(none, length);
+        if bytes == none {
+            runtimeError('Could not allocate string!');
+            return this;
+        }
+        for i in 0..this.length {
+            bytes[i] = this.bytes[i];
+        }
         for j, i in this.length..length {
             bytes[i] = rhsString.bytes[j];
         }
@@ -117,6 +142,9 @@ generic struct Array {
     func $constructor(basis: $Type, length: uint) {
         this.length = length;
         this.buffer = reallocate(none, 8 * length);
+        if this.buffer == none {
+            runtimeError('Could not allocate array on the heap!');
+        }
         for i in 0..length {
             // FIXME: This crashes the compiler for some reason?
             // Maybe because, at the time of binding, the $get function has not
@@ -209,6 +237,9 @@ generic struct List {
     func $constructor(phantom: $Type) {
         this.length = 0;
         this.buffer = reallocate(none, 8 * 4);
+        if this.buffer == none {
+            runtimeError('Could not allocate list on the heap!');
+        }
         this.capacity = 4;
     }
 
