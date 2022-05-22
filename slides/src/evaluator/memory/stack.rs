@@ -1,4 +1,4 @@
-use crate::{evaluator::WORD_SIZE_IN_BYTES, DebugFlags};
+use crate::{evaluator::{WORD_SIZE_IN_BYTES, memory::static_memory::StaticMemoryWord}, DebugFlags};
 
 use super::{static_memory::StaticMemory, FlaggedWord, Flags};
 
@@ -53,9 +53,24 @@ impl Stack {
     pub fn push_static_memory(&mut self, static_memory: StaticMemory) {
         assert_eq!(self.static_memory_size, 0);
         let static_memory_size = static_memory.data.len();
-        for (word, flags) in static_memory.data.into_iter().zip(static_memory.flags.into_iter()) {
-            self.data.push(word);
-            self.flags.push(flags)
+        let mut address = 0;
+        for word in static_memory.data {
+            match word {
+                StaticMemoryWord::Word(word) => {
+                    self.data.push(word);
+                    self.flags.push(Flags::default());
+                }
+                StaticMemoryWord::RelativePointer(relative_pointer) => {
+                    let word = if relative_pointer > 0 {
+                        address + relative_pointer as u64
+                    } else {
+                        address - relative_pointer.abs() as u64
+                    };
+                    self.data.push(word);
+                    self.flags.push(Flags::default().pointer());
+                }
+            }
+            address += WORD_SIZE_IN_BYTES;
         }
         self.print_maybe_stack();
         self.static_memory_size = static_memory_size;

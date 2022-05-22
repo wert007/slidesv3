@@ -2,10 +2,15 @@ use crate::DebugFlags;
 
 use super::WORD_SIZE_IN_BYTES;
 
+#[derive(Debug, Clone)]
+pub enum StaticMemoryWord {
+    Word(u64),
+    RelativePointer(i64),
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct StaticMemory {
-    pub data: Vec<u64>,
-    pub flags: Vec<super::Flags>,
+    pub data: Vec<StaticMemoryWord>,
 }
 
 impl StaticMemory {
@@ -18,7 +23,7 @@ impl StaticMemory {
         let result = result * WORD_SIZE_IN_BYTES;
         let length = string.len() as _;
         self.push_immediate(length);
-        self.push_pointer(result + 2 * WORD_SIZE_IN_BYTES);
+        self.push_pointer(WORD_SIZE_IN_BYTES as i64);
         for word in string.as_bytes().chunks(8) {
             let word = [
                 word.get(0).copied().unwrap_or_default(),
@@ -44,7 +49,6 @@ impl StaticMemory {
 
     pub fn insert(&mut self, other: &mut Self) {
         self.data.append(&mut other.data);
-        self.flags.append(&mut other.flags);
     }
 
     pub fn size_in_bytes(&self) -> u64 {
@@ -52,20 +56,21 @@ impl StaticMemory {
     }
 
     fn push_immediate(&mut self, value: u64) {
-        self.data.push(value);
-        self.flags.push(super::Flags::default());
+        self.data.push(StaticMemoryWord::Word(value));
     }
 
-    fn push_pointer(&mut self, value: u64) {
-        self.data.push(value);
-        self.flags.push(super::Flags::default().pointer());
+    fn push_pointer(&mut self, relative_pointer: i64) {
+        self.data.push(StaticMemoryWord::RelativePointer(relative_pointer));
     }
 }
 
 pub fn print_static_memory_as_string(static_memory: &StaticMemory) -> String {
     let mut result = Vec::with_capacity(static_memory.size_in_bytes() as _);
     for word in &static_memory.data {
-        result.extend_from_slice(&word.to_be_bytes());
+        match word {
+            StaticMemoryWord::Word(word) => result.extend_from_slice(&word.to_be_bytes()),
+            StaticMemoryWord::RelativePointer(_) => {},
+        }
     }
     String::from_utf8_lossy(&result).into_owned()
 }
