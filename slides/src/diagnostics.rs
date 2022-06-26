@@ -385,7 +385,7 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_missing_return_statement(&mut self, span: TextSpan, expected_return_type: &Type) {
         let message: &[Message] = &[
-            "Not all paths in function return. Every path needs a return value of type".into(),
+            "Not all paths in function return. Every path needs a return value of type ".into(),
             expected_return_type.into(),
             ".".into(),
         ];
