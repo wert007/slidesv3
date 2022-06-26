@@ -28,14 +28,15 @@ pub struct ImportLibraryFunction {
 
 pub(super) fn bind_import_statements<'a>(
     node: SyntaxNode<'a>,
+    unmoveable_label_range: usize,
     binder: &mut BindingState<'a, '_>,
 ) -> Option<SyntaxNode<'a>> {
     match node.kind {
         SyntaxNodeKind::CompilationUnit(compilation_unit) => Some(
-            bind_import_statements_compilation_unit(compilation_unit, binder),
+            bind_import_statements_compilation_unit(compilation_unit, unmoveable_label_range, binder),
         ),
         SyntaxNodeKind::ImportStatement(import_statement) => {
-            bind_import_statements_import_statement(node.span, import_statement, binder);
+            bind_import_statements_import_statement(node.span, import_statement, unmoveable_label_range, binder);
             None
         }
         SyntaxNodeKind::_ConstDeclaration(_)
@@ -67,11 +68,12 @@ pub(super) fn bind_import_statements<'a>(
 
 fn bind_import_statements_compilation_unit<'a>(
     compilation_unit: CompilationUnitNodeKind<'a>,
+    unmoveable_label_range: usize,
     binder: &mut BindingState<'a, '_>,
 ) -> SyntaxNode<'a> {
     let mut statements = Vec::with_capacity(compilation_unit.statements.len());
     for statement in compilation_unit.statements {
-        if let Some(statement) = bind_import_statements(statement, binder) {
+        if let Some(statement) = bind_import_statements(statement, unmoveable_label_range, binder) {
             statements.push(statement);
         }
     }
@@ -81,14 +83,16 @@ fn bind_import_statements_compilation_unit<'a>(
 fn bind_import_statements_import_statement<'a>(
     span: TextSpan,
     import_statement: ImportStatementNodeKind<'a>,
+    unmoveable_label_range: usize,
     binder: &mut BindingState<'a, '_>,
 ) {
-    bind_import_statement(span, import_statement, binder);
+    bind_import_statement(span, import_statement, unmoveable_label_range, binder);
 }
 
 fn bind_import_statement<'a>(
     span: TextSpan,
     import_statement: ImportStatementNodeKind<'a>,
+    unmoveable_label_range: usize,
     binder: &mut BindingState<'a, '_>,
 ) {
     let import_function = if let Some(it) = bind_import_function(*import_statement.function, binder)
@@ -103,7 +107,7 @@ fn bind_import_statement<'a>(
         name,
         span,
     };
-    execute_import_function(import_statement, binder);
+    execute_import_function(import_statement, unmoveable_label_range, binder);
 }
 
 fn bind_import_function<'a>(
@@ -165,13 +169,14 @@ fn bind_import_function<'a>(
 
 fn execute_import_function<'a>(
     import: BoundImportStatement<'a>,
+    unmoveable_label_range: usize,
     binder: &mut BindingState<'a, '_>,
 ) {
     match import.function {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
             let path = directory.join(library.path).with_extension("sld");
-            load_library_from_path(binder, &path, import.span, import.name, true);
+            load_library_from_path(binder, &path, import.span, import.name, true, unmoveable_label_range);
         }
     }
 }
@@ -182,6 +187,7 @@ pub(super) fn load_library_from_path<'a>(
     span: TextSpan,
     library_name: &'a str,
     import_std_lib: bool,
+    unmoveable_label_range: usize,
 ) {
     let (path, lib) = binder
         .libraries
@@ -208,7 +214,7 @@ pub(super) fn load_library_from_path<'a>(
     } else {
         path
     };
-    load_library_into_binder(span, library_name, lib, path, binder);
+    load_library_into_binder(span, library_name, lib, path, unmoveable_label_range, binder);
 }
 
 fn load_library_into_binder<'a>(
@@ -216,6 +222,7 @@ fn load_library_into_binder<'a>(
     name: &'a str,
     mut lib: Library,
     path: Option<String>,
+    unmoveable_label_range: usize,
     binder: &mut BindingState<'a, '_>,
 ) {
     binder.max_used_variables = binder
@@ -248,7 +255,7 @@ fn load_library_into_binder<'a>(
     lib.name = name.into();
     let need_to_load_std_libs = lib.name.is_empty() && binder.libraries.is_empty();
     if need_to_load_std_libs || path.is_none() {
-        lib.relocate_labels(binder.label_offset);
+        lib.relocate_labels(binder.label_offset, unmoveable_label_range);
         lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
         binder.label_offset += lib.program.label_count;
     }

@@ -68,7 +68,7 @@ impl Library {
         self.functions.iter().find(|f| f.name == name)
     }
 
-    pub fn relocate_labels(&mut self, label_offset: usize) {
+    pub fn relocate_labels(&mut self, label_offset: usize, unmoveable_label_range: usize) {
         if label_offset == 0 {
             return;
         }
@@ -76,7 +76,7 @@ impl Library {
             function.function_label += label_offset as u64;
         }
         for strct in self.structs.iter_mut() {
-            strct.function_table_mut().relocate_labels(label_offset);
+            strct.function_table_mut().relocate_labels(label_offset, unmoveable_label_range);
         }
         for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
@@ -85,12 +85,18 @@ impl Library {
                     op_code: OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Label,
                     ..
                 }) => {
+                    if *arg < unmoveable_label_range as u64 {
+                        continue;
+                    }
                     *arg += label_offset as u64;
                 }
                 InstructionOrLabelReference::LabelReference(LabelReference {
                     label_reference,
                     ..
                 }) => {
+                    if *label_reference < unmoveable_label_range {
+                        continue;
+                    }
                     *label_reference += label_offset;
                 }
                 _ => {}
@@ -353,12 +359,16 @@ impl StructFunctionTable {
         result
     }
 
-    fn relocate_labels(&mut self, label_offset: usize) {
+    fn relocate_labels(&mut self, label_offset: usize, unmoveable_label_range: usize) {
         if label_offset == 0 {
             return;
         }
         self.function_symbols_iter_mut()
-            .for_each(|f| f.function_label += label_offset as u64);
+            .for_each(|f| {
+                if f.function_label >= unmoveable_label_range as u64 {
+                    f.function_label += label_offset as u64
+                }
+            });
     }
 
     fn relocate_structs(&mut self, struct_offset: usize) {

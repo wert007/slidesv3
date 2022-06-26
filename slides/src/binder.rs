@@ -1201,7 +1201,8 @@ fn bind<'a>(
     if import_std_lib {
         std_imports(&mut binder);
     }
-    let node = dependency_resolver::bind_import_statements(node, &mut binder).unwrap();
+    let unmoveable_label_range = binder.label_offset;
+    let node = dependency_resolver::bind_import_statements(node, unmoveable_label_range, &mut binder).unwrap();
     bind_top_level_statements(node, &mut binder);
 
     for lib in binder.libraries.iter_mut() {
@@ -1421,6 +1422,7 @@ fn std_imports(binder: &mut BindingState) {
         TextSpan::zero(),
         "",
         false,
+        0,
     );
 }
 
