@@ -2,12 +2,14 @@ use crate::binder::typing::{SystemCallKind, Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    Error,
     None,
     Integer(i64),
     Boolean(bool),
     SystemCall(SystemCallKind),
     String(String),
     LabelPointer(usize, Type),
+    Library(usize),
 }
 
 #[allow(dead_code)]
@@ -46,12 +48,14 @@ impl Value {
 
     pub fn infer_type(&self, string_type: Type) -> Type {
         match self {
+            Value::Error => Type::Error,
             Value::Integer(_) => Type::IntegerLiteral,
             Value::Boolean(_) => Type::Boolean,
             Value::SystemCall(kind) => Type::SystemCall(*kind),
             Value::String(_) => string_type,
             Value::None => Type::None,
             Value::LabelPointer(_, type_) => type_.clone(),
+            Value::Library(index) => Type::Library(*index),
         }
     }
 }
@@ -77,12 +81,14 @@ impl From<String> for Value {
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Value::Error => write!(f, "error"),
             Value::Integer(value) => write!(f, "{}", value),
             Value::Boolean(value) => write!(f, "{}", value),
             Value::SystemCall(value) => write!(f, "system call {}", value),
             Value::String(value) => write!(f, "'{}'", value),
             Value::None => write!(f, "none"),
             Value::LabelPointer(label, type_) => write!(f, "L{:X} : {}", label, type_),
+            Value::Library(index) => write!(f, "library#{}", index),
         }
     }
 }

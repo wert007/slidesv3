@@ -466,6 +466,7 @@ pub fn convert_value(
             }
             .into()]
         }
+        Value::Error | Value::Library(_) => unreachable!(),
     };
     vec![Instruction::load_immediate(value).span(span).into()]
 }

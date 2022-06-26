@@ -238,9 +238,9 @@ fn load_library_into_binder<'a>(
         let mut should_load_library = true;
         let variable = if lib.has_errors {
             should_load_library = false;
-            binder.register_variable(name, Type::Error, true)
+            binder.register_constant(name, Value::Error)
         } else {
-            binder.register_variable(name, Type::Library(index), true)
+            binder.register_constant(name, Value::Library(index))
         };
         if variable.is_none() {
             binder
