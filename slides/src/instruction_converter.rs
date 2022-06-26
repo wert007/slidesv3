@@ -258,40 +258,13 @@ pub fn convert_library<'a>(
     }
     let exported_functions = bound_program.exported_functions;
     let exported_structs = bound_program.exported_structs;
-    let mut bound_program = bound_program.program;
+    let bound_program = bound_program.program;
     let bound_node = bound_program.functions;
     let mut converter = InstructionConverter {
         static_memory: StaticMemory::new(debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count,
     };
-    for lib in bound_program
-        .referenced_libraries
-        .iter_mut()
-        .filter(|l| !l.is_already_loaded)
-    {
-        let static_memory_size = converter.static_memory.size_in_bytes();
-        for inst in lib.instructions.iter_mut() {
-            if let InstructionOrLabelReference::Instruction(Instruction {
-                arg,
-                op_code: OpCode::LoadPointer,
-                ..
-            }) = inst
-            {
-                // None pointers are saved as u64::MAX value to not interfere
-                // with the actual static memory, since none gets "allocated"
-                // way later. This fixes all these pointer to point to none.
-                if *arg == u64::MAX {
-                    *arg = 0
-                } else {
-                    *arg += static_memory_size;
-                }
-            }
-        }
-        converter
-            .static_memory
-            .insert(&mut lib.program.static_memory);
-    }
     let instructions = convert_node(bound_node, &mut converter);
     if debug_flags.print_instructions_and_labels {
         for (i, instruction) in instructions.iter().enumerate() {
