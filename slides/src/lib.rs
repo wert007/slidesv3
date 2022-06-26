@@ -32,6 +32,9 @@ pub fn load_library(
     debug_flags: DebugFlags,
     import_std_libs: bool,
 ) -> Library {
+    if debug_flags.print_library_loading_order {
+        println!("Loading library {}. import std libs = {}", file_name, import_std_libs);
+    }
     let source_text = SourceText::new(input, file_name);
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);
     let mut result = instruction_converter::convert_library(

@@ -40,9 +40,15 @@ args:
     - print-static-memory-as-string:
         long: dstaticmem
         help: Prints the static memory as a string
+    - print-static-memory-as-hex:
+        long: dstaticmem-hex
+        help: Prints the static memory as hex
     - print-stack:
         long: dstack
         help: Prints the stack, whenever it changes
+    - print-library-loading-order:
+        long: dlib
+        help: Prints the order in which libraries are loaded.
     - output-basic-blocks-to-dot:
         long: dbb
         help: Writes the basic blocks of each function to debug-out/FUNCTION_NAME.dot

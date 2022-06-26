@@ -216,7 +216,17 @@ pub fn convert<'a>(
         crate::debug::output_instructions_with_source_code_to_sldasm(&instructions, source_text);
     }
     if debug_flags.print_static_memory_as_string {
-        memory::static_memory::print_static_memory_as_string(&converter.static_memory);
+        println!(
+            "static_mem = {}",
+            memory::static_memory::print_static_memory_as_string(&converter.static_memory)
+        );
+    }
+    if debug_flags.print_static_memory_as_hex {
+        println!(
+            "static_mem {} = {}",
+            source_text.file_name,
+            memory::static_memory::print_static_memory_as_hex(&converter.static_memory)
+        );
     }
     Program {
         startup_instructions: vec![],
@@ -288,6 +298,12 @@ pub fn convert_library<'a>(
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &instructions,
             source_text,
+        );
+    }
+    if debug_flags.print_static_memory_as_hex {
+        println!(
+            "static_mem = {}",
+            memory::static_memory::print_static_memory_as_hex(&converter.static_memory)
         );
     }
     Library {

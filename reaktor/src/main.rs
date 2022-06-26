@@ -20,7 +20,9 @@ fn main() -> Result<(), std::io::Error> {
         print_labels: matches.is_present("print-labels"),
         print_heap_as_string: matches.is_present("print-heap-memory-as-string"),
         print_static_memory_as_string: matches.is_present("print-static-memory-as-string"),
+        print_static_memory_as_hex: matches.is_present("print-static-memory-as-hex"),
         print_stack: matches.is_present("print-stack"),
+        print_library_loading_order: matches.is_present("print-library-loading-order"),
         output_basic_blocks_to_dot: matches.is_present("output-basic-blocks-to-dot"),
         output_instructions_to_sldasm: matches.is_present("output-instructions-to-sldasm"),
         output_instructions_and_labels_to_sldasm: matches

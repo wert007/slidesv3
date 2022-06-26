@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use crate::DebugFlags;
 
 use super::WORD_SIZE_IN_BYTES;
@@ -64,6 +66,7 @@ impl StaticMemory {
     }
 }
 
+#[must_use]
 pub fn print_static_memory_as_string(static_memory: &StaticMemory) -> String {
     let mut result = Vec::with_capacity(static_memory.size_in_bytes() as _);
     for word in &static_memory.data {
@@ -73,4 +76,22 @@ pub fn print_static_memory_as_string(static_memory: &StaticMemory) -> String {
         }
     }
     String::from_utf8_lossy(&result).into_owned()
+}
+
+#[must_use]
+pub fn print_static_memory_as_hex(static_memory: &StaticMemory) -> String {
+    let mut result = String::with_capacity(static_memory.size_in_bytes() as usize / 4 * 6);
+    for (index, word) in static_memory.data.iter().enumerate() {
+        let addr = index as u64 * WORD_SIZE_IN_BYTES;
+        match index % 2 {
+            1 => write!(result, "  "),
+            0 => write!(result, "\n{addr:16x}: "),
+            _ => unreachable!(),
+        }.unwrap();
+        match word {
+            StaticMemoryWord::Word(word) => write!(result, " {word:016x}"),
+            StaticMemoryWord::RelativePointer(pointer) => write!(result, "#{:016x}", (addr as i64 + pointer) as usize),
+        }.unwrap();
+    }
+    result
 }
