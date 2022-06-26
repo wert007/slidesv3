@@ -45,7 +45,6 @@ func main() {
     let f = [ [ 1 ], [ 2, 3 ], [ 4, 5, 6, ], ];
     print(f[2]);
     print(f[2][2]);
-    // TODO: Crashes!
     f[2][2] = 999;
     f[1] = [ 42, 1337, 876 ];
     print(f);

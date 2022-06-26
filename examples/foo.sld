@@ -1,11 +1,7 @@
-import lib('does-no-exist.sld') as ha;
+import lib('mylib') as mylib;
+import lib('math') as math;
 
 func main() {
-    // Crashes???
-    let l = new List('');
-    let a = 'he';
-    for _ in 0..5 {
-        l.add(a);
-    }
-    print(l);
+    let v = new math.Vec2(3, 4);
+    print(v);
 }
