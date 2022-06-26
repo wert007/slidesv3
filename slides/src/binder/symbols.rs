@@ -76,7 +76,9 @@ impl Library {
             function.function_label += label_offset as u64;
         }
         for strct in self.structs.iter_mut() {
-            strct.function_table_mut().relocate_labels(label_offset, unmoveable_label_range);
+            strct
+                .function_table_mut()
+                .relocate_labels(label_offset, unmoveable_label_range);
         }
         for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
@@ -363,12 +365,11 @@ impl StructFunctionTable {
         if label_offset == 0 {
             return;
         }
-        self.function_symbols_iter_mut()
-            .for_each(|f| {
-                if f.function_label >= unmoveable_label_range as u64 {
-                    f.function_label += label_offset as u64
-                }
-            });
+        self.function_symbols_iter_mut().for_each(|f| {
+            if f.function_label >= unmoveable_label_range as u64 {
+                f.function_label += label_offset as u64
+            }
+        });
     }
 
     fn relocate_structs(&mut self, struct_offset: usize) {

@@ -193,7 +193,8 @@ pub fn convert<'a>(
             op_code: OpCode::LoadPointer,
             arg,
             ..
-        }) = inst {
+        }) = inst
+        {
             // All none pointers are saved as u64::MAX value to not interfere
             // with the actual static memory, since normally none gets
             // "allocated" way later. And the converter does not know if none is
@@ -534,7 +535,11 @@ fn convert_array_index_for_assignment(
     );
     result.push(Instruction::multiplication().span(span).into());
 
-    result.push(Instruction::store_in_memory(base_type_size).span(span).into());
+    result.push(
+        Instruction::store_in_memory(base_type_size)
+            .span(span)
+            .into(),
+    );
     result
 }
 
@@ -549,7 +554,11 @@ fn convert_field_access_for_assignment(
             .span(span)
             .into(),
     );
-    result.push(Instruction::store_in_memory(field_access.type_.size_in_bytes()).span(span).into());
+    result.push(
+        Instruction::store_in_memory(field_access.type_.size_in_bytes())
+            .span(span)
+            .into(),
+    );
     result
 }
 
@@ -605,9 +614,7 @@ fn convert_binary(
                 _ => Instruction::equals(),
             }
         }
-        BoundBinaryOperator::NotEquals => {
-            Instruction::not_equals()
-        }
+        BoundBinaryOperator::NotEquals => Instruction::not_equals(),
         BoundBinaryOperator::LessThan => Instruction::less_than(),
         BoundBinaryOperator::GreaterThan => Instruction::greater_than(),
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(),
@@ -616,9 +623,7 @@ fn convert_binary(
         BoundBinaryOperator::NoneableOrValue => {
             Instruction::noneable_or_value(!binary.rhs.type_.is_pointer())
         }
-        operator
-        @
-        (BoundBinaryOperator::LogicalAnd
+        operator @ (BoundBinaryOperator::LogicalAnd
         | BoundBinaryOperator::LogicalOr
         | BoundBinaryOperator::Range) => {
             unreachable!("{} is handled in the binder already!", operator)
@@ -735,8 +740,7 @@ fn convert_system_call(
                 | SystemCallKind::RuntimeError
                 | SystemCallKind::AddressOf => 1,
                 SystemCallKind::Reallocate => 2,
-                SystemCallKind::Break
-                | SystemCallKind::IgnoreTypeChecking => unreachable!(),
+                SystemCallKind::Break | SystemCallKind::IgnoreTypeChecking => unreachable!(),
             };
 
             for argument in system_call.arguments {
@@ -794,7 +798,9 @@ fn convert_field_access(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
     match field_access.type_ {
-        Type::SystemCall(_) => {unreachable!()}
+        Type::SystemCall(_) => {
+            unreachable!()
+        }
         Type::Function(_) => {
             result.push(
                 Instruction::load_register(field_access.offset)
@@ -802,23 +808,23 @@ fn convert_field_access(
                     .into(),
             );
         }
-        type_ => {
-            match type_.size_in_bytes() {
-                1 => {
-                    result.push(
-                        Instruction::read_byte_with_offset(field_access.offset).span(span).into(),
-                    );
-                }
-                8 => {
-                    result.push(
-                        Instruction::read_word_with_offset(field_access.offset)
-                            .span(span)
-                            .into(),
-                    );
-                }
-                _ => unreachable!(),
+        type_ => match type_.size_in_bytes() {
+            1 => {
+                result.push(
+                    Instruction::read_byte_with_offset(field_access.offset)
+                        .span(span)
+                        .into(),
+                );
             }
-        }
+            8 => {
+                result.push(
+                    Instruction::read_word_with_offset(field_access.offset)
+                        .span(span)
+                        .into(),
+                );
+            }
+            _ => unreachable!(),
+        },
     }
     result
 }
@@ -925,7 +931,11 @@ fn convert_conversion(
             result.push(Instruction::load_immediate(0).span(span).into());
             result.push(Instruction::duplicate_over(1).span(span).into());
             result.push(Instruction::greater_than().span(span).into());
-            result.push(Instruction::jump_to_label_conditionally(label_if_is_not_uint, true).span(span).into());
+            result.push(
+                Instruction::jump_to_label_conditionally(label_if_is_not_uint, true)
+                    .span(span)
+                    .into(),
+            );
             // If the int is >= 0, it needs to be converted into a noneable
             result.push(Instruction::write_to_heap(1).span(span).into());
             result.push(Instruction::jump_to_label(label_end_if).span(span).into());
@@ -933,10 +943,9 @@ fn convert_conversion(
             result.push(Instruction::pop().span(span).into());
             result.push(Instruction::load_none_pointer().span(span).into());
             result.push(Instruction::label(label_end_if).span(span).into());
-
         }
-        ConversionKind::BiggerIntToSmallerInt(target_size_in_bytes) => todo!(),
-        ConversionKind::BiggerUintToSmallerUint(target_size_in_bytes) => todo!(),
+        ConversionKind::BiggerIntToSmallerInt(_target_size_in_bytes) => todo!(),
+        ConversionKind::BiggerUintToSmallerUint(_target_size_in_bytes) => todo!(),
     }
     result
 }

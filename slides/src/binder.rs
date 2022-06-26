@@ -9,14 +9,14 @@ mod tests;
 mod type_replacer;
 pub mod typing;
 
-use std::{borrow::Cow, convert::TryFrom, path::Path, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom, path::Path};
 
 use crate::{
     binder::{
         bound_nodes::{is_same_expression::IsSameExpression, BoundNodeKind},
         operators::{BoundBinary, BoundUnaryOperator},
         symbols::StructFunctionKind,
-        typing::{Type, IntegerType},
+        typing::{IntegerType, Type},
     },
     diagnostics::DiagnosticBag,
     instruction_converter::{self, instruction::Instruction, InstructionOrLabelReference},
@@ -46,7 +46,9 @@ use self::{
         FunctionSymbol, GenericFunction, GenericStructSymbol, Library, MaybeGenericStructSymbol,
         StructFieldSymbol, StructFunctionTable, StructSymbol,
     },
-    typing::{FunctionType, StructReferenceType, StructType, SystemCallKind, TypedGenericStructType},
+    typing::{
+        FunctionType, StructReferenceType, StructType, SystemCallKind, TypedGenericStructType,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -1202,7 +1204,9 @@ fn bind<'a>(
         std_imports(&mut binder);
     }
     let unmoveable_label_range = binder.label_offset;
-    let node = dependency_resolver::bind_import_statements(node, unmoveable_label_range, &mut binder).unwrap();
+    let node =
+        dependency_resolver::bind_import_statements(node, unmoveable_label_range, &mut binder)
+            .unwrap();
     bind_top_level_statements(node, &mut binder);
 
     for lib in binder.libraries.iter_mut() {
@@ -1366,7 +1370,7 @@ fn bind_function_declaration_body<'a, 'b>(
             | StructFunctionKind::ElementCount
             | StructFunctionKind::Equals
             | StructFunctionKind::Add
-            | StructFunctionKind::AddTo
+            | StructFunctionKind::AddTo,
         )
         | None => {}
     }
@@ -1410,8 +1414,14 @@ fn default_statements(binder: &mut BindingState) {
         Value::SystemCall(SystemCallKind::RuntimeError),
     );
     binder.register_constant("addressOf", Value::SystemCall(SystemCallKind::AddressOf));
-    binder.register_constant("garbageCollect", Value::SystemCall(SystemCallKind::GarbageCollect));
-    binder.register_constant("ignoreTypeChecking", Value::SystemCall(SystemCallKind::IgnoreTypeChecking));
+    binder.register_constant(
+        "garbageCollect",
+        Value::SystemCall(SystemCallKind::GarbageCollect),
+    );
+    binder.register_constant(
+        "ignoreTypeChecking",
+        Value::SystemCall(SystemCallKind::IgnoreTypeChecking),
+    );
     binder.register_constant("toString", Value::SystemCall(SystemCallKind::ToString));
 }
 
@@ -1688,7 +1698,9 @@ fn type_check_struct_function_kind(
                     1,
                 );
             }
-            if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer(IntegerType::Unsigned64)) {
+            if !function_type.parameter_types[0]
+                .can_be_converted_to(&Type::Integer(IntegerType::Unsigned64))
+            {
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.parameter_types[0],
@@ -1704,7 +1716,9 @@ fn type_check_struct_function_kind(
                     2,
                 );
             }
-            if !function_type.parameter_types[0].can_be_converted_to(&Type::Integer(IntegerType::Unsigned64)) {
+            if !function_type.parameter_types[0]
+                .can_be_converted_to(&Type::Integer(IntegerType::Unsigned64))
+            {
                 binder.diagnostic_bag.report_cannot_convert(
                     span,
                     &function_type.parameter_types[0],
@@ -1908,7 +1922,8 @@ fn bind_struct_body<'a>(
 
 fn bind_parameter<'a>(parameter: ParameterNode<'a>, binder: &mut BindingState) -> (&'a str, Type) {
     let name = parameter.identifier.lexeme;
-    let type_ = bind_type(parameter.type_declaration.type_, binder).convert_typed_generic_struct_to_struct();
+    let type_ = bind_type(parameter.type_declaration.type_, binder)
+        .convert_typed_generic_struct_to_struct();
     (name, type_)
 }
 
@@ -2059,19 +2074,22 @@ fn bind_array_literal<'a, 'b>(
     binder: &mut BindingState<'a, 'b>,
 ) -> BoundNode {
     let array_type = binder.look_up_std_struct_id(StdTypeKind::Array);
-    let expected_type = if let Some(Type::TypedGenericStruct(typed_generic_struct_type)) = &binder.expected_type {
-        Some(typed_generic_struct_type.type_.clone())
-    } else {
-        None
-    };
+    let expected_type =
+        if let Some(Type::TypedGenericStruct(typed_generic_struct_type)) = &binder.expected_type {
+            Some(typed_generic_struct_type.type_.clone())
+        } else {
+            None
+        };
     let first_child = array_literal.children.remove(0);
-    let (mut type_, mut children) = bind_array_literal_first_child(first_child, expected_type, binder);
+    let (mut type_, mut children) =
+        bind_array_literal_first_child(first_child, expected_type, binder);
     for child in array_literal.children {
         let (child, repetition) =
             if let SyntaxNodeKind::RepetitionNode(repetition_node) = child.kind {
                 let base_expression = bind_node(*repetition_node.base_expression, binder);
                 let repetition = bind_node(*repetition_node.repetition, binder);
-                let repetition = bind_conversion(repetition, &Type::Integer(IntegerType::Unsigned64), binder);
+                let repetition =
+                    bind_conversion(repetition, &Type::Integer(IntegerType::Unsigned64), binder);
                 let repetition = match repetition.constant_value {
                     Some(value) => value.value.as_integer().unwrap(),
                     None => {
@@ -2115,7 +2133,8 @@ fn bind_array_literal_first_child<'a>(
     let children = if let SyntaxNodeKind::RepetitionNode(repetition_node) = first_child.kind {
         let base_expression = bind_node(*repetition_node.base_expression, binder);
         let repetition = bind_node(*repetition_node.repetition, binder);
-        let repetition = bind_conversion(repetition, &Type::Integer(IntegerType::Unsigned64), binder);
+        let repetition =
+            bind_conversion(repetition, &Type::Integer(IntegerType::Unsigned64), binder);
         let repetition = match repetition.constant_value {
             Some(value) => value.value.as_integer().unwrap(),
             None => {
@@ -2186,7 +2205,8 @@ fn bind_constructor_call<'a>(
             brackets: vec![],
         },
         binder,
-    ).convert_typed_generic_struct_to_struct();
+    )
+    .convert_typed_generic_struct_to_struct();
     let (struct_type, struct_id) = match type_ {
         Type::Struct(it) => (binder.get_struct_type_by_id(it.id).unwrap(), it.id),
         Type::StructReference(id) => (binder.get_struct_type_by_id(id.id).unwrap(), id.id),
@@ -2334,14 +2354,31 @@ fn bind_generic_struct_type_for_type(
         }
         id
     } else {
-        let function_labels_map : HashMap<_, _> = generic_struct.functions.iter().map(|f| (f.function_label as usize, binder.generate_label())).collect();
+        let function_labels_map: HashMap<_, _> = generic_struct
+            .functions
+            .iter()
+            .map(|f| (f.function_label as usize, binder.generate_label()))
+            .collect();
         let mut simple_function_table = SimpleStructFunctionTable::default();
         for (kind, function) in generic_struct
             .struct_type
             .function_table
-            .available_struct_function_kinds().into_iter().zip(generic_struct.struct_type.function_table.function_symbols_iter_mut()) // TODO: Use a function_symbols_iter instead of iter_mut
+            .available_struct_function_kinds()
+            .into_iter()
+            .zip(
+                generic_struct
+                    .struct_type
+                    .function_table
+                    .function_symbols_iter_mut(),
+            )
+        // TODO: Use a function_symbols_iter instead of iter_mut
         {
-            simple_function_table.set(kind, *function_labels_map.get(&(function.function_label as usize)).unwrap());
+            simple_function_table.set(
+                kind,
+                *function_labels_map
+                    .get(&(function.function_label as usize))
+                    .unwrap(),
+            );
         }
         let id = binder
             .register_generated_struct_name(struct_name.clone(), simple_function_table)
@@ -2353,9 +2390,18 @@ fn bind_generic_struct_type_for_type(
             let target_label = StructFunctionKind::try_from(function.function_name.as_str())
                 .ok()
                 .map(|k| simple_function_table.get(k))
-                .flatten().or(Some(*function_labels_map.get(&(old_label as usize)).unwrap()));
-            let new_label =
-                bind_generic_function_for_type(function, true, type_, target_label, function_labels_map.clone(), binder) as u64;
+                .flatten()
+                .or(Some(
+                    *function_labels_map.get(&(old_label as usize)).unwrap(),
+                ));
+            let new_label = bind_generic_function_for_type(
+                function,
+                true,
+                type_,
+                target_label,
+                function_labels_map.clone(),
+                binder,
+            ) as u64;
             if Some(old_label as usize) == constructor_label {
                 changed_constructor_label = Some(new_label as usize);
             }
@@ -2463,17 +2509,34 @@ fn bind_binary_insertion<'a>(
             let lhs = bind_conversion(lhs, &bound_binary.lhs, binder);
             let rhs = bind_conversion(rhs, &bound_binary.rhs, binder);
             if let Some(function_symbol) = bound_binary.function_symbol {
-                BoundNode::function_call(span, BoundNode::label_reference(function_symbol.function_label as _, Type::Function(Box::new(function_symbol.function_type))), if bound_binary.reverse_args { vec![lhs, rhs] } else { vec![rhs, lhs] }, false, bound_binary.result)
+                BoundNode::function_call(
+                    span,
+                    BoundNode::label_reference(
+                        function_symbol.function_label as _,
+                        Type::Function(Box::new(function_symbol.function_type)),
+                    ),
+                    if bound_binary.reverse_args {
+                        vec![lhs, rhs]
+                    } else {
+                        vec![rhs, lhs]
+                    },
+                    false,
+                    bound_binary.result,
+                )
             } else {
                 match bound_binary.op {
                     BoundBinaryOperator::Range => {
-                        let base_type = if matches!(lhs.type_, Type::Integer(integer_type) if integer_type.is_signed()) {
-                        binder
-                            .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
-                            .unwrap()
+                        let base_type = if matches!(lhs.type_, Type::Integer(integer_type) if integer_type.is_signed())
+                        {
+                            binder
+                                .get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::Range))
+                                .unwrap()
                         } else {
-                            binder.get_struct_by_id(binder.look_up_std_struct_id(StdTypeKind::UnsignedRange))
-                            .unwrap()
+                            binder
+                                .get_struct_by_id(
+                                    binder.look_up_std_struct_id(StdTypeKind::UnsignedRange),
+                                )
+                                .unwrap()
                         };
                         let function = base_type
                             .function_table
@@ -2487,7 +2550,9 @@ fn bind_binary_insertion<'a>(
                     BoundBinaryOperator::Equals => {
                         let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
                         if let Type::Struct(struct_type) = type_ {
-                            if let Some(equals_function) = struct_type.function_table.equals_function {
+                            if let Some(equals_function) =
+                                struct_type.function_table.equals_function
+                            {
                                 let base = BoundNode::label_reference(
                                     equals_function.function_label as usize,
                                     Type::function(equals_function.function_type),
@@ -2500,7 +2565,13 @@ fn bind_binary_insertion<'a>(
                                     Type::Boolean,
                                 )
                             } else {
-                                BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                                BoundNode::binary(
+                                    span,
+                                    lhs,
+                                    bound_binary.op,
+                                    rhs,
+                                    bound_binary.result,
+                                )
                             }
                         } else {
                             BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
@@ -2509,7 +2580,9 @@ fn bind_binary_insertion<'a>(
                     BoundBinaryOperator::NotEquals => {
                         let type_ = binder.convert_struct_reference_to_struct(lhs.type_.clone());
                         if let Type::Struct(struct_type) = type_ {
-                            if let Some(equals_function) = struct_type.function_table.equals_function {
+                            if let Some(equals_function) =
+                                struct_type.function_table.equals_function
+                            {
                                 let base = BoundNode::label_reference(
                                     equals_function.function_label as usize,
                                     Type::function(equals_function.function_type),
@@ -2527,7 +2600,13 @@ fn bind_binary_insertion<'a>(
                                     Type::Boolean,
                                 )
                             } else {
-                                BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                                BoundNode::binary(
+                                    span,
+                                    lhs,
+                                    bound_binary.op,
+                                    rhs,
+                                    bound_binary.result,
+                                )
                             }
                         } else {
                             BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
@@ -2571,14 +2650,24 @@ fn bind_binary_operator<'a, 'b>(
         {
             Some(BoundBinary::same_input(lhs, result, Type::Boolean))
         }
-        (Type::Integer(lhs), BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, Type::IntegerLiteral) =>
-        {
-            Some(BoundBinary::same_input(&Type::Integer(*lhs), result, Type::Boolean))
-        }
-        (Type::IntegerLiteral, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, Type::Integer(rhs)) =>
-        {
-            Some(BoundBinary::same_input(&Type::Integer(*rhs), result, Type::Boolean))
-        }
+        (
+            Type::Integer(lhs),
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            Type::IntegerLiteral,
+        ) => Some(BoundBinary::same_input(
+            &Type::Integer(*lhs),
+            result,
+            Type::Boolean,
+        )),
+        (
+            Type::IntegerLiteral,
+            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
+            Type::Integer(rhs),
+        ) => Some(BoundBinary::same_input(
+            &Type::Integer(*rhs),
+            result,
+            Type::Boolean,
+        )),
         (
             Type::Noneable(inner),
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
@@ -2588,11 +2677,9 @@ fn bind_binary_operator<'a, 'b>(
             outer,
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
             Type::Noneable(inner),
-        ) if outer.can_be_converted_to(inner) && outer != &Type::Void => Some(BoundBinary::same_input(
-            &Type::Noneable(inner.clone()),
-            result,
-            Type::Boolean,
-        )),
+        ) if outer.can_be_converted_to(inner) && outer != &Type::Void => Some(
+            BoundBinary::same_input(&Type::Noneable(inner.clone()), result, Type::Boolean),
+        ),
         (
             Type::Noneable(inner),
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
@@ -2616,7 +2703,11 @@ fn bind_binary_operator<'a, 'b>(
             Type::None,
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
             Type::Pointer | Type::PointerOf(_),
-        ) => Some(BoundBinary::same_input(&Type::Pointer, result, Type::Boolean)),
+        ) => Some(BoundBinary::same_input(
+            &Type::Pointer,
+            result,
+            Type::Boolean,
+        )),
         (
             Type::Integer(lhs_integer_type),
             BoundBinaryOperator::ArithmeticAddition
@@ -2624,7 +2715,10 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::ArithmeticMultiplication
             | BoundBinaryOperator::ArithmeticDivision,
             Type::Integer(rhs_integer_type),
-        ) if lhs_integer_type == rhs_integer_type => Some(BoundBinary::same_output(result, Type::Integer(*lhs_integer_type))),
+        ) if lhs_integer_type == rhs_integer_type => Some(BoundBinary::same_output(
+            result,
+            Type::Integer(*lhs_integer_type),
+        )),
         (
             Type::Integer(lhs_integer_type),
             BoundBinaryOperator::ArithmeticAddition
@@ -2632,7 +2726,9 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::ArithmeticMultiplication
             | BoundBinaryOperator::ArithmeticDivision,
             Type::Integer(rhs_integer_type),
-        ) if lhs_integer_type.equals_ignoring_sign(rhs_integer_type) => Some(BoundBinary::same_output(result, Type::Integer(lhs_integer_type.to_signed()))),
+        ) if lhs_integer_type.equals_ignoring_sign(rhs_integer_type) => Some(
+            BoundBinary::same_output(result, Type::Integer(lhs_integer_type.to_signed())),
+        ),
         (
             Type::Integer(lhs_integer_type),
             BoundBinaryOperator::ArithmeticAddition
@@ -2640,7 +2736,10 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::ArithmeticMultiplication
             | BoundBinaryOperator::ArithmeticDivision,
             Type::IntegerLiteral,
-        ) => Some(BoundBinary::same_output(result, Type::Integer(*lhs_integer_type))),
+        ) => Some(BoundBinary::same_output(
+            result,
+            Type::Integer(*lhs_integer_type),
+        )),
         (
             Type::IntegerLiteral,
             BoundBinaryOperator::ArithmeticAddition
@@ -2648,7 +2747,10 @@ fn bind_binary_operator<'a, 'b>(
             | BoundBinaryOperator::ArithmeticMultiplication
             | BoundBinaryOperator::ArithmeticDivision,
             Type::Integer(rhs_integer_type),
-        ) => Some(BoundBinary::same_output(result, Type::Integer(*rhs_integer_type))),
+        ) => Some(BoundBinary::same_output(
+            result,
+            Type::Integer(*rhs_integer_type),
+        )),
         (
             Type::IntegerLiteral,
             BoundBinaryOperator::ArithmeticAddition
@@ -2699,29 +2801,59 @@ fn bind_binary_operator<'a, 'b>(
             Type::Boolean,
         ) => Some(BoundBinary::same_output(result, Type::Boolean)),
         (
-            lhs_type @ Type::StructReference(lhs), BoundBinaryOperator::ArithmeticAddition, rhs_type @ Type::StructReference(rhs)
+            lhs_type @ Type::StructReference(lhs),
+            BoundBinaryOperator::ArithmeticAddition,
+            rhs_type @ Type::StructReference(rhs),
         ) => {
             let lhs = binder.get_struct_by_id(lhs.id).unwrap();
             let rhs = binder.get_struct_by_id(rhs.id).unwrap();
             if let Some(add_function) = &lhs.function_table.add_function {
                 if rhs_type.can_be_converted_to(&add_function.function_type.parameter_types[0]) {
-                    Some(BoundBinary::from_function_symbol(lhs_type, result, &add_function.function_type.parameter_types[0], add_function, false))
+                    Some(BoundBinary::from_function_symbol(
+                        lhs_type,
+                        result,
+                        &add_function.function_type.parameter_types[0],
+                        add_function,
+                        false,
+                    ))
                 } else if let Some(add_to_function) = &rhs.function_table.add_to_function {
-                    Some(BoundBinary::from_function_symbol(&add_to_function.function_type.parameter_types[0], result, rhs_type, add_to_function, true))
+                    Some(BoundBinary::from_function_symbol(
+                        &add_to_function.function_type.parameter_types[0],
+                        result,
+                        rhs_type,
+                        add_to_function,
+                        true,
+                    ))
                 } else {
                     None
                 }
             } else if let Some(add_to_function) = &rhs.function_table.add_to_function {
-                Some(BoundBinary::from_function_symbol(&add_to_function.function_type.parameter_types[0], result, rhs_type, add_to_function, true))
+                Some(BoundBinary::from_function_symbol(
+                    &add_to_function.function_type.parameter_types[0],
+                    result,
+                    rhs_type,
+                    add_to_function,
+                    true,
+                ))
             } else {
                 None
             }
         }
-        (lhs_type @ Type::StructReference(lhs), BoundBinaryOperator::ArithmeticAddition, rhs_type) => {
+        (
+            lhs_type @ Type::StructReference(lhs),
+            BoundBinaryOperator::ArithmeticAddition,
+            rhs_type,
+        ) => {
             let lhs = binder.get_struct_by_id(lhs.id).unwrap();
             if let Some(add_function) = &lhs.function_table.add_function {
                 if rhs_type.can_be_converted_to(&add_function.function_type.parameter_types[0]) {
-                    Some(BoundBinary::from_function_symbol(lhs_type, result, &add_function.function_type.parameter_types[0], add_function, false))
+                    Some(BoundBinary::from_function_symbol(
+                        lhs_type,
+                        result,
+                        &add_function.function_type.parameter_types[0],
+                        add_function,
+                        false,
+                    ))
                 } else {
                     None
                 }
@@ -2729,11 +2861,21 @@ fn bind_binary_operator<'a, 'b>(
                 None
             }
         }
-        (lhs_type, BoundBinaryOperator::ArithmeticAddition, rhs_type @ Type::StructReference(rhs)) => {
+        (
+            lhs_type,
+            BoundBinaryOperator::ArithmeticAddition,
+            rhs_type @ Type::StructReference(rhs),
+        ) => {
             let rhs = binder.get_struct_by_id(rhs.id).unwrap();
             if let Some(add_to_function) = &rhs.function_table.add_to_function {
                 if lhs_type.can_be_converted_to(&add_to_function.function_type.parameter_types[0]) {
-                    Some(BoundBinary::from_function_symbol(&add_to_function.function_type.parameter_types[0], result, rhs_type, add_to_function, true))
+                    Some(BoundBinary::from_function_symbol(
+                        &add_to_function.function_type.parameter_types[0],
+                        result,
+                        rhs_type,
+                        add_to_function,
+                        true,
+                    ))
                 } else {
                     None
                 }
@@ -2764,17 +2906,33 @@ fn bind_binary_operator<'a, 'b>(
             rhs_type,
             rhs_type.clone(),
         )),
-        (Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral, BoundBinaryOperator::Range, Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral) => {
+        (
+            Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral,
+            BoundBinaryOperator::Range,
+            Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral,
+        ) => {
             let range_type = binder.look_up_std_struct_id(StdTypeKind::Range);
             let range_type = binder.get_struct_by_id(range_type).unwrap();
             let range_type = Type::Struct(Box::new(range_type));
-            Some(BoundBinary::same_input(&Type::Integer(IntegerType::Signed64), result, range_type))
+            Some(BoundBinary::same_input(
+                &Type::Integer(IntegerType::Signed64),
+                result,
+                range_type,
+            ))
         }
-        (Type::Integer(IntegerType::Unsigned64) | Type::IntegerLiteral, BoundBinaryOperator::Range, Type::Integer(IntegerType::Unsigned64) | Type::IntegerLiteral) => {
+        (
+            Type::Integer(IntegerType::Unsigned64) | Type::IntegerLiteral,
+            BoundBinaryOperator::Range,
+            Type::Integer(IntegerType::Unsigned64) | Type::IntegerLiteral,
+        ) => {
             let range_type = binder.look_up_std_struct_id(StdTypeKind::Range);
             let range_type = binder.get_struct_by_id(range_type).unwrap();
             let range_type = Type::Struct(Box::new(range_type));
-            Some(BoundBinary::same_input(&Type::Integer(IntegerType::Unsigned64), result, range_type))
+            Some(BoundBinary::same_input(
+                &Type::Integer(IntegerType::Unsigned64),
+                result,
+                range_type,
+            ))
         }
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
@@ -2967,7 +3125,9 @@ fn bind_function_call<'a, 'b>(
 }
 
 fn string_type(binder: &BindingState) -> Type {
-    binder.look_up_type_by_name(StdTypeKind::String.name()).expect("Could not load std type!")
+    binder
+        .look_up_type_by_name(StdTypeKind::String.name())
+        .expect("Could not load std type!")
 }
 
 fn bind_array_index<'a, 'b>(
@@ -3458,7 +3618,10 @@ fn bind_conversion<'a>(
                 todo!("Implement downcast function calls")
             }
         } else {
-            unreachable!("type_ was {:#?} and base.type_ was {:#?}", type_, base.type_);
+            unreachable!(
+                "type_ was {:#?} and base.type_ was {:#?}",
+                type_, base.type_
+            );
         }
     } else if base.type_.can_be_converted_to(type_) {
         base.type_ = binder.convert_struct_reference_to_struct(base.type_);
@@ -3636,7 +3799,9 @@ fn bind_for_statement<'a, 'b>(
     let variable = variable.unwrap();
     let variable = BoundNode::variable(span, variable, variable_type);
     let index_variable = match for_statement.optional_index_variable.map(|i| i.lexeme) {
-        Some(index_variable) => binder.register_variable(index_variable, Type::Integer(IntegerType::Unsigned64), true),
+        Some(index_variable) => {
+            binder.register_variable(index_variable, Type::Integer(IntegerType::Unsigned64), true)
+        }
         None => binder.register_generated_variable(
             format!("{}$index", variable_name),
             Type::Integer(IntegerType::Unsigned64),
@@ -3733,7 +3898,11 @@ fn bind_variable_declaration<'a, 'b>(
     }
     let type_ = match type_ {
         Type::IntegerLiteral => Type::Integer(IntegerType::Signed64),
-        Type::TypedGenericStruct(typed_generic_struct_type) => Type::Struct(Box::new(binder.get_struct_by_id(typed_generic_struct_type.id).unwrap())),
+        Type::TypedGenericStruct(typed_generic_struct_type) => Type::Struct(Box::new(
+            binder
+                .get_struct_by_id(typed_generic_struct_type.id)
+                .unwrap(),
+        )),
         _ => type_,
     };
     let initializer = bind_conversion(initializer, &type_, binder);

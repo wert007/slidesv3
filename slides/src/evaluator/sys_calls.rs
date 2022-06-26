@@ -1,6 +1,6 @@
 use crate::{
     binder::{
-        typing::{FunctionType, StructReferenceType, Type, self},
+        typing::{self, FunctionType, StructReferenceType, Type},
         SimpleStructFunctionTable,
     },
     evaluator::memory::bytes_to_word,
@@ -18,7 +18,9 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
     let pointer = state.reallocate(0, 2 * WORD_SIZE_IN_BYTES);
     let mut pointer_bytes = state.reallocate(0, string_length);
     if pointer == 0 || pointer_bytes == 0 {
-        state.runtime_diagnostics.no_heap_memory_left(None, WORD_SIZE_IN_BYTES + string_length);
+        state
+            .runtime_diagnostics
+            .no_heap_memory_left(None, WORD_SIZE_IN_BYTES + string_length);
         state.runtime_diagnostics.clone().flush_to_console();
         state.runtime_diagnostics.diagnostics.clear();
         state.runtime_error_happened = true;
@@ -27,7 +29,10 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
     }
     // TODO: Clear bucket maybe?
     state.heap.write_word(pointer, string_length);
-    state.heap.write_flagged_word(pointer + WORD_SIZE_IN_BYTES, FlaggedWord::pointer(pointer_bytes));
+    state.heap.write_flagged_word(
+        pointer + WORD_SIZE_IN_BYTES,
+        FlaggedWord::pointer(pointer_bytes),
+    );
     for &byte in string.as_bytes() {
         state.heap.write_byte(pointer_bytes, byte);
         pointer_bytes += 1;
@@ -111,7 +116,11 @@ fn to_string_native(
     state: &mut EvaluatorState,
 ) -> String {
     match type_ {
-        Type::Library(_) | Type::GenericType | Type::TypedGenericStruct(_) | Type::IntegerLiteral | Type::IgnoreTypeChecking => unreachable!(),
+        Type::Library(_)
+        | Type::GenericType
+        | Type::TypedGenericStruct(_)
+        | Type::IntegerLiteral
+        | Type::IgnoreTypeChecking => unreachable!(),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
@@ -158,14 +167,12 @@ fn to_string_native(
                 format!("type struct id#{}", id.id)
             }
         }
-        Type::Integer(integer_type) => {
-            match integer_type {
-                typing::IntegerType::Signed8 => format!("{}", argument.unwrap_value() as i8),
-                typing::IntegerType::Signed64 => format!("{}", argument.unwrap_value() as i64),
-                typing::IntegerType::Unsigned8 => format!("{}", argument.unwrap_value() as u8),
-                typing::IntegerType::Unsigned64 => format!("{}", argument.unwrap_value() as u64),
-            }
-        }
+        Type::Integer(integer_type) => match integer_type {
+            typing::IntegerType::Signed8 => format!("{}", argument.unwrap_value() as i8),
+            typing::IntegerType::Signed64 => format!("{}", argument.unwrap_value() as i64),
+            typing::IntegerType::Unsigned8 => format!("{}", argument.unwrap_value() as u8),
+            typing::IntegerType::Unsigned64 => format!("{}", argument.unwrap_value() as u64),
+        },
         Type::Pointer => {
             format!("0x{:x}", argument.unwrap_pointer())
         }
@@ -204,11 +211,10 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
     // FIXME: Use string_length_in_words instead.
     let mut string_buffer: Vec<u8> = Vec::with_capacity(string_length_in_bytes as _);
 
-
-
-    let string_start = state.read_word(string_start + WORD_SIZE_IN_BYTES).unwrap_pointer();
-    let range = (string_start
-        ..string_start + string_length_in_words * WORD_SIZE_IN_BYTES)
+    let string_start = state
+        .read_word(string_start + WORD_SIZE_IN_BYTES)
+        .unwrap_pointer();
+    let range = (string_start..string_start + string_length_in_words * WORD_SIZE_IN_BYTES)
         .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {

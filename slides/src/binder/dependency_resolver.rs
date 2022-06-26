@@ -32,11 +32,20 @@ pub(super) fn bind_import_statements<'a>(
     binder: &mut BindingState<'a, '_>,
 ) -> Option<SyntaxNode<'a>> {
     match node.kind {
-        SyntaxNodeKind::CompilationUnit(compilation_unit) => Some(
-            bind_import_statements_compilation_unit(compilation_unit, unmoveable_label_range, binder),
-        ),
+        SyntaxNodeKind::CompilationUnit(compilation_unit) => {
+            Some(bind_import_statements_compilation_unit(
+                compilation_unit,
+                unmoveable_label_range,
+                binder,
+            ))
+        }
         SyntaxNodeKind::ImportStatement(import_statement) => {
-            bind_import_statements_import_statement(node.span, import_statement, unmoveable_label_range, binder);
+            bind_import_statements_import_statement(
+                node.span,
+                import_statement,
+                unmoveable_label_range,
+                binder,
+            );
             None
         }
         SyntaxNodeKind::_ConstDeclaration(_)
@@ -176,7 +185,14 @@ fn execute_import_function<'a>(
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory);
             let path = directory.join(library.path).with_extension("sld");
-            load_library_from_path(binder, &path, import.span, import.name, true, unmoveable_label_range);
+            load_library_from_path(
+                binder,
+                &path,
+                import.span,
+                import.name,
+                true,
+                unmoveable_label_range,
+            );
         }
     }
 }
@@ -203,10 +219,7 @@ pub(super) fn load_library_from_path<'a>(
                     Library::error()
                 }
             };
-            (
-                None,
-                lib
-            )
+            (None, lib)
         });
     // If it is a std library, there is no path to it, but it might still be already loaded.
     let path = if library_name.is_empty() {
@@ -214,7 +227,14 @@ pub(super) fn load_library_from_path<'a>(
     } else {
         path
     };
-    load_library_into_binder(span, library_name, lib, path, unmoveable_label_range, binder);
+    load_library_into_binder(
+        span,
+        library_name,
+        lib,
+        path,
+        unmoveable_label_range,
+        binder,
+    );
 }
 
 fn load_library_into_binder<'a>(

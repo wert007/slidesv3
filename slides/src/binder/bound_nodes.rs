@@ -3,7 +3,7 @@ use crate::{text::TextSpan, value::Value};
 use super::{
     operators::{BoundBinaryOperator, BoundUnaryOperator},
     symbols::StructFunctionTable,
-    typing::{FunctionKind, StructType, SystemCallKind, Type, IntegerType},
+    typing::{FunctionKind, IntegerType, StructType, SystemCallKind, Type},
 };
 
 pub mod is_same_expression;
@@ -130,7 +130,11 @@ impl BoundNode {
             rhs,
             // Note: Since we know, that string_type is never used, we can put
             // really anything in there.
-            Some(Self::literal(false_span, Value::Boolean(false), Type::Boolean)),
+            Some(Self::literal(
+                false_span,
+                Value::Boolean(false),
+                Type::Boolean,
+            )),
             Type::Boolean,
         )
     }
@@ -366,7 +370,11 @@ impl BoundNode {
                             ),
                         ),
                         vec![
-                            BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
+                            BoundNode::variable(
+                                span,
+                                index_variable,
+                                Type::Integer(IntegerType::Unsigned64),
+                            ),
                             BoundNode::variable(
                                 span,
                                 collection_variable,
@@ -383,10 +391,18 @@ impl BoundNode {
                 // $index = $index + 1;
                 BoundNode::assignment(
                     span,
-                    BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
+                    BoundNode::variable(
+                        span,
+                        index_variable,
+                        Type::Integer(IntegerType::Unsigned64),
+                    ),
                     BoundNode::binary(
                         span,
-                        BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
+                        BoundNode::variable(
+                            span,
+                            index_variable,
+                            Type::Integer(IntegerType::Unsigned64),
+                        ),
                         BoundBinaryOperator::ArithmeticAddition,
                         // Note: Since we know, that string_type is never used,
                         // we can put really anything in there.

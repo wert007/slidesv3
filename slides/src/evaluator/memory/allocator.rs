@@ -129,8 +129,7 @@ impl Allocator {
                     // If the user can supply arbitrary values as pointer this
                     // might not be true, but right now this is not the case.
                     assert!(old_bucket.is_some(), "address = {:#x}", address);
-                    old_bucket
-                        .filter(|b| b.size_in_words >= size_in_words)
+                    old_bucket.filter(|b| b.size_in_words >= size_in_words)
                 };
                 match bucket {
                     Some(bucket) => bucket.index,
@@ -212,7 +211,9 @@ impl Allocator {
         let address = clear_address(address) as u64;
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address as _).expect("There is no bucket to read the word from!").is_used,
+            self.find_bucket_from_address(address as _)
+                .expect("There is no bucket to read the word from!")
+                .is_used,
             "address = 0x{:x}",
             address
         );
@@ -220,14 +221,19 @@ impl Allocator {
         let flags = value.flags;
         let bytes = value.value.to_be_bytes();
         let value = bytes[(address % WORD_SIZE_IN_BYTES) as usize];
-        FlaggedWord { value: value as u64, flags }
+        FlaggedWord {
+            value: value as u64,
+            flags,
+        }
     }
 
     pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
         let address = clear_address(address) as u64;
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address as _).expect("There is no bucket to read the word from!").is_used,
+            self.find_bucket_from_address(address as _)
+                .expect("There is no bucket to read the word from!")
+                .is_used,
             "address = 0x{:x}",
             address
         );
@@ -251,7 +257,8 @@ impl Allocator {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+                .unwrap()
                 .is_used
         );
         self.data[address as usize]
@@ -261,7 +268,8 @@ impl Allocator {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+                .unwrap()
                 .is_used
         );
         FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
@@ -318,14 +326,18 @@ impl Allocator {
         let mut bytes = old_value.value.to_be_bytes();
         bytes[(address % WORD_SIZE_IN_BYTES) as usize] = byte.value as u8;
         let value = u64::from_be_bytes(bytes);
-        let value = FlaggedWord { value, flags: byte.flags };
+        let value = FlaggedWord {
+            value,
+            flags: byte.flags,
+        };
         self.write_flagged_word_aligned(word_address / WORD_SIZE_IN_BYTES, value);
     }
 
     fn write_word_aligned(&mut self, address: u64, value: u64) {
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+                .unwrap()
                 .is_used,
             "bucket = {:#?}, address = 0x{:x}",
             self.find_bucket_from_address(address),
@@ -342,7 +354,8 @@ impl Allocator {
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
         #[cfg(debug_assertions)]
         assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+                .unwrap()
                 .is_used,
             "bucket = {:#?}, address = 0x{:x}",
             self.find_bucket_from_address(address),

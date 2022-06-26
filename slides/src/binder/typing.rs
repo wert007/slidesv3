@@ -28,8 +28,7 @@ impl IntegerType {
 
     pub fn to_signed(&self) -> IntegerType {
         match self {
-            IntegerType::Signed8 |
-            IntegerType::Signed64 => *self,
+            IntegerType::Signed8 | IntegerType::Signed64 => *self,
             IntegerType::Unsigned8 => Self::Signed8,
             IntegerType::Unsigned64 => Self::Signed64,
         }
@@ -51,8 +50,7 @@ impl IntegerType {
     fn can_be_converted_to(&self, other: IntegerType) -> bool {
         if self.to_signed() == other.to_signed() {
             !self.is_signed()
-        }
-        else if self.is_signed() == other.is_signed() {
+        } else if self.is_signed() == other.is_signed() {
             self.size_in_bytes() <= other.size_in_bytes()
         } else {
             false
@@ -126,7 +124,7 @@ impl Type {
 
     pub fn convert_typed_generic_struct_to_struct(self) -> Self {
         if let Type::TypedGenericStruct(typed_generic_struct_type) = self {
-            Type::Struct(Box::new(typed_generic_struct_type.struct_type	))
+            Type::Struct(Box::new(typed_generic_struct_type.struct_type))
         } else {
             self
         }
@@ -148,12 +146,18 @@ impl Type {
             (Type::Struct(id), Type::StructReference(other_id)) if id.id == other_id.id => true,
             (Type::StructReference(id), Type::Struct(other)) if id.id == other.id => true,
             (Type::TypedGenericStruct(id), Type::Struct(other)) if id.id == other.id => true,
-            (Type::TypedGenericStruct(id), Type::StructReference(other)) if id.id == other.id => true,
-            (Type::StructReference(id), Type::TypedGenericStruct(other)) if id.id == other.id => true,
+            (Type::TypedGenericStruct(id), Type::StructReference(other)) if id.id == other.id => {
+                true
+            }
+            (Type::StructReference(id), Type::TypedGenericStruct(other)) if id.id == other.id => {
+                true
+            }
             (Type::Struct(id), Type::TypedGenericStruct(other)) if id.id == other.id => true,
             // FIXME: This means that 9999 would be a valid u8?
             (Type::IntegerLiteral, Type::Integer(_)) => true,
-            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => from_integer_type.can_be_converted_to(*to_integer_type),
+            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => {
+                from_integer_type.can_be_converted_to(*to_integer_type)
+            }
             _ => false,
         }
     }
@@ -166,7 +170,9 @@ impl Type {
             // (Type::Pointer, Type::Integer) => true,
             (Type::PointerOf(inner), Type::Noneable(other)) => inner.can_be_converted_to(other),
             (Type::Noneable(base_type), other) => base_type.can_be_converted_to(other),
-            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => from_integer_type.can_be_casted_to(*to_integer_type),
+            (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => {
+                from_integer_type.can_be_casted_to(*to_integer_type)
+            }
             _ => false,
         }
     }
@@ -191,7 +197,9 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("GenericTypes should only be accessed during binding!"),
-            Type::IgnoreTypeChecking => panic!("IgnoreTypeChecking should only be accessed during binding!"),
+            Type::IgnoreTypeChecking => {
+                panic!("IgnoreTypeChecking should only be accessed during binding!")
+            }
             Type::Error => 1,
             Type::Void => 1,
             Type::Any => 1,
@@ -253,7 +261,6 @@ impl Type {
     pub const TYPE_IDENTIFIER_POINTER: u64 = 14;
     pub const TYPE_IDENTIFIER_POINTER_OF: u64 = 15;
 
-
     pub fn type_identifier_kind(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
@@ -295,10 +302,14 @@ impl Type {
             unknown => {
                 if unknown >= 1 << 16 {
                     let integer_type = (unknown >> 16) - 1;
-                    Some(Type::Integer(IntegerType::try_from_primitive(integer_type as u8).ok()?))
+                    Some(Type::Integer(
+                        IntegerType::try_from_primitive(integer_type as u8).ok()?,
+                    ))
                 } else if unknown >= 1 << 8 {
                     let system_call_kind = (unknown >> 8) - 1;
-                    Some(Type::SystemCall(SystemCallKind::try_from_primitive(system_call_kind as u8).ok()?))
+                    Some(Type::SystemCall(
+                        SystemCallKind::try_from_primitive(system_call_kind as u8).ok()?,
+                    ))
                 } else {
                     None
                 }

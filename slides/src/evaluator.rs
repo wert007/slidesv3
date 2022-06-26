@@ -654,7 +654,11 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
     let result = if needs_dereferencing && !is_none {
         state.read_word(lhs.unwrap_pointer())
     } else {
-        if is_none { rhs } else { lhs }
+        if is_none {
+            rhs
+        } else {
+            lhs
+        }
     };
     state.stack.push_flagged_word(result);
 }

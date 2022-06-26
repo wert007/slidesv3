@@ -80,7 +80,8 @@ impl StaticMemory {
     }
 
     fn push_pointer(&mut self, relative_pointer: i64) {
-        self.data.push(StaticMemoryWord::RelativePointer(relative_pointer));
+        self.data
+            .push(StaticMemoryWord::RelativePointer(relative_pointer));
     }
 
     pub fn try_read_string_from(&self, address: u64) -> Option<String> {
@@ -114,7 +115,7 @@ pub fn print_static_memory_as_string(static_memory: &StaticMemory) -> String {
     for word in &static_memory.data {
         match word {
             StaticMemoryWord::Word(word) => result.extend_from_slice(&word.to_be_bytes()),
-            StaticMemoryWord::RelativePointer(_) => {},
+            StaticMemoryWord::RelativePointer(_) => {}
         }
     }
     String::from_utf8_lossy(&result).into_owned()
@@ -129,11 +130,15 @@ pub fn print_static_memory_as_hex(static_memory: &StaticMemory) -> String {
             1 => write!(result, "  "),
             0 => write!(result, "\n{addr:16x}: "),
             _ => unreachable!(),
-        }.unwrap();
+        }
+        .unwrap();
         match word {
             StaticMemoryWord::Word(word) => write!(result, " {word:016x}"),
-            StaticMemoryWord::RelativePointer(pointer) => write!(result, "#{:016x}", (addr as i64 + pointer) as usize),
-        }.unwrap();
+            StaticMemoryWord::RelativePointer(pointer) => {
+                write!(result, "#{:016x}", (addr as i64 + pointer) as usize)
+            }
+        }
+        .unwrap();
     }
     result
 }

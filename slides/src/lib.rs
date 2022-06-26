@@ -16,14 +16,23 @@ use crate::{diagnostics::DiagnosticBag, text::SourceText};
 use binder::symbols::Library;
 pub use debug::DebugFlags;
 
-pub fn load_library_from_path<P>(path: P, debug_flags: DebugFlags, import_std_libs: bool) -> std::io::Result<Library>
+pub fn load_library_from_path<P>(
+    path: P,
+    debug_flags: DebugFlags,
+    import_std_libs: bool,
+) -> std::io::Result<Library>
 where
     P: AsRef<Path>,
 {
     let path = path.as_ref().to_owned();
     let source_code = std::fs::read_to_string(&path)?;
     let file_name = path.to_string_lossy();
-    Ok(load_library(&source_code, &file_name, debug_flags, import_std_libs))
+    Ok(load_library(
+        &source_code,
+        &file_name,
+        debug_flags,
+        import_std_libs,
+    ))
 }
 
 pub fn load_library(
@@ -33,7 +42,10 @@ pub fn load_library(
     import_std_libs: bool,
 ) -> Library {
     if debug_flags.print_library_loading_order {
-        println!("Loading library {}. import std libs = {}", file_name, import_std_libs);
+        println!(
+            "Loading library {}. import std libs = {}",
+            file_name, import_std_libs
+        );
     }
     let source_text = SourceText::new(input, file_name);
     let mut diagnostic_bag = DiagnosticBag::new(&source_text);

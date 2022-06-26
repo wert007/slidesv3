@@ -1,6 +1,9 @@
-use std::{process::Command, fmt::Write};
+use std::{fmt::Write, process::Command};
 
-use crate::evaluator::memory::{allocator::{Allocator, BucketEntry}, self};
+use crate::evaluator::memory::{
+    self,
+    allocator::{Allocator, BucketEntry},
+};
 
 pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
     let color_names = [
@@ -28,16 +31,26 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
         match bucket {
             BucketEntry::Bucket(bucket) => {
                 let address = (bucket.address * memory::WORD_SIZE_IN_BYTES) | memory::HEAP_POINTER;
-                let address = address.to_be_bytes().iter().map(|e| format!("{e:02X}")).collect::<Vec<_>>().join(" ".into());
-                let potential_str : Option<String> = {
+                let address = address
+                    .to_be_bytes()
+                    .iter()
+                    .map(|e| format!("{e:02X}"))
+                    .collect::<Vec<_>>()
+                    .join(" ".into());
+                let potential_str: Option<String> = {
                     let mut data = vec![];
-                    for word in &heap.data[bucket.address as usize..][..bucket.size_in_words as usize] {
+                    for word in
+                        &heap.data[bucket.address as usize..][..bucket.size_in_words as usize]
+                    {
                         data.extend_from_slice(&word.to_be_bytes());
                     }
                     match std::str::from_utf8(&data) {
-                        Ok(s) => {
-                            Some(s.chars().filter(|c| !c.is_control()).map(|c| if c == '"' { '`' } else { c }).collect())
-                        }
+                        Ok(s) => Some(
+                            s.chars()
+                                .filter(|c| !c.is_control())
+                                .map(|c| if c == '"' { '`' } else { c })
+                                .collect(),
+                        ),
                         Err(_) => None,
                     }
                 };
@@ -49,7 +62,13 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
                     writeln!(bucket_data).unwrap();
                 }
 
-                result.push_str(&format!("Address:{}\\l{:#?}\\lData:\\l{}\\l", address, bucket, bucket_data).replace('\n', "\\l"));
+                result.push_str(
+                    &format!(
+                        "Address:{}\\l{:#?}\\lData:\\l{}\\l",
+                        address, bucket, bucket_data
+                    )
+                    .replace('\n', "\\l"),
+                );
                 if let Some(str) = potential_str {
                     write!(result, "String:\\l'{}'\\l", str).unwrap();
                 }

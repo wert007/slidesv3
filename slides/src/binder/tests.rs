@@ -1,7 +1,10 @@
 use assert_matches::assert_matches;
 
 use crate::{
-    binder::{bound_nodes::{BoundLiteralNodeKind, BoundNodeKind}, typing::IntegerType},
+    binder::{
+        bound_nodes::{BoundLiteralNodeKind, BoundNodeKind},
+        typing::IntegerType,
+    },
     diagnostics::Diagnostic,
     text::SourceText,
     value::Value,
