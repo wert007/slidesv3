@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     binder::typing::SystemCallKind,
-    evaluator::memory::WORD_SIZE_IN_BYTES,
+    evaluator::memory::{static_memory::StaticMemory, WORD_SIZE_IN_BYTES},
     instruction_converter::{
         instruction::{op_codes::OpCode, Instruction},
         InstructionOrLabelReference, LabelReference,
@@ -13,16 +13,40 @@ use crate::{
     text::SourceText,
 };
 
-pub fn print_instructions_with_source_code(instructions: &[Instruction], source: &SourceText) {
-    let output = instructions_with_source_code_to_string(instructions, source);
+#[derive(Default, Clone, Copy)]
+pub struct Context<'a> {
+    reg_names: &'a [Option<String>],
+    static_memory: Option<&'a StaticMemory>,
+}
+
+impl<'a> Context<'a> {
+    pub fn with_static_memory(self, static_memory: &'a StaticMemory) -> Self {
+        Self {
+            static_memory: Some(static_memory),
+            ..self
+        }
+    }
+
+    pub fn with_register_names(self, reg_names: &'a [Option<String>]) -> Self {
+        Self { reg_names, ..self }
+    }
+}
+
+pub fn print_instructions_with_source_code(
+    instructions: &[Instruction],
+    source: &SourceText,
+    context: Context,
+) {
+    let output = instructions_with_source_code_to_string(instructions, source, context);
     println!("{}", output)
 }
 
 pub fn output_instructions_with_source_code_to_sldasm(
     instructions: &[Instruction],
     source: &SourceText,
+    context: Context,
 ) {
-    let output = instructions_with_source_code_to_string(instructions, source);
+    let output = instructions_with_source_code_to_string(instructions, source, context);
     let output_path = PathBuf::from("../debug-out").join(
         Path::new(source.file_name)
             .with_extension("sldasm")
@@ -35,14 +59,16 @@ pub fn output_instructions_with_source_code_to_sldasm(
 pub fn print_instructions_or_labels_with_source_code(
     instructions: &[InstructionOrLabelReference],
     source: &SourceText,
+    context: Context,
 ) {
-    let output = instructions_or_labels_with_source_code_to_string(instructions, source);
+    let output = instructions_or_labels_with_source_code_to_string(instructions, source, context);
     println!("{}", output)
 }
 
 pub fn output_instructions_or_labels_with_source_code_to_sldasm(
     instructions: &[InstructionOrLabelReference],
     source: &SourceText,
+    context: Context,
 ) {
     let mut is_foreign = false;
     let mut current_span = None;
@@ -72,7 +98,7 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
                     buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     buffer.push_str(&format!("{:3X}: ", index));
-                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, None));
+                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, context));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -94,6 +120,7 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
 fn instructions_with_source_code_to_string(
     instructions: &[Instruction],
     source: &SourceText,
+    context: Context,
 ) -> String {
     let mut is_foreign = false;
     let mut current_span = None;
@@ -118,7 +145,7 @@ fn instructions_with_source_code_to_string(
         }
         buffer.push_str("  ");
         buffer.push_str(&format!("{:3X}: ", index));
-        buffer.push_str(&instruction_to_string(*instruction, None));
+        buffer.push_str(&instruction_to_string(*instruction, context));
         buffer.push('\n');
     }
     buffer
@@ -127,6 +154,7 @@ fn instructions_with_source_code_to_string(
 fn instructions_or_labels_with_source_code_to_string(
     instructions: &[InstructionOrLabelReference],
     source: &SourceText,
+    context: Context,
 ) -> String {
     let mut is_foreign = false;
     let mut current_span = None;
@@ -156,7 +184,7 @@ fn instructions_or_labels_with_source_code_to_string(
                     buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     buffer.push_str(&format!("{:3X}: ", index));
-                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, None));
+                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, context));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -172,6 +200,7 @@ fn instructions_or_labels_with_source_code_to_string(
 fn instructions_or_labels_to_string(
     start_index: usize,
     instructions: &[InstructionOrLabelReference],
+    context: Context,
 ) -> String {
     let mut result = String::new();
     let mut index = start_index;
@@ -183,7 +212,7 @@ fn instructions_or_labels_to_string(
                     result.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     result.push_str(&format!("{:3X}: ", index));
-                    result.push_str(&instruction_or_label_to_string(*instruction, true, None));
+                    result.push_str(&instruction_or_label_to_string(*instruction, true, context));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -200,19 +229,14 @@ fn instructions_or_labels_to_string(
 fn instructions_to_string(
     start_index: usize,
     instructions: &[Instruction],
-    reg_names: &[Option<&str>],
+    context: Context,
 ) -> String {
     let mut result = String::new();
     let mut index = start_index;
     for instruction in instructions {
         result.push_str("  ");
         result.push_str(&format!("{:3X}: ", index));
-        let reg_name = if (reg_names.len() as u64) < instruction.arg {
-            reg_names[instruction.arg as usize]
-        } else {
-            None
-        };
-        result.push_str(&instruction_to_string(*instruction, reg_name));
+        result.push_str(&instruction_to_string(*instruction, context));
         index += 1;
         result.push('\n');
     }
@@ -223,26 +247,28 @@ fn label_reference_to_string(label: LabelReference) -> String {
     format!("ldlbl L{:02X}", label.label_reference)
 }
 
-pub fn instruction_to_string(instruction: Instruction, reg_name: Option<&str>) -> String {
-    instruction_or_label_to_string(instruction, false, reg_name)
+pub fn instruction_to_string(instruction: Instruction, context: Context) -> String {
+    instruction_or_label_to_string(instruction, false, context)
 }
 
 fn instruction_or_label_to_string(
     instruction: Instruction,
     has_labels: bool,
-    reg_name: Option<&str>,
+    context: Context,
 ) -> String {
     match instruction.op_code {
         OpCode::NoOp => instruction_no_arg_to_string("noop"),
         OpCode::LoadImmediate => instruction_dec_signed_arg_to_string("ldimm", instruction.arg),
-        OpCode::LoadPointer => instruction_ptr_unsigned_arg_to_string("ldptr", instruction.arg),
+        OpCode::LoadPointer => {
+            instruction_ptr_unsigned_arg_to_string_with_context("ldptr", instruction.arg, context)
+        }
         OpCode::DuplicateOver => instruction_word_count_arg_to_string("dupover", instruction.arg),
         OpCode::Pop => instruction_no_arg_to_string("pop"),
         OpCode::LoadRegister => {
-            instruction_reg_arg_name_to_string("ldreg", instruction.arg, reg_name)
+            instruction_reg_arg_name_to_string("ldreg", instruction.arg, context)
         }
         OpCode::StoreInRegister => {
-            instruction_reg_arg_name_to_string("streg", instruction.arg, reg_name)
+            instruction_reg_arg_name_to_string("streg", instruction.arg, context)
         }
         OpCode::StoreInMemory => instruction_ptr_unsigned_arg_to_string("stm", instruction.arg),
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
@@ -275,7 +301,9 @@ fn instruction_or_label_to_string(
         OpCode::LessThanEquals => instruction_no_arg_to_string("lte"),
         OpCode::GreaterThanEquals => instruction_no_arg_to_string("gte"),
         OpCode::StringConcat => instruction_no_arg_to_string("strconcat"),
-        OpCode::NoneableOrValue => instruction_dereference_arg_to_string("noneableor", instruction.arg),
+        OpCode::NoneableOrValue => {
+            instruction_dereference_arg_to_string("noneableor", instruction.arg)
+        }
         OpCode::Jump if !has_labels => {
             instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg)
         }
@@ -320,12 +348,32 @@ fn instruction_ptr_unsigned_arg_to_string(name: &str, arg: u64) -> String {
     format!("{} 0x{:x}", name, arg)
 }
 
-fn instruction_reg_arg_to_string(name: &str, arg: u64) -> String {
-    instruction_reg_arg_name_to_string(name, arg, None)
+fn instruction_ptr_unsigned_arg_to_string_with_context(
+    name: &str,
+    arg: u64,
+    context: Context,
+) -> String {
+    let string = context
+        .static_memory
+        .map(|it| it.try_read_string_from(arg))
+        .flatten();
+    match string {
+        Some(it) => {
+            format!("{} 0x{:x} > '{}'", name, arg, it)
+        }
+        None => {
+            format!("{} 0x{:x}", name, arg)
+        }
+    }
 }
 
-fn instruction_reg_arg_name_to_string(name: &str, arg: u64, reg_name: Option<&str>) -> String {
-    if let Some(reg_name) = reg_name {
+fn instruction_reg_arg_name_to_string(name: &str, arg: u64, context: Context) -> String {
+    if let Some(reg_name) = context
+        .reg_names
+        .get(arg as usize)
+        .map(|i| i.as_ref())
+        .flatten()
+    {
         format!("{} {}", name, reg_name)
     } else {
         format!("{} r#{}", name, arg)

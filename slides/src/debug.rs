@@ -1,7 +1,7 @@
 mod allocator;
 mod basic_blocks;
 mod bound_nodes;
-mod instructions;
+pub mod instructions;
 
 pub use allocator::output_allocator_to_dot;
 pub use basic_blocks::output_basic_blocks_to_dot;

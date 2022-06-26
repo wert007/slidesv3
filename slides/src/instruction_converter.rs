@@ -21,9 +21,9 @@ use crate::{
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
-        typing::{FunctionKind, SystemCallKind, Type, IntegerType},
+        typing::{FunctionKind, IntegerType, SystemCallKind, Type},
     },
-    debug::DebugFlags,
+    debug::{instructions::Context, DebugFlags},
     diagnostics::DiagnosticBag,
     evaluator::memory::{self, bytes_to_word, static_memory::StaticMemory, WORD_SIZE_IN_BYTES},
     text::{SourceText, TextSpan},
@@ -208,12 +208,17 @@ pub fn convert<'a>(
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &instructions,
             source_text,
+            Context::default().with_static_memory(&converter.static_memory),
         );
     }
 
     let instructions = label_replacer::replace_labels(instructions, debug_flags);
     if debug_flags.output_instructions_to_sldasm {
-        crate::debug::output_instructions_with_source_code_to_sldasm(&instructions, source_text);
+        crate::debug::output_instructions_with_source_code_to_sldasm(
+            &instructions,
+            source_text,
+            Context::default().with_static_memory(&converter.static_memory),
+        );
     }
     if debug_flags.print_static_memory_as_string {
         println!(
@@ -298,6 +303,7 @@ pub fn convert_library<'a>(
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &instructions,
             source_text,
+            Context::default().with_static_memory(&converter.static_memory),
         );
     }
     if debug_flags.print_static_memory_as_hex {

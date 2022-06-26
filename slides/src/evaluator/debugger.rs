@@ -33,15 +33,15 @@ pub fn create_session(state: &mut EvaluatorState) {
         return;
     }
     let current_instruction = state.instructions[state.pc];
-    let reg_name = if current_instruction.arg < state.debugger_state.register_names.len() as u64 {
-        state.debugger_state.register_names[current_instruction.arg as usize].as_deref()
-    } else {
-        None
-    };
     println!(
         "{:5X}: {}",
         state.pc,
-        crate::debug::instruction_to_string(current_instruction, reg_name)
+        crate::debug::instruction_to_string(
+            current_instruction,
+            crate::debug::instructions::Context::default()
+                .with_static_memory(state.stack.static_memory())
+                .with_register_names(&state.debugger_state.register_names)
+        ),
     );
     let mut line = String::new();
     loop {

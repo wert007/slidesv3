@@ -4,6 +4,7 @@ mod sys_calls;
 
 use crate::{
     binder::typing::SystemCallKind,
+    debug::instructions::Context,
     evaluator::memory::WORD_SIZE_IN_BYTES,
     instruction_converter::{
         instruction::{op_codes::OpCode, Instruction},
@@ -183,7 +184,10 @@ fn execute_function(
                 "  CI {:X}*{}: {}",
                 pc,
                 nestedness,
-                crate::debug::instruction_to_string(state.instructions[pc], None)
+                crate::debug::instruction_to_string(
+                    state.instructions[pc],
+                    Context::default().with_static_memory(state.stack.static_memory())
+                )
             );
         }
         if state.debug_flags.slow_mode {

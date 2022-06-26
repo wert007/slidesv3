@@ -4,10 +4,28 @@ use crate::DebugFlags;
 
 use super::WORD_SIZE_IN_BYTES;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum StaticMemoryWord {
     Word(u64),
     RelativePointer(i64),
+}
+
+impl StaticMemoryWord {
+    pub fn as_word(&self) -> Option<u64> {
+        if let Self::Word(v) = self {
+            Some(*v)
+        } else {
+            None
+        }
+    }
+
+    pub fn as_relative_pointer(&self) -> Option<i64> {
+        if let Self::RelativePointer(v) = self {
+            Some(*v)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -63,6 +81,30 @@ impl StaticMemory {
 
     fn push_pointer(&mut self, relative_pointer: i64) {
         self.data.push(StaticMemoryWord::RelativePointer(relative_pointer));
+    }
+
+    pub fn try_read_string_from(&self, address: u64) -> Option<String> {
+        if address == 0 {
+            return None;
+        }
+        if address % WORD_SIZE_IN_BYTES != 0 {
+            return None;
+        }
+        let index = (address / WORD_SIZE_IN_BYTES) as usize;
+        let length_in_bytes = self.data[index].as_word()?;
+        let length = super::bytes_to_word(length_in_bytes);
+        let pointer = self.data[index + 1].as_relative_pointer()?;
+        if pointer % WORD_SIZE_IN_BYTES as i64 != 0 {
+            return None;
+        }
+        let pointer = (pointer / WORD_SIZE_IN_BYTES as i64) as isize;
+        let pointer = (index as isize + pointer + 1) as usize;
+        let mut data = Vec::with_capacity(length as usize);
+        for index in pointer..pointer + length as usize {
+            let word = self.data[index].as_word()?;
+            data.extend_from_slice(&word.to_be_bytes());
+        }
+        Some(String::from_utf8_lossy(&data[..length_in_bytes as usize]).to_string())
     }
 }
 

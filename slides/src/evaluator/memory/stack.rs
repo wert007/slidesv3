@@ -1,4 +1,7 @@
-use crate::{evaluator::{WORD_SIZE_IN_BYTES, memory::static_memory::StaticMemoryWord}, DebugFlags};
+use crate::{
+    evaluator::{memory::static_memory::StaticMemoryWord, WORD_SIZE_IN_BYTES},
+    DebugFlags,
+};
 
 use super::{static_memory::StaticMemory, FlaggedWord, Flags};
 
@@ -6,7 +9,7 @@ pub struct Stack {
     pub data: Vec<u64>,
     pub flags: Vec<Flags>,
     print_stack: bool,
-    static_memory_size: usize,
+    static_memory: StaticMemory,
 }
 
 impl Stack {
@@ -15,7 +18,7 @@ impl Stack {
             data: vec![],
             flags: vec![],
             print_stack: debug_flags.print_stack,
-            static_memory_size: 0,
+            static_memory: StaticMemory::new(debug_flags),
         }
     }
 
@@ -51,10 +54,9 @@ impl Stack {
     }
 
     pub fn push_static_memory(&mut self, static_memory: StaticMemory) {
-        assert_eq!(self.static_memory_size, 0);
-        let static_memory_size = static_memory.data.len();
+        assert_eq!(self.static_memory.size_in_bytes(), 0);
         let mut address = 0;
-        for word in static_memory.data {
+        for &word in &static_memory.data {
             match word {
                 StaticMemoryWord::Word(word) => {
                     self.data.push(word);
@@ -73,7 +75,11 @@ impl Stack {
             address += WORD_SIZE_IN_BYTES;
         }
         self.print_maybe_stack();
-        self.static_memory_size = static_memory_size;
+        self.static_memory = static_memory;
+    }
+
+    pub fn static_memory(&self) -> &StaticMemory {
+        &self.static_memory
     }
 
     pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
@@ -87,7 +93,10 @@ impl Stack {
     pub fn read_flagged_byte(&self, address: u64) -> FlaggedWord {
         let value = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES);
         let byte = value.value.to_be_bytes()[(address % WORD_SIZE_IN_BYTES) as usize];
-        FlaggedWord { value: byte as _, flags: value.flags }
+        FlaggedWord {
+            value: byte as _,
+            flags: value.flags,
+        }
     }
 
     fn read_flagged_word_aligned(&self, address: u64) -> FlaggedWord {
@@ -103,11 +112,19 @@ impl Stack {
     }
 
     pub fn write_flagged_byte(&mut self, address: u64, value: FlaggedWord) {
-        let old_value = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES).value;
+        let old_value = self
+            .read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES)
+            .value;
         let mut bytes = old_value.to_be_bytes();
         bytes[(address % WORD_SIZE_IN_BYTES) as usize] = value.value as u8;
         let word = u64::from_be_bytes(bytes);
-        self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, FlaggedWord { value: word, flags: value.flags });
+        self.write_flagged_word_aligned(
+            address / WORD_SIZE_IN_BYTES,
+            FlaggedWord {
+                value: word,
+                flags: value.flags,
+            },
+        );
     }
 
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
@@ -122,7 +139,12 @@ impl Stack {
         }
         print!("stack = [");
         let mut is_first = true;
-        for (value, flags) in self.data.iter().zip(&self.flags).skip(self.static_memory_size) {
+        for (value, flags) in self
+            .data
+            .iter()
+            .zip(&self.flags)
+            .skip(self.static_memory.data.len())
+        {
             if !is_first {
                 print!(", ");
             }
