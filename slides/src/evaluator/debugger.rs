@@ -67,6 +67,9 @@ pub fn create_session(state: &mut EvaluatorState) {
                         return;
                     }
                     Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words),
+                    Command::StaticMemory => {
+                        print_static_memory(&state.stack, state.static_memory_size_in_words)
+                    }
                     Command::Replace(new_value) => {
                         let flags = state.stack.pop().flags;
                         state
@@ -95,6 +98,9 @@ pub fn create_session(state: &mut EvaluatorState) {
                     Command::Heapdump(file_name) => {
                         crate::debug::output_allocator_to_dot(file_name, &state.heap);
                     }
+                    Command::StringTable => {
+                        print_string_table(&state.stack, state.static_memory_size_in_words);
+                    }
                 }
             }
             None => {
@@ -102,6 +108,44 @@ pub fn create_session(state: &mut EvaluatorState) {
             }
         }
         line.clear();
+    }
+}
+
+fn print_string_table(stack: &memory::stack::Stack, static_memory_size_in_words: usize) {
+    let mut entries = vec![];
+    let mut last_length = None;
+    let mut last_address = 0;
+
+    let mut i = 1;
+
+    while i < static_memory_size_in_words as u64 {
+        let address = i * memory::WORD_SIZE_IN_BYTES;
+        match last_length {
+            Some(length) => {
+                let pointer = stack.read_flagged_word(address).unwrap_pointer();
+                i = memory::bytes_to_word(pointer);
+                let word_length = memory::bytes_to_word(length);
+                let data: Vec<u8> = stack.data[i as usize..][..word_length as usize]
+                    .into_iter()
+                    .flat_map(|e| e.to_be_bytes())
+                    .collect();
+                let string = String::from_utf8_lossy(&data).to_string();
+                entries.push((last_address, length, string));
+                last_length = None;
+                i += word_length;
+            }
+            None => {
+                last_length = Some(stack.read_flagged_word(address).unwrap_value());
+                last_address = address;
+                i += 1;
+            }
+        }
+    }
+
+    println!("Address | Length | Value");
+    println!("--------|--------|------");
+    for (address, length, entry) in entries {
+        println!("{:>7X} | {:>6} | '{}'", address, length, entry);
     }
 }
 
@@ -168,6 +212,20 @@ fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
     }
 }
 
+fn print_static_memory(stack: &super::memory::stack::Stack, static_memory_count: usize) {
+    println!("{} Entries in static_memory:", static_memory_count);
+    for i in 0..static_memory_count {
+        let address = i as u64 * memory::WORD_SIZE_IN_BYTES;
+        let entry = stack.read_flagged_word(address);
+        print!("{:03X}: ", address);
+        if entry.is_pointer() {
+            println!("#{:x}", entry.unwrap_pointer());
+        } else {
+            println!("{}", entry.unwrap_value());
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum Command {
     Repeat,
@@ -175,6 +233,7 @@ enum Command {
     NextInstruction,
     Skip,
     Stack,
+    StaticMemory,
     Registers,
     Pointer(u64),
     IndirectPointer(u64),
@@ -183,6 +242,7 @@ enum Command {
     Replace(u64),
     RenameRegister(usize, String),
     Heapdump(String),
+    StringTable,
 }
 
 impl Default for Command {
@@ -212,6 +272,7 @@ fn parse_command(input: &str) -> Option<Command> {
                 }
             }
             ["stack"] => Some(Command::Stack),
+            ["staticmem"] => Some(Command::StaticMemory),
             ["registers"] => Some(Command::Registers),
             ["rename", register, name] => {
                 if let Some(register) = register.strip_prefix("r#") {
@@ -225,9 +286,8 @@ fn parse_command(input: &str) -> Option<Command> {
             ["n" | "next"] => Some(Command::NextInstruction),
             ["s" | "skip"] => Some(Command::Skip),
             [""] => Some(Command::Repeat),
-            ["heapdump", arg] => {
-                Some(Command::Heapdump(arg.into()))
-            }
+            ["heapdump", arg] => Some(Command::Heapdump(arg.into())),
+            ["strtbl"] => Some(Command::StringTable),
             _ => None,
         }
     }
