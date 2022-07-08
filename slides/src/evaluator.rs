@@ -24,7 +24,7 @@ use self::memory::{
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {
         $evaluator.runtime_diagnostics.$($fn_call)*;
-        $evaluator.runtime_diagnostics.clone().flush_to_console();
+        $evaluator.runtime_diagnostics.clone().flush_to_console(std::io::stdout()).expect("Could not write to stdout.");
         $evaluator.runtime_diagnostics.diagnostics.clear();
         $evaluator.runtime_error_happened = true;
     };
@@ -155,6 +155,7 @@ pub fn evaluate(
         }
         Err(()) => {
             if debug_flags.use_debugger {
+                assert!(!debug_flags.record_output);
                 debugger::create_session(&mut state);
             }
             Value::Integer(-1)
@@ -291,7 +292,9 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_breakpoint(state: &mut EvaluatorState, _: Instruction) {
-    state.debugger_state.session_state = debugger::SessionState::Continue;
+    if !state.debug_flags.record_output {
+        state.debugger_state.session_state = debugger::SessionState::Continue;
+    }
 }
 
 fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction) {

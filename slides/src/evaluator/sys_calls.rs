@@ -1,3 +1,4 @@
+use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 use crate::{
     binder::{
         typing::{self, FunctionType, StructReferenceType, Type},
@@ -5,11 +6,24 @@ use crate::{
     },
     evaluator::memory::bytes_to_word,
 };
-
-use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
+use std::io::Write;
 
 pub fn print(argument: FlaggedWord, state: &mut EvaluatorState) {
-    println!("{}", to_string_native(Type::Any, 0, argument, state));
+    // TODO: duplicate code in runtime_error, maybe use a macro for this?
+    if state.debug_flags.record_output {
+        let path = state.runtime_diagnostics.source_text.file_name;
+        let mut path = std::path::PathBuf::from(path);
+        path.set_extension("out");
+        let mut file = std::fs::File::options()
+            .create(true)
+            .append(true)
+            .open(path)
+            .expect("Could not create output file.");
+        writeln!(file, "{}", to_string_native(Type::Any, 0, argument, state))
+            .expect("Could not write to output file.");
+    } else {
+        println!("{}", to_string_native(Type::Any, 0, argument, state));
+    }
 }
 
 pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
@@ -21,7 +35,11 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
         state
             .runtime_diagnostics
             .no_heap_memory_left(None, WORD_SIZE_IN_BYTES + string_length);
-        state.runtime_diagnostics.clone().flush_to_console();
+        state
+            .runtime_diagnostics
+            .clone()
+            .flush_to_console(std::io::stdout())
+            .expect("Could not write to stdout.");
         state.runtime_diagnostics.diagnostics.clear();
         state.runtime_error_happened = true;
         state.stack.push_pointer(0);
@@ -240,8 +258,23 @@ pub fn reallocate(pointer: FlaggedWord, size: FlaggedWord, state: &mut Evaluator
 
 pub fn runtime_error(argument: FlaggedWord, state: &mut EvaluatorState) {
     let argument = string_to_string_native(argument, state);
-    let argument = argument.replace('\0', "");
-    println!("Runtime error happened: {}", argument);
+
+    // TODO: duplicate code in print, maybe use a macro for this?
+    if state.debug_flags.record_output {
+        let path = state.runtime_diagnostics.source_text.file_name;
+        let mut path = std::path::PathBuf::from(path);
+        path.set_extension("out");
+        let mut file = std::fs::File::options()
+            .create(true)
+            .append(true)
+            .open(path)
+            .expect("Could not create output file.");
+        writeln!(file, "Runtime error happened: {}", argument)
+            .expect("Could not write to output file.");
+    } else {
+        println!("Runtime error happened: {}", argument);
+    }
+
     state.runtime_error_happened = true;
 }
 

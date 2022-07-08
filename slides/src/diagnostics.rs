@@ -121,10 +121,11 @@ impl<'a> DiagnosticBag<'a> {
         !self.diagnostics.is_empty()
     }
 
-    pub fn flush_to_console(self) {
+    pub fn flush_to_console(self, mut output: impl std::io::Write) -> std::io::Result<()> {
         for diagnostic in self.diagnostics {
-            println!("{}", diagnostic.into_string(&self.registered_types));
+            writeln!(output, "{}", diagnostic.into_string(&self.registered_types))?;
         }
+        Ok(())
     }
 
     fn report(&mut self, message: Message<'a>, span: TextSpan) {
