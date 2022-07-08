@@ -1428,7 +1428,8 @@ fn default_statements(binder: &mut BindingState) {
 fn std_imports(binder: &mut BindingState) {
     dependency_resolver::load_library_from_path(
         binder,
-        Path::new("../slides/builtin/std.sld"),
+        // TODO: Use a better way to find and load the std lib...
+        Path::new("slides/builtin/std.sld"),
         TextSpan::zero(),
         "",
         false,
