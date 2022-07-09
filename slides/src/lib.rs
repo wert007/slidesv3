@@ -1,4 +1,6 @@
 mod binder;
+#[cfg(test)]
+mod compilation_tests;
 #[allow(dead_code)]
 mod debug;
 mod diagnostics;
@@ -8,8 +10,6 @@ mod lexer;
 mod parser;
 mod text;
 mod value;
-#[cfg(test)]
-mod compilation_tests;
 
 use std::path::Path;
 
@@ -59,8 +59,13 @@ pub fn load_library(
     );
     if diagnostic_bag.has_errors() {
         result.has_errors = true;
-        assert!(!debug_flags.record_output, "Cannot record libraries at the moment!");
-        diagnostic_bag.flush_to_console(std::io::stdout()).expect("Could not write to stdout.");
+        assert!(
+            !debug_flags.record_output,
+            "Cannot record libraries at the moment!"
+        );
+        diagnostic_bag
+            .flush_to_console(std::io::stdout())
+            .expect("Could not write to stdout.");
     }
     result
 }
@@ -76,9 +81,13 @@ pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
                 let mut path = std::path::PathBuf::from(file_name);
                 path.set_extension("diagnostics");
                 let file = std::fs::File::create(path).expect("Could not create output file.");
-                diagnostic_bag.flush_to_console(file).expect("Could not write to output file.")
+                diagnostic_bag
+                    .flush_to_console(file)
+                    .expect("Could not write to output file.")
             }
-            false => diagnostic_bag.flush_to_console(std::io::stdout()).expect("Could not write to stdout."),
+            false => diagnostic_bag
+                .flush_to_console(std::io::stdout())
+                .expect("Could not write to stdout."),
         }
         return;
     }
