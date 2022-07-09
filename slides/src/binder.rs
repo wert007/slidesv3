@@ -1426,10 +1426,15 @@ fn default_statements(binder: &mut BindingState) {
 }
 
 fn std_imports(binder: &mut BindingState) {
+    let lookup_path = Path::new("builtin/std.sld");
+    if !lookup_path.exists() {
+        let stdlib_sourcecode = include_str!("../builtin/std.sld");
+        std::fs::create_dir_all(lookup_path.parent().unwrap()).unwrap();
+        std::fs::write(lookup_path, stdlib_sourcecode).unwrap();
+    }
     dependency_resolver::load_library_from_path(
         binder,
-        // TODO: Use a better way to find and load the std lib...
-        Path::new("slides/builtin/std.sld"),
+        lookup_path,
         TextSpan::zero(),
         "",
         false,
