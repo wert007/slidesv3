@@ -4,8 +4,6 @@ mod dependency_resolver;
 mod lowerer;
 pub mod operators;
 pub mod symbols;
-#[cfg(test)]
-mod tests;
 mod type_replacer;
 pub mod typing;
 

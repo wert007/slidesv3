@@ -1,6 +1,4 @@
 pub mod instruction;
-#[cfg(test)]
-mod tests;
 
 mod label_replacer;
 
