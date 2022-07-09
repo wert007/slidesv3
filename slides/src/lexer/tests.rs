@@ -239,7 +239,7 @@ fn lexer_successfull() {
 
 fn lex_helper_successfull(input: &str, callback: impl FnOnce(VecDeque<SyntaxToken>)) {
     let source_text = SourceText::new(input, "");
-    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text, true);
     let result = lex(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
     callback(result)

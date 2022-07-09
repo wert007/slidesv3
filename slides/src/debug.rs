@@ -35,6 +35,7 @@ pub struct DebugFlags {
     pub slow_mode: bool,
     pub use_debugger: bool,
     pub record_output: bool,
+    pub test_runner: bool,
 }
 
 impl DebugFlags {

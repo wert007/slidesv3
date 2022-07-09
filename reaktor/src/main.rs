@@ -31,6 +31,7 @@ fn main() -> Result<(), std::io::Error> {
         slow_mode: matches.is_present("slow"),
         use_debugger: matches.is_present("debugger"),
         record_output: matches.is_present("record"),
+        test_runner: matches.is_present("test-runner"),
     };
 
     match input_file {

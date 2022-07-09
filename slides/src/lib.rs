@@ -50,7 +50,7 @@ pub fn load_library(
         );
     }
     let source_text = SourceText::new(input, file_name);
-    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text, debug_flags.record_output || debug_flags.test_runner);
     let mut result = instruction_converter::convert_library(
         &source_text,
         &mut diagnostic_bag,
@@ -72,7 +72,7 @@ pub fn load_library(
 
 pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
     let source_text = SourceText::new(input, file_name);
-    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text, debug_flags.record_output || debug_flags.test_runner);
     let result = instruction_converter::convert(&source_text, &mut diagnostic_bag, debug_flags);
     // let result = binder::bind(input, &mut diagnostic_bag);
     if diagnostic_bag.has_errors() || !debug_flags.run_program {

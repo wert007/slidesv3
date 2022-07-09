@@ -92,10 +92,10 @@ impl<'a> Diagnostic<'a> {
         }
     }
 
-    pub fn into_string(self, struct_table: &[String]) -> String {
+    pub fn into_string(self, struct_table: &[String], hide_filenames: bool) -> String {
         format!(
             "Error {}: {}",
-            self.location,
+            self.location.display_with_show_filenames(!hide_filenames),
             self.message.into_string_with_struct_table(struct_table)
         )
     }
@@ -106,14 +106,19 @@ pub struct DiagnosticBag<'a> {
     pub diagnostics: Vec<Diagnostic<'a>>,
     pub source_text: &'a SourceText<'a>,
     pub registered_types: Vec<String>,
+    /// This is used for tests, to account for different relative paths, by just
+    /// ignoring them. This might be improved, by only showing the filename,
+    /// without any path in this case.
+    pub hide_filenames: bool,
 }
 
 impl<'a> DiagnosticBag<'a> {
-    pub fn new(source_text: &'a SourceText<'a>) -> Self {
+    pub fn new(source_text: &'a SourceText<'a>, hide_filenames: bool) -> Self {
         Self {
             diagnostics: vec![],
             source_text,
             registered_types: vec![],
+            hide_filenames,
         }
     }
 
@@ -123,7 +128,7 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn flush_to_console(self, mut output: impl std::io::Write) -> std::io::Result<()> {
         for diagnostic in self.diagnostics {
-            writeln!(output, "{}", diagnostic.into_string(&self.registered_types))?;
+            writeln!(output, "{}", diagnostic.into_string(&self.registered_types, self.hide_filenames))?;
         }
         Ok(())
     }

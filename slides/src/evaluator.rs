@@ -136,7 +136,7 @@ pub fn evaluate(
         pc: 0,
         instructions: program.instructions,
         is_main_call: true,
-        runtime_diagnostics: DiagnosticBag::new(source_text),
+        runtime_diagnostics: DiagnosticBag::new(source_text, debug_flags.record_output || debug_flags.test_runner),
         runtime_error_happened: false,
         debugger_state: debugger::DebuggerState::default(),
         protected_pointers: vec![],
