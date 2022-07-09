@@ -1,4 +1,6 @@
 mod binder;
+#[cfg(test)]
+mod compilation_tests;
 #[allow(dead_code)]
 mod debug;
 mod diagnostics;
@@ -48,7 +50,7 @@ pub fn load_library(
         );
     }
     let source_text = SourceText::new(input, file_name);
-    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text, debug_flags.record_output || debug_flags.test_runner);
     let mut result = instruction_converter::convert_library(
         &source_text,
         &mut diagnostic_bag,
@@ -57,20 +59,37 @@ pub fn load_library(
     );
     if diagnostic_bag.has_errors() {
         result.has_errors = true;
-        diagnostic_bag.flush_to_console();
+        assert!(
+            !debug_flags.record_output,
+            "Cannot record libraries at the moment!"
+        );
+        diagnostic_bag
+            .flush_to_console(std::io::stderr())
+            .expect("Could not write to stdout.");
     }
     result
 }
 
 pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
     let source_text = SourceText::new(input, file_name);
-    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text, debug_flags.record_output || debug_flags.test_runner);
     let result = instruction_converter::convert(&source_text, &mut diagnostic_bag, debug_flags);
     // let result = binder::bind(input, &mut diagnostic_bag);
     if diagnostic_bag.has_errors() || !debug_flags.run_program {
-        diagnostic_bag.flush_to_console();
+        match debug_flags.record_output {
+            true => {
+                let mut path = std::path::PathBuf::from(file_name);
+                path.set_extension("diagnostics");
+                let file = std::fs::File::options().write(true).truncate(true).create(true).open(path).expect("Could not create output file.");
+                diagnostic_bag
+                    .flush_to_console(file)
+                    .expect("Could not write to output file.")
+            }
+            false => diagnostic_bag
+                .flush_to_console(std::io::stderr())
+                .expect("Could not write to stdout."),
+        }
         return;
     }
-    let result = evaluator::evaluate(result, &source_text, debug_flags);
-    println!("= {}", result);
+    evaluator::evaluate(result, &source_text, debug_flags);
 }

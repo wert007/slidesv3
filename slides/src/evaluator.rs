@@ -24,7 +24,7 @@ use self::memory::{
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {
         $evaluator.runtime_diagnostics.$($fn_call)*;
-        $evaluator.runtime_diagnostics.clone().flush_to_console();
+        $evaluator.runtime_diagnostics.clone().flush_to_console(std::io::stdout()).expect("Could not write to stdout.");
         $evaluator.runtime_diagnostics.diagnostics.clear();
         $evaluator.runtime_error_happened = true;
     };
@@ -136,25 +136,17 @@ pub fn evaluate(
         pc: 0,
         instructions: program.instructions,
         is_main_call: true,
-        runtime_diagnostics: DiagnosticBag::new(source_text),
+        runtime_diagnostics: DiagnosticBag::new(source_text, debug_flags.record_output || debug_flags.test_runner),
         runtime_error_happened: false,
         debugger_state: debugger::DebuggerState::default(),
         protected_pointers: vec![],
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
-        Ok(None) => {
-            for (variable, &value) in state.registers.iter().enumerate() {
-                if value.is_pointer() {
-                    println!("{:00}: #{}", variable, value.unwrap_pointer())
-                } else {
-                    println!("{:00}: {}", variable, value.unwrap_value() as i64)
-                }
-            }
-            Value::Integer(-1)
-        }
+        Ok(None) => Value::Integer(-1),
         Err(()) => {
             if debug_flags.use_debugger {
+                assert!(!debug_flags.record_output);
                 debugger::create_session(&mut state);
             }
             Value::Integer(-1)
@@ -291,7 +283,9 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_breakpoint(state: &mut EvaluatorState, _: Instruction) {
-    state.debugger_state.session_state = debugger::SessionState::Continue;
+    if !state.debug_flags.record_output {
+        state.debugger_state.session_state = debugger::SessionState::Continue;
+    }
 }
 
 fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction) {

@@ -239,42 +239,8 @@ fn lexer_successfull() {
 
 fn lex_helper_successfull(input: &str, callback: impl FnOnce(VecDeque<SyntaxToken>)) {
     let source_text = SourceText::new(input, "");
-    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+    let mut diagnostic_bag = DiagnosticBag::new(&source_text, true);
     let result = lex(&source_text, &mut diagnostic_bag, DebugFlags::default());
     assert!(!diagnostic_bag.has_errors());
     callback(result)
-}
-
-#[test]
-fn lexer_error() {
-    lex_helper_errors("-99999999999999999999", |token, diagnostics| {
-        assert_eq!(token.len(), 3);
-        assert_eq!(diagnostics.len(), 1);
-    });
-
-    lex_helper_errors(" %", |token, diagnostics| {
-        assert_eq!(token.len(), 1);
-        assert_eq!(diagnostics.len(), 1);
-    });
-
-    lex_helper_errors("/* this is a comment", |token, diagnostics| {
-        assert_eq!(token.len(), 1);
-        assert_eq!(diagnostics.len(), 1);
-    });
-
-    lex_helper_errors("1 /* 2", |token, diagnostics| {
-        assert_eq!(token.len(), 2);
-        assert_eq!(diagnostics.len(), 1);
-    });
-}
-
-fn lex_helper_errors(
-    input: &str,
-    callback: impl FnOnce(VecDeque<SyntaxToken>, Vec<crate::diagnostics::Diagnostic>),
-) {
-    let source_text = SourceText::new(input, "");
-    let mut diagnostic_bag = DiagnosticBag::new(&source_text);
-    let result = lex(&source_text, &mut diagnostic_bag, DebugFlags::default());
-    assert!(diagnostic_bag.has_errors(), "input: {}", input);
-    callback(result, diagnostic_bag.diagnostics)
 }

@@ -68,3 +68,9 @@ args:
     - debugger:
         long: debugger
         help: Starts the debugger, if a program had a runtime error
+    - record:
+        long: record
+        help: Records the output of this program and saves it, so it can be used for tests.
+    - test-runner:
+        long: test-runner
+        help: Informs the program, that this is being run by a test.

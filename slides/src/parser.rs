@@ -1,6 +1,4 @@
 pub mod syntax_nodes;
-#[cfg(test)]
-mod tests;
 
 use std::collections::VecDeque;
 

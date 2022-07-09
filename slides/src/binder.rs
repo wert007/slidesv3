@@ -4,8 +4,6 @@ mod dependency_resolver;
 mod lowerer;
 pub mod operators;
 pub mod symbols;
-#[cfg(test)]
-mod tests;
 mod type_replacer;
 pub mod typing;
 
@@ -21,19 +19,7 @@ use crate::{
     diagnostics::DiagnosticBag,
     instruction_converter::{self, instruction::Instruction, InstructionOrLabelReference},
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    parser::{
-        self,
-        syntax_nodes::{
-            ArrayIndexNodeKind, ArrayLiteralNodeKind, AssignmentNodeKind, BinaryNodeKind,
-            BlockStatementNodeKind, CastExpressionNodeKind, ConstDeclarationNodeKind,
-            ConstructorCallNodeKind, ExpressionStatementNodeKind, FieldAccessNodeKind,
-            ForStatementNodeKind, FunctionCallNodeKind, FunctionDeclarationNodeKind,
-            FunctionTypeNode, IfStatementNodeKind, LiteralNodeKind, ParameterNode,
-            ParenthesizedNodeKind, ReturnStatementNodeKind, StructBodyNode,
-            StructDeclarationNodeKind, SyntaxNode, SyntaxNodeKind, TypeNode, UnaryNodeKind,
-            VariableDeclarationNodeKind, VariableNodeKind, WhileStatementNodeKind,
-        },
-    },
+    parser::{self, syntax_nodes::*},
     text::{SourceText, TextSpan},
     value::Value,
     DebugFlags,
@@ -1426,10 +1412,15 @@ fn default_statements(binder: &mut BindingState) {
 }
 
 fn std_imports(binder: &mut BindingState) {
+    let lookup_path = Path::new("builtin/std.sld");
+    if !lookup_path.exists() {
+        let stdlib_sourcecode = include_str!("../builtin/std.sld");
+        std::fs::create_dir_all(lookup_path.parent().unwrap()).unwrap();
+        std::fs::write(lookup_path, stdlib_sourcecode).unwrap();
+    }
     dependency_resolver::load_library_from_path(
         binder,
-        // TODO: Use a better way to find and load the std lib...
-        Path::new("slides/builtin/std.sld"),
+        lookup_path,
         TextSpan::zero(),
         "",
         false,

@@ -1,6 +1,4 @@
 pub mod instruction;
-#[cfg(test)]
-mod tests;
 
 mod label_replacer;
 
@@ -9,16 +7,7 @@ use std::path::PathBuf;
 use crate::{
     binder::{
         self,
-        bound_nodes::{
-            BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
-            BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
-            BoundConstructorCallNodeKind, BoundConversionNodeKind,
-            BoundExpressionStatementNodeKind, BoundFieldAccessNodeKind, BoundFunctionCallNodeKind,
-            BoundFunctionDeclarationNodeKind, BoundJumpNodeKind, BoundLiteralNodeKind, BoundNode,
-            BoundNodeKind, BoundReturnStatementNodeKind, BoundSystemCallNodeKind,
-            BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundVariableNodeKind,
-            ConversionKind,
-        },
+        bound_nodes::*,
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
         typing::{FunctionKind, IntegerType, SystemCallKind, Type},

@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 #[derive(Debug, Clone)]
 pub struct SourceText<'a> {
     pub text: &'a str,
@@ -122,21 +124,27 @@ pub struct TextLocation<'a> {
     pub source_text: &'a SourceText<'a>,
 }
 
-impl std::fmt::Display for TextLocation<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.source_text.file_name.is_empty() {
-            write!(f, "at {}-{}", self.span.start(), self.span.end())
+impl TextLocation<'_> {
+    pub fn display_with_show_filenames(&self, show_filenames: bool) -> String {
+        let mut result = String::new();
+        if self.source_text.file_name.is_empty() || !show_filenames {
+            write!(result, "at {}-{}", self.span.start(), self.span.end()).expect("Failed to write to string.");
         } else {
             let start_line = self.source_text.line_index(self.span.start()) + 1;
             let start_column = self.source_text.column_index(self.span.start()) + 1;
-            // let end_line = self.source_text.line_index(self.span.end()) + 1;
-            // let end_column = self.source_text.column_index(self.span.end()) + 1;
             write!(
-                f,
+                result,
                 "in {}:{}:{}",
                 self.source_text.file_name, start_line, start_column
-            )
+            ).expect("Failed to write to string.");
         }
+        result
+    }
+}
+
+impl std::fmt::Display for TextLocation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display_with_show_filenames(true))
     }
 }
 
