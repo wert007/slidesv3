@@ -8,6 +8,8 @@ mod lexer;
 mod parser;
 mod text;
 mod value;
+#[cfg(test)]
+mod compilation_tests;
 
 use std::path::Path;
 
