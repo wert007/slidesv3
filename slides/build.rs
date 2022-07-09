@@ -41,9 +41,12 @@ fn write_test(test_file: &mut File, path: PathBuf) {
     let path = path.canonicalize().unwrap();
     let mut path_output = path.clone();
     path_output.set_extension("out");
-    write!(
-            test_file,
-            r#"
+    let mut path_error = path.clone();
+    path_error.set_extension("diagnostics");
+    if path_output.exists() {
+        write!(
+                test_file,
+                r#"
 #[test]
 fn {name}() {{
     let output = Command::new("../target/debug/reaktor.exe").arg("--test-runner").arg({path:?}).output().unwrap();
@@ -53,12 +56,35 @@ fn {name}() {{
 
     assert_eq!(expected_output, actual_output);
 }}
+    "#,
+            name = test_name,
+            path = path.display(),
+            path_output = path_output.display(),
+        )
+        .unwrap();
+    } else if path_error.exists() {
+        write!(
+            test_file,
+            r#"
+#[test]
+fn {name}() {{
+let output = Command::new("../target/debug/reaktor.exe").arg("--test-runner").arg({path:?}).output().unwrap();
+assert!(output.stdout.is_empty(), "{{}}", String::from_utf8(output.stdout).unwrap());
+let actual_output = String::from_utf8(output.stderr).unwrap();
+let expected_output = include_str!({path_error:?});
+
+assert_eq!(expected_output, actual_output);
+}}
 "#,
         name = test_name,
         path = path.display(),
-        path_output = path_output.display(),
+        path_error = path_error.display(),
     )
     .unwrap();
+
+    } else {
+        unreachable!("The test {} was not recorded yet!", test_name);
+    }
 }
 
 fn write_header(test_file: &mut File) {

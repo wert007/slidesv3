@@ -38,7 +38,7 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
         state
             .runtime_diagnostics
             .clone()
-            .flush_to_console(std::io::stdout())
+            .flush_to_console(std::io::stderr())
             .expect("Could not write to stdout.");
         state.runtime_diagnostics.diagnostics.clear();
         state.runtime_error_happened = true;

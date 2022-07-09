@@ -64,7 +64,7 @@ pub fn load_library(
             "Cannot record libraries at the moment!"
         );
         diagnostic_bag
-            .flush_to_console(std::io::stdout())
+            .flush_to_console(std::io::stderr())
             .expect("Could not write to stdout.");
     }
     result
@@ -80,13 +80,13 @@ pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
             true => {
                 let mut path = std::path::PathBuf::from(file_name);
                 path.set_extension("diagnostics");
-                let file = std::fs::File::create(path).expect("Could not create output file.");
+                let file = std::fs::File::options().write(true).truncate(true).create(true).open(path).expect("Could not create output file.");
                 diagnostic_bag
                     .flush_to_console(file)
                     .expect("Could not write to output file.")
             }
             false => diagnostic_bag
-                .flush_to_console(std::io::stdout())
+                .flush_to_console(std::io::stderr())
                 .expect("Could not write to stdout."),
         }
         return;
