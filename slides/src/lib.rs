@@ -80,6 +80,5 @@ pub fn evaluate(input: &str, file_name: &str, debug_flags: DebugFlags) {
         }
         return;
     }
-    let result = evaluator::evaluate(result, &source_text, debug_flags);
-    println!("= {}", result);
+    evaluator::evaluate(result, &source_text, debug_flags);
 }
