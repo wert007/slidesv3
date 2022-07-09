@@ -1,0 +1,3 @@
+Error at 27-38: No binary operator == for types bool and int literal.
+Error at 53-65: No binary operator + for types bool and int literal.
+Error at 80-81: No variable named 'c' could be found.
