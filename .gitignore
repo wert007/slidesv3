@@ -1,4 +1,7 @@
-*/target
-*/Cargo.lock
+/target
 .vscode
 debug-out/
+# Temporary ignored until more major
+extension/
+# Temporary ignored until more major
+lsp/
