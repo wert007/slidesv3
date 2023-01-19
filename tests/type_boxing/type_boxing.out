@@ -1,0 +1,23 @@
+Log: 42
+Log: true
+Log: none
+Log: 13
+Log: none
+Log: [ 1, 2, 3 ]
+Log: [ [ 1 ], [ 2 ], [ 3 ] ]
+Log: system call print
+Log: Hello World!
+Log: fn (int) -> int
+Log: Noneable strings work just fine
+Log: type struct id#12
+Log: Value(42)
+Log: none
+Log: Value(42)
+Log: [ Value(1), Value(2), Value(3) ]
+0: 0
+1: 0
+2: 0
+3: 0
+4: 0
+5: 0
+= -1

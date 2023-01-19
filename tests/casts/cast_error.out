@@ -1,0 +1,2 @@
+Error in ..\tests\casts\cast_error.sld:4:19: No cast necessary between types int? and int. Remove the unnecessary cast. Note, that cast will return int?.
+Error in ..\tests\casts\cast_error.sld:4:24: Cannot convert type int? to type int.

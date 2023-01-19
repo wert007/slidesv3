@@ -64,7 +64,7 @@ func main() {
     }
     {
         i = 0;
-        let list = new List(i);
+        let list: List<int> = new List();
         while i < 95 {
             i = i + 1;
             list.add(i);

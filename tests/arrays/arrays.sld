@@ -1,4 +1,20 @@
 func main() {
+    arrays_in_arrays();
+    arrays();
+    weird_arrays();
+}
+
+func arrays_in_arrays() {
+    let a = [ [ 1, ], [ 2, ], ];
+    print(a);
+    let b = [ [ [ 1, ], ], [ [ 2, ], ], ];
+    b[0][0][0] = 2;
+    print(b);
+    let c = [ [ ['This'] ], [ [ 'is'] ], [ [ 'very' ]], [['mean']], [['!']]];
+    print(c);
+}
+
+func arrays() {
     let a = [1, 2, 3];
     print(a[0]);
     print(a[1]);
@@ -14,7 +30,6 @@ func main() {
     let b_1 = b[1];
     print('b_1?');
     print(b_1);
-    // print(b == a);
     print('b == b2?');
     print(b == b2);
     print('b == [true, false]?');
@@ -45,7 +60,6 @@ func main() {
     let f = [ [ 1 ], [ 2, 3 ], [ 4, 5, 6, ], ];
     print(f[2]);
     print(f[2][2]);
-    // TODO: Crashes!
     f[2][2] = 999;
     f[1] = [ 42, 1337, 876 ];
     print(f);
@@ -55,18 +69,61 @@ func main() {
 
     let h = [a, c, f[0], f[1], f[2], [843, 43], [321, 32]];
     print(h);
-
-    let default = 0;
-    let l = new List(default);
-    for i in 0..5 {
-        l.add(i);
-    }
-    print(l);
-    print(l.length());
-    // let list = new List([1, 2]);
-    // list.add(3);
-    // list.add([4, 5, 6]);
-    // print(list);
-    // list.concat(list);
-    // let length = list.length();
 }
+
+struct A {
+    value: int;
+
+    func add(a: int) -> int {
+        return a + this.value;
+    }
+}
+
+struct B {
+    value: int;
+
+    func sub(a: int) -> int {
+        return a - this.value;
+    }
+}
+
+struct C {
+    value: int;
+
+    func mul(a: int) -> int {
+        return a * this.value;
+    }
+}
+
+struct D {
+    value: int;
+
+    func div(a: int) -> int {
+        return a / this.value;
+    }
+}
+
+func weird_arrays() {
+    let a = new A(1);
+    let b = new B(2);
+    let c = new C(3);
+    let d = new D(4);
+    let weird_closure_array = [
+        a.add,
+        b.sub,
+        c.mul,
+        d.div,
+    ];
+
+    // let i = 0;
+    // while i < 4 {
+    //     print('closure(5) = ' + weird_closure_array[i](5));
+    //     i = i + 1;
+    // }
+
+    for closure in weird_closure_array {
+        print('closure(5) = ' + closure(5));
+        // print(closure + '(5) = ' + closure(5));
+    }
+}
+

@@ -1,0 +1,2 @@
+Error in ..\tests\arrays\arrays_error.sld:3:13: Cannot convert type int to type uint.
+Error in ..\tests\arrays\arrays_error.sld:4:7: Cannot convert type int to type uint.

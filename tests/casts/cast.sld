@@ -25,25 +25,4 @@ func main() {
     print('c (5) is uint and 5? ' + (cast c : uint == 5));
     c = 0;
     print('c (0) is uint and 0? ' + (cast c : uint == 0));
-    // These are errors
-    // print(cast b : int);
-    // print(cast b : bool);
-    // let c : int? = none;
-    // This could have a better error message
-    // let d : int = cast c : int;
 }
-
-/*
-struct Foo {
-    value: int;
-}
-
-cast Foo : int {
-    return this.value;
-}
-
-cast Foo : uint? {
-    return cast this.value : uint?;
-}
-
-*/
