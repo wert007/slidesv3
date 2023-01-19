@@ -8,6 +8,7 @@ pub enum Value {
     SystemCall(SystemCallKind),
     String(String),
     LabelPointer(usize, Type),
+    EnumType(Vec<String>),
 }
 
 #[allow(dead_code)]
@@ -52,6 +53,7 @@ impl Value {
             Value::String(_) => Type::String,
             Value::None => Type::None,
             Value::LabelPointer(_, type_) => type_.clone(),
+            Value::EnumType(values) => Type::Enum(values.clone()),
         }
     }
 }
@@ -83,6 +85,7 @@ impl std::fmt::Display for Value {
             Value::String(value) => write!(f, "'{}'", value),
             Value::None => write!(f, "none"),
             Value::LabelPointer(label, type_) => write!(f, "L{:X} : {}", label, type_),
+            Value::EnumType(_) => write!(f, "anomynous enum type"),
         }
     }
 }

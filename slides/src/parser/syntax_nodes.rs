@@ -89,6 +89,7 @@ impl<'a> SyntaxNode<'a> {
         optional_generic_keyword: Option<SyntaxToken<'a>>,
         struct_keyword: SyntaxToken<'a>,
         identifier: SyntaxToken<'a>,
+        optional_parent: Option<SyntaxToken<'a>>,
         body: StructBodyNode<'a>,
     ) -> Self {
         let span = TextSpan::bounds(
@@ -103,6 +104,24 @@ impl<'a> SyntaxNode<'a> {
             kind: SyntaxNodeKind::StructDeclaration(StructDeclarationNodeKind {
                 optional_generic_keyword,
                 struct_keyword,
+                identifier,
+                optional_parent,
+                body: Box::new(body),
+            }),
+            is_inserted: false,
+        }
+    }
+
+    pub fn enum_declaration(
+        enum_keyword: SyntaxToken<'a>,
+        identifier: SyntaxToken<'a>,
+        body: EnumBodyNode<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(enum_keyword.span(), body.span);
+        Self {
+            span,
+            kind: SyntaxNodeKind::EnumDeclaration(EnumDeclarationNodeKind {
+                enum_keyword,
                 identifier,
                 body: Box::new(body),
             }),
@@ -526,6 +545,7 @@ pub enum SyntaxNodeKind<'a> {
     ImportStatement(ImportStatementNodeKind<'a>),
     FunctionDeclaration(Box<FunctionDeclarationNodeKind<'a>>),
     StructDeclaration(StructDeclarationNodeKind<'a>),
+    EnumDeclaration(EnumDeclarationNodeKind<'a>),
 
     // Expressions
     Literal(LiteralNodeKind<'a>),
@@ -635,6 +655,7 @@ pub struct StructDeclarationNodeKind<'a> {
     pub optional_generic_keyword: Option<SyntaxToken<'a>>,
     pub struct_keyword: SyntaxToken<'a>,
     pub identifier: SyntaxToken<'a>,
+    pub optional_parent: Option<SyntaxToken<'a>>,
     pub body: Box<StructBodyNode<'a>>,
 }
 
@@ -662,6 +683,48 @@ impl<'a> StructBodyNode<'a> {
             rbrace,
             span,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumDeclarationNodeKind<'a> {
+    pub enum_keyword: SyntaxToken<'a>,
+    pub identifier: SyntaxToken<'a>,
+    pub body: Box<EnumBodyNode<'a>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumBodyNode<'a> {
+    pub lbrace: SyntaxToken<'a>,
+    pub values: Vec<EnumValueNode<'a>>,
+    pub rbrace: SyntaxToken<'a>,
+    pub span: TextSpan,
+}
+
+impl<'a> EnumBodyNode<'a> {
+    pub fn new(
+        lbrace: SyntaxToken<'a>,
+        values: Vec<EnumValueNode<'a>>,
+        rbrace: SyntaxToken<'a>,
+    ) -> Self {
+        let span = TextSpan::bounds(lbrace.span(), rbrace.span());
+        Self { lbrace, values, rbrace, span }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumValueNode<'a> {
+    pub identifier: SyntaxToken<'a>,
+    // pub optional_value: Option<SyntaxToken<'a>>,
+    pub span: TextSpan,
+}
+
+impl<'a> EnumValueNode<'a> {
+    pub fn new(
+        identifier: SyntaxToken<'a>,
+    ) -> Self {
+        let span = identifier.span();
+        Self { identifier, span }
     }
 }
 
@@ -705,6 +768,7 @@ pub struct TypeNode<'a> {
     pub optional_ampersand_token: Option<SyntaxToken<'a>>,
     pub library_name: Option<SyntaxToken<'a>>,
     pub type_name: SyntaxToken<'a>,
+    pub generic_type_qualifier: Option<Box<TypeNode<'a>>>,
     pub optional_question_mark: Option<SyntaxToken<'a>>,
     pub brackets: Vec<SyntaxToken<'a>>,
 }
@@ -714,6 +778,7 @@ impl<'a> TypeNode<'a> {
         optional_ampersand_token: Option<SyntaxToken<'a>>,
         library_name: Option<SyntaxToken<'a>>,
         type_name: SyntaxToken<'a>,
+        generic_type_qualifier: Option<TypeNode<'a>>,
         optional_question_mark: Option<SyntaxToken<'a>>,
         brackets: Vec<SyntaxToken<'a>>,
     ) -> Self {
@@ -721,6 +786,7 @@ impl<'a> TypeNode<'a> {
             optional_ampersand_token,
             library_name,
             type_name,
+            generic_type_qualifier: generic_type_qualifier.map(Box::new),
             optional_question_mark,
             brackets,
         }

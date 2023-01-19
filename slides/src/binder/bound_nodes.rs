@@ -497,6 +497,7 @@ impl BoundNode {
         is_main: bool,
         body: BoundNode,
         parameters: Vec<u64>,
+        base_register: Option<u64>,
     ) -> Self {
         Self {
             span: body.span,
@@ -505,6 +506,7 @@ impl BoundNode {
                 is_main,
                 body: Box::new(body),
                 parameters,
+                base_register,
             }),
             type_: Type::Void,
             constant_value: None,
@@ -655,6 +657,7 @@ pub struct BoundFunctionDeclarationNodeKind {
     pub is_main: bool,
     pub body: Box<BoundNode>,
     pub parameters: Vec<u64>,
+    pub base_register: Option<u64>,
 }
 
 impl BoundFunctionDeclarationNodeKind {

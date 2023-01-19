@@ -79,6 +79,7 @@ pub enum Type {
     // during binding in the variable declaration. If this stays this way there
     // is probably a better solution to store that type then this type here.
     TypedGenericStruct(Box<TypedGenericStructType>),
+    Enum(Vec<String>),
 }
 
 impl Type {
@@ -100,7 +101,7 @@ impl Type {
 
     pub fn convert_typed_generic_struct_to_struct(self) -> Self {
         if let Type::TypedGenericStruct(typed_generic_struct_type) = self {
-            Type::Struct(Box::new(typed_generic_struct_type.struct_type	))
+            Type::Struct(Box::new(typed_generic_struct_type.struct_type))
         } else {
             self
         }
@@ -163,6 +164,7 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("GenericTypes should only be accessed during binding!"),
+            Type::Enum(_) => todo!("Implement enums at runtime"),
             Type::Error => 1,
             Type::Void => 1,
             Type::Any => 1,
@@ -232,6 +234,7 @@ impl Type {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
             Type::IntegerLiteral => panic!("Only literals have this type! And they should be bound to a specific type at some point!"),
+            Type::Enum(_) => todo!("Implement enums at runtime"),
             Type::Error => Self::TYPE_IDENTIFIER_ERROR,
             Type::Void => Self::TYPE_IDENTIFIER_VOID,
             Type::Any => Self::TYPE_IDENTIFIER_ANY,
@@ -284,6 +287,7 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Any => unreachable!(),
+            Type::Enum(_) => todo!("Implement enums at runtime"),
             Type::Error => 0,
             Type::Void => 0,
             Type::Integer(integer_type) => integer_type.size_in_bytes(),
@@ -318,6 +322,7 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::GenericType => panic!("Generic Types should only be accessed during binding!"),
+            Type::Enum(_) => todo!("Implement enums at runtime"),
             Type::Error
             | Type::Void
             | Type::Any
@@ -378,6 +383,7 @@ impl std::fmt::Display for Type {
             }
             Type::Pointer => write!(f, "pointer"),
             Type::PointerOf(base) => write!(f, "&{}", base),
+            Type::Enum(_) => write!(f, "anonymous enum type"),
         }
     }
 }
@@ -575,18 +581,20 @@ pub struct StructType {
     pub functions: Vec<Type>,
     pub function_table: StructFunctionTable,
     pub is_generic: bool,
+    pub parent_id: Option<u64>,
+    pub size_in_bytes: u64,
 }
 
-impl StructType {
-    pub fn size_in_bytes(&self) -> u64 {
-        let mut result = 0;
-        for field in &self.fields {
-            // FIXME: This is only true if all sizes are a multiple of words.
-            result += field.size_in_bytes();
-        }
-        result
-    }
-}
+// impl StructType {
+//     pub fn size_in_bytes(&self) -> u64 {
+//         let mut result = 0;
+//         for field in &self.fields {
+//             // FIXME: This is only true if all sizes are a multiple of words.
+//             result += field.size_in_bytes();
+//         }
+//         result
+//     }
+// }
 
 impl std::fmt::Display for StructType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

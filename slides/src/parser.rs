@@ -15,7 +15,7 @@ use crate::{
     DebugFlags,
 };
 
-use self::syntax_nodes::{ElseClause, ParameterNode, StructBodyNode, SyntaxNode, TypeNode};
+use self::syntax_nodes::{ElseClause, ParameterNode, StructBodyNode, SyntaxNode, TypeNode, EnumBodyNode, EnumValueNode};
 
 struct Parser<'a, 'b> {
     tokens: VecDeque<SyntaxToken<'a>>,
@@ -106,6 +106,7 @@ fn parse_top_level_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> 
         SyntaxTokenKind::ImportKeyword => parse_import_statement(parser),
         SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
         SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
+        SyntaxTokenKind::EnumKeyword => parse_enum_statement(parser),
         SyntaxTokenKind::GenericKeyword => match parser.peek_n_token(1).kind {
             SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
             SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
@@ -178,9 +179,23 @@ fn parse_struct_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     };
     let struct_keyword = parser.match_token(SyntaxTokenKind::StructKeyword);
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
+    let parent = if parser.peek_token().kind == SyntaxTokenKind::Colon {
+        let _colon = parser.next_token();
+        Some(parser.match_token(SyntaxTokenKind::Identifier))
+    } else {
+        None
+    };
     let body = parse_struct_body(optional_generic_keyword.is_some(), parser);
 
-    SyntaxNode::struct_declaration(optional_generic_keyword, struct_keyword, identifier, body)
+    SyntaxNode::struct_declaration(optional_generic_keyword, struct_keyword, identifier, parent, body)
+}
+
+fn parse_enum_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+    let enum_keyword = parser.match_token(SyntaxTokenKind::EnumKeyword);
+    let identifier = parser.match_token(SyntaxTokenKind::Identifier);
+    let body = parse_enum_body(parser);
+
+    SyntaxNode::enum_declaration(enum_keyword, identifier, body)
 }
 
 fn parse_function_type<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> FunctionTypeNode<'a> {
@@ -262,6 +277,28 @@ fn parse_struct_body<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> Struc
     StructBodyNode::new(is_generic, lbrace, statements, rbrace)
 }
 
+fn parse_enum_body<'a>(parser: &mut Parser<'a, '_>) -> EnumBodyNode<'a> {
+    let lbrace = parser.match_token(SyntaxTokenKind::LBrace);
+    let mut values = Vec::new();
+    while !matches!(
+        parser.peek_token().kind,
+        SyntaxTokenKind::RBrace | SyntaxTokenKind::Eoi
+    ) {
+        let token_count = parser.token_count();
+        let value_identifier = parser.match_token(SyntaxTokenKind::Identifier);
+        values.push(EnumValueNode::new(value_identifier));
+        if parser.peek_token().kind != SyntaxTokenKind::RBrace {
+            parser.match_token(SyntaxTokenKind::Comma);
+        }
+        if token_count == parser.token_count() {
+            parser.next_token();
+        }
+    }
+    let rbrace = parser.match_token(SyntaxTokenKind::RBrace);
+
+    EnumBodyNode::new(lbrace, values, rbrace)
+}
+
 fn parse_parameter<'a>(parser: &mut Parser<'a, '_>) -> ParameterNode<'a> {
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
     let colon_token = parser.match_token(SyntaxTokenKind::Colon);
@@ -283,6 +320,14 @@ fn parse_type<'a>(parser: &mut Parser<'a, '_>) -> TypeNode<'a> {
     } else {
         (None, identifier)
     };
+    let generic_type_qualifier = if parser.peek_token().kind == SyntaxTokenKind::LessThan {
+        parser.next_token();
+        let generic_type_qualifier = parse_type(parser);
+        parser.match_token(SyntaxTokenKind::GreaterThan);
+        Some(generic_type_qualifier)
+    } else {
+        None
+    };
     let optional_question_mark = if parser.peek_token().kind == SyntaxTokenKind::QuestionMark {
         Some(parser.next_token())
     } else {
@@ -303,6 +348,7 @@ fn parse_type<'a>(parser: &mut Parser<'a, '_>) -> TypeNode<'a> {
         optional_ampersand_token,
         library_name,
         type_name,
+        generic_type_qualifier,
         optional_question_mark,
         brackets,
     )

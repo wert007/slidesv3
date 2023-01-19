@@ -135,6 +135,7 @@ pub enum SyntaxTokenKind {
     CastKeyword,
     ConstKeyword,
     ElseKeyword,
+    EnumKeyword,
     FalseKeyword,
     ForKeyword,
     FuncKeyword,
@@ -178,6 +179,7 @@ impl SyntaxTokenKind {
         }
     }
 
+    // TODO: Add test, that asserts, that is_keyword covers all of the keyword constructor.
     pub fn is_keyword(&self) -> bool {
         matches!(
             self,
@@ -191,6 +193,7 @@ impl SyntaxTokenKind {
             "cast" => Some(Self::CastKeyword),
             "const" => Some(Self::ConstKeyword),
             "else" => Some(Self::ElseKeyword),
+            "enum" => Some(Self::EnumKeyword),
             "false" => Some(Self::FalseKeyword),
             "for" => Some(Self::ForKeyword),
             "func" => Some(Self::FuncKeyword),
@@ -291,6 +294,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::CastKeyword => write!(f, "cast"),
             SyntaxTokenKind::ConstKeyword => write!(f, "const"),
             SyntaxTokenKind::ElseKeyword => write!(f, "else"),
+            SyntaxTokenKind::EnumKeyword => write!(f, "enum"),
             SyntaxTokenKind::FalseKeyword => write!(f, "false"),
             SyntaxTokenKind::ForKeyword => write!(f, "for"),
             SyntaxTokenKind::FuncKeyword => write!(f, "func"),

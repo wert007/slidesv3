@@ -1,3 +1,76 @@
+/* struct string {
+    length: uint;
+    bytes: &byte;
+
+    func $equals(other: string) -> bool {
+        if this.length != other.length {
+            return false;
+        }
+        for i in 0..this.length {
+            if this.bytes[i] != other.bytes[i] {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    func $addTo(lhs: any) -> string {
+        let lhsString = toString(lhs);
+        let length = this.length + lhsString.length;
+        // FIXME: Reallocate does not work with stack/static memory pointers. So
+        // we create a new pointer in any case. Even if we are already a heap
+        // pointer...
+        // Note: this might not apply here, since toString probably returns
+        // always a heap allocated string, except for other strings, which
+        // should used as a parameter here.
+        // Then again, you probably do not want to change the byte buffer of one
+        // of the supplied strings.
+        let bytes : &byte = reallocate(none, length);
+        if bytes == none {
+            runtimeError('Could not allocate string!');
+            return lhsString;
+        }
+        for i in 0..this.length {
+            bytes[i] = lhsString.bytes[i];
+        }
+        for j, i in lhsString.length..length {
+            bytes[i] = this.bytes[j];
+        }
+        return new string(length, bytes);
+    }
+
+    func $add(rhs: any) -> string {
+        let rhsString = toString(rhs);
+        let length = this.length + rhsString.length;
+        // FIXME: Reallocate does not work with stack/static memory pointers. So
+        // we create a new pointer in any case. Even if we are already a heap
+        // pointer...
+        let bytes : &byte = reallocate(none, length);
+        if bytes == none {
+            runtimeError('Could not allocate string!');
+            return this;
+        }
+        for i in 0..this.length {
+            bytes[i] = this.bytes[i];
+        }
+        for j, i in this.length..length {
+            bytes[i] = rhsString.bytes[j];
+        }
+        return new string(length, bytes);
+    }
+
+    func length() -> uint {
+        // TODO: This crashed the compiler!
+        // return this.length();
+        return this.length;
+    }
+
+    func $toString() -> string {
+        return this;
+    }
+}
+*/
+
 struct Range {
     start: int;
     end: int;
@@ -14,6 +87,7 @@ struct Range {
     }
 
     func $get(index: uint) -> int {
+        print('hii');
         return this.start + this.stepSize * index;
     }
 
@@ -69,6 +143,9 @@ generic struct Array {
     func $constructor(basis: $Type, length: uint) {
         this.length = length;
         this.buffer = reallocate(none, 8 * length);
+        if this.buffer == none {
+            runtimeError('Could not allocate array on the heap!');
+        }
         for i in 0..length {
             // FIXME: This crashes the compiler for some reason?
             // Maybe because, at the time of binding, the $get function has not
@@ -158,9 +235,12 @@ generic struct List {
     length: uint;
     buffer: &$Type;
 
-    func $constructor(phantom: $Type) {
+    func $constructor() {
         this.length = 0;
         this.buffer = reallocate(none, 8 * 4);
+        if this.buffer == none {
+            runtimeError('Could not allocate list on the heap!');
+        }
         this.capacity = 4;
     }
 
@@ -282,20 +362,4 @@ generic struct List {
 //     simple_type_identifier: uint;
 //     struct_id: uint?;
 //     struct_function_table: FunctionTable?;
-// }
-
-// struct string {
-//     bytes: byte[];
-
-//     func $equals(other: string) -> bool {
-//         return this.bytes == other.bytes;
-//     }
-
-//     func length() -> uint {
-//         return this.bytes.length();
-//     }
-
-//     func $toString() -> string {
-//         return byteArrayToString(bytes);
-//     }
 // }

@@ -111,7 +111,7 @@ fn to_string_native(
     state: &mut EvaluatorState,
 ) -> String {
     match type_ {
-        Type::Library(_) | Type::GenericType | Type::TypedGenericStruct(_) | Type::IntegerLiteral => unreachable!(),
+        Type::Library(_) | Type::GenericType | Type::TypedGenericStruct(_) | Type::IntegerLiteral | Type::Enum(_) => unreachable!(),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {

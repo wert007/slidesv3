@@ -38,30 +38,7 @@ pub(super) fn bind_import_statements<'a>(
             bind_import_statements_import_statement(node.span, import_statement, binder);
             None
         }
-        SyntaxNodeKind::_ConstDeclaration(_)
-        | SyntaxNodeKind::FunctionDeclaration(_)
-        | SyntaxNodeKind::StructDeclaration(_)
-        | SyntaxNodeKind::Literal(_)
-        | SyntaxNodeKind::ArrayLiteral(_)
-        | SyntaxNodeKind::RepetitionNode(_)
-        | SyntaxNodeKind::CastExpression(_)
-        | SyntaxNodeKind::ConstructorCall(_)
-        | SyntaxNodeKind::Variable(_)
-        | SyntaxNodeKind::Binary(_)
-        | SyntaxNodeKind::Unary(_)
-        | SyntaxNodeKind::Parenthesized(_)
-        | SyntaxNodeKind::FunctionCall(_)
-        | SyntaxNodeKind::ArrayIndex(_)
-        | SyntaxNodeKind::FieldAccess(_)
-        | SyntaxNodeKind::BlockStatement(_)
-        | SyntaxNodeKind::ForStatement(_)
-        | SyntaxNodeKind::IfStatement(_)
-        | SyntaxNodeKind::VariableDeclaration(_)
-        | SyntaxNodeKind::ReturnStatement(_)
-        | SyntaxNodeKind::WhileStatement(_)
-        | SyntaxNodeKind::Assignment(_)
-        | SyntaxNodeKind::ExpressionStatement(_)
-        | SyntaxNodeKind::StructField(_) => Some(node),
+        _ => Some(node),
     }
 }
 
@@ -174,6 +151,35 @@ fn execute_import_function<'a>(
         }
     }
 }
+
+pub(super) fn load_library_from_source<'a>(
+    binder: &mut BindingState<'a, '_>,
+    path: &Path,
+    source: &'static str,
+    span: TextSpan,
+    library_name: &'a str,
+    import_std_lib: bool
+) {
+    let (path, lib) = binder
+        .libraries
+        .iter()
+        .find_map(|l| l.find_imported_library_by_path(path))
+        .map(|(s, l)| (Some(s), l))
+        .unwrap_or_else(|| {
+            (
+                None,
+                crate::load_library_from_source("std", source, binder.debug_flags, import_std_lib),
+            )
+        });
+    // If it is a std library, there is no path to it, but it might still be already loaded.
+    let path = if library_name.is_empty() {
+        Some(String::new())
+    } else {
+        path
+    };
+    load_library_into_binder(span, library_name, lib, path, binder);
+}
+
 
 pub(super) fn load_library_from_path<'a>(
     binder: &mut BindingState<'a, '_>,

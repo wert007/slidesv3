@@ -82,7 +82,7 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
         }
         buffer.push('\n');
     }
-    let output_path = PathBuf::from("../debug-out").join(
+    let output_path = PathBuf::from("./debug-out").join(
         Path::new(source.file_name)
             .with_extension("sldasm")
             .file_name()

@@ -502,6 +502,12 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
+    pub fn report_generic_type_in_ungeneric_struct(&mut self, span: TextSpan, struct_name: &str) {
+        let message = format!("Used generic type in struct {struct_name} without declaring it as 'generic'.").into();
+        // TODO: Add hint to struct declaration.
+        self.report(message, span);
+    }
+
     // Runtime Errors
     pub fn no_heap_memory_left(&mut self, span: Option<TextSpan>, needed_memory_in_bytes: u64) {
         let message = format!(

@@ -30,6 +30,15 @@ where
     load_library(&source_code, &file_name, debug_flags, import_std_libs)
 }
 
+pub fn load_library_from_source(
+    file_name: &str,
+    source_code: &'static str,
+    debug_flags: DebugFlags,
+    import_std_libs: bool,
+) -> Library {
+    load_library(&source_code, &file_name, debug_flags, import_std_libs)
+}
+
 pub fn load_library(
     input: &str,
     file_name: &str,

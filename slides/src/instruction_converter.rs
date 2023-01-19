@@ -390,6 +390,10 @@ fn convert_function_declaration(
     for parameter in function_declaration.parameters.into_iter().rev() {
         result.push(Instruction::store_in_register(parameter).span(span).into());
     }
+    if let Some(register) = function_declaration.base_register {
+        result.push(Instruction::load_register(0).span(span).into());
+        result.push(Instruction::store_in_register(register).span(span).into());
+    }
     result.append(&mut convert_node(*function_declaration.body, converter));
     result
 }
@@ -443,7 +447,8 @@ pub fn convert_value(
                 span,
             }
             .into()]
-        }
+        },
+        Value::EnumType(_) => todo!("This is probably unreachable? This should be meaningless at least."),
     };
     vec![Instruction::load_immediate(value).span(span).into()]
 }
@@ -655,7 +660,7 @@ fn convert_constructor_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let word_count = bytes_to_word(constructor_call.base_type.size_in_bytes());
+    let word_count = bytes_to_word(constructor_call.base_type.size_in_bytes);
     match constructor_call.function {
         Some(function) => {
             let argument_count = constructor_call.arguments.len() as u64;

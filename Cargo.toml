@@ -2,4 +2,5 @@
 members = [
     "reaktor",
     "slides",
+    "lang-tests",
 ]
