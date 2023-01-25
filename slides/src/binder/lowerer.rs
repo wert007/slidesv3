@@ -9,7 +9,7 @@ use super::{
         BoundIfStatementNodeKind, BoundNode, BoundReturnStatementNodeKind, BoundSystemCallNodeKind,
         BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundWhileStatementNodeKind,
     },
-    typing::Type,
+    typing::TypeId,
 };
 
 struct Flattener {
@@ -210,7 +210,7 @@ fn flatten_expression(node: BoundNode, flattener: &mut Flattener) -> BoundNode {
 
 fn flatten_variable_declaration(
     span: TextSpan,
-    _type_: Type,
+    _type_: TypeId,
     variable_declaration: BoundVariableDeclarationNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -225,7 +225,7 @@ fn flatten_variable_declaration(
 
 fn flatten_assignment(
     span: TextSpan,
-    _type_: Type,
+    _type_: TypeId,
     assignment: BoundAssignmentNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -236,7 +236,7 @@ fn flatten_assignment(
 
 fn flatten_return_statement(
     span: TextSpan,
-    _type_: Type,
+    _type_: TypeId,
     return_statement: BoundReturnStatementNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -248,7 +248,7 @@ fn flatten_return_statement(
 
 fn flatten_expression_statement(
     span: TextSpan,
-    _type_: Type,
+    _type_: TypeId,
     expression_statement: BoundExpressionStatementNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -258,7 +258,7 @@ fn flatten_expression_statement(
 
 fn flatten_field_access(
     span: TextSpan,
-    _type_: Type,
+    _type_: TypeId,
     field_access: BoundFieldAccessNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -268,7 +268,7 @@ fn flatten_field_access(
 
 fn flatten_closure(
     span: TextSpan,
-    type_: Type,
+    type_: TypeId,
     closure: BoundClosureNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -291,7 +291,7 @@ fn flatten_closure(
 
 fn flatten_conversion(
     span: TextSpan,
-    _type_: Type,
+    _type_: TypeId,
     conversion: BoundConversionNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -301,7 +301,7 @@ fn flatten_conversion(
 
 fn flatten_array_index(
     span: TextSpan,
-    type_: Type,
+    type_: TypeId,
     array_index: BoundArrayIndexNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -312,7 +312,7 @@ fn flatten_array_index(
 
 fn flatten_system_call(
     span: TextSpan,
-    type_: Type,
+    type_: TypeId,
     system_call: BoundSystemCallNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -325,7 +325,7 @@ fn flatten_system_call(
 
 fn flatten_function_call(
     span: TextSpan,
-    type_: Type,
+    type_: TypeId,
     function_call: BoundFunctionCallNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -345,7 +345,7 @@ fn flatten_function_call(
 
 fn flatten_binary_expression(
     span: TextSpan,
-    type_: Type,
+    type_: TypeId,
     binary_expression: BoundBinaryNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -356,7 +356,7 @@ fn flatten_binary_expression(
 
 fn flatten_unary_expression(
     span: TextSpan,
-    type_: Type,
+    type_: TypeId,
     unary_expression: BoundUnaryNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -366,7 +366,7 @@ fn flatten_unary_expression(
 
 fn flatten_constructor_call(
     span: TextSpan,
-    _type_: Type,
+    _type_: TypeId,
     constructor_call: BoundConstructorCallNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -384,7 +384,7 @@ fn flatten_constructor_call(
 
 fn flatten_array_literal_expression(
     span: TextSpan,
-    type_: Type,
+    type_: TypeId,
     array_literal_expression: BoundArrayLiteralNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
@@ -469,6 +469,6 @@ fn create_label(flattener: &mut Flattener) -> (BoundNode, BoundNode) {
     let index = flattener.next_label_index();
     (
         BoundNode::label(index),
-        BoundNode::label_reference(index, Type::Error),
+        BoundNode::label_reference(index, typeid!(Type::Error)),
     )
 }

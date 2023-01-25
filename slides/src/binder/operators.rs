@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::typing::Type;
+use super::typing::TypeId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BoundUnaryOperator {
@@ -25,14 +25,14 @@ impl fmt::Display for BoundUnaryOperator {
 
 #[derive(Debug)]
 pub struct BoundBinary {
-    pub lhs: Type,
+    pub lhs: TypeId,
     pub op: BoundBinaryOperator,
-    pub rhs: Type,
-    pub result: Type,
+    pub rhs: TypeId,
+    pub result: TypeId,
 }
 
 impl BoundBinary {
-    pub fn same_input(input: &Type, op: BoundBinaryOperator, result: Type) -> BoundBinary {
+    pub fn same_input(input: TypeId, op: BoundBinaryOperator, result: TypeId) -> BoundBinary {
         Self {
             lhs: input.clone(),
             op,
@@ -41,7 +41,7 @@ impl BoundBinary {
         }
     }
 
-    pub fn same_output(op: BoundBinaryOperator, type_: Type) -> BoundBinary {
+    pub fn same_output(op: BoundBinaryOperator, type_: TypeId) -> BoundBinary {
         Self {
             lhs: type_.clone(),
             op,
@@ -50,7 +50,7 @@ impl BoundBinary {
         }
     }
 
-    pub fn new(lhs: &Type, op: BoundBinaryOperator, rhs: &Type, result: Type) -> BoundBinary {
+    pub fn new(lhs: TypeId, op: BoundBinaryOperator, rhs: TypeId, result: TypeId) -> BoundBinary {
         Self {
             lhs: lhs.clone(),
             op,

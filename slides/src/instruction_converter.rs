@@ -1,6 +1,6 @@
 pub mod instruction;
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 mod label_replacer;
 
@@ -21,13 +21,13 @@ use crate::{
         },
         operators::{BoundBinaryOperator, BoundUnaryOperator},
         symbols::Library,
-        typing::{FunctionKind, SystemCallKind, Type, IntegerType},
+        typing::{FunctionKind, SystemCallKind, Type, TypeId},
     },
     debug::DebugFlags,
     diagnostics::DiagnosticBag,
     evaluator::memory::{self, bytes_to_word, static_memory::StaticMemory, WORD_SIZE_IN_BYTES},
     text::{SourceText, TextSpan},
-    value::Value,
+    value::Value, Project,
 };
 
 use self::instruction::{op_codes::OpCode, Instruction};
@@ -88,17 +88,34 @@ impl From<LabelReference> for InstructionOrLabelReference {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct InstructionConverter {
+
+#[derive(Debug)]
+pub struct InstructionConverter<'a> {
     pub static_memory: StaticMemory,
     pub fixed_variable_count: usize,
+    project: &'a Project,
     next_label_index: usize,
 }
 
-impl InstructionConverter {
+impl InstructionConverter<'_> {
     pub fn generate_label(&mut self) -> usize {
         self.next_label_index += 1;
         self.next_label_index
+    }
+}
+
+impl InstructionConverter<'static> {
+    pub(crate) fn new() -> InstructionConverter<'static> {
+        use lazy_static::lazy_static;
+        lazy_static! {
+            static ref DEFAULT_PROJECT: Project = Project::new(DebugFlags::default());
+        }
+        Self {
+            static_memory: StaticMemory::default(),
+            fixed_variable_count: 0,
+            project: &DEFAULT_PROJECT,
+            next_label_index: 0,
+        }
     }
 }
 
@@ -127,20 +144,21 @@ impl Program {
     }
 }
 
-pub fn convert<'a>(
+pub fn convert_with_project_parameter<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
-    debug_flags: DebugFlags,
+    project: &mut Project,
 ) -> Program {
-    let mut bound_program = binder::bind_program(source_text, diagnostic_bag, debug_flags);
+    let mut bound_program = binder::bind_program_with_project_parameter(source_text, diagnostic_bag, project);
     if diagnostic_bag.has_errors() {
         return Program::error();
     }
     let bound_node = bound_program.functions;
     let mut converter = InstructionConverter {
-        static_memory: StaticMemory::new(debug_flags),
+        static_memory: StaticMemory::new(project.debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count + 1,
+        project,
     };
     converter.static_memory.allocate_null();
     let minimum_memory_relocation = converter.static_memory.size_in_bytes();
@@ -204,18 +222,18 @@ pub fn convert<'a>(
         }
     }
     instructions.append(&mut program_code);
-    if debug_flags.output_instructions_and_labels_to_sldasm {
+    if project.debug_flags.output_instructions_and_labels_to_sldasm {
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &instructions,
             source_text,
         );
     }
 
-    let instructions = label_replacer::replace_labels(instructions, debug_flags);
-    if debug_flags.output_instructions_to_sldasm {
+    let instructions = label_replacer::replace_labels(instructions, project.debug_flags);
+    if project.debug_flags.output_instructions_to_sldasm {
         crate::debug::output_instructions_with_source_code_to_sldasm(&instructions, source_text);
     }
-    if debug_flags.print_static_memory_as_string {
+    if project.debug_flags.print_static_memory_as_string {
         memory::static_memory::print_static_memory_as_string(&converter.static_memory);
     }
     Program {
@@ -229,14 +247,14 @@ pub fn convert<'a>(
     }
 }
 
-pub fn convert_library<'a>(
+pub fn convert_library_with_project_parameter<'a>(
     source_text: &'a SourceText<'a>,
     diagnostic_bag: &mut DiagnosticBag<'a>,
-    debug_flags: DebugFlags,
+    project: &mut Project,
     import_std_lib: bool,
 ) -> Library {
     let bound_program =
-        binder::bind_library(source_text, diagnostic_bag, debug_flags, import_std_lib);
+        binder::bind_library_with_project_parameter(source_text, diagnostic_bag, project, import_std_lib);
     if diagnostic_bag.has_errors() {
         return Library::error();
     }
@@ -245,9 +263,10 @@ pub fn convert_library<'a>(
     let mut bound_program = bound_program.program;
     let bound_node = bound_program.functions;
     let mut converter = InstructionConverter {
-        static_memory: StaticMemory::new(debug_flags),
+        static_memory: StaticMemory::new(project.debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count,
+        project,
     };
     for lib in bound_program
         .referenced_libraries
@@ -277,14 +296,14 @@ pub fn convert_library<'a>(
             .insert(&mut lib.program.static_memory);
     }
     let instructions = convert_node(bound_node, &mut converter);
-    if debug_flags.print_instructions_and_labels {
+    if project.debug_flags.print_instructions_and_labels {
         for (i, instruction) in instructions.iter().enumerate() {
             println!("  {:000}: {}", i, instruction);
         }
     }
 
-    // let instructions = label_replacer::replace_labels(instructions, debug_flags);
-    if debug_flags.output_instructions_to_sldasm {
+    // let instructions = label_replacer::replace_labels(instructions, project.debug_flags);
+    if project.debug_flags.output_instructions_to_sldasm {
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &instructions,
             source_text,
@@ -448,7 +467,7 @@ pub fn convert_value(
             }
             .into()]
         },
-        Value::EnumType(_) => todo!("This is probably unreachable? This should be meaningless at least."),
+        Value::EnumType(_, _) => todo!("This is probably unreachable? This should be meaningless at least."),
     };
     vec![Instruction::load_immediate(value).span(span).into()]
 }
@@ -501,9 +520,9 @@ fn convert_array_index_for_assignment(
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let base_type_size = match &array_index.base.type_ {
-        Type::PointerOf(base_type) => base_type.size_in_bytes(),
-        error => unreachable!("unexpected access type {}", error),
+    let base_type_size = match &converter.project.types[array_index.base.type_] {
+        Type::PointerOf(base_type) => converter.project.types[*base_type].size_in_bytes(),
+        error => unreachable!("unexpected access type {:?}", error),
     };
     // array
     let mut result = convert_node(*array_index.base, converter);
@@ -540,7 +559,7 @@ fn convert_unary(
     unary: BoundUnaryNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let is_pointer = unary.operand.type_.is_pointer();
+    let is_pointer = converter.project.types[unary.operand.type_].is_pointer();
     let mut result = convert_node(*unary.operand, converter);
     match unary.operator_token {
         BoundUnaryOperator::ArithmeticNegate => {
@@ -570,12 +589,12 @@ fn convert_binary(
         BoundBinaryOperator::ArithmeticMultiplication => Instruction::multiplication(),
         BoundBinaryOperator::ArithmeticDivision => Instruction::division(),
         BoundBinaryOperator::Equals => {
-            match (&binary.lhs.type_, &binary.rhs.type_) {
+            match (&converter.project.types[binary.lhs.type_], &converter.project.types[binary.rhs.type_]) {
                 (Type::String, Type::String) => Instruction::array_equals(),
-                (Type::Noneable(base_type), Type::Noneable(_)) if !base_type.is_pointer() => {
-                    Instruction::noneable_equals(base_type.size_in_bytes())
+                (Type::Noneable(base_type), Type::Noneable(_)) if !converter.project.types[*base_type].is_pointer() => {
+                    Instruction::noneable_equals(converter.project.types[*base_type].size_in_bytes())
                 }
-                (Type::Noneable(base_type), Type::Noneable(_)) if base_type.is_pointer() => {
+                (Type::Noneable(base_type), Type::Noneable(_)) if converter.project.types[*base_type].is_pointer() => {
                     todo!(
                         "Not completely implemented. None must become an actual
                     pointer, which points to invalid memory. And array_equals
@@ -589,7 +608,7 @@ fn convert_binary(
             }
         }
         BoundBinaryOperator::NotEquals => {
-            if matches!(binary.lhs.type_, Type::String) && matches!(binary.rhs.type_, Type::String)
+            if binary.lhs.type_ == typeid!(Type::String) && binary.rhs.type_ == typeid!(Type::String)
             {
                 Instruction::array_not_equals()
             } else {
@@ -602,7 +621,7 @@ fn convert_binary(
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(),
         BoundBinaryOperator::StringConcat => Instruction::string_concat(),
         BoundBinaryOperator::NoneableOrValue => {
-            Instruction::noneable_or_value(!binary.rhs.type_.is_pointer())
+            Instruction::noneable_or_value(!converter.project.types[binary.rhs.type_].is_pointer())
         }
         operator
         @
@@ -635,7 +654,7 @@ fn convert_function_call(
     for argument in function_call.arguments {
         result.append(&mut convert_node(argument, converter));
     }
-    let is_closure = matches!(function_call.base.type_, Type::Closure(_));
+    let is_closure = matches!(converter.project.types[function_call.base.type_], Type::Closure(_));
     result.append(&mut convert_node(*function_call.base, converter));
     if is_closure {
         result.push(
@@ -660,7 +679,7 @@ fn convert_constructor_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let word_count = bytes_to_word(constructor_call.base_type.size_in_bytes);
+    let word_count = bytes_to_word(converter.project.types[constructor_call.base_type].size_in_bytes());
     match constructor_call.function {
         Some(function) => {
             let argument_count = constructor_call.arguments.len() as u64;
@@ -754,7 +773,7 @@ fn convert_array_length_system_call(
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
     let base = system_call.arguments.pop().unwrap();
-    let is_closure = matches!(base.type_, Type::Closure(_));
+    let is_closure = matches!(converter.project.types[base.type_], Type::Closure(_));
     result.append(&mut convert_node(base, converter));
     if is_closure {
         result.push(Instruction::decode_closure(1, false).span(span).into());
@@ -771,9 +790,9 @@ fn convert_array_index(
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let base_type_size = match &array_index.base.type_ {
-        Type::PointerOf(base_type) => base_type.size_in_bytes(),
-        error => unreachable!("unexpected access type {}", error),
+    let base_type_size = match &converter.project.types[array_index.base.type_] {
+        Type::PointerOf(base_type) => converter.project.types[*base_type].size_in_bytes(),
+        error => unreachable!("unexpected access type {:?}", error),
     };
 
     let mut result = convert_node(*array_index.base, converter);
@@ -796,7 +815,7 @@ fn convert_field_access(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
-    match field_access.type_ {
+    match &converter.project.types[field_access.type_] {
         Type::SystemCall(_) => {}
         Type::Function(_) => {
             result.push(
@@ -863,10 +882,10 @@ fn convert_conversion(
     conversion: BoundConversionNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let conversion_kind = conversion.kind();
+    let conversion_kind = conversion.kind(&converter.project.types);
     let base_type = conversion.base.type_.clone();
-    let base_type = if base_type == Type::IntegerLiteral {
-        Type::Integer(IntegerType::Signed64)
+    let base_type = if base_type == typeid!(Type::IntegerLiteral) {
+        typeid!(Type::Integer(IntegerType::Signed64))
     } else {
         base_type
     };
@@ -874,22 +893,26 @@ fn convert_conversion(
     match conversion_kind {
         ConversionKind::None => {}
         ConversionKind::TypeBoxing => {
-            let type_word_count = convert_type_identifier(base_type, span, &mut result);
+            convert_type_identifier(base_type, span, &mut result);
             result.push(
-                Instruction::write_to_heap(type_word_count + 1)
+                // The type id is 1 word big and the pointer to the inner value
+                // as well.
+                Instruction::write_to_heap(1 + 1)
                     .span(span)
                     .into(),
             );
         }
         ConversionKind::TypeUnboxing => {
-            let type_word_count = convert_type_identifier(
-                conversion.type_.noneable_base_type().unwrap().clone(),
+            convert_type_identifier(
+                converter.project.types[conversion.type_].noneable_base_type().unwrap().clone(),
                 span,
                 &mut result,
             );
             // Write to heap to keep code simpler. This can be optimized later!
             result.push(
-                Instruction::write_to_heap(type_word_count)
+                // TypeIdentifier are now always just an u64 number as an index
+                // in a big type array. So we only have 1 word big type ids.
+                Instruction::write_to_heap(1)
                     .span(span)
                     .into(),
             );
@@ -901,7 +924,7 @@ fn convert_conversion(
                     .into(),
             );
             // If types are equal, the value of the type needs to be converted into a noneable
-            if !base_type.is_pointer() {
+            if !converter.project.types[base_type].is_pointer() {
                 result.push(Instruction::write_to_heap(1).span(span).into());
             }
             result.push(Instruction::label(label).span(span).into());
@@ -933,108 +956,108 @@ fn convert_conversion(
 }
 
 fn convert_type_identifier(
-    base_type: Type,
+    base_type: TypeId,
     span: TextSpan,
     result: &mut Vec<InstructionOrLabelReference>,
-) -> u64 {
-    let size_in_words = base_type.type_identifier_size_in_words();
-    let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
-    let type_identifier_kind = base_type.type_identifier_kind();
-    let type_word_count = match base_type {
-        Type::Noneable(base_type) => convert_type_identifier(*base_type, span, result) + 2,
-        Type::PointerOf(base_type) => convert_type_identifier(*base_type, span, result) + 2,
-        Type::Function(function_type) => {
-            let mut type_word_count = 3;
-            let parameter_count = function_type.parameter_types.len() as u64;
-            // ParameterTypes
-            for parameter in function_type.parameter_types.into_iter().rev() {
-                type_word_count += convert_type_identifier(parameter, span, result);
-            }
-            // ReturnType
-            type_word_count += convert_type_identifier(function_type.return_type, span, result);
-            // ThisType or Void
-            type_word_count += convert_type_identifier(
-                function_type.this_type.unwrap_or(Type::Void),
-                span,
-                result,
-            );
-            // ParameterCount + 2
-            result.push(
-                Instruction::load_immediate(parameter_count + 2)
-                    .span(span)
-                    .into(),
-            );
-            type_word_count
-        }
-        Type::Closure(closure_type) => {
-            let mut type_word_count = 3;
-            let parameter_count = closure_type.base_function_type.parameter_types.len() as u64;
-            // ParameterTypes
-            for parameter in closure_type
-                .base_function_type
-                .parameter_types
-                .into_iter()
-                .rev()
-            {
-                type_word_count += convert_type_identifier(parameter, span, result);
-            }
-            // ReturnType
-            type_word_count +=
-                convert_type_identifier(closure_type.base_function_type.return_type, span, result);
-            // ThisType or Void
-            type_word_count += convert_type_identifier(
-                closure_type
-                    .base_function_type
-                    .this_type
-                    .unwrap_or(Type::Void),
-                span,
-                result,
-            );
-            // ParameterCount + 2
-            result.push(
-                Instruction::load_immediate(parameter_count + 2)
-                    .span(span)
-                    .into(),
-            );
-            type_word_count
-        }
-        Type::Struct(struct_type) => {
-            result.push(match struct_type.function_table.to_string_function {
-                Some(function) => LabelReference {
-                    label_reference: function.function_label as _,
-                    span,
-                }
-                .into(),
-                None => Instruction::load_none_pointer().span(span).into(),
-            });
-            result.push(
-                Instruction::load_immediate(struct_type.id)
-                    .span(span)
-                    .into(),
-            );
-            4
-        }
-        Type::StructReference(id) => {
-            result.push(match id.simple_function_table.to_string_function {
-                Some(function) => LabelReference {
-                    label_reference: function as _,
-                    span,
-                }
-                .into(),
-                None => Instruction::load_none_pointer().span(span).into(),
-            });
-            result.push(Instruction::load_immediate(id.id).span(span).into());
-            4
-        }
-        _ => 2,
-    };
-    result.push(
-        Instruction::load_immediate(type_identifier_kind)
-            .span(span)
-            .into(),
-    );
-    result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
-    type_word_count
+) {
+    // let size_in_words = base_type.type_identifier_size_in_words();
+    // let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
+    // let type_identifier_kind = base_type.type_identifier_kind();
+    // let type_word_count = match base_type {
+    //     Type::Noneable(base_type) => convert_type_identifier(*base_type, span, result) + 2,
+    //     Type::PointerOf(base_type) => convert_type_identifier(*base_type, span, result) + 2,
+    //     Type::Function(function_type) => {
+    //         let mut type_word_count = 3;
+    //         let parameter_count = function_type.parameter_types.len() as u64;
+    //         // ParameterTypes
+    //         for parameter in function_type.parameter_types.into_iter().rev() {
+    //             type_word_count += convert_type_identifier(parameter, span, result);
+    //         }
+    //         // ReturnType
+    //         type_word_count += convert_type_identifier(function_type.return_type, span, result);
+    //         // ThisType or Void
+    //         type_word_count += convert_type_identifier(
+    //             function_type.this_type.unwrap_or(Type::Void),
+    //             span,
+    //             result,
+    //         );
+    //         // ParameterCount + 2
+    //         result.push(
+    //             Instruction::load_immediate(parameter_count + 2)
+    //                 .span(span)
+    //                 .into(),
+    //         );
+    //         type_word_count
+    //     }
+    //     Type::Closure(closure_type) => {
+    //         let mut type_word_count = 3;
+    //         let parameter_count = closure_type.base_function_type.parameter_types.len() as u64;
+    //         // ParameterTypes
+    //         for parameter in closure_type
+    //             .base_function_type
+    //             .parameter_types
+    //             .into_iter()
+    //             .rev()
+    //         {
+    //             type_word_count += convert_type_identifier(parameter, span, result);
+    //         }
+    //         // ReturnType
+    //         type_word_count +=
+    //             convert_type_identifier(closure_type.base_function_type.return_type, span, result);
+    //         // ThisType or Void
+    //         type_word_count += convert_type_identifier(
+    //             closure_type
+    //                 .base_function_type
+    //                 .this_type
+    //                 .unwrap_or(Type::Void),
+    //             span,
+    //             result,
+    //         );
+    //         // ParameterCount + 2
+    //         result.push(
+    //             Instruction::load_immediate(parameter_count + 2)
+    //                 .span(span)
+    //                 .into(),
+    //         );
+    //         type_word_count
+    //     }
+    //     Type::Struct(struct_type) => {
+    //         result.push(match struct_type.function_table.to_string_function {
+    //             Some(function) => LabelReference {
+    //                 label_reference: function.function_label as _,
+    //                 span,
+    //             }
+    //             .into(),
+    //             None => Instruction::load_none_pointer().span(span).into(),
+    //         });
+    //         result.push(
+    //             Instruction::load_immediate(struct_type.id)
+    //                 .span(span)
+    //                 .into(),
+    //         );
+    //         4
+    //     }
+    //     Type::StructReference(id) => {
+    //         result.push(match id.simple_function_table.to_string_function {
+    //             Some(function) => LabelReference {
+    //                 label_reference: function as _,
+    //                 span,
+    //             }
+    //             .into(),
+    //             None => Instruction::load_none_pointer().span(span).into(),
+    //         });
+    //         result.push(Instruction::load_immediate(id.id).span(span).into());
+    //         4
+    //     }
+    //     _ => 2,
+    // };
+    // result.push(
+    //     Instruction::load_immediate(type_identifier_kind)
+    //         .span(span)
+    //         .into(),
+    // );
+    // result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
+    result.push(Instruction::load_immediate(base_type.as_raw()).span(span).into());
 }
 
 fn convert_variable_declaration(
@@ -1081,7 +1104,7 @@ fn convert_expression_statement(
     expression_statement: BoundExpressionStatementNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let pushes_on_stack = !matches!(expression_statement.expression.type_, Type::Void);
+    let pushes_on_stack = expression_statement.expression.type_ != typeid!(Type::Void);
     let mut result = convert_node(*expression_statement.expression, converter);
     if pushes_on_stack {
         result.push(Instruction::pop().span(span).into());

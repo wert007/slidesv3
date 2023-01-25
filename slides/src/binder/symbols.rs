@@ -10,7 +10,7 @@ use crate::instruction_converter::{
 
 use super::{
     bound_nodes::BoundNode,
-    typing::{FunctionType, Type},
+    typing::{FunctionType, TypeId},
     BoundGenericStructSymbol, BoundMaybeGenericStructSymbol, BoundStructFieldSymbol,
     BoundStructSymbol, FunctionDeclarationBody,
 };
@@ -97,25 +97,6 @@ impl Library {
             }
         }
     }
-
-    pub fn relocate_structs(&mut self, struct_offset: usize) {
-        for function in self.functions.iter_mut() {
-            function.relocate_structs(struct_offset);
-        }
-        for strct in self.structs.iter_mut() {
-            for field in strct.fields_mut() {
-                match &mut field.type_ {
-                    Type::Function(function_type) => function_type.relocate_structs(struct_offset),
-                    Type::Struct(_) => {
-                        unreachable!("relocate_structs currently only works for StructReferences")
-                    }
-                    Type::StructReference(index) => index.id += struct_offset as u64,
-                    _ => {}
-                }
-            }
-            strct.function_table_mut().relocate_structs(struct_offset);
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,24 +105,6 @@ pub struct FunctionSymbol {
     pub function_type: FunctionType,
     pub function_label: u64,
     pub is_member_function: bool,
-}
-
-impl FunctionSymbol {
-    pub fn relocate_structs(&mut self, struct_offset: usize) {
-        for parameter in self
-            .function_type
-            .parameter_types
-            .iter_mut()
-            .chain(self.function_type.this_type.iter_mut())
-        {
-            if let Type::StructReference(index) = parameter {
-                index.id += struct_offset as u64;
-            }
-        }
-        if let Type::StructReference(index) = &mut self.function_type.return_type {
-            index.id += struct_offset as u64;
-        }
-    }
 }
 
 impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
@@ -228,6 +191,7 @@ impl From<BoundMaybeGenericStructSymbol<'_>> for MaybeGenericStructSymbol {
 pub struct StructSymbol {
     pub name: String,
     pub fields: Vec<StructFieldSymbol>,
+    pub functions: Vec<StructFieldSymbol>,
     pub function_table: StructFunctionTable,
 }
 
@@ -236,6 +200,7 @@ impl From<BoundStructSymbol<'_>> for StructSymbol {
         Self {
             name: it.name.into(),
             fields: it.fields.into_iter().map(Into::into).collect(),
+            functions: it.functions.into_iter().map(Into::into).collect(),
             function_table: it.function_table,
         }
     }
@@ -269,7 +234,7 @@ impl From<BoundGenericStructSymbol<'_>> for GenericStructSymbol {
 #[derive(Debug, Clone)]
 pub struct StructFieldSymbol {
     pub name: String,
-    pub type_: Type,
+    pub type_: TypeId,
     pub offset: u64,
     pub is_read_only: bool,
 }
@@ -318,6 +283,16 @@ impl StructFunctionTable {
             .chain(self.equals_function.iter_mut())
     }
 
+    pub(crate) fn function_symbols_iter(&self) -> impl Iterator<Item = &FunctionSymbol> {
+        self.constructor_function
+            .iter()
+            .chain(self.to_string_function.iter())
+            .chain(self.get_function.iter())
+            .chain(self.set_function.iter())
+            .chain(self.element_count_function.iter())
+            .chain(self.equals_function.iter())
+    }
+
     pub fn available_struct_function_kinds(&self) -> Vec<StructFunctionKind> {
         let mut result = Vec::with_capacity(16);
         if self.constructor_function.is_some() {
@@ -347,11 +322,6 @@ impl StructFunctionTable {
         }
         self.function_symbols_iter_mut()
             .for_each(|f| f.function_label += label_offset as u64);
-    }
-
-    fn relocate_structs(&mut self, struct_offset: usize) {
-        self.function_symbols_iter_mut()
-            .for_each(|f| f.relocate_structs(struct_offset));
     }
 
     pub fn replace_labels(mut self, label_relocation: Vec<(u64, u64)>) -> Self {
@@ -399,7 +369,7 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
 pub struct GenericFunction {
     pub function_label: u64,
     pub function_name: String,
-    pub function_type: FunctionType,
+    pub function_type: TypeId,
     pub body: BoundNode,
     pub labels: Vec<usize>,
 }

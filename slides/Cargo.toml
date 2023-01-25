@@ -7,4 +7,6 @@ edition = "2018"
 
 [dependencies]
 assert_matches = "1.5"
+lazy_static = "1.4.0"
 num_enum = "0.5"
+once_cell = "1.17.0"

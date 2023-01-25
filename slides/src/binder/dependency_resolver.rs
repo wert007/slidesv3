@@ -1,7 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use crate::{
-    binder::{symbols::Library, typing::Type, BindingState},
+    binder::{
+        symbols::Library,
+        typing::{Type, TypeId},
+        BindingState,
+    },
     parser::syntax_nodes::{
         CompilationUnitNodeKind, ImportStatementNodeKind, SyntaxNode, SyntaxNodeKind,
     },
@@ -110,8 +114,8 @@ fn bind_import_function<'a>(
                     if path.as_string().is_none() {
                         binder.diagnostic_bag.report_cannot_convert(
                             argument_span,
-                            &path.infer_type(),
-                            &Type::String,
+                            path.infer_type(),
+                            typeid!(Type::String),
                         );
                         return None;
                     }
@@ -158,7 +162,7 @@ pub(super) fn load_library_from_source<'a>(
     source: &'static str,
     span: TextSpan,
     library_name: &'a str,
-    import_std_lib: bool
+    import_std_lib: bool,
 ) {
     let (path, lib) = binder
         .libraries
@@ -168,7 +172,7 @@ pub(super) fn load_library_from_source<'a>(
         .unwrap_or_else(|| {
             (
                 None,
-                crate::load_library_from_source("std", source, binder.debug_flags, import_std_lib),
+                binder.project.load_library(source, "std", import_std_lib),
             )
         });
     // If it is a std library, there is no path to it, but it might still be already loaded.
@@ -179,7 +183,6 @@ pub(super) fn load_library_from_source<'a>(
     };
     load_library_into_binder(span, library_name, lib, path, binder);
 }
-
 
 pub(super) fn load_library_from_path<'a>(
     binder: &mut BindingState<'a, '_>,
@@ -196,7 +199,7 @@ pub(super) fn load_library_from_path<'a>(
         .unwrap_or_else(|| {
             (
                 None,
-                crate::load_library_from_path(path, binder.debug_flags, import_std_lib),
+                binder.project.load_library_from_path(path, import_std_lib),
             )
         });
     // If it is a std library, there is no path to it, but it might still be already loaded.
@@ -228,9 +231,17 @@ fn load_library_into_binder<'a>(
         let mut should_load_library = true;
         let variable = if lib.has_errors {
             should_load_library = false;
-            binder.register_variable(name, Type::Error, true)
+            binder.register_variable(name, typeid!(Type::Error), true)
         } else {
-            binder.register_variable(name, Type::Library(index), true)
+            let type_ = binder
+                    .project
+                    .types
+                    .look_up_or_add_type(Type::Library(index));
+            binder.register_variable(
+                name,
+                type_,
+                true,
+            )
         };
         if variable.is_none() {
             binder
@@ -246,20 +257,21 @@ fn load_library_into_binder<'a>(
     let need_to_load_std_libs = lib.name.is_empty() && binder.libraries.is_empty();
     if need_to_load_std_libs || path.is_none() {
         lib.relocate_labels(binder.label_offset);
-        lib.relocate_structs(binder.structs.len() + binder.struct_table.len());
         binder.label_offset += lib.program.label_count;
     }
     for strct in &lib.structs {
         match &path {
             Some(empty) if empty.is_empty() => {
                 assert!(lib.name.is_empty());
-                binder.register_maybe_generic_struct_as(strct.name(), strct);
+                binder.register_struct_name(strct.name(), strct.function_table().into());
+                // binder.register_maybe_generic_struct_as(strct.name(), strct);
             }
             Some(path) => {
-                let old_name = format!("{}.{}", path, strct.name());
-                let new_name = format!("{}.{}", name, strct.name());
-                let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
-                binder.rename_struct_by_id(struct_id, new_name);
+                let _old_name = format!("{}.{}", path, strct.name());
+                let _new_name = format!("{}.{}", name, strct.name());
+                todo!("Libraries are not working yet.")
+                // let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
+                // binder.rename_struct_by_id(struct_id, new_name);
             }
             None => {
                 let struct_name = if lib.name.is_empty() {
@@ -267,29 +279,33 @@ fn load_library_into_binder<'a>(
                 } else {
                     format!("{}.{}", name, strct.name())
                 };
-                binder.register_maybe_generic_struct_as(&struct_name, strct);
+                binder.register_struct_name(struct_name, strct.function_table().into());
             }
         }
     }
     if name.is_empty() {
         for function in &lib.functions {
+            let function_type = binder
+                .project
+                .types
+                .look_up_or_add_type(Type::function(function.function_type.clone()));
+
             binder.register_generated_constant(
                 function.name.clone(),
-                Value::LabelPointer(
-                    function.function_label as usize,
-                    Type::function(function.function_type.clone()),
-                ),
+                Value::LabelPointer(function.function_label as usize, function_type),
             );
         }
     } else {
         for function in &lib.functions {
             if function.is_member_function {
+                let function_type = binder
+                    .project
+                    .types
+                    .look_up_or_add_type(Type::function(function.function_type.clone()));
+
                 binder.register_generated_constant(
                     format!("{}.{}", name, function.name),
-                    Value::LabelPointer(
-                        function.function_label as usize,
-                        Type::function(function.function_type.clone()),
-                    ),
+                    Value::LabelPointer(function.function_label as usize, function_type),
                 );
             }
         }

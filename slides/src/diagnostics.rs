@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use crate::{
-    binder::{typing::Type, BoundStructSymbol},
+    binder::typing::TypeId,
     lexer::syntax_token::SyntaxTokenKind,
     parser::syntax_nodes::SyntaxNodeKind,
     text::{SourceText, TextLocation, TextSpan},
@@ -10,7 +10,7 @@ use crate::{
 #[derive(Debug, Clone)]
 enum Message<'a> {
     String(Cow<'a, str>),
-    Type(Type),
+    TypeId(TypeId),
     Composition(Vec<Message<'a>>),
 }
 
@@ -18,21 +18,12 @@ impl Message<'_> {
     pub fn into_string_with_struct_table(self, struct_table: &[String]) -> String {
         match self {
             Message::String(it) => it.into(),
-            Message::Type(type_) => type_to_name(struct_table, type_),
+            Message::TypeId(type_) => type_.to_string(),
             Message::Composition(composition) => composition
                 .into_iter()
                 .map(|m| m.into_string_with_struct_table(struct_table))
                 .collect(),
         }
-    }
-}
-
-fn type_to_name(struct_table: &[String], type_: Type) -> String {
-    match type_ {
-        Type::Struct(struct_type) => struct_table[struct_type.id as usize].clone(),
-        Type::StructReference(id) => struct_table[id.id as usize].clone(),
-        Type::Noneable(base_type) => format!("{}?", type_to_name(struct_table, *base_type)),
-        _ => type_.to_string(),
     }
 }
 
@@ -48,9 +39,9 @@ impl<'a> From<&'a str> for Message<'a> {
     }
 }
 
-impl From<&Type> for Message<'_> {
-    fn from(it: &Type) -> Self {
-        Self::Type(it.clone())
+impl From<TypeId> for Message<'_> {
+    fn from(it: TypeId) -> Self {
+        Self::TypeId(it.clone())
     }
 }
 
@@ -167,7 +158,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span)
     }
 
-    pub fn report_cannot_convert(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
+    pub fn report_cannot_convert(&mut self, span: TextSpan, from_type: TypeId, to_type: TypeId) {
         // let message = Message::Composition(vec![
         //     "Cannot convert type ".into(),
         //     from_type.into(),
@@ -184,7 +175,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span)
     }
 
-    pub fn report_no_unary_operator(&mut self, span: TextSpan, operator: &str, type_: &Type) {
+    pub fn report_no_unary_operator(&mut self, span: TextSpan, operator: &str, type_: TypeId) {
         let message = format!("No unary operator {} for type ", operator);
         let message: &[Message] = &[message.into(), type_.into(), ".".into()];
         self.report(message.into(), span);
@@ -193,9 +184,9 @@ impl<'a> DiagnosticBag<'a> {
     pub fn report_no_binary_operator(
         &mut self,
         span: TextSpan,
-        lhs_type: &Type,
+        lhs_type: TypeId,
         operator: &str,
-        rhs_type: &Type,
+        rhs_type: TypeId,
     ) {
         let message = format!("No binary operator {} for types ", operator,);
         let message: &[Message] = &[
@@ -301,7 +292,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_no_fields_on_type(&mut self, span: TextSpan, type_: &Type) {
+    pub fn report_no_fields_on_type(&mut self, span: TextSpan, type_: TypeId) {
         let message: &[Message] = &[
             "There are no fields on type ".into(),
             type_.into(),
@@ -314,7 +305,7 @@ impl<'a> DiagnosticBag<'a> {
         &mut self,
         span: TextSpan,
         field_name: &str,
-        type_: &Type,
+        type_: TypeId,
     ) {
         let message = format!("There are no fields named '{}' on type ", field_name,);
         let message: &[Message] = &[message.into(), type_.into(), ".".into()];
@@ -324,26 +315,28 @@ impl<'a> DiagnosticBag<'a> {
     pub fn report_no_field_named_on_struct(
         &mut self,
         span: TextSpan,
-        field_name: &str,
-        bound_struct_type: BoundStructSymbol<'_>,
+        field_name: &'a str,
+        bound_struct_type: TypeId,
     ) {
-        let mut message = format!(
-            "There is no field named {} on struct {}.",
-            field_name, bound_struct_type.name
+        let message = message_format!(
+            "There is no field named ",
+            field_name,
+            " on struct ",
+            bound_struct_type
         );
         // TODO: Add optional information field and have a span for the Struct
         // source code.
-        if !bound_struct_type.fields.is_empty() {
-            message.push_str("\n  Available fields are:\n");
-            for field in &bound_struct_type.fields {
-                message.push_str("    ");
-                message.push_str(&field.name);
-                message.push_str(": ");
-                message.push_str(&field.type_.to_string());
-                message.push_str(";\n");
-            }
-        }
-        self.report(message.into(), span);
+        // if !bound_struct_type.fields.is_empty() {
+        //     message.push_str("\n  Available fields are:\n");
+        //     for field in &bound_struct_type.fields {
+        //         message.push_str("    ");
+        //         message.push_str(&field.name);
+        //         message.push_str(": ");
+        //         message.push_str(&field.type_.to_string());
+        //         message.push_str(";\n");
+        //     }
+        // }
+        self.report(message, span);
     }
 
     pub fn report_not_all_fields_have_been_assigned(
@@ -374,7 +367,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_missing_return_value(&mut self, span: TextSpan, expected_return_type: &Type) {
+    pub fn report_missing_return_value(&mut self, span: TextSpan, expected_return_type: TypeId) {
         let message: &[Message] = &[
             "Function returns type ".into(),
             expected_return_type.into(),
@@ -383,7 +376,11 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_missing_return_statement(&mut self, span: TextSpan, expected_return_type: &Type) {
+    pub fn report_missing_return_statement(
+        &mut self,
+        span: TextSpan,
+        expected_return_type: TypeId,
+    ) {
         let message: &[Message] = &[
             "Not all paths in function return. Every path needs a return value of type".into(),
             expected_return_type.into(),
@@ -397,30 +394,28 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_unnecessary_cast(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
-        let cast_return_type = &Type::noneable(to_type.clone());
+    pub fn report_unnecessary_cast(&mut self, span: TextSpan, from_type: TypeId, to_type: TypeId) {
         let message = message_format!(
             "No cast necessary between types ",
             from_type,
             " and ",
             to_type,
             ". Remove the unnecessary cast. Note, that cast will return ",
-            cast_return_type,
-            ".",
+            to_type,
+            "?.",
         );
         self.report(message, span);
     }
 
-    pub fn report_impossible_cast(&mut self, span: TextSpan, from_type: &Type, to_type: &Type) {
-        let cast_return_type = &Type::noneable(to_type.clone());
+    pub fn report_impossible_cast(&mut self, span: TextSpan, from_type: TypeId, to_type: TypeId) {
         let message = message_format!(
             "No cast possible between types ",
             from_type,
             " and ",
             to_type,
             ". Note, that cast will return ",
-            cast_return_type,
-            "."
+            to_type,
+            "?."
         );
         self.report(message, span);
     }
@@ -475,7 +470,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_cannot_index_get(&mut self, span: TextSpan, type_: &Type) {
+    pub fn report_cannot_index_get(&mut self, span: TextSpan, type_: TypeId) {
         let message = message_format!(
             "Type ",
             type_,
@@ -484,7 +479,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_cannot_index_set(&mut self, span: TextSpan, type_: &Type) {
+    pub fn report_cannot_index_set(&mut self, span: TextSpan, type_: TypeId) {
         let message = message_format!(
             "Type ",
             type_,
@@ -493,7 +488,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_cannot_iterate(&mut self, span: TextSpan, type_: &Type) {
+    pub fn report_cannot_iterate(&mut self, span: TextSpan, type_: TypeId) {
         let message = message_format!(
             "Type ",
             type_,
@@ -503,7 +498,9 @@ impl<'a> DiagnosticBag<'a> {
     }
 
     pub fn report_generic_type_in_ungeneric_struct(&mut self, span: TextSpan, struct_name: &str) {
-        let message = format!("Used generic type in struct {struct_name} without declaring it as 'generic'.").into();
+        let message =
+            format!("Used generic type in struct {struct_name} without declaring it as 'generic'.")
+                .into();
         // TODO: Add hint to struct declaration.
         self.report(message, span);
     }

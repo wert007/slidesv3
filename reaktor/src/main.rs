@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use clap::{load_yaml, App};
-use slides::DebugFlags;
+use slides::{DebugFlags, Project};
 
 fn main() -> Result<(), std::io::Error> {
     let yaml = load_yaml!("cli_arguments.yaml");
@@ -38,6 +38,7 @@ fn main() -> Result<(), std::io::Error> {
 
 fn repl(debug_flags: DebugFlags) -> Result<(), std::io::Error> {
     let mut buf = String::new();
+    let mut project = Project::new(debug_flags);
     loop {
         buf.clear();
         print!(">> ");
@@ -47,13 +48,14 @@ fn repl(debug_flags: DebugFlags) -> Result<(), std::io::Error> {
         if buf.is_empty() {
             break;
         }
-        slides::evaluate(&buf, "", debug_flags);
+        project.evaluate(&buf, "");
     }
     Ok(())
 }
 
 fn compile(file_path: &str, debug_flags: DebugFlags) -> Result<(), std::io::Error> {
     let file = std::fs::read_to_string(file_path)?;
-    slides::evaluate(&file, file_path, debug_flags);
+    let mut project = Project::new(debug_flags);
+    project.evaluate(&file, file_path);
     Ok(())
 }

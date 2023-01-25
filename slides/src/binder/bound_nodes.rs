@@ -3,7 +3,7 @@ use crate::{text::TextSpan, value::Value};
 use super::{
     operators::{BoundBinaryOperator, BoundUnaryOperator},
     symbols::StructFunctionTable,
-    typing::{FunctionKind, StructType, SystemCallKind, Type, IntegerType},
+    typing::{FunctionKind, SystemCallKind, Type, TypeId, TypeCollection},
 };
 
 pub mod is_same_expression;
@@ -25,7 +25,7 @@ impl From<Value> for BoundConstant {
 pub struct BoundNode {
     pub span: TextSpan,
     pub kind: BoundNodeKind,
-    pub type_: Type,
+    pub type_: TypeId,
     pub constant_value: Option<BoundConstant>,
 }
 
@@ -38,7 +38,7 @@ impl BoundNode {
         Self {
             span,
             kind: BoundNodeKind::ErrorExpression,
-            type_: Type::Error,
+            type_: typeid!(Type::Error),
             constant_value: None,
         }
     }
@@ -67,7 +67,7 @@ impl BoundNode {
         }
     }
 
-    pub fn array_literal(span: TextSpan, children: Vec<BoundNode>, type_: Type) -> Self {
+    pub fn array_literal(span: TextSpan, children: Vec<BoundNode>, type_: TypeId) -> Self {
         Self {
             span,
             kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
@@ -79,22 +79,22 @@ impl BoundNode {
     pub fn constructor_call(
         span: TextSpan,
         arguments: Vec<BoundNode>,
-        base_type: StructType,
+        base_type: TypeId,
         function: Option<u64>,
     ) -> Self {
         Self {
             span,
             kind: BoundNodeKind::ConstructorCall(Box::new(BoundConstructorCallNodeKind {
                 arguments,
-                base_type: base_type.clone(),
+                base_type,
                 function,
             })),
-            type_: Type::Struct(Box::new(base_type)),
+            type_: base_type,
             constant_value: None,
         }
     }
 
-    pub fn variable(span: TextSpan, variable_index: u64, type_: Type) -> Self {
+    pub fn variable(span: TextSpan, variable_index: u64, type_: TypeId) -> Self {
         Self {
             span,
             kind: BoundNodeKind::VariableExpression(BoundVariableNodeKind { variable_index }),
@@ -108,7 +108,7 @@ impl BoundNode {
         lhs: BoundNode,
         operator_token: BoundBinaryOperator,
         rhs: BoundNode,
-        type_: Type,
+        type_: TypeId,
     ) -> Self {
         Self {
             span,
@@ -129,7 +129,7 @@ impl BoundNode {
             lhs,
             rhs,
             Some(Self::literal(false_span, Value::Boolean(false))),
-            Type::Boolean,
+            typeid!(Type::Boolean),
         )
     }
 
@@ -140,7 +140,7 @@ impl BoundNode {
             lhs,
             Self::literal(true_span, Value::Boolean(true)),
             Some(rhs),
-            Type::Boolean,
+            typeid!(Type::Boolean),
         )
     }
 
@@ -148,7 +148,7 @@ impl BoundNode {
         span: TextSpan,
         operator_token: BoundUnaryOperator,
         operand: BoundNode,
-        type_: Type,
+        type_: TypeId,
     ) -> Self {
         Self {
             span,
@@ -166,7 +166,7 @@ impl BoundNode {
         base: BoundNode,
         arguments: Vec<BoundNode>,
         has_this_argument: bool,
-        type_: Type,
+        type_: TypeId,
     ) -> Self {
         Self {
             span,
@@ -180,7 +180,7 @@ impl BoundNode {
         }
     }
 
-    pub fn array_index(span: TextSpan, base: BoundNode, index: BoundNode, type_: Type) -> Self {
+    pub fn array_index(span: TextSpan, base: BoundNode, index: BoundNode, type_: TypeId) -> Self {
         Self {
             span,
             kind: BoundNodeKind::ArrayIndex(BoundArrayIndexNodeKind {
@@ -192,7 +192,7 @@ impl BoundNode {
         }
     }
 
-    pub fn field_access(span: TextSpan, base: BoundNode, offset: u64, type_: Type) -> Self {
+    pub fn field_access(span: TextSpan, base: BoundNode, offset: u64, type_: TypeId) -> Self {
         Self {
             span,
             kind: BoundNodeKind::FieldAccess(BoundFieldAccessNodeKind {
@@ -205,7 +205,7 @@ impl BoundNode {
         }
     }
 
-    pub fn closure(span: TextSpan, arguments: Vec<BoundNode>, id: u64, type_: Type) -> Self {
+    pub fn closure(span: TextSpan, arguments: Vec<BoundNode>, id: u64, type_: TypeId) -> Self {
         Self {
             span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
@@ -221,7 +221,7 @@ impl BoundNode {
         span: TextSpan,
         arguments: Vec<BoundNode>,
         label_index: usize,
-        type_: Type,
+        type_: TypeId,
     ) -> Self {
         Self {
             span,
@@ -238,7 +238,7 @@ impl BoundNode {
         span: TextSpan,
         arguments: Vec<BoundNode>,
         system_call_kind: SystemCallKind,
-        type_: Type,
+        type_: TypeId,
     ) -> Self {
         Self {
             span,
@@ -251,7 +251,7 @@ impl BoundNode {
         }
     }
 
-    pub fn conversion(span: TextSpan, base: BoundNode, type_: Type) -> Self {
+    pub fn conversion(span: TextSpan, base: BoundNode, type_: TypeId) -> Self {
         Self {
             span,
             constant_value: base.constant_value.clone(),
@@ -267,7 +267,7 @@ impl BoundNode {
         span: TextSpan,
         base: SystemCallKind,
         arguments: Vec<BoundNode>,
-        type_: Type,
+        type_: TypeId,
     ) -> Self {
         Self {
             span,
@@ -284,7 +284,7 @@ impl BoundNode {
                 condition: Box::new(condition),
                 body: Box::new(body),
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -310,10 +310,11 @@ impl BoundNode {
         collection: BoundNode,
         body: BoundNode,
         function_table: StructFunctionTable,
+        types: &TypeCollection,
     ) -> Self {
         let while_condition = BoundNode::binary(
             span,
-            BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
+            BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
             BoundBinaryOperator::LessThan,
             BoundNode::function_call(
                 span,
@@ -323,14 +324,14 @@ impl BoundNode {
                         .as_ref()
                         .unwrap()
                         .function_label as usize,
-                    Type::function(
+                    types.look_up_type(&Type::function(
                         function_table
                             .element_count_function
                             .as_ref()
                             .unwrap()
                             .function_type
                             .clone(),
-                    ),
+                    )).expect("Functions on struct members should already be bound."),
                 ),
                 vec![BoundNode::variable(
                     span,
@@ -338,9 +339,9 @@ impl BoundNode {
                     collection.type_.clone(),
                 )],
                 false,
-                Type::Integer(IntegerType::Unsigned64),
+                typeid!(Type::Integer(IntegerType::Unsigned64)),
             ),
-            Type::Boolean,
+            typeid!(Type::Boolean),
         );
         let while_body = BoundNode::block_statement(
             span,
@@ -352,17 +353,17 @@ impl BoundNode {
                         span,
                         BoundNode::label_reference(
                             function_table.get_function.as_ref().unwrap().function_label as usize,
-                            Type::function(
+                            types.look_up_type(&Type::function(
                                 function_table
                                     .get_function
                                     .as_ref()
                                     .unwrap()
                                     .function_type
                                     .clone(),
-                            ),
+                            )).expect("Functions on struct members should already be bound."),
                         ),
                         vec![
-                            BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
+                            BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
                             BoundNode::variable(
                                 span,
                                 collection_variable,
@@ -379,13 +380,13 @@ impl BoundNode {
                 // $index = $index + 1;
                 BoundNode::assignment(
                     span,
-                    BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
+                    BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
                     BoundNode::binary(
                         span,
-                        BoundNode::variable(span, index_variable, Type::Integer(IntegerType::Unsigned64)),
+                        BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
                         BoundBinaryOperator::ArithmeticAddition,
                         BoundNode::literal_from_value(Value::Integer(1)),
-                        Type::Integer(IntegerType::Unsigned64),
+                        typeid!(Type::Integer(IntegerType::Unsigned64)),
                     ),
                 ),
             ],
@@ -409,7 +410,7 @@ impl BoundNode {
         span: TextSpan,
         variable_index: u64,
         initializer: BoundNode,
-        variable_type: Option<Type>,
+        variable_type: Option<TypeId>,
     ) -> Self {
         Self {
             span,
@@ -418,7 +419,7 @@ impl BoundNode {
                 variable_type: variable_type.unwrap_or_else(|| initializer.type_.clone()),
                 initializer: Box::new(initializer),
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -429,7 +430,7 @@ impl BoundNode {
         body: BoundNode,
         else_body: Option<BoundNode>,
     ) -> Self {
-        Self::if_expression(span, condition, body, else_body, Type::Void)
+        Self::if_expression(span, condition, body, else_body, typeid!(Type::Void))
     }
 
     pub fn if_expression(
@@ -437,10 +438,10 @@ impl BoundNode {
         condition: BoundNode,
         body: BoundNode,
         else_body: Option<BoundNode>,
-        type_: Type,
+        type_: TypeId,
     ) -> Self {
         if else_body.is_none() {
-            assert_eq!(type_, Type::Void);
+            assert_eq!(type_, typeid!(Type::Void));
         }
         Self {
             span,
@@ -461,16 +462,16 @@ impl BoundNode {
                 variable: Box::new(variable),
                 expression: Box::new(expression),
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
 
     pub fn block_statement(span: TextSpan, statements: Vec<BoundNode>) -> Self {
-        Self::block_expression(span, statements, Type::Void)
+        Self::block_expression(span, statements, typeid!(Type::Void))
     }
 
-    pub fn block_expression(span: TextSpan, expressions: Vec<BoundNode>, type_: Type) -> Self {
+    pub fn block_expression(span: TextSpan, expressions: Vec<BoundNode>, type_: TypeId) -> Self {
         Self {
             span,
             kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind {
@@ -487,7 +488,7 @@ impl BoundNode {
             kind: BoundNodeKind::ExpressionStatement(BoundExpressionStatementNodeKind {
                 expression: Box::new(expression),
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -508,12 +509,12 @@ impl BoundNode {
                 parameters,
                 base_register,
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
 
-    pub fn label_reference(index: usize, type_: Type) -> Self {
+    pub fn label_reference(index: usize, type_: TypeId) -> Self {
         Self {
             span: TextSpan::zero(),
             kind: BoundNodeKind::LabelReference(index),
@@ -526,7 +527,7 @@ impl BoundNode {
         Self {
             span: TextSpan::zero(),
             kind: BoundNodeKind::Label(index),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -539,7 +540,7 @@ impl BoundNode {
                 target: Box::new(target),
                 jump_if_true: true,
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -552,7 +553,7 @@ impl BoundNode {
                 target: Box::new(target),
                 jump_if_true: true,
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -565,7 +566,7 @@ impl BoundNode {
                 target: Box::new(target),
                 jump_if_true: false,
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -581,7 +582,7 @@ impl BoundNode {
                 expression: expression.map(Box::new),
                 restores_variables,
             }),
-            type_: Type::Void,
+            type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
@@ -707,7 +708,7 @@ impl BoundArrayLiteralNodeKind {
 #[derive(Debug, Clone)]
 pub struct BoundConstructorCallNodeKind {
     pub arguments: Vec<BoundNode>,
-    pub base_type: StructType,
+    pub base_type: TypeId,
     pub function: Option<u64>,
 }
 
@@ -806,7 +807,7 @@ impl BoundArrayIndexNodeKind {
 pub struct BoundFieldAccessNodeKind {
     pub base: Box<BoundNode>,
     pub offset: u64,
-    pub type_: Type,
+    pub type_: TypeId,
 }
 
 impl BoundFieldAccessNodeKind {
@@ -834,7 +835,7 @@ impl BoundClosureNodeKind {
 #[derive(Debug, Clone)]
 pub struct BoundConversionNodeKind {
     pub base: Box<BoundNode>,
-    pub type_: Type,
+    pub type_: TypeId,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -848,8 +849,8 @@ pub enum ConversionKind {
 }
 
 impl BoundConversionNodeKind {
-    pub fn kind(&self) -> ConversionKind {
-        match (&self.type_, &self.base.type_) {
+    pub fn kind(&self, type_collection: &TypeCollection) -> ConversionKind {
+        match (&type_collection[self.type_], &type_collection[self.base.type_]) {
             (Type::Void, _) | (_, Type::Void) | (_, Type::Error) | (Type::Error, _) => {
                 unreachable!()
             }
@@ -875,7 +876,7 @@ impl BoundConversionNodeKind {
             | (Type::Noneable(_), Type::SystemCall(_))
             | (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,
             (Type::Noneable(to), Type::Integer(from)) => {
-                if let Type::Integer(to) = &**to {
+                if let Type::Integer(to) = &type_collection[*to] {
                     if from.is_signed() && !to.is_signed() {
                         ConversionKind::IntToUint
                     } else {
@@ -919,7 +920,7 @@ impl BoundIfStatementNodeKind {
 pub struct BoundVariableDeclarationNodeKind {
     pub variable_index: u64,
     pub initializer: Box<BoundNode>,
-    pub variable_type: Type,
+    pub variable_type: TypeId,
 }
 
 impl BoundVariableDeclarationNodeKind {

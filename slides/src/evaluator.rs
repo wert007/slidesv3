@@ -10,7 +10,7 @@ use crate::{
         Program,
     },
     value::Value,
-    DebugFlags, DiagnosticBag,
+    DiagnosticBag, Project,
 };
 use num_enum::TryFromPrimitive;
 
@@ -33,7 +33,6 @@ type ResultType = Value;
 
 #[derive(Debug)]
 pub struct EvaluatorState<'a> {
-    debug_flags: DebugFlags,
     stack: Stack,
     static_memory_size_in_words: usize,
     heap: Allocator,
@@ -46,6 +45,7 @@ pub struct EvaluatorState<'a> {
     runtime_error_happened: bool,
     debugger_state: debugger::DebuggerState,
     protected_pointers: Vec<u64>,
+    pub project: Project,
 }
 
 impl EvaluatorState<'_> {
@@ -104,12 +104,12 @@ impl EvaluatorState<'_> {
 pub fn evaluate(
     program: Program,
     source_text: &crate::text::SourceText<'_>,
-    debug_flags: DebugFlags,
+    project: Project,
 ) -> ResultType {
+    let debug_flags = project.debug_flags;
     let mut stack = Stack::new(debug_flags);
     stack.push_static_memory(program.static_memory);
     let mut state = EvaluatorState {
-        debug_flags,
         static_memory_size_in_words: stack.len(),
         stack,
         // heap: Allocator::new(128, debug_flags),
@@ -123,6 +123,7 @@ pub fn evaluate(
         runtime_error_happened: false,
         debugger_state: debugger::DebuggerState::default(),
         protected_pointers: vec![],
+        project,
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
@@ -162,7 +163,7 @@ fn execute_function(
     let mut debug_nestedness = 0;
     while state.pc < state.instructions.len() {
         let pc = state.pc;
-        if state.debug_flags.print_current_instruction() {
+        if state.project.debug_flags.print_current_instruction() {
             println!(
                 "  CI {:X}*{}: {}",
                 pc,
@@ -170,7 +171,7 @@ fn execute_function(
                 crate::debug::instruction_to_string(state.instructions[pc], None)
             );
         }
-        if state.debug_flags.slow_mode {
+        if state.project.debug_flags.slow_mode {
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
         match state.instructions[pc].op_code {
@@ -613,7 +614,11 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
     let result = if needs_dereferencing && !is_none {
         state.read_pointer(lhs.unwrap_pointer())
     } else {
-        if is_none { rhs } else { lhs }
+        if is_none {
+            rhs
+        } else {
+            lhs
+        }
     };
     state.stack.push_flagged_word(result);
 }

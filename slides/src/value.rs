@@ -1,4 +1,4 @@
-use crate::binder::typing::{SystemCallKind, Type};
+use crate::binder::typing::{SystemCallKind, TypeId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -7,8 +7,8 @@ pub enum Value {
     Boolean(bool),
     SystemCall(SystemCallKind),
     String(String),
-    LabelPointer(usize, Type),
-    EnumType(Vec<String>),
+    LabelPointer(usize, TypeId),
+    EnumType(Vec<String>, TypeId),
 }
 
 #[allow(dead_code)]
@@ -37,7 +37,7 @@ impl Value {
         }
     }
 
-    pub fn as_label_pointer(&self) -> Option<(usize, &Type)> {
+    pub fn as_label_pointer(&self) -> Option<(usize, &TypeId)> {
         if let Self::LabelPointer(label_reference, type_) = self {
             Some((*label_reference, type_))
         } else {
@@ -45,15 +45,15 @@ impl Value {
         }
     }
 
-    pub fn infer_type(&self) -> Type {
+    pub fn infer_type(&self) -> TypeId {
         match self {
-            Value::Integer(_) => Type::IntegerLiteral,
-            Value::Boolean(_) => Type::Boolean,
-            Value::SystemCall(kind) => Type::SystemCall(*kind),
-            Value::String(_) => Type::String,
-            Value::None => Type::None,
+            Value::Integer(_) => typeid!(Type::IntegerLiteral),
+            Value::Boolean(_) => typeid!(Type::Boolean),
+            Value::String(_) => typeid!(Type::String),
+            Value::None => typeid!(Type::None),
             Value::LabelPointer(_, type_) => type_.clone(),
-            Value::EnumType(values) => Type::Enum(values.clone()),
+            Value::SystemCall(kind) => typeid!(Type::SystemCall(kind)),
+            Value::EnumType(_, it) => *it,
         }
     }
 }
@@ -85,7 +85,7 @@ impl std::fmt::Display for Value {
             Value::String(value) => write!(f, "'{}'", value),
             Value::None => write!(f, "none"),
             Value::LabelPointer(label, type_) => write!(f, "L{:X} : {}", label, type_),
-            Value::EnumType(_) => write!(f, "anomynous enum type"),
+            Value::EnumType(_, t) => write!(f, "anomynous enum type {t}"),
         }
     }
 }

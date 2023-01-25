@@ -136,6 +136,7 @@ func stepBy(range: Range, stepSize: int) -> Range {
     return result;
 }
 
+/*
 generic struct Array {
     length: uint;
     buffer: &$Type;
@@ -206,6 +207,7 @@ generic struct Array {
         return this.length;
     }
 }
+*/
 
 func clampToUnsigned(value: int) -> uint {
     return cast value : uint ?? 0;
@@ -230,6 +232,7 @@ func toHex(value: uint) -> string {
     return '0x' + result;
 }
 
+/*
 generic struct List {
     capacity: uint;
     length: uint;
@@ -313,7 +316,7 @@ generic struct List {
         return this.length;
     }
 }
-
+*/
 // generic cast List<$Type> : Array<$Type> {
 //     return new Array(this.length, this.buffer);
 // }
