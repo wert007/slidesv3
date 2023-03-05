@@ -234,14 +234,10 @@ fn load_library_into_binder<'a>(
             binder.register_variable(name, typeid!(Type::Error), true)
         } else {
             let type_ = binder
-                    .project
-                    .types
-                    .look_up_or_add_type(Type::Library(index));
-            binder.register_variable(
-                name,
-                type_,
-                true,
-            )
+                .project
+                .types
+                .look_up_or_add_type(Type::Library(index));
+            binder.register_variable(name, type_, true)
         };
         if variable.is_none() {
             binder
@@ -263,32 +259,30 @@ fn load_library_into_binder<'a>(
         match &path {
             Some(empty) if empty.is_empty() => {
                 assert!(lib.name.is_empty());
-                binder.register_struct_name(strct.name(), strct.function_table().into());
+                binder.register_struct_name(strct.name.as_str(), (&strct.function_table).into());
                 // binder.register_maybe_generic_struct_as(strct.name(), strct);
             }
             Some(path) => {
-                let _old_name = format!("{}.{}", path, strct.name());
-                let _new_name = format!("{}.{}", name, strct.name());
+                let _old_name = format!("{}.{}", path, strct.name);
+                let _new_name = format!("{}.{}", name, strct.name);
                 todo!("Libraries are not working yet.")
                 // let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
                 // binder.rename_struct_by_id(struct_id, new_name);
             }
             None => {
                 let struct_name = if lib.name.is_empty() {
-                    strct.name().to_owned()
+                    strct.name.to_owned()
                 } else {
-                    format!("{}.{}", name, strct.name())
+                    format!("{}.{}", name, strct.name)
                 };
-                binder.register_struct_name(struct_name, strct.function_table().into());
+                binder.register_struct_name(struct_name, (&strct.function_table).into());
             }
         }
     }
     if name.is_empty() {
         for function in &lib.functions {
-            let function_type = binder
-                .project
-                .types
-                .look_up_or_add_type(Type::function(function.function_type.clone()));
+            let function_type = binder.project.types[function.function_type].clone();
+            let function_type = binder.project.types.look_up_or_add_type(function_type);
 
             binder.register_generated_constant(
                 function.name.clone(),
@@ -298,10 +292,8 @@ fn load_library_into_binder<'a>(
     } else {
         for function in &lib.functions {
             if function.is_member_function {
-                let function_type = binder
-                    .project
-                    .types
-                    .look_up_or_add_type(Type::function(function.function_type.clone()));
+                let function_type = binder.project.types[function.function_type].clone();
+                let function_type = binder.project.types.look_up_or_add_type(function_type);
 
                 binder.register_generated_constant(
                     format!("{}.{}", name, function.name),

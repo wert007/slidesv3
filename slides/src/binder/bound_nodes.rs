@@ -3,7 +3,7 @@ use crate::{text::TextSpan, value::Value};
 use super::{
     operators::{BoundBinaryOperator, BoundUnaryOperator},
     symbols::StructFunctionTable,
-    typing::{FunctionKind, SystemCallKind, Type, TypeId, TypeCollection},
+    typing::{FunctionKind, SystemCallKind, Type, TypeCollection, TypeId},
 };
 
 pub mod is_same_expression;
@@ -310,11 +310,15 @@ impl BoundNode {
         collection: BoundNode,
         body: BoundNode,
         function_table: StructFunctionTable,
-        types: &TypeCollection,
+        _types: &TypeCollection,
     ) -> Self {
         let while_condition = BoundNode::binary(
             span,
-            BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
+            BoundNode::variable(
+                span,
+                index_variable,
+                typeid!(Type::Integer(IntegerType::Unsigned64)),
+            ),
             BoundBinaryOperator::LessThan,
             BoundNode::function_call(
                 span,
@@ -324,14 +328,11 @@ impl BoundNode {
                         .as_ref()
                         .unwrap()
                         .function_label as usize,
-                    types.look_up_type(&Type::function(
-                        function_table
-                            .element_count_function
-                            .as_ref()
-                            .unwrap()
-                            .function_type
-                            .clone(),
-                    )).expect("Functions on struct members should already be bound."),
+                    function_table
+                        .element_count_function
+                        .as_ref()
+                        .unwrap()
+                        .function_type,
                 ),
                 vec![BoundNode::variable(
                     span,
@@ -353,17 +354,14 @@ impl BoundNode {
                         span,
                         BoundNode::label_reference(
                             function_table.get_function.as_ref().unwrap().function_label as usize,
-                            types.look_up_type(&Type::function(
-                                function_table
-                                    .get_function
-                                    .as_ref()
-                                    .unwrap()
-                                    .function_type
-                                    .clone(),
-                            )).expect("Functions on struct members should already be bound."),
+                            function_table.get_function.as_ref().unwrap().function_type,
                         ),
                         vec![
-                            BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
+                            BoundNode::variable(
+                                span,
+                                index_variable,
+                                typeid!(Type::Integer(IntegerType::Unsigned64)),
+                            ),
                             BoundNode::variable(
                                 span,
                                 collection_variable,
@@ -380,10 +378,18 @@ impl BoundNode {
                 // $index = $index + 1;
                 BoundNode::assignment(
                     span,
-                    BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
+                    BoundNode::variable(
+                        span,
+                        index_variable,
+                        typeid!(Type::Integer(IntegerType::Unsigned64)),
+                    ),
                     BoundNode::binary(
                         span,
-                        BoundNode::variable(span, index_variable, typeid!(Type::Integer(IntegerType::Unsigned64))),
+                        BoundNode::variable(
+                            span,
+                            index_variable,
+                            typeid!(Type::Integer(IntegerType::Unsigned64)),
+                        ),
                         BoundBinaryOperator::ArithmeticAddition,
                         BoundNode::literal_from_value(Value::Integer(1)),
                         typeid!(Type::Integer(IntegerType::Unsigned64)),
@@ -850,7 +856,10 @@ pub enum ConversionKind {
 
 impl BoundConversionNodeKind {
     pub fn kind(&self, type_collection: &TypeCollection) -> ConversionKind {
-        match (&type_collection[self.type_], &type_collection[self.base.type_]) {
+        match (
+            &type_collection[self.type_],
+            &type_collection[self.base.type_],
+        ) {
             (Type::Void, _) | (_, Type::Void) | (_, Type::Error) | (Type::Error, _) => {
                 unreachable!()
             }

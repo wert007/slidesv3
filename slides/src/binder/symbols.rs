@@ -9,10 +9,9 @@ use crate::instruction_converter::{
 };
 
 use super::{
-    bound_nodes::BoundNode,
-    typing::{FunctionType, TypeId},
-    BoundGenericStructSymbol, BoundMaybeGenericStructSymbol, BoundStructFieldSymbol,
-    BoundStructSymbol, FunctionDeclarationBody,
+    bound_nodes::BoundNode, typing::{TypeId, GenericTypeId, GenericType}, BoundGenericStructSymbol,
+    BoundMaybeGenericStructSymbol, BoundStructFieldSymbol, BoundStructSymbol,
+    FunctionDeclarationBody,
 };
 
 #[derive(Debug, Clone)]
@@ -22,7 +21,8 @@ pub struct Library {
     pub startup: Vec<InstructionOrLabelReference>,
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
-    pub structs: Vec<MaybeGenericStructSymbol>,
+    pub structs: Vec<StructSymbol>,
+    pub generic_structs: Vec<GenericType>,
     pub has_errors: bool,
     pub path: PathBuf,
     pub referenced_libraries: Vec<Library>,
@@ -38,6 +38,7 @@ impl Library {
             program: Program::error(),
             functions: vec![],
             structs: vec![],
+            generic_structs: vec![],
             has_errors: true,
             path: PathBuf::new(),
             referenced_libraries: vec![],
@@ -76,7 +77,7 @@ impl Library {
             function.function_label += label_offset as u64;
         }
         for strct in self.structs.iter_mut() {
-            strct.function_table_mut().relocate_labels(label_offset);
+            strct.function_table.relocate_labels(label_offset);
         }
         for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
@@ -102,13 +103,13 @@ impl Library {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionSymbol {
     pub name: String,
-    pub function_type: FunctionType,
+    pub function_type: TypeId,
     pub function_label: u64,
     pub is_member_function: bool,
 }
 
-impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
-    fn from(it: FunctionDeclarationBody) -> Self {
+impl From<FunctionDeclarationBody<'_, TypeId>> for FunctionSymbol {
+    fn from(it: FunctionDeclarationBody<TypeId>) -> Self {
         Self {
             name: it.function_name.into(),
             function_type: it.function_type,
@@ -122,43 +123,6 @@ impl From<FunctionDeclarationBody<'_>> for FunctionSymbol {
 pub enum MaybeGenericStructSymbol {
     Struct(StructSymbol),
     GenericStruct(GenericStructSymbol),
-}
-
-impl MaybeGenericStructSymbol {
-    pub fn name(&self) -> &str {
-        match self {
-            MaybeGenericStructSymbol::Struct(it) => &it.name,
-            MaybeGenericStructSymbol::GenericStruct(it) => &it.name,
-        }
-    }
-
-    pub fn fields(&self) -> &[StructFieldSymbol] {
-        match self {
-            MaybeGenericStructSymbol::Struct(it) => &it.fields,
-            MaybeGenericStructSymbol::GenericStruct(it) => &it.fields,
-        }
-    }
-
-    pub fn fields_mut(&mut self) -> core::slice::IterMut<StructFieldSymbol> {
-        match self {
-            MaybeGenericStructSymbol::Struct(it) => it.fields.iter_mut(),
-            MaybeGenericStructSymbol::GenericStruct(it) => it.fields.iter_mut(),
-        }
-    }
-
-    pub fn function_table(&self) -> &StructFunctionTable {
-        match self {
-            MaybeGenericStructSymbol::Struct(it) => &it.function_table,
-            MaybeGenericStructSymbol::GenericStruct(it) => &it.function_table,
-        }
-    }
-
-    pub fn function_table_mut(&mut self) -> &mut StructFunctionTable {
-        match self {
-            MaybeGenericStructSymbol::Struct(it) => &mut it.function_table,
-            MaybeGenericStructSymbol::GenericStruct(it) => &mut it.function_table,
-        }
-    }
 }
 
 impl From<StructSymbol> for MaybeGenericStructSymbol {
@@ -179,9 +143,6 @@ impl From<BoundMaybeGenericStructSymbol<'_>> for MaybeGenericStructSymbol {
             BoundMaybeGenericStructSymbol::Struct(it) => StructSymbol::from(it).into(),
             BoundMaybeGenericStructSymbol::GenericStruct(it) => {
                 GenericStructSymbol::from(it).into()
-            }
-            BoundMaybeGenericStructSymbol::Empty => {
-                unreachable!("Tried to convert/export an empty symbol")
             }
         }
     }
@@ -369,7 +330,15 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
 pub struct GenericFunction {
     pub function_label: u64,
     pub function_name: String,
-    pub function_type: TypeId,
+    pub function_type: GenericTypeId,
     pub body: BoundNode,
     pub labels: Vec<usize>,
 }
+
+impl PartialEq for GenericFunction {
+    fn eq(&self, other: &Self) -> bool {
+        self.function_label == other.function_label && self.function_name == other.function_name && self.function_type == other.function_type && self.labels == other.labels
+    }
+}
+
+impl Eq for GenericFunction {}

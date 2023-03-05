@@ -63,7 +63,6 @@ fn to_string_native(
     match &state.project.types[type_] {
         Type::Library(_)
         | Type::GenericType
-        | Type::TypedGenericStruct(_)
         | Type::IntegerLiteral
         | Type::Enum(..)
         | Type::StructPlaceholder(..) => unreachable!(),

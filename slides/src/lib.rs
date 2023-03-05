@@ -82,6 +82,10 @@ impl Project {
         let file_name = path.to_string_lossy();
         self.load_library(&source_code, &file_name, import_std_libs)
     }
+
+    pub(crate) fn maybe_print_type_table(&self) {
+        self.types.maybe_print_type_table(self.debug_flags);
+    }
 }
 
 // pub fn load_library_from_source(

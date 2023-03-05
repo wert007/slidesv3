@@ -26,6 +26,7 @@ pub struct DebugFlags {
     pub print_bound_program: bool,
     pub print_stack: bool,
     pub print_labels: bool,
+    pub print_type_table: bool,
     pub output_basic_blocks_to_dot: bool,
     pub output_instructions_to_sldasm: bool,
     pub output_instructions_and_labels_to_sldasm: bool,

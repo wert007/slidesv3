@@ -43,6 +43,9 @@ args:
     - print-stack:
         long: dstack
         help: Prints the stack, whenever it changes
+    - print-type-table:
+        long: dptt
+        help: Prints the type table
     - output-basic-blocks-to-dot:
         long: dbb
         help: Writes the basic blocks of each function to debug-out/FUNCTION_NAME.dot

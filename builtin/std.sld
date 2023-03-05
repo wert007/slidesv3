@@ -136,7 +136,6 @@ func stepBy(range: Range, stepSize: int) -> Range {
     return result;
 }
 
-/*
 generic struct Array {
     length: uint;
     buffer: &$Type;
@@ -151,6 +150,8 @@ generic struct Array {
             // FIXME: This crashes the compiler for some reason?
             // Maybe because, at the time of binding, the $get function has not
             // been bound yet?
+            //
+            // Not anymore! But also doesn't work!
             // this[i] = basis;
             this.buffer[i] = basis;
         }
@@ -207,7 +208,6 @@ generic struct Array {
         return this.length;
     }
 }
-*/
 
 func clampToUnsigned(value: int) -> uint {
     return cast value : uint ?? 0;
@@ -232,7 +232,6 @@ func toHex(value: uint) -> string {
     return '0x' + result;
 }
 
-/*
 generic struct List {
     capacity: uint;
     length: uint;
@@ -253,7 +252,7 @@ generic struct List {
         }
         let capacity = 2 * this.capacity + 1;
 
-        let placeholder : &$Type = reallocate(this.buffer, capacity * 8);
+        let placeholder: &$Type = reallocate(this.buffer, capacity * 8);
         if placeholder == none {
             runtimeError('Could not allocate enough space for more elements!');
         }
@@ -315,8 +314,12 @@ generic struct List {
     func length() -> uint {
         return this.length;
     }
+
+    // func $cast() -> Array<$Type> {
+    //     return new Array(this.length, this.buffer);
+    // }
 }
-*/
+
 // generic cast List<$Type> : Array<$Type> {
 //     return new Array(this.length, this.buffer);
 // }
