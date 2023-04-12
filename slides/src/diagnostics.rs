@@ -1,52 +1,62 @@
-use std::borrow::Cow;
-
 use crate::{
-    binder::typing::TypeId,
+    binder::typing::{TypeCollection, TypeId},
     lexer::syntax_token::SyntaxTokenKind,
     parser::syntax_nodes::SyntaxNodeKind,
-    text::{SourceText, TextLocation, TextSpan},
+    text::{SourceTextCollection, SourceTextId, TextLocation, TextSpan},
 };
 
 #[derive(Debug, Clone)]
-enum Message<'a> {
-    String(Cow<'a, str>),
+pub enum Message {
+    String(String),
+    SourceTextSnippet(TextLocation),
     TypeId(TypeId),
-    Composition(Vec<Message<'a>>),
+    Composition(Vec<Message>),
 }
 
-impl Message<'_> {
-    pub fn into_string_with_struct_table(self, struct_table: &[String]) -> String {
+impl Message {
+    pub fn into_string_with_struct_table(
+        self,
+        types: &TypeCollection,
+        source_text_collection: &SourceTextCollection,
+    ) -> String {
         match self {
             Message::String(it) => it.into(),
-            Message::TypeId(type_) => type_.to_string(),
+            Message::TypeId(type_) => types.name(type_).into_owned(),
+            Message::SourceTextSnippet(it) => source_text_collection[it].into(),
             Message::Composition(composition) => composition
                 .into_iter()
-                .map(|m| m.into_string_with_struct_table(struct_table))
+                .map(|m| m.into_string_with_struct_table(types, source_text_collection))
                 .collect(),
         }
     }
 }
 
-impl From<String> for Message<'_> {
+impl From<String> for Message {
     fn from(it: String) -> Self {
         Self::String(it.into())
     }
 }
 
-impl<'a> From<&'a str> for Message<'a> {
-    fn from(it: &'a str) -> Self {
+impl From<TextLocation> for Message {
+    fn from(it: TextLocation) -> Self {
+        Self::SourceTextSnippet(it)
+    }
+}
+
+impl From<&str> for Message {
+    fn from(it: &str) -> Self {
         Self::String(it.into())
     }
 }
 
-impl From<TypeId> for Message<'_> {
+impl From<TypeId> for Message {
     fn from(it: TypeId) -> Self {
         Self::TypeId(it.clone())
     }
 }
 
-impl<'a> From<&[Message<'a>]> for Message<'a> {
-    fn from(it: &[Message<'a>]) -> Self {
+impl From<&[Message]> for Message {
+    fn from(it: &[Message]) -> Self {
         Self::Composition(it.into())
     }
 }
@@ -63,48 +73,45 @@ macro_rules! message_format {
 }
 
 #[derive(Debug, Clone)]
-pub struct Diagnostic<'a> {
-    message: Message<'a>,
-    location: TextLocation<'a>,
+pub struct Diagnostic {
+    message: Message,
+    location: TextLocation,
 }
 
-impl<'a> Diagnostic<'a> {
-    pub(self) fn runtime(
-        message: Message<'a>,
-        span: Option<TextSpan>,
-        source_text: &'a SourceText<'a>,
-    ) -> Self {
+impl Diagnostic {
+    pub(self) fn runtime(message: Message, location: Option<TextLocation>) -> Self {
         Self {
             message,
-            location: TextLocation {
-                span: span.unwrap_or_else(TextSpan::zero),
-                source_text,
-            },
+            location: location
+                .expect("Instruction without location found. This should be removed!"),
         }
     }
 
-    pub fn into_string(self, struct_table: &[String]) -> String {
+    pub fn into_string(
+        self,
+        types: &TypeCollection,
+        source_text_collection: &SourceTextCollection,
+    ) -> String {
         format!(
             "Error {}: {}",
-            self.location,
-            self.message.into_string_with_struct_table(struct_table)
+            self.location.display(source_text_collection),
+            self.message
+                .into_string_with_struct_table(types, source_text_collection)
         )
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct DiagnosticBag<'a> {
-    pub diagnostics: Vec<Diagnostic<'a>>,
-    pub source_text: &'a SourceText<'a>,
-    pub registered_types: Vec<String>,
+pub struct DiagnosticBag {
+    pub diagnostics: Vec<Diagnostic>,
+    pub registered_types: TypeCollection,
 }
 
-impl<'a> DiagnosticBag<'a> {
-    pub fn new(source_text: &'a SourceText<'a>) -> Self {
+impl DiagnosticBag {
+    pub fn new() -> Self {
         Self {
             diagnostics: vec![],
-            source_text,
-            registered_types: vec![],
+            registered_types: TypeCollection::new(),
         }
     }
 
@@ -112,42 +119,41 @@ impl<'a> DiagnosticBag<'a> {
         !self.diagnostics.is_empty()
     }
 
-    pub fn flush_to_console(self) {
+    pub fn flush_to_console(self, source_text_collection: &SourceTextCollection) {
         for diagnostic in self.diagnostics {
-            println!("{}", diagnostic.into_string(&self.registered_types));
+            println!(
+                "{}",
+                diagnostic.into_string(&self.registered_types, source_text_collection)
+            );
         }
     }
 
-    fn report(&mut self, message: Message<'a>, span: TextSpan) {
-        let diagnostic = Diagnostic {
-            message,
-            location: TextLocation {
-                span,
-                source_text: self.source_text,
-            },
-        };
+    fn report(&mut self, message: Message, location: TextLocation) {
+        let diagnostic = Diagnostic { message, location };
         self.diagnostics.push(diagnostic);
     }
 
-    fn report_runtime(&mut self, message: Message<'a>, span: Option<TextSpan>) {
-        let diagnostic = Diagnostic::runtime(message, span, self.source_text);
+    fn report_runtime(&mut self, message: Message, location: Option<TextLocation>) {
+        let diagnostic = Diagnostic::runtime(message, location);
         self.diagnostics.push(diagnostic);
     }
 
-    pub fn report_bad_input(&mut self, start: usize, character: char) {
+    pub fn report_bad_input(&mut self, start: usize, source_text: SourceTextId, character: char) {
         let message = format!("Bad character in input: {}", character);
         let span = TextSpan::new(start, 1, true);
-        self.report(message.into(), span)
+        let location = TextLocation { span, source_text };
+        self.report(message.into(), location)
     }
-    pub fn report_bad_integer(&mut self, start: usize, text: &str) {
+    pub fn report_bad_integer(&mut self, start: usize, source_text: SourceTextId, text: &str) {
         let message = format!("'{}' is no valid u64 integer.", text);
         let span = TextSpan::new(start, text.len(), true);
-        self.report(message.into(), span)
+        let location = TextLocation { span, source_text };
+        self.report(message.into(), location)
     }
 
     pub fn report_unexpected_token_kind(
         &mut self,
-        span: TextSpan,
+        location: TextLocation,
         actual_token_kind: SyntaxTokenKind,
         expected_token_kind: SyntaxTokenKind,
     ) {
@@ -155,106 +161,119 @@ impl<'a> DiagnosticBag<'a> {
             "Expected token kind {:?} but actually found {:?}.",
             expected_token_kind, actual_token_kind
         );
-        self.report(message.into(), span)
+        self.report(message.into(), location)
     }
 
-    pub fn report_cannot_convert(&mut self, span: TextSpan, from_type: TypeId, to_type: TypeId) {
-        // let message = Message::Composition(vec![
-        //     "Cannot convert type ".into(),
-        //     from_type.into(),
-        //     " to type ".into(),
-        //     to_type.into(),
-        //     ".".into()
-        // ]);
+    pub fn report_cannot_convert(
+        &mut self,
+        location: TextLocation,
+        from_type: TypeId,
+        to_type: TypeId,
+    ) {
         let message = message_format!("Cannot convert type ", from_type, " to type ", to_type, ".");
-        self.report(message, span)
+        self.report(message, location)
     }
 
-    pub fn report_invalid_void_expression(&mut self, span: TextSpan) {
+    pub fn report_invalid_void_expression(&mut self, location: TextLocation) {
         let message = "Expected value type, but expression is of type void.".into();
-        self.report(message, span)
+        self.report(message, location)
     }
 
-    pub fn report_no_unary_operator(&mut self, span: TextSpan, operator: &str, type_: TypeId) {
-        let message = format!("No unary operator {} for type ", operator);
-        let message: &[Message] = &[message.into(), type_.into(), ".".into()];
-        self.report(message.into(), span);
+    pub fn report_no_unary_operator(
+        &mut self,
+        location: TextLocation,
+        operator: TextLocation,
+        type_: TypeId,
+    ) {
+        let message = message_format!("No unary operator ", operator, " for type ", type_, ".");
+        self.report(message, location);
     }
 
     pub fn report_no_binary_operator(
         &mut self,
-        span: TextSpan,
+        location: TextLocation,
         lhs_type: TypeId,
-        operator: &str,
+        operator: TextLocation,
         rhs_type: TypeId,
     ) {
-        let message = format!("No binary operator {} for types ", operator,);
-        let message: &[Message] = &[
-            message.into(),
-            lhs_type.into(),
-            " and ".into(),
-            rhs_type.into(),
-            ".".into(),
-        ];
-        self.report(message.into(), span);
+        let message = message_format!(
+            "No binary operator ",
+            operator,
+            " for types ",
+            lhs_type,
+            " and ",
+            rhs_type,
+            "."
+        );
+        self.report(message, location);
     }
 
     #[allow(dead_code)]
-    pub fn report_not_supported(&mut self, span: TextSpan, unsupported: &str) {
+    pub fn report_not_supported(&mut self, location: TextLocation, unsupported: &'static str) {
         let message = format!("Currently {} are not supported!", unsupported);
-        self.report(message.into(), span);
+        self.report(message.into(), location);
     }
 
-    pub fn report_cannot_declare_variable(&mut self, span: TextSpan, variable_name: &str) {
-        let message = format!(
-            "A variable named '{}' cannot be declared here.",
-            variable_name
+    pub fn report_cannot_declare_variable(
+        &mut self,
+        location: TextLocation,
+        variable_name: impl Into<Message>,
+    ) {
+        let message = message_format!(
+            "A variable named '",
+            variable_name,
+            "' cannot be declared here."
         );
-        self.report(message.into(), span);
+        self.report(message, location);
     }
 
-    pub(crate) fn report_cannot_declare_struct(&mut self, span: TextSpan, struct_name: &str) {
-        let message = format!("A struct named {} was already declared.", struct_name);
+    pub(crate) fn report_cannot_declare_struct(
+        &mut self,
+        location: TextLocation,
+        struct_name: TextLocation,
+    ) {
+        let message = message_format!("A struct named ", struct_name, " was already declared.");
         // FIXME: Reference the first declaration of a struct with that name.
-        self.report(message.into(), span);
+        self.report(message, location);
     }
 
     pub fn report_cannot_declare_keyword_as_variable(
         &mut self,
-        span: TextSpan,
-        variable_name: &str,
+        location: TextLocation,
+        variable_name: TextLocation,
     ) {
-        let message = format!(
-            "'{}' is a keyword and cannot be overwritten.",
-            variable_name
+        let message = message_format!(
+            "'",
+            variable_name,
+            "' is a keyword and cannot be overwritten.",
         );
-        self.report(message.into(), span);
+        self.report(message, location);
     }
 
-    pub fn report_field_already_declared(&mut self, span: TextSpan, name: &str) {
-        let message = format!("Field named {} already declared in struct.", name);
+    pub fn report_field_already_declared(&mut self, location: TextLocation, name: &str) {
+        let message = message_format!("Field named ", name, " already declared in struct.");
         // FIXME: Reference the first declaration of a field with that name.
-        self.report(message.into(), span);
+        self.report(message, location);
     }
 
-    pub fn report_variable_not_found(&mut self, span: TextSpan, variable_name: &str) {
-        let message = format!("No variable named '{}' could be found.", variable_name);
-        self.report(message.into(), span);
+    pub fn report_variable_not_found(&mut self, location: TextLocation, variable_name: TextLocation) {
+        let message = message_format!("No variable named '", variable_name, "' could be found.");
+        self.report(message, location);
     }
 
-    pub fn report_cannot_assign_to(&mut self, span: TextSpan) {
+    pub fn report_cannot_assign_to(&mut self, location: TextLocation) {
         let message = "Only variables can be assigned to. Did you mean to use ==?".into();
-        self.report(message, span);
+        self.report(message, location);
     }
 
-    pub fn report_variable_is_read_only(&mut self, span: TextSpan) {
+    pub fn report_variable_is_read_only(&mut self, location: TextLocation) {
         let message = "Variable cannot be assigned to, it is a read only variable.".into();
-        self.report(message, span);
+        self.report(message, location);
     }
 
     pub fn report_unexpected_argument_count(
         &mut self,
-        span: TextSpan,
+        location: TextLocation,
         actual_argument_count: usize,
         expected_argument_count: usize,
     ) {
@@ -262,12 +281,12 @@ impl<'a> DiagnosticBag<'a> {
             "Expected {} arguments, but actually found {}.",
             expected_argument_count, actual_argument_count
         );
-        self.report(message.into(), span)
+        self.report(message.into(), location)
     }
 
     pub fn report_unexpected_parameter_count(
         &mut self,
-        span: TextSpan,
+        location: TextLocation,
         actual_parameter_count: usize,
         expected_parameter_count: usize,
     ) {
@@ -275,47 +294,58 @@ impl<'a> DiagnosticBag<'a> {
             "Expected {} parameters, but actually found {}.",
             expected_parameter_count, actual_parameter_count
         );
-        self.report(message.into(), span)
+        self.report(message.into(), location)
     }
 
-    pub fn report_unterminated_comment(&mut self, start: usize, text: &str) {
+    pub fn report_unterminated_comment(
+        &mut self,
+        start: usize,
+        source_text: SourceTextId,
+        text: &str,
+    ) {
         let span = TextSpan::new(start, text.len(), true);
+        let location = TextLocation { span, source_text };
         let message = "Unterminated comment found here.".into();
-        self.report(message, span);
+        self.report(message, location);
     }
 
-    pub fn report_unterminated_string(&mut self, span: TextSpan, expected_char: char) {
+    pub fn report_unterminated_string(&mut self, location: TextLocation, expected_char: char) {
         let message = format!(
             "Unterminated string found here. Expected `{}`.",
             expected_char
         );
-        self.report(message.into(), span);
+        self.report(message.into(), location);
     }
 
-    pub fn report_no_fields_on_type(&mut self, span: TextSpan, type_: TypeId) {
+    pub fn report_no_fields_on_type(&mut self, location: TextLocation, type_: TypeId) {
         let message: &[Message] = &[
             "There are no fields on type ".into(),
             type_.into(),
             ".".into(),
         ];
-        self.report(message.into(), span);
+        self.report(message.into(), location);
     }
 
     pub fn report_no_field_named_on_type(
         &mut self,
-        span: TextSpan,
-        field_name: &str,
+        location: TextLocation,
+        field_name: TextLocation,
         type_: TypeId,
     ) {
-        let message = format!("There are no fields named '{}' on type ", field_name,);
-        let message: &[Message] = &[message.into(), type_.into(), ".".into()];
-        self.report(message.into(), span);
+        let message = message_format!(
+            "There are no fields named '",
+            field_name,
+            "' on type ",
+            type_,
+            "."
+        );
+        self.report(message, location);
     }
 
     pub fn report_no_field_named_on_struct(
         &mut self,
-        span: TextSpan,
-        field_name: &'a str,
+        location: TextLocation,
+        field_name: TextLocation,
         bound_struct_type: TypeId,
     ) {
         let message = message_format!(
@@ -336,12 +366,12 @@ impl<'a> DiagnosticBag<'a> {
         //         message.push_str(";\n");
         //     }
         // }
-        self.report(message, span);
+        self.report(message, location);
     }
 
     pub fn report_not_all_fields_have_been_assigned(
         &mut self,
-        span: TextSpan,
+        span: TextLocation,
         struct_name: &str,
         unassigned_fields: &[&str],
     ) {
@@ -354,7 +384,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_invalid_top_level_statement(&mut self, span: TextSpan, kind: SyntaxNodeKind) {
+    pub fn report_invalid_top_level_statement(&mut self, span: TextLocation, kind: SyntaxNodeKind) {
         let message = format!(
             "{:?} is no valid top level statement. Use functions instead.",
             kind
@@ -362,12 +392,16 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_unknown_type(&mut self, span: TextSpan, type_name: &str) {
-        let message = format!("Unknown type {} found.", type_name);
-        self.report(message.into(), span);
+    pub fn report_unknown_type(&mut self, location: TextLocation, type_name: impl Into<Message>) {
+        let message = message_format!("Unknown type ", type_name, " found.");
+        self.report(message, location);
     }
 
-    pub fn report_missing_return_value(&mut self, span: TextSpan, expected_return_type: TypeId) {
+    pub fn report_missing_return_value(
+        &mut self,
+        span: TextLocation,
+        expected_return_type: TypeId,
+    ) {
         let message: &[Message] = &[
             "Function returns type ".into(),
             expected_return_type.into(),
@@ -378,7 +412,7 @@ impl<'a> DiagnosticBag<'a> {
 
     pub fn report_missing_return_statement(
         &mut self,
-        span: TextSpan,
+        span: TextLocation,
         expected_return_type: TypeId,
     ) {
         let message: &[Message] = &[
@@ -389,12 +423,17 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message.into(), span);
     }
 
-    pub fn report_invalid_variable_type_none(&mut self, span: TextSpan) {
+    pub fn report_invalid_variable_type_none(&mut self, span: TextLocation) {
         let message = "Variables cannot be assigned none, without type information. Try adding a : TypeDeclaration.".into();
         self.report(message, span);
     }
 
-    pub fn report_unnecessary_cast(&mut self, span: TextSpan, from_type: TypeId, to_type: TypeId) {
+    pub fn report_unnecessary_cast(
+        &mut self,
+        span: TextLocation,
+        from_type: TypeId,
+        to_type: TypeId,
+    ) {
         let message = message_format!(
             "No cast necessary between types ",
             from_type,
@@ -407,7 +446,12 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_impossible_cast(&mut self, span: TextSpan, from_type: TypeId, to_type: TypeId) {
+    pub fn report_impossible_cast(
+        &mut self,
+        span: TextLocation,
+        from_type: TypeId,
+        to_type: TypeId,
+    ) {
         let message = message_format!(
             "No cast possible between types ",
             from_type,
@@ -420,57 +464,61 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_expected_constant(&mut self, span: TextSpan) {
+    pub fn report_expected_constant(&mut self, span: TextLocation) {
         let message = "Only constant expressions are allowed here.".into();
         self.report(message, span);
     }
 
-    pub fn report_only_function_call_in_import_statement(&mut self, span: TextSpan) {
+    pub fn report_only_function_call_in_import_statement(&mut self, span: TextLocation) {
         let message =
             "Only function calls like lib('path/to/lib.sld') are valid in import statements."
                 .into();
         self.report(message, span);
     }
 
-    pub fn report_unknown_import_function(&mut self, span: TextSpan, function_name: &str) {
-        let message = format!(
-            "No function named {} found for imports. Use lib('path/to/lib.sld') instead.",
-            function_name
+    pub fn report_unknown_import_function(
+        &mut self,
+        location: TextLocation,
+        function_name: TextLocation,
+    ) {
+        let message = message_format!(
+            "No function named ",
+            function_name,
+            " found for imports. Use lib('path/to/lib.sld') instead."
         );
-        self.report(message.into(), span);
+        self.report(message, location);
     }
 
-    pub(crate) fn report_unknown_library(&mut self, span: TextSpan, library_name: &str) {
-        let message = format!(
-            "No library named {} found. Did you misspell it? Or are you missing an import?",
-            library_name
+    pub(crate) fn report_unknown_library(&mut self, span: TextLocation, library_name: TextLocation) {
+        let message = message_format!(
+            "No library named ", library_name, " found. Did you misspell it? Or are you missing an import?",
         );
-        self.report(message.into(), span);
+        self.report(message, span);
     }
 
-    pub fn report_errors_in_referenced_library(&mut self, span: TextSpan, library_name: &str) {
+    pub fn report_errors_in_referenced_library(&mut self, span: TextLocation, library_name: &str) {
         let message = format!("Errors in {} found. Fix them and recompile.", library_name);
         self.report(message.into(), span);
     }
 
-    pub fn report_no_main_function_found(&mut self) {
+    pub fn report_no_main_function_found(&mut self, source_text: SourceTextId) {
         let message =
             "No main() function found in file. Did you forget it? Or maybe this is a library."
                 .into();
-        self.report(message, TextSpan::zero());
+        self.report(message, TextLocation::zero_in_file(source_text));
     }
 
-    pub fn report_invalid_field_name(&mut self, span: TextSpan, field_name: &str) {
+    pub fn report_invalid_field_name(&mut self, span: TextLocation, field_name: &str) {
         let message = format!("Cannot use $ fields in code. Field was {}.", field_name);
         self.report(message.into(), span);
     }
 
-    pub fn report_unrecognized_operator_function(&mut self, span: TextSpan, identifier: &str) {
-        let message = format!("Function name {} was not recognized as a valid operator functions. Remove the $ if you want to call this function. Or use a valid name like $constructor.", identifier);
-        self.report(message.into(), span);
+    pub fn report_unrecognized_operator_function(&mut self, span: TextLocation, identifier: TextLocation) {
+        let message = message_format!("Function name ", identifier, " was not recognized as a valid operator functions. Remove the $ if you want to call this function. Or use a valid name like $constructor.");
+        self.report(message, span);
     }
 
-    pub fn report_cannot_index_get(&mut self, span: TextSpan, type_: TypeId) {
+    pub fn report_cannot_index_get(&mut self, span: TextLocation, type_: TypeId) {
         let message = message_format!(
             "Type ",
             type_,
@@ -479,7 +527,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_cannot_index_set(&mut self, span: TextSpan, type_: TypeId) {
+    pub fn report_cannot_index_set(&mut self, span: TextLocation, type_: TypeId) {
         let message = message_format!(
             "Type ",
             type_,
@@ -488,7 +536,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_cannot_iterate(&mut self, span: TextSpan, type_: TypeId) {
+    pub fn report_cannot_iterate(&mut self, span: TextLocation, type_: TypeId) {
         let message = message_format!(
             "Type ",
             type_,
@@ -497,16 +545,22 @@ impl<'a> DiagnosticBag<'a> {
         self.report(message, span);
     }
 
-    pub fn report_generic_type_in_ungeneric_struct(&mut self, span: TextSpan, struct_name: &str) {
-        let message =
-            format!("Used generic type in struct {struct_name} without declaring it as 'generic'.")
-                .into();
+    pub fn report_generic_type_in_ungeneric_struct(
+        &mut self,
+        span: TextLocation,
+        struct_name: TextLocation,
+    ) {
+        let message = message_format!(
+            "Used generic type in struct ",
+            struct_name,
+            " without declaring it as 'generic'."
+        );
         // TODO: Add hint to struct declaration.
         self.report(message, span);
     }
 
     // Runtime Errors
-    pub fn no_heap_memory_left(&mut self, span: Option<TextSpan>, needed_memory_in_bytes: u64) {
+    pub fn no_heap_memory_left(&mut self, span: Option<TextLocation>, needed_memory_in_bytes: u64) {
         let message = format!(
             "Out of memory. No heap memory for {} bytes left.",
             needed_memory_in_bytes
@@ -514,7 +568,7 @@ impl<'a> DiagnosticBag<'a> {
         self.report_runtime(message.into(), span);
     }
 
-    pub fn division_by_zero(&mut self, span: Option<TextSpan>) {
+    pub fn division_by_zero(&mut self, span: Option<TextLocation>) {
         let message = "Divison by Zero.".into();
         self.report_runtime(message, span);
     }

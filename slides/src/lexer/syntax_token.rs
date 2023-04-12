@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod tests;
 
-use crate::text::TextSpan;
+use crate::text::{SourceTextId, TextLocation, TextSpan};
 
-#[derive(Debug, Clone)]
-pub struct SyntaxToken<'a> {
+#[derive(Debug, Clone, Copy)]
+pub struct SyntaxToken {
     pub kind: SyntaxTokenKind,
-    pub lexeme: &'a str,
-    pub start: usize,
+    pub location: TextLocation,
 }
 
 #[macro_export]
@@ -21,75 +20,82 @@ macro_rules! const_number_literal_syntax_token {
     };
 }
 
-impl<'a> SyntaxToken<'a> {
-    pub fn error(start: usize, kind: SyntaxTokenKind) -> Self {
-        Self {
-            start,
-            lexeme: "error",
-            kind,
-        }
+impl SyntaxToken {
+    pub fn error(location: TextLocation, kind: SyntaxTokenKind) -> Self {
+        Self { kind, location }
     }
 
-    pub fn number_literal(start: usize, lexeme: &'a str) -> Self {
+    pub fn number_literal(start: usize, lexeme: &str, source_text: SourceTextId) -> Self {
         Self {
-            start,
-            lexeme,
             kind: SyntaxTokenKind::NumberLiteral,
+            location: TextLocation {
+                span: TextSpan::new(start, lexeme.len(), false),
+                source_text,
+            },
         }
     }
 
-    pub fn string_literal(start: usize, lexeme: &'a str) -> Self {
+    pub fn string_literal(start: usize, lexeme: &str, source_text: SourceTextId) -> Self {
         Self {
-            start,
-            lexeme,
             kind: SyntaxTokenKind::StringLiteral,
+            location: TextLocation {
+                span: TextSpan::new(start, lexeme.len(), false),
+                source_text,
+            },
         }
     }
 
-    pub fn keyword(start: usize, lexeme: &'a str) -> Self {
+    pub fn keyword(start: usize, lexeme: &str, source_text: SourceTextId) -> Self {
         let kind = SyntaxTokenKind::keyword(lexeme).expect(lexeme);
         Self {
             kind,
-            lexeme,
-            start,
+            location: TextLocation {
+                span: TextSpan::new(start, lexeme.len(), false),
+                source_text,
+            },
         }
     }
 
-    pub fn identifier(start: usize, lexeme: &'a str) -> Self {
+    pub fn identifier(start: usize, lexeme: &str, source_text: SourceTextId) -> Self {
         Self {
             kind: SyntaxTokenKind::Identifier,
-            lexeme,
-            start,
+            location: TextLocation {
+                span: TextSpan::new(start, lexeme.len(), false),
+                source_text,
+            },
         }
     }
 
-    pub fn operator(start: usize, lexeme: &'a str) -> Self {
+    pub fn operator(start: usize, lexeme: &str, source_text: SourceTextId) -> Self {
         let kind = lexeme.into();
         Self {
             kind,
-            lexeme,
-            start,
+            location: TextLocation {
+                span: TextSpan::new(start, lexeme.len(), false),
+                source_text,
+            },
         }
     }
 
-    pub fn bracket_pair(lbracket: SyntaxToken, _rbracket: SyntaxToken) -> Self {
+    pub fn bracket_pair(lbracket: SyntaxToken, rbracket: SyntaxToken) -> Self {
         Self {
             kind: SyntaxTokenKind::BracketPair,
-            lexeme: "[]", // TODO: use actual lexeme
-            start: lbracket.start,
+            location: TextLocation::bounds(lbracket.location, rbracket.location),
         }
     }
 
-    pub fn eoi(start: usize) -> Self {
+    pub fn eoi(start: usize, source_text: SourceTextId) -> Self {
         Self {
             kind: SyntaxTokenKind::Eoi,
-            lexeme: "",
-            start,
+            location: TextLocation {
+                span: TextSpan::new(start, 0, false),
+                source_text,
+            },
         }
     }
 
     pub fn span(&self) -> TextSpan {
-        TextSpan::new(self.start, self.lexeme.chars().count(), false)
+        self.location.span
     }
 }
 

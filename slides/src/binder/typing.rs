@@ -234,8 +234,8 @@ impl<T: TypeCollectionIndex> Index<T> for TypeCollection {
 
 #[derive(Debug, Clone)]
 pub struct TypeCollection {
-    types: Vec<Type>,
-    generic_types: Vec<GenericType>,
+    pub types: Vec<Type>,
+    pub generic_types: Vec<GenericType>,
 }
 
 impl TypeCollection {
@@ -281,6 +281,9 @@ impl TypeCollection {
             None => {
                 let result = self.types.len();
                 self.types.push(type_);
+                // if result == 30 {
+                //     panic!();
+                // }
                 result
             }
         };
@@ -455,7 +458,11 @@ impl TypeCollection {
             self.generic_types.len()
         );
         for (index, generic_type) in self.generic_types.iter().enumerate() {
-            println!("  {:2}. {}", index, self.name_of_generic_type_debug(generic_type));
+            println!(
+                "  {:2}. {}",
+                index,
+                self.name_of_generic_type_debug(generic_type)
+            );
         }
     }
 
@@ -496,10 +503,32 @@ impl TypeCollection {
             return replace_with;
         }
         match &self[type_] {
-            Type::StructPlaceholder(_, _) => unreachable!(),
-            Type::Function(_) => todo!(),
+            Type::StructPlaceholder(name, _) => {
+                dbg!(name);
+                todo!()
+            }
+            Type::Function(it) => {
+                let it = it.clone();
+                let parameter_types = it
+                    .parameter_types
+                    .into_iter()
+                    .map(|t| self.replace_in_type_for_type(t, replace, replace_with))
+                    .collect();
+                let this_type = it
+                    .this_type
+                    .map(|t| self.replace_in_type_for_type(t, replace, replace_with));
+                let return_type =
+                    self.replace_in_type_for_type(it.return_type, replace, replace_with);
+                self.look_up_or_add_type(Type::Function(FunctionType {
+                    parameter_types,
+                    this_type,
+                    return_type,
+                    system_call_kind: it.system_call_kind,
+                    name: it.name,
+                    is_generic: it.is_generic,
+                }))
+            }
             Type::Closure(_) => todo!(),
-            Type::Struct(_) => todo!(),
             Type::Noneable(it) => {
                 let it = self.replace_in_type_for_type(*it, replace, replace_with);
                 self.look_up_or_add_type(Type::Noneable(it))
@@ -507,6 +536,22 @@ impl TypeCollection {
             Type::PointerOf(it) => {
                 let it = self.replace_in_type_for_type(*it, replace, replace_with);
                 self.look_up_or_add_type(Type::PointerOf(it))
+            }
+            Type::Struct(struct_type) if struct_type.applied_type.is_some() => {
+                if Some(replace) == struct_type.applied_type {
+                    self.look_up_type_by_name(&format!(
+                        "{}<{}>",
+                        // Get the base part of the generic struct
+                        struct_type.name.split_once('<').unwrap().0,
+                        self.name(replace_with)
+                    ))
+                    .expect(
+                        "Convert the applied type of the struct in a better way then currently!",
+                    )
+                    .unwrap_type_id()
+                } else {
+                    type_
+                }
             }
             _ => type_,
         }
@@ -517,12 +562,11 @@ impl TypeCollection {
     /// GenericTypeId into a TypeId. This is used to bind parameters to a type.
     pub(crate) fn to_fake_type_id(&mut self, it: GenericTypeId) -> TypeId {
         match self[it].clone() {
-            GenericType::StructPlaceholder(name, _) => {
-                self.look_up_or_add_type(Type::StructPlaceholder(
+            GenericType::StructPlaceholder(name, struct_function_table) => self
+                .look_up_or_add_type(Type::StructPlaceholder(
                     format!("{}<$Type>", name),
-                    SimpleStructFunctionTable::default(),
-                ))
-            }
+                    struct_function_table,
+                )),
             GenericType::Struct(struct_type, _) => {
                 let struct_type = StructType {
                     name: format!("{}<$Type>", struct_type.name),
@@ -545,6 +589,18 @@ impl TypeCollection {
                 };
                 self.look_up_or_add_type(Type::Function(function_type))
             }
+        }
+    }
+
+    pub(crate) fn for_each_type(&mut self, mut cb: impl FnMut(&mut Type)) {
+        for ty in &mut self.types {
+            cb(ty);
+        }
+    }
+
+    pub(crate) fn for_each_generic_type(&mut self, mut cb: impl FnMut(&mut GenericType)) {
+        for ty in &mut self.generic_types {
+            cb(ty);
         }
     }
 }
@@ -610,6 +666,20 @@ impl GenericType {
             _ => None,
         }
     }
+
+    fn as_struct_type(&self) -> Option<&StructType> {
+        match self {
+            GenericType::Struct(it, _) => Some(it),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn as_struct_type_mut(&mut self) -> Option<&mut StructType> {
+        match self {
+            GenericType::Struct(it, _) => Some(it),
+            _ => None,
+        }
+    }
 }
 
 impl TypeCollectionIndexOutput<GenericTypeId> for GenericType {
@@ -670,6 +740,14 @@ impl Type {
 
     pub fn type_identifier_size_in_words(&self) -> u64 {
         1
+    }
+
+    pub fn raw_size_in_bytes(&self) -> u64 {
+        if let Type::Struct(s) = self {
+            s.size_in_bytes
+        } else {
+            self.size_in_bytes()
+        }
     }
 
     pub fn size_in_bytes(&self) -> u64 {
@@ -734,6 +812,14 @@ impl Type {
     }
 
     pub(crate) fn as_struct_type(&self) -> Option<&StructType> {
+        if let Type::Struct(it) = self {
+            Some(it)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn as_struct_type_mut(&mut self) -> Option<&mut StructType> {
         if let Type::Struct(it) = self {
             Some(it)
         } else {
@@ -943,6 +1029,20 @@ impl FunctionType<TypeId> {
     }
 }
 
+impl FunctionType<GenericTypeId> {
+    pub(crate) fn to_fake_type_id(&self, types: &mut TypeCollection) -> Cow<FunctionType<TypeId>> {
+        let result = FunctionType {
+            parameter_types: self.parameter_types.clone(),
+            this_type: self.this_type.map(|t| types.to_fake_type_id(t)),
+            return_type: self.return_type,
+            system_call_kind: self.system_call_kind,
+            name: self.name.clone(),
+            is_generic: self.is_generic,
+        };
+        Cow::Owned(result)
+    }
+}
+
 impl<T> FunctionType<T> {
     pub fn error() -> Self {
         Self {
@@ -1105,14 +1205,6 @@ pub enum MemberOffsetOrAddress {
 }
 
 impl MemberOffsetOrAddress {
-    pub(crate) fn unwrap_address(&self) -> usize {
-        if let Self::Address(it) = self {
-            *it
-        } else {
-            panic!("Expected address, but found offset!");
-        }
-    }
-
     pub(crate) fn unwrap_offset(&self) -> usize {
         if let Self::Offset(it) = self {
             *it

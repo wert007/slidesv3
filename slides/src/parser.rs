@@ -11,23 +11,26 @@ use crate::{
         syntax_token::{SyntaxToken, SyntaxTokenKind},
     },
     parser::syntax_nodes::{FunctionTypeNode, ReturnTypeNode, TypeDeclaration},
-    text::{SourceText, TextSpan},
+    text::{SourceTextCollection, SourceTextId, TextLocation},
     DebugFlags,
 };
 
-use self::syntax_nodes::{ElseClause, ParameterNode, StructBodyNode, SyntaxNode, TypeNode, EnumBodyNode, EnumValueNode};
+use self::syntax_nodes::{
+    ElseClause, EnumBodyNode, EnumValueNode, ParameterNode, StructBodyNode, SyntaxNode, TypeNode,
+};
 
 struct Parser<'a, 'b> {
-    tokens: VecDeque<SyntaxToken<'a>>,
-    diagnostic_bag: &'b mut DiagnosticBag<'a>,
+    tokens: VecDeque<SyntaxToken>,
+    diagnostic_bag: &'a mut DiagnosticBag,
+    source_texts: &'b SourceTextCollection,
 }
 
-impl<'a> Parser<'a, '_> {
+impl Parser<'_, '_> {
     fn token_count(&self) -> usize {
         self.tokens.len()
     }
 
-    fn next_token(&mut self) -> SyntaxToken<'a> {
+    fn next_token(&mut self) -> SyntaxToken {
         if self.tokens.is_empty() {
             panic!("No tokens could be found!")
         } else if self.tokens.len() == 1 {
@@ -37,7 +40,7 @@ impl<'a> Parser<'a, '_> {
         }
     }
 
-    fn peek_token(&self) -> &SyntaxToken<'a> {
+    fn peek_token(&self) -> &SyntaxToken {
         if self.tokens.is_empty() {
             panic!("No tokens could be found!")
         } else {
@@ -45,7 +48,7 @@ impl<'a> Parser<'a, '_> {
         }
     }
 
-    fn peek_n_token(&self, n: usize) -> &SyntaxToken<'a> {
+    fn peek_n_token(&self, n: usize) -> &SyntaxToken {
         if self.tokens.is_empty() {
             panic!("No tokens could be found!")
         } else if self.tokens.len() > n {
@@ -55,40 +58,46 @@ impl<'a> Parser<'a, '_> {
         }
     }
 
-    fn match_token(&mut self, kind: SyntaxTokenKind) -> SyntaxToken<'a> {
+    fn match_token(&mut self, kind: SyntaxTokenKind) -> SyntaxToken {
         let current_token_kind = self.peek_token().kind;
-        let current_token_span = self.peek_token().span();
-        let current_token_start = self.peek_token().start;
+        let current_token_location = self.peek_token().location;
         if current_token_kind == kind {
             self.next_token()
         } else {
             self.diagnostic_bag.report_unexpected_token_kind(
-                current_token_span,
+                current_token_location,
                 current_token_kind,
                 kind,
             );
-            SyntaxToken::error(current_token_start, kind)
+            SyntaxToken::error(current_token_location, kind)
         }
     }
 }
 
-pub fn parse<'a>(
-    source_text: &'a SourceText<'a>,
-    diagnostic_bag: &mut DiagnosticBag<'a>,
+pub fn parse(
+    source_text: SourceTextId,
+    source_text_collection: &SourceTextCollection,
+    diagnostic_bag: &mut DiagnosticBag,
     debug_flags: DebugFlags,
-) -> SyntaxNode<'a> {
-    let tokens = lexer::lex(source_text, diagnostic_bag, debug_flags);
+) -> SyntaxNode {
+    let tokens = lexer::lex(
+        source_text,
+        source_text_collection,
+        diagnostic_bag,
+        debug_flags,
+    );
     if diagnostic_bag.has_errors() {
-        return SyntaxNode::error(0);
+        return SyntaxNode::error(TextLocation::zero_in_file(source_text));
     }
     let mut parser = Parser {
         tokens,
         diagnostic_bag,
+        source_texts: source_text_collection,
     };
     parse_compilation_unit(&mut parser)
 }
 
-fn parse_compilation_unit<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_compilation_unit(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let mut statements = vec![];
     while parser.peek_token().kind != SyntaxTokenKind::Eoi {
         let token_count = parser.token_count();
@@ -101,7 +110,7 @@ fn parse_compilation_unit<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     SyntaxNode::compilation_unit(statements, eoi)
 }
 
-fn parse_top_level_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_top_level_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     match parser.peek_token().kind {
         SyntaxTokenKind::ImportKeyword => parse_import_statement(parser),
         SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
@@ -112,29 +121,29 @@ fn parse_top_level_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> 
             SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
             _ => {
                 let token = parser.next_token();
-                let span = token.span();
+                let span = token.location;
                 parser.diagnostic_bag.report_unexpected_token_kind(
                     span,
                     token.kind,
                     SyntaxTokenKind::FuncKeyword,
                 );
-                SyntaxNode::error(span.start())
+                SyntaxNode::error(token.location)
             }
         },
         _ => {
             let token = parser.next_token();
-            let span = token.span();
+            let span = token.location;
             parser.diagnostic_bag.report_unexpected_token_kind(
                 span,
                 token.kind,
                 SyntaxTokenKind::FuncKeyword,
             );
-            SyntaxNode::error(span.start())
+            SyntaxNode::error(token.location)
         }
     }
 }
 
-fn parse_import_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_import_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let import_keyword = parser.match_token(SyntaxTokenKind::ImportKeyword);
     // This currently, and probably always, can only be a function call.
     let expression = parse_function_call(parser);
@@ -151,7 +160,7 @@ fn parse_import_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     )
 }
 
-fn parse_function_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_function_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let optional_generic_keyword = if parser.peek_token().kind == SyntaxTokenKind::GenericKeyword {
         Some(parser.match_token(SyntaxTokenKind::GenericKeyword))
     } else {
@@ -171,7 +180,7 @@ fn parse_function_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     )
 }
 
-fn parse_struct_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_struct_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let optional_generic_keyword = if parser.peek_token().kind == SyntaxTokenKind::GenericKeyword {
         Some(parser.match_token(SyntaxTokenKind::GenericKeyword))
     } else {
@@ -187,10 +196,16 @@ fn parse_struct_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     };
     let body = parse_struct_body(optional_generic_keyword.is_some(), parser);
 
-    SyntaxNode::struct_declaration(optional_generic_keyword, struct_keyword, identifier, parent, body)
+    SyntaxNode::struct_declaration(
+        optional_generic_keyword,
+        struct_keyword,
+        identifier,
+        parent,
+        body,
+    )
 }
 
-fn parse_enum_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_enum_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let enum_keyword = parser.match_token(SyntaxTokenKind::EnumKeyword);
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
     let body = parse_enum_body(parser);
@@ -198,7 +213,7 @@ fn parse_enum_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     SyntaxNode::enum_declaration(enum_keyword, identifier, body)
 }
 
-fn parse_function_type<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> FunctionTypeNode<'a> {
+fn parse_function_type(is_generic: bool, parser: &mut Parser<'_, '_>) -> FunctionTypeNode {
     let lparen = parser.match_token(SyntaxTokenKind::LParen);
     let mut parameters = vec![];
     let mut comma_tokens = vec![];
@@ -240,7 +255,7 @@ fn parse_function_type<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> Fun
     )
 }
 
-fn parse_struct_body<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> StructBodyNode<'a> {
+fn parse_struct_body(is_generic: bool, parser: &mut Parser<'_, '_>) -> StructBodyNode {
     let lbrace = parser.match_token(SyntaxTokenKind::LBrace);
     let mut statements = vec![];
     while !matches!(
@@ -260,11 +275,11 @@ fn parse_struct_body<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> Struc
             _ => {
                 let current = parser.next_token();
                 parser.diagnostic_bag.report_unexpected_token_kind(
-                    current.span(),
+                    current.location,
                     current.kind,
                     SyntaxTokenKind::Identifier,
                 );
-                SyntaxNode::error(current.start)
+                SyntaxNode::error(current.location)
             }
         };
         statements.push(statement);
@@ -277,7 +292,7 @@ fn parse_struct_body<'a>(is_generic: bool, parser: &mut Parser<'a, '_>) -> Struc
     StructBodyNode::new(is_generic, lbrace, statements, rbrace)
 }
 
-fn parse_enum_body<'a>(parser: &mut Parser<'a, '_>) -> EnumBodyNode<'a> {
+fn parse_enum_body(parser: &mut Parser<'_, '_>) -> EnumBodyNode {
     let lbrace = parser.match_token(SyntaxTokenKind::LBrace);
     let mut values = Vec::new();
     while !matches!(
@@ -299,14 +314,14 @@ fn parse_enum_body<'a>(parser: &mut Parser<'a, '_>) -> EnumBodyNode<'a> {
     EnumBodyNode::new(lbrace, values, rbrace)
 }
 
-fn parse_parameter<'a>(parser: &mut Parser<'a, '_>) -> ParameterNode<'a> {
+fn parse_parameter(parser: &mut Parser<'_, '_>) -> ParameterNode {
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
     let colon_token = parser.match_token(SyntaxTokenKind::Colon);
     let type_ = parse_type(parser);
     ParameterNode::new(identifier, colon_token, type_)
 }
 
-fn parse_type<'a>(parser: &mut Parser<'a, '_>) -> TypeNode<'a> {
+fn parse_type(parser: &mut Parser<'_, '_>) -> TypeNode {
     let optional_ampersand_token = if parser.peek_token().kind == SyntaxTokenKind::Ampersand {
         Some(parser.match_token(SyntaxTokenKind::Ampersand))
     } else {
@@ -354,7 +369,7 @@ fn parse_type<'a>(parser: &mut Parser<'a, '_>) -> TypeNode<'a> {
     )
 }
 
-fn parse_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     match parser.peek_token().kind {
         SyntaxTokenKind::LBrace => parse_block_statement(parser),
         SyntaxTokenKind::ForKeyword => parse_for_statement(parser),
@@ -366,7 +381,7 @@ fn parse_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     }
 }
 
-fn parse_block_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_block_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let open_brace_token = parser.match_token(SyntaxTokenKind::LBrace);
     let mut statements = vec![];
     while !matches!(
@@ -383,7 +398,7 @@ fn parse_block_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     SyntaxNode::block_statement(open_brace_token, statements, close_brace_token)
 }
 
-fn parse_for_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_for_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let for_keyword = parser.match_token(SyntaxTokenKind::ForKeyword);
     let mut variable = parser.match_token(SyntaxTokenKind::Identifier);
     let optional_index_variable = if parser.peek_token().kind == SyntaxTokenKind::Comma {
@@ -408,7 +423,7 @@ fn parse_for_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     )
 }
 
-fn parse_if_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_if_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let if_keyword = parser.match_token(SyntaxTokenKind::IfKeyword);
     let condition = parse_expression(parser);
     let body = parse_block_statement(parser);
@@ -420,7 +435,7 @@ fn parse_if_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     SyntaxNode::if_statement(if_keyword, condition, body, else_clause)
 }
 
-fn parse_else_clause<'a>(parser: &mut Parser<'a, '_>) -> ElseClause<'a> {
+fn parse_else_clause(parser: &mut Parser<'_, '_>) -> ElseClause {
     let else_keyword = parser.match_token(SyntaxTokenKind::ElseKeyword);
     let body = if parser.peek_token().kind == SyntaxTokenKind::IfKeyword {
         parse_if_statement(parser)
@@ -430,14 +445,17 @@ fn parse_else_clause<'a>(parser: &mut Parser<'a, '_>) -> ElseClause<'a> {
     ElseClause::new(else_keyword, body)
 }
 
-fn parse_variable_declaration<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_variable_declaration(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let let_keyword = parser.match_token(SyntaxTokenKind::LetKeyword);
     let identifier = if parser.peek_token().kind.is_keyword() {
         let token = parser.next_token();
         parser
             .diagnostic_bag
-            .report_cannot_declare_keyword_as_variable(token.span(), token.lexeme);
-        SyntaxToken::identifier(token.span().start(), "")
+            .report_cannot_declare_keyword_as_variable(
+                token.location,
+                token.location,
+            );
+        SyntaxToken::identifier(token.span().start(), "", token.location.source_text)
     } else {
         parser.match_token(SyntaxTokenKind::Identifier)
     };
@@ -461,7 +479,7 @@ fn parse_variable_declaration<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a>
     )
 }
 
-fn parse_return_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_return_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let return_keyword = parser.match_token(SyntaxTokenKind::ReturnKeyword);
     let optional_expression = if parser.peek_token().kind == SyntaxTokenKind::Semicolon {
         None
@@ -473,18 +491,18 @@ fn parse_return_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     SyntaxNode::return_statement(return_keyword, optional_expression, semicolon_token)
 }
 
-fn parse_while_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_while_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let while_keyword = parser.match_token(SyntaxTokenKind::WhileKeyword);
     let condition = parse_expression(parser);
     let body = parse_block_statement(parser);
     SyntaxNode::while_statement(while_keyword, condition, body)
 }
 
-fn parse_assignment_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_assignment_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let lhs = parse_binary_with_parent_precedence(parser, 1);
     if parser.peek_token().kind == SyntaxTokenKind::Equals {
         if !lhs.kind.is_assignable() && !lhs.is_inserted {
-            parser.diagnostic_bag.report_cannot_assign_to(lhs.span);
+            parser.diagnostic_bag.report_cannot_assign_to(lhs.location);
         }
         parser.next_token();
         let expression = parse_expression(parser);
@@ -496,18 +514,18 @@ fn parse_assignment_statement<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a>
     }
 }
 
-fn parse_expression<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_expression(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     parse_binary(parser)
 }
 
-fn parse_binary<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_binary(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     parse_binary_with_parent_precedence(parser, 0)
 }
 
-fn parse_binary_with_parent_precedence<'a>(
-    parser: &mut Parser<'a, '_>,
+fn parse_binary_with_parent_precedence(
+    parser: &mut Parser<'_, '_>,
     parent_precedence: u32,
-) -> SyntaxNode<'a> {
+) -> SyntaxNode {
     let mut lhs;
     let unary_precedence = parser.peek_token().kind.unary_precedence();
     if unary_precedence != 0 && unary_precedence >= parent_precedence {
@@ -526,7 +544,7 @@ fn parse_binary_with_parent_precedence<'a>(
 
         let operator_token = parser.next_token();
         if operator_token.kind == SyntaxTokenKind::Equals {
-            parser.diagnostic_bag.report_cannot_assign_to(lhs.span);
+            parser.diagnostic_bag.report_cannot_assign_to(lhs.location);
         }
         let rhs = parse_binary_with_parent_precedence(parser, precedence);
         lhs = SyntaxNode::binary(lhs, operator_token, rhs);
@@ -534,7 +552,7 @@ fn parse_binary_with_parent_precedence<'a>(
     lhs
 }
 
-fn parse_function_call<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_function_call(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let mut base = parse_primary(parser);
     loop {
         match parser.peek_token().kind {
@@ -575,11 +593,11 @@ fn parse_function_call<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
             SyntaxTokenKind::Period => {
                 let period = parser.next_token();
                 let identifier = parser.match_token(SyntaxTokenKind::Identifier);
-                base = if identifier.lexeme.starts_with('$') {
+                base = if parser.source_texts[identifier.location].starts_with('$') {
                     parser
                         .diagnostic_bag
-                        .report_invalid_field_name(identifier.span(), identifier.lexeme);
-                    SyntaxNode::error(base.span().start())
+                        .report_invalid_field_name(identifier.location, &parser.source_texts[identifier.location]);
+                    SyntaxNode::error(base.location)
                 } else {
                     SyntaxNode::field_access(base, period, identifier)
                 };
@@ -590,8 +608,8 @@ fn parse_function_call<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     base
 }
 
-fn parse_primary<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
-    let span = parser.peek_token().span();
+fn parse_primary(parser: &mut Parser<'_, '_>) -> SyntaxNode {
+    let location = parser.peek_token().location;
     match parser.peek_token().kind {
         SyntaxTokenKind::LParen => {
             let lparen = parser.next_token();
@@ -611,17 +629,17 @@ fn parse_primary<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
         SyntaxTokenKind::Identifier => parse_identifier(parser),
         unexpected_token => {
             parser.diagnostic_bag.report_unexpected_token_kind(
-                span,
+                location,
                 unexpected_token,
                 SyntaxTokenKind::NumberLiteral,
             );
             // parser.next_token();
-            SyntaxNode::error(span.start())
+            SyntaxNode::error(location)
         }
     }
 }
 
-fn parse_array_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_array_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let lbracket = parser.match_token(SyntaxTokenKind::LBracket);
     let mut children = vec![];
     let mut comma_tokens = vec![];
@@ -647,30 +665,32 @@ fn parse_array_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     }
     let rbracket = parser.match_token(SyntaxTokenKind::RBracket);
     if children.is_empty() {
-        let span = TextSpan::bounds(lbracket.span(), rbracket.span());
+        let location = TextLocation::bounds(lbracket.location, rbracket.location);
         parser.diagnostic_bag.report_not_supported(
-            span,
+            location,
             "Empty Array literals (`[]`) are not supported currently.",
         );
     }
     SyntaxNode::array_literal(lbracket, children, comma_tokens, rbracket)
 }
 
-fn parse_number_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_number_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     SyntaxNode::literal(
         parser.match_token(SyntaxTokenKind::NumberLiteral),
+        parser.source_texts,
         parser.diagnostic_bag,
     )
 }
 
-fn parse_string_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_string_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     SyntaxNode::literal(
         parser.match_token(SyntaxTokenKind::StringLiteral),
+        parser.source_texts,
         parser.diagnostic_bag,
     )
 }
 
-fn parse_boolean_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_boolean_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let token = parser.next_token();
     match token.kind {
         SyntaxTokenKind::TrueKeyword => SyntaxNode::true_literal(token),
@@ -679,12 +699,12 @@ fn parse_boolean_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     }
 }
 
-fn parse_none_literal<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_none_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let token = parser.match_token(SyntaxTokenKind::NoneKeyword);
     SyntaxNode::none_literal(token)
 }
 
-fn parse_cast_expression<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_cast_expression(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let cast_keyword = parser.match_token(SyntaxTokenKind::CastKeyword);
     let expression = parse_expression(parser);
     let colon_token = parser.match_token(SyntaxTokenKind::Colon);
@@ -693,7 +713,7 @@ fn parse_cast_expression<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     SyntaxNode::cast_expression(cast_keyword, expression, colon_token, type_)
 }
 
-fn parse_constructor<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_constructor(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let new_keyword = parser.match_token(SyntaxTokenKind::NewKeyword);
     let type_name = parser.match_token(SyntaxTokenKind::Identifier);
     let (library_name, type_name) = if parser.peek_token().kind == SyntaxTokenKind::Period {
@@ -738,6 +758,6 @@ fn parse_constructor<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
     )
 }
 
-fn parse_identifier<'a>(parser: &mut Parser<'a, '_>) -> SyntaxNode<'a> {
+fn parse_identifier(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     SyntaxNode::variable(parser.match_token(SyntaxTokenKind::Identifier))
 }

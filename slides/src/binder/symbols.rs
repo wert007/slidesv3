@@ -9,9 +9,7 @@ use crate::instruction_converter::{
 };
 
 use super::{
-    bound_nodes::BoundNode, typing::{TypeId, GenericTypeId, GenericType}, BoundGenericStructSymbol,
-    BoundMaybeGenericStructSymbol, BoundStructFieldSymbol, BoundStructSymbol,
-    FunctionDeclarationBody,
+    bound_nodes::BoundNode, typing::{TypeId, GenericTypeId, GenericType},
 };
 
 #[derive(Debug, Clone)]
@@ -108,17 +106,6 @@ pub struct FunctionSymbol {
     pub is_member_function: bool,
 }
 
-impl From<FunctionDeclarationBody<'_, TypeId>> for FunctionSymbol {
-    fn from(it: FunctionDeclarationBody<TypeId>) -> Self {
-        Self {
-            name: it.function_name.into(),
-            function_type: it.function_type,
-            function_label: it.function_label,
-            is_member_function: it.base_struct.is_some(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum MaybeGenericStructSymbol {
     Struct(StructSymbol),
@@ -137,34 +124,12 @@ impl From<GenericStructSymbol> for MaybeGenericStructSymbol {
     }
 }
 
-impl From<BoundMaybeGenericStructSymbol<'_>> for MaybeGenericStructSymbol {
-    fn from(it: BoundMaybeGenericStructSymbol) -> Self {
-        match it {
-            BoundMaybeGenericStructSymbol::Struct(it) => StructSymbol::from(it).into(),
-            BoundMaybeGenericStructSymbol::GenericStruct(it) => {
-                GenericStructSymbol::from(it).into()
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct StructSymbol {
     pub name: String,
     pub fields: Vec<StructFieldSymbol>,
     pub functions: Vec<StructFieldSymbol>,
     pub function_table: StructFunctionTable,
-}
-
-impl From<BoundStructSymbol<'_>> for StructSymbol {
-    fn from(it: BoundStructSymbol<'_>) -> Self {
-        Self {
-            name: it.name.into(),
-            fields: it.fields.into_iter().map(Into::into).collect(),
-            functions: it.functions.into_iter().map(Into::into).collect(),
-            function_table: it.function_table,
-        }
-    }
 }
 
 impl StructSymbol {
@@ -181,17 +146,6 @@ pub struct GenericStructSymbol {
     pub functions: Vec<GenericFunction>,
 }
 
-impl From<BoundGenericStructSymbol<'_>> for GenericStructSymbol {
-    fn from(it: BoundGenericStructSymbol<'_>) -> Self {
-        Self {
-            name: it.struct_type.name.into(),
-            fields: it.struct_type.fields.into_iter().map(Into::into).collect(),
-            function_table: it.struct_type.function_table,
-            functions: it.functions,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct StructFieldSymbol {
     pub name: String,
@@ -200,16 +154,16 @@ pub struct StructFieldSymbol {
     pub is_read_only: bool,
 }
 
-impl From<BoundStructFieldSymbol<'_>> for StructFieldSymbol {
-    fn from(it: BoundStructFieldSymbol<'_>) -> Self {
-        Self {
-            name: it.name.into(),
-            type_: it.type_,
-            offset: it.offset,
-            is_read_only: it.is_read_only,
-        }
-    }
-}
+// impl From<BoundStructFieldSymbol> for StructFieldSymbol {
+//     fn from(it: BoundStructFieldSymbol) -> Self {
+//         Self {
+//             name: it.name.into(),
+//             type_: it.type_,
+//             offset: it.offset,
+//             is_read_only: it.is_read_only,
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StructFunctionTable {

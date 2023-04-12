@@ -1,10 +1,14 @@
-use crate::{instruction_converter::instruction::op_codes::OpCode, DebugFlags};
+use crate::{
+    binder::typing::TypeCollection, instruction_converter::instruction::op_codes::OpCode,
+    DebugFlags,
+};
 
 use super::{instruction::Instruction, InstructionOrLabelReference};
 
 pub(crate) fn replace_labels(
     instructions: Vec<InstructionOrLabelReference>,
     debug_flags: DebugFlags,
+    types: &mut TypeCollection,
 ) -> Vec<Instruction> {
     let labels = collect_labels(&instructions);
     if debug_flags.print_labels {
@@ -12,12 +16,26 @@ pub(crate) fn replace_labels(
             println!("L{:X}: #{:x}", index, label);
         }
     }
+    types.for_each_type(|t| {
+        if let Some(s) = t.as_struct_type_mut() {
+            for f in s.function_table.function_symbols_iter_mut() {
+                f.function_label = labels[f.function_label as usize];
+            }
+        }
+    });
+    types.for_each_generic_type(|t| {
+        if let Some(s) = t.as_struct_type_mut() {
+            for f in s.function_table.function_symbols_iter_mut() {
+                f.function_label = labels[f.function_label as usize];
+            }
+        }
+    });
     instructions
         .into_iter()
         .map(|i_l| match i_l {
             InstructionOrLabelReference::Instruction(i) => i,
             InstructionOrLabelReference::LabelReference(l) => {
-                Instruction::load_pointer(labels[l.label_reference]).span(l.span)
+                Instruction::load_pointer(labels[l.label_reference]).location(l.span)
             }
         })
         .map(|i| {

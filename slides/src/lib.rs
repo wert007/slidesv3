@@ -16,12 +16,14 @@ use crate::{diagnostics::DiagnosticBag, text::SourceText};
 
 use binder::{symbols::Library, typing::TypeCollection};
 pub use debug::DebugFlags;
+use text::{SourceTextCollection, SourceTextId};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Project {
     types: TypeCollection,
     debug_flags: DebugFlags,
+    source_text_collection: SourceTextCollection,
 }
 
 impl Project {
@@ -29,42 +31,43 @@ impl Project {
         Self {
             types: TypeCollection::new(),
             debug_flags,
+            source_text_collection: SourceTextCollection::default(),
         }
     }
-    pub fn evaluate(&mut self, source_code: &str, file_name: &str) {
-        let source_text = SourceText::new(source_code, file_name);
-        let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+
+    pub fn evaluate(&mut self, source_text: &str, file_name: &str) {
+        let source_text = SourceText::new(source_text, file_name);
+        let source_text = self.source_text_collection.add(source_text);
+        let mut diagnostic_bag = DiagnosticBag::new();
         let result = instruction_converter::convert_with_project_parameter(
-            &source_text,
+            source_text,
             &mut diagnostic_bag,
             self,
         );
         // let result = binder::bind(input, &mut diagnostic_bag);
         if diagnostic_bag.has_errors() || !self.debug_flags.run_program {
-            diagnostic_bag.flush_to_console();
+            diagnostic_bag.flush_to_console(&self.source_text_collection);
             return;
         }
-        let result = evaluator::evaluate(result, &source_text, self.clone());
+        let result = evaluator::evaluate(result, source_text, self.clone());
         println!("= {}", result);
     }
 
     pub fn load_library(
         &mut self,
-        source_code: &str,
-        file_name: &str,
+        source_text: SourceTextId,
         import_std_libs: bool,
     ) -> Library {
-        let source_text = SourceText::new(source_code, file_name);
-        let mut diagnostic_bag = DiagnosticBag::new(&source_text);
+        let mut diagnostic_bag = DiagnosticBag::new();
         let mut result = instruction_converter::convert_library_with_project_parameter(
-            &source_text,
+            source_text,
             &mut diagnostic_bag,
             self,
             import_std_libs,
         );
         if diagnostic_bag.has_errors() {
             result.has_errors = true;
-            diagnostic_bag.flush_to_console();
+            diagnostic_bag.flush_to_console(&self.source_text_collection);
         }
         result
     }
@@ -80,7 +83,8 @@ impl Project {
         }
         let source_code = source_code.unwrap();
         let file_name = path.to_string_lossy();
-        self.load_library(&source_code, &file_name, import_std_libs)
+        let source_text = self.source_text_collection.add(SourceText::new(source_code, file_name));
+        self.load_library(source_text, import_std_libs)
     }
 
     pub(crate) fn maybe_print_type_table(&self) {

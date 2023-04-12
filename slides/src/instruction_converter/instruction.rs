@@ -1,6 +1,6 @@
 use num_enum::TryFromPrimitive;
 
-use crate::{binder::typing::SystemCallKind, text::TextSpan};
+use crate::{binder::typing::SystemCallKind, text::TextLocation};
 
 use self::op_codes::OpCode;
 
@@ -10,14 +10,14 @@ pub mod op_codes;
 pub struct Instruction {
     pub op_code: OpCode,
     pub arg: u64,
-    pub span: Option<TextSpan>,
+    pub location: Option<TextLocation>,
 }
 
 #[allow(dead_code)]
 impl Instruction {
-    pub fn span(mut self, span: TextSpan) -> Self {
-        assert!(self.span.is_none());
-        self.span = Some(span);
+    pub fn location(mut self, location: TextLocation) -> Self {
+        assert!(self.location.is_none());
+        self.location = Some(location);
         self
     }
 
@@ -25,7 +25,7 @@ impl Instruction {
         Self {
             op_code: OpCode::NoOp,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -33,7 +33,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LoadImmediate,
             arg: immediate,
-            span: None,
+            location: None,
         }
     }
 
@@ -41,7 +41,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LoadPointer,
             arg: pointer,
-            span: None,
+            location: None,
         }
     }
 
@@ -49,7 +49,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LoadPointer,
             arg: u64::MAX,
-            span: None,
+            location: None,
         }
     }
 
@@ -61,7 +61,7 @@ impl Instruction {
         Self {
             op_code: OpCode::DuplicateOver,
             arg: words_over,
-            span: None,
+            location: None,
         }
     }
 
@@ -69,7 +69,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Pop,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -77,7 +77,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LoadRegister,
             arg: register,
-            span: None,
+            location: None,
         }
     }
 
@@ -85,7 +85,7 @@ impl Instruction {
         Self {
             op_code: OpCode::StoreInRegister,
             arg: register,
-            span: None,
+            location: None,
         }
     }
 
@@ -93,7 +93,7 @@ impl Instruction {
         Self {
             op_code: OpCode::StoreInMemory,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -101,7 +101,7 @@ impl Instruction {
         Self {
             op_code: OpCode::WriteToStack,
             arg: address,
-            span: None,
+            location: None,
         }
     }
 
@@ -109,14 +109,14 @@ impl Instruction {
         Self {
             op_code: OpCode::WriteToHeap,
             arg: word_count,
-            span: None,
+            location: None,
         }
     }
     pub const fn allocate(size_in_bytes: u64) -> Self {
         Self {
             op_code: OpCode::Allocate,
             arg: size_in_bytes,
-            span: None,
+            location: None,
         }
     }
 
@@ -124,7 +124,7 @@ impl Instruction {
         Self {
             op_code: OpCode::ReadWordWithOffset,
             arg: offset,
-            span: None,
+            location: None,
         }
     }
 
@@ -132,7 +132,7 @@ impl Instruction {
         Self {
             op_code: OpCode::MemoryCopy,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -141,7 +141,7 @@ impl Instruction {
         Self {
             op_code: OpCode::MemoryCopy,
             arg: size_in_bytes,
-            span: None,
+            location: None,
         }
     }
 
@@ -149,7 +149,7 @@ impl Instruction {
         Self {
             op_code: OpCode::TypeIdentifier,
             arg: type_identifier,
-            span: None,
+            location: None,
         }
     }
 
@@ -157,7 +157,7 @@ impl Instruction {
         Self {
             op_code: OpCode::BitwiseTwosComplement,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -165,7 +165,7 @@ impl Instruction {
         Self {
             op_code: OpCode::BitwiseXor,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -173,7 +173,7 @@ impl Instruction {
         Self {
             op_code: OpCode::BitwiseNxor,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -181,7 +181,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Addition,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -189,7 +189,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Subtraction,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -197,7 +197,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Multiplication,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -205,7 +205,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Division,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -213,7 +213,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Equals,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -221,7 +221,7 @@ impl Instruction {
         Self {
             op_code: OpCode::NotEquals,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -229,7 +229,7 @@ impl Instruction {
         Self {
             op_code: OpCode::ArrayEquals,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -237,7 +237,7 @@ impl Instruction {
         Self {
             op_code: OpCode::ArrayNotEquals,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -245,7 +245,7 @@ impl Instruction {
         Self {
             op_code: OpCode::NoneableEquals,
             arg: size_in_bytes,
-            span: None,
+            location: None,
         }
     }
 
@@ -253,7 +253,7 @@ impl Instruction {
         Self {
             op_code: OpCode::TypeIdentifierEquals,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -261,7 +261,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LessThan,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -269,7 +269,7 @@ impl Instruction {
         Self {
             op_code: OpCode::GreaterThan,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -277,7 +277,7 @@ impl Instruction {
         Self {
             op_code: OpCode::LessThanEquals,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -285,7 +285,7 @@ impl Instruction {
         Self {
             op_code: OpCode::GreaterThanEquals,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -293,7 +293,7 @@ impl Instruction {
         Self {
             op_code: OpCode::StringConcat,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -301,7 +301,7 @@ impl Instruction {
         Self {
             op_code: OpCode::NoneableOrValue,
             arg: needs_dereferencing as _,
-            span: None,
+            location: None,
         }
     }
 
@@ -309,7 +309,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Jump,
             arg: label_index as _,
-            span: None,
+            location: None,
         }
     }
 
@@ -317,7 +317,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Jump,
             arg: address,
-            span: None,
+            location: None,
         }
     }
 
@@ -330,7 +330,7 @@ impl Instruction {
         Self {
             op_code,
             arg: label_index as _,
-            span: None,
+            location: None,
         }
     }
 
@@ -338,7 +338,7 @@ impl Instruction {
         Self {
             op_code: OpCode::JumpIfFalse,
             arg: address,
-            span: None,
+            location: None,
         }
     }
 
@@ -346,7 +346,7 @@ impl Instruction {
         Self {
             op_code: OpCode::JumpIfTrue,
             arg: address,
-            span: None,
+            location: None,
         }
     }
 
@@ -355,7 +355,7 @@ impl Instruction {
         Self {
             op_code: OpCode::SysCall,
             arg,
-            span: None,
+            location: None,
         }
     }
 
@@ -363,7 +363,7 @@ impl Instruction {
         Self {
             op_code: OpCode::FunctionCall,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 
@@ -371,7 +371,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Label,
             arg: index as _,
-            span: None,
+            location: None,
         }
     }
 
@@ -386,7 +386,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Return,
             arg,
-            span: None,
+            location: None,
         }
     }
 
@@ -394,7 +394,7 @@ impl Instruction {
         Self {
             op_code: OpCode::DecodeClosure,
             arg: (argument_count << 1) + has_function_pointer as u64,
-            span: None,
+            location: None,
         }
     }
 
@@ -402,7 +402,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Breakpoint,
             arg: 0,
-            span: None,
+            location: None,
         }
     }
 }

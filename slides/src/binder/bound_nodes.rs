@@ -1,4 +1,4 @@
-use crate::{text::TextSpan, value::Value};
+use crate::{text::TextLocation, value::Value};
 
 use super::{
     operators::{BoundBinaryOperator, BoundUnaryOperator},
@@ -23,7 +23,7 @@ impl From<Value> for BoundConstant {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct BoundNode {
-    pub span: TextSpan,
+    pub location: TextLocation,
     pub kind: BoundNodeKind,
     pub type_: TypeId,
     pub constant_value: Option<BoundConstant>,
@@ -34,19 +34,19 @@ impl BoundNode {
         self.kind.for_each_child_mut(function);
     }
 
-    pub fn error(span: TextSpan) -> Self {
+    pub fn error(span: TextLocation) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::ErrorExpression,
             type_: typeid!(Type::Error),
             constant_value: None,
         }
     }
 
-    pub fn literal_from_value(value: Value) -> Self {
+    pub fn literal(span: TextLocation, value: Value) -> Self {
         let type_ = value.infer_type();
         Self {
-            span: TextSpan::zero(),
+            location: span,
             kind: BoundNodeKind::LiteralExpression(BoundLiteralNodeKind {
                 value: value.clone(),
             }),
@@ -55,21 +55,9 @@ impl BoundNode {
         }
     }
 
-    pub fn literal(span: TextSpan, value: Value) -> Self {
-        let type_ = value.infer_type();
+    pub fn array_literal(span: TextLocation, children: Vec<BoundNode>, type_: TypeId) -> Self {
         Self {
-            span,
-            kind: BoundNodeKind::LiteralExpression(BoundLiteralNodeKind {
-                value: value.clone(),
-            }),
-            type_,
-            constant_value: Some(value.into()),
-        }
-    }
-
-    pub fn array_literal(span: TextSpan, children: Vec<BoundNode>, type_: TypeId) -> Self {
-        Self {
-            span,
+            location: span,
             kind: BoundNodeKind::ArrayLiteralExpression(BoundArrayLiteralNodeKind { children }),
             type_,
             constant_value: None,
@@ -77,13 +65,13 @@ impl BoundNode {
     }
 
     pub fn constructor_call(
-        span: TextSpan,
+        span: TextLocation,
         arguments: Vec<BoundNode>,
         base_type: TypeId,
         function: Option<u64>,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::ConstructorCall(Box::new(BoundConstructorCallNodeKind {
                 arguments,
                 base_type,
@@ -94,9 +82,9 @@ impl BoundNode {
         }
     }
 
-    pub fn variable(span: TextSpan, variable_index: u64, type_: TypeId) -> Self {
+    pub fn variable(span: TextLocation, variable_index: u64, type_: TypeId) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::VariableExpression(BoundVariableNodeKind { variable_index }),
             type_,
             constant_value: None,
@@ -104,14 +92,14 @@ impl BoundNode {
     }
 
     pub fn binary(
-        span: TextSpan,
+        span: TextLocation,
         lhs: BoundNode,
         operator_token: BoundBinaryOperator,
         rhs: BoundNode,
         type_: TypeId,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::BinaryExpression(BoundBinaryNodeKind {
                 lhs: Box::new(lhs),
                 operator_token,
@@ -122,8 +110,8 @@ impl BoundNode {
         }
     }
 
-    pub fn logical_and(span: TextSpan, lhs: BoundNode, rhs: BoundNode) -> Self {
-        let false_span = lhs.span;
+    pub fn logical_and(span: TextLocation, lhs: BoundNode, rhs: BoundNode) -> Self {
+        let false_span = lhs.location;
         Self::if_expression(
             span,
             lhs,
@@ -133,8 +121,8 @@ impl BoundNode {
         )
     }
 
-    pub fn logical_or(span: TextSpan, lhs: BoundNode, rhs: BoundNode) -> Self {
-        let true_span = lhs.span;
+    pub fn logical_or(span: TextLocation, lhs: BoundNode, rhs: BoundNode) -> Self {
+        let true_span = lhs.location;
         Self::if_expression(
             span,
             lhs,
@@ -145,13 +133,13 @@ impl BoundNode {
     }
 
     pub fn unary(
-        span: TextSpan,
+        span: TextLocation,
         operator_token: BoundUnaryOperator,
         operand: BoundNode,
         type_: TypeId,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::UnaryExpression(BoundUnaryNodeKind {
                 operator_token,
                 operand: Box::new(operand),
@@ -162,14 +150,14 @@ impl BoundNode {
     }
 
     pub fn function_call(
-        span: TextSpan,
+        span: TextLocation,
         base: BoundNode,
         arguments: Vec<BoundNode>,
         has_this_argument: bool,
         type_: TypeId,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
                 base: Box::new(base),
                 arguments,
@@ -180,9 +168,14 @@ impl BoundNode {
         }
     }
 
-    pub fn array_index(span: TextSpan, base: BoundNode, index: BoundNode, type_: TypeId) -> Self {
+    pub fn array_index(
+        span: TextLocation,
+        base: BoundNode,
+        index: BoundNode,
+        type_: TypeId,
+    ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::ArrayIndex(BoundArrayIndexNodeKind {
                 base: Box::new(base),
                 index: Box::new(index),
@@ -192,9 +185,9 @@ impl BoundNode {
         }
     }
 
-    pub fn field_access(span: TextSpan, base: BoundNode, offset: u64, type_: TypeId) -> Self {
+    pub fn field_access(span: TextLocation, base: BoundNode, offset: u64, type_: TypeId) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::FieldAccess(BoundFieldAccessNodeKind {
                 base: Box::new(base),
                 offset,
@@ -205,9 +198,9 @@ impl BoundNode {
         }
     }
 
-    pub fn closure(span: TextSpan, arguments: Vec<BoundNode>, id: u64, type_: TypeId) -> Self {
+    pub fn closure(span: TextLocation, arguments: Vec<BoundNode>, id: u64, type_: TypeId) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
                 arguments,
                 function: FunctionKind::FunctionId(id),
@@ -218,13 +211,13 @@ impl BoundNode {
     }
 
     pub fn closure_label(
-        span: TextSpan,
+        span: TextLocation,
         arguments: Vec<BoundNode>,
         label_index: usize,
         type_: TypeId,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
                 arguments,
                 function: FunctionKind::LabelReference(label_index),
@@ -235,13 +228,13 @@ impl BoundNode {
     }
 
     pub fn system_call_closure(
-        span: TextSpan,
+        span: TextLocation,
         arguments: Vec<BoundNode>,
         system_call_kind: SystemCallKind,
         type_: TypeId,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
                 arguments,
                 function: FunctionKind::SystemCall(system_call_kind),
@@ -251,9 +244,9 @@ impl BoundNode {
         }
     }
 
-    pub fn conversion(span: TextSpan, base: BoundNode, type_: TypeId) -> Self {
+    pub fn conversion(span: TextLocation, base: BoundNode, type_: TypeId) -> Self {
         Self {
-            span,
+            location: span,
             constant_value: base.constant_value.clone(),
             kind: BoundNodeKind::Conversion(BoundConversionNodeKind {
                 base: Box::new(base),
@@ -264,22 +257,22 @@ impl BoundNode {
     }
 
     pub fn system_call(
-        span: TextSpan,
+        span: TextLocation,
         base: SystemCallKind,
         arguments: Vec<BoundNode>,
         type_: TypeId,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::SystemCall(BoundSystemCallNodeKind { base, arguments }),
             type_,
             constant_value: None,
         }
     }
 
-    pub fn while_statement(span: TextSpan, condition: BoundNode, body: BoundNode) -> Self {
+    pub fn while_statement(span: TextLocation, condition: BoundNode, body: BoundNode) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::WhileStatement(BoundWhileStatementNodeKind {
                 condition: Box::new(condition),
                 body: Box::new(body),
@@ -303,7 +296,7 @@ impl BoundNode {
     /// }
 
     pub fn for_statement(
-        span: TextSpan,
+        span: TextLocation,
         index_variable: u64,
         collection_variable: u64,
         variable: BoundNode,
@@ -323,6 +316,7 @@ impl BoundNode {
             BoundNode::function_call(
                 span,
                 BoundNode::label_reference(
+                    span,
                     function_table
                         .element_count_function
                         .as_ref()
@@ -353,6 +347,7 @@ impl BoundNode {
                     BoundNode::function_call(
                         span,
                         BoundNode::label_reference(
+                            span,
                             function_table.get_function.as_ref().unwrap().function_label as usize,
                             function_table.get_function.as_ref().unwrap().function_type,
                         ),
@@ -391,7 +386,7 @@ impl BoundNode {
                             typeid!(Type::Integer(IntegerType::Unsigned64)),
                         ),
                         BoundBinaryOperator::ArithmeticAddition,
-                        BoundNode::literal_from_value(Value::Integer(1)),
+                        BoundNode::literal(span, Value::Integer(1)),
                         typeid!(Type::Integer(IntegerType::Unsigned64)),
                     ),
                 ),
@@ -404,7 +399,7 @@ impl BoundNode {
                 BoundNode::variable_declaration(
                     span,
                     index_variable,
-                    BoundNode::literal_from_value(Value::Integer(0)),
+                    BoundNode::literal(span, Value::Integer(0)),
                     None,
                 ), // let $index = 0;
                 BoundNode::while_statement(span, while_condition, while_body), // while $index < array length($collection)
@@ -413,13 +408,13 @@ impl BoundNode {
     }
 
     pub fn variable_declaration(
-        span: TextSpan,
+        span: TextLocation,
         variable_index: u64,
         initializer: BoundNode,
         variable_type: Option<TypeId>,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::VariableDeclaration(BoundVariableDeclarationNodeKind {
                 variable_index,
                 variable_type: variable_type.unwrap_or_else(|| initializer.type_.clone()),
@@ -431,7 +426,7 @@ impl BoundNode {
     }
 
     pub fn if_statement(
-        span: TextSpan,
+        span: TextLocation,
         condition: BoundNode,
         body: BoundNode,
         else_body: Option<BoundNode>,
@@ -440,7 +435,7 @@ impl BoundNode {
     }
 
     pub fn if_expression(
-        span: TextSpan,
+        span: TextLocation,
         condition: BoundNode,
         body: BoundNode,
         else_body: Option<BoundNode>,
@@ -450,7 +445,7 @@ impl BoundNode {
             assert_eq!(type_, typeid!(Type::Void));
         }
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::IfStatement(BoundIfStatementNodeKind {
                 condition: Box::new(condition),
                 body: Box::new(body),
@@ -461,9 +456,9 @@ impl BoundNode {
         }
     }
 
-    pub fn assignment(span: TextSpan, variable: BoundNode, expression: BoundNode) -> Self {
+    pub fn assignment(span: TextLocation, variable: BoundNode, expression: BoundNode) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::Assignment(BoundAssignmentNodeKind {
                 variable: Box::new(variable),
                 expression: Box::new(expression),
@@ -473,13 +468,17 @@ impl BoundNode {
         }
     }
 
-    pub fn block_statement(span: TextSpan, statements: Vec<BoundNode>) -> Self {
+    pub fn block_statement(span: TextLocation, statements: Vec<BoundNode>) -> Self {
         Self::block_expression(span, statements, typeid!(Type::Void))
     }
 
-    pub fn block_expression(span: TextSpan, expressions: Vec<BoundNode>, type_: TypeId) -> Self {
+    pub fn block_expression(
+        span: TextLocation,
+        expressions: Vec<BoundNode>,
+        type_: TypeId,
+    ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::BlockStatement(BoundBlockStatementNodeKind {
                 statements: expressions,
             }),
@@ -488,9 +487,9 @@ impl BoundNode {
         }
     }
 
-    pub fn expression_statement(span: TextSpan, expression: BoundNode) -> Self {
+    pub fn expression_statement(span: TextLocation, expression: BoundNode) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::ExpressionStatement(BoundExpressionStatementNodeKind {
                 expression: Box::new(expression),
             }),
@@ -507,7 +506,7 @@ impl BoundNode {
         base_register: Option<u64>,
     ) -> Self {
         Self {
-            span: body.span,
+            location: body.location,
             kind: BoundNodeKind::FunctionDeclaration(BoundFunctionDeclarationNodeKind {
                 label,
                 is_main,
@@ -520,27 +519,27 @@ impl BoundNode {
         }
     }
 
-    pub fn label_reference(index: usize, type_: TypeId) -> Self {
+    pub fn label_reference(location: TextLocation, index: usize, type_: TypeId) -> Self {
         Self {
-            span: TextSpan::zero(),
+            location,
             kind: BoundNodeKind::LabelReference(index),
             type_,
             constant_value: None,
         }
     }
 
-    pub fn label(index: usize) -> Self {
+    pub fn label(location: TextLocation, index: usize) -> Self {
         Self {
-            span: TextSpan::zero(),
+            location,
             kind: BoundNodeKind::Label(index),
             type_: typeid!(Type::Void),
             constant_value: None,
         }
     }
 
-    pub fn jump(target: BoundNode) -> Self {
+    pub fn jump(location: TextLocation, target: BoundNode) -> Self {
         Self {
-            span: TextSpan::zero(),
+            location,
             kind: BoundNodeKind::Jump(BoundJumpNodeKind {
                 condition: None,
                 target: Box::new(target),
@@ -551,9 +550,9 @@ impl BoundNode {
         }
     }
 
-    pub fn jump_if_true(condition: BoundNode, target: BoundNode) -> Self {
+    pub fn jump_if_true(location: TextLocation, condition: BoundNode, target: BoundNode) -> Self {
         Self {
-            span: TextSpan::zero(),
+            location,
             kind: BoundNodeKind::Jump(BoundJumpNodeKind {
                 condition: Some(Box::new(condition)),
                 target: Box::new(target),
@@ -564,9 +563,9 @@ impl BoundNode {
         }
     }
 
-    pub fn jump_if_false(condition: BoundNode, target: BoundNode) -> Self {
+    pub fn jump_if_false(location: TextLocation, condition: BoundNode, target: BoundNode) -> Self {
         Self {
-            span: TextSpan::zero(),
+            location,
             kind: BoundNodeKind::Jump(BoundJumpNodeKind {
                 condition: Some(Box::new(condition)),
                 target: Box::new(target),
@@ -578,12 +577,12 @@ impl BoundNode {
     }
 
     pub fn return_statement(
-        span: TextSpan,
+        span: TextLocation,
         expression: Option<BoundNode>,
         restores_variables: bool,
     ) -> Self {
         Self {
-            span,
+            location: span,
             kind: BoundNodeKind::ReturnStatement(BoundReturnStatementNodeKind {
                 expression: expression.map(Box::new),
                 restores_variables,

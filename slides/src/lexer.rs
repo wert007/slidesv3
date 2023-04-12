@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use crate::{
     diagnostics::DiagnosticBag,
     lexer::syntax_token::SyntaxToken,
-    text::{SourceText, TextSpan},
+    text::{TextSpan, SourceTextId, SourceTextCollection, TextLocation},
     DebugFlags,
 };
 
@@ -76,15 +76,16 @@ impl StringState {
 }
 
 pub fn lex<'a>(
-    content: &'a SourceText<'a>,
-    diagnostic_bag: &mut DiagnosticBag<'a>,
+    source_text: SourceTextId,
+    source_text_collection: &SourceTextCollection,
+    diagnostic_bag: &mut DiagnosticBag,
     debug_flags: DebugFlags,
-) -> VecDeque<SyntaxToken<'a>> {
+) -> VecDeque<SyntaxToken> {
     let mut result = VecDeque::new();
     let mut state = State::Default;
     let mut nested_comments_depth = 0;
     let mut char_len = 0;
-    let text = content.text;
+    let text = &source_text_collection[source_text].text;
     for (char_index, (byte_index, character)) in text.char_indices().enumerate() {
         let index = TextIndex {
             byte_index,
@@ -107,7 +108,7 @@ pub fn lex<'a>(
                 }
                 (State::Default, ws) if ws.is_whitespace() => {}
                 (State::Default, o) if is_operator(o) => {
-                    result.push_back(SyntaxToken::operator(char_index, &text[byte_index..][..1]));
+                    result.push_back(SyntaxToken::operator(char_index, &text[byte_index..][..1], source_text));
                 }
                 (State::Default, '!') => {
                     state = State::MaybeTwoCharOperator(index, '=');
@@ -129,6 +130,7 @@ pub fn lex<'a>(
                     result.push_back(SyntaxToken::operator(
                         start.char_index,
                         &text[start.byte_index..][..1],
+                        source_text
                     ));
                     state = State::Default;
                     continue 'start;
@@ -161,6 +163,7 @@ pub fn lex<'a>(
                         result.push_back(SyntaxToken::number_literal(
                             start.char_index,
                             &text[start.byte_index..byte_index],
+                            source_text,
                         ));
                         continue 'start;
                     }
@@ -175,11 +178,12 @@ pub fn lex<'a>(
                                 false,
                             );
                             diagnostic_bag
-                                .report_unterminated_string(span, string_state.enclosing_char);
+                                .report_unterminated_string(TextLocation { span, source_text }, string_state.enclosing_char);
                         }
                         result.push_back(SyntaxToken::string_literal(
                             start.char_index,
                             &text[start.byte_index..byte_index + 1],
+                            source_text,
                         ));
                     }
                 }
@@ -188,9 +192,9 @@ pub fn lex<'a>(
                         state = State::Default;
                         let lexeme = &text[start.byte_index..byte_index];
                         result.push_back(if SyntaxTokenKind::keyword(lexeme).is_some() {
-                            SyntaxToken::keyword(start.char_index, lexeme)
+                            SyntaxToken::keyword(start.char_index, lexeme, source_text)
                         } else {
-                            SyntaxToken::identifier(start.char_index, lexeme)
+                            SyntaxToken::identifier(start.char_index, lexeme, source_text)
                         });
                         continue 'start;
                     }
@@ -201,7 +205,7 @@ pub fn lex<'a>(
                         state = State::MultiCharOperator(start);
                     } else {
                         let lexeme = &text[start.byte_index..byte_index];
-                        result.push_back(SyntaxToken::operator(start.char_index, lexeme));
+                        result.push_back(SyntaxToken::operator(start.char_index, lexeme, source_text));
                         continue 'start;
                     }
                 }
@@ -210,10 +214,11 @@ pub fn lex<'a>(
                         state = State::Default;
                         let lexeme = &text[start.byte_index..byte_index];
                         if is_valid_operator(lexeme) {
-                            result.push_back(SyntaxToken::operator(start.char_index, lexeme));
+                            result.push_back(SyntaxToken::operator(start.char_index, lexeme, source_text));
                         } else {
                             diagnostic_bag.report_bad_input(
                                 start.char_index,
+                                source_text,
                                 text.as_bytes()[start.byte_index] as _,
                             )
                         }
@@ -222,7 +227,7 @@ pub fn lex<'a>(
                 }
                 (State::SingleLineComment(_) | State::MultiLineComment(_), _) => {}
                 (_, bad_character) => {
-                    diagnostic_bag.report_bad_input(char_index, bad_character);
+                    diagnostic_bag.report_bad_input(char_index, source_text, bad_character);
                 }
             }
             break;
@@ -234,49 +239,52 @@ pub fn lex<'a>(
             result.push_back(SyntaxToken::number_literal(
                 start.char_index,
                 &text[start.byte_index..],
+                source_text,
             ));
         }
         State::String(start, string_state) => {
             let span = TextSpan::new(start.char_index, char_len - start.char_index, false);
-            diagnostic_bag.report_unterminated_string(span, string_state.enclosing_char);
+            diagnostic_bag.report_unterminated_string(TextLocation { span, source_text }, string_state.enclosing_char);
             result.push_back(SyntaxToken::string_literal(
                 start.char_index,
                 &text[start.byte_index..],
+                source_text,
             ));
         }
         State::Identifier(start) => {
             let lexeme = &text[start.byte_index..];
             result.push_back(if SyntaxTokenKind::keyword(lexeme).is_some() {
-                SyntaxToken::keyword(start.char_index, lexeme)
+                SyntaxToken::keyword(start.char_index, lexeme, source_text)
             } else {
-                SyntaxToken::identifier(start.char_index, lexeme)
+                SyntaxToken::identifier(start.char_index, lexeme, source_text)
             });
         }
         State::MaybeTwoCharOperator(start, _) => {
             let lexeme = &text[start.byte_index..];
-            result.push_back(SyntaxToken::operator(start.char_index, lexeme));
+            result.push_back(SyntaxToken::operator(start.char_index, lexeme, source_text));
         }
         State::MultiCharOperator(start) => {
             let lexeme = &text[start.byte_index..];
             if !is_valid_operator(lexeme) {
                 diagnostic_bag
-                    .report_bad_input(start.char_index, text.as_bytes()[start.byte_index] as _)
+                    .report_bad_input(start.char_index, source_text, text.as_bytes()[start.byte_index] as _)
             } else {
-                result.push_back(SyntaxToken::operator(start.char_index, lexeme));
+                result.push_back(SyntaxToken::operator(start.char_index, lexeme, source_text));
             }
         }
         State::MaybeComment(start) => result.push_back(SyntaxToken::operator(
             start.char_index,
             &text[start.byte_index..],
+            source_text,
         )),
         State::SingleLineComment(_start) => {
             // Here you would emit a token.
         }
         State::MaybeCloseMultiLineComment(start) | State::MultiLineComment(start) => {
-            diagnostic_bag.report_unterminated_comment(start.char_index, &text[start.byte_index..])
+            diagnostic_bag.report_unterminated_comment(start.char_index, source_text, &text[start.byte_index..])
         }
     }
-    result.push_back(SyntaxToken::eoi(text.len()));
+    result.push_back(SyntaxToken::eoi(text.len(), source_text));
     if debug_flags.print_tokens() {
         for token in &result {
             println!("{:?}", token);

@@ -23,7 +23,7 @@ use self::memory::{
 macro_rules! runtime_error {
     ($evaluator:ident, $($fn_call:tt)*) => {
         $evaluator.runtime_diagnostics.$($fn_call)*;
-        $evaluator.runtime_diagnostics.clone().flush_to_console();
+        $evaluator.runtime_diagnostics.clone().flush_to_console(&$evaluator.project.source_text_collection);
         $evaluator.runtime_diagnostics.diagnostics.clear();
         $evaluator.runtime_error_happened = true;
     };
@@ -32,7 +32,7 @@ macro_rules! runtime_error {
 type ResultType = Value;
 
 #[derive(Debug)]
-pub struct EvaluatorState<'a> {
+pub struct EvaluatorState {
     stack: Stack,
     static_memory_size_in_words: usize,
     heap: Allocator,
@@ -41,14 +41,14 @@ pub struct EvaluatorState<'a> {
     pc: usize,
     instructions: Vec<Instruction>,
     is_main_call: bool,
-    runtime_diagnostics: DiagnosticBag<'a>,
+    runtime_diagnostics: DiagnosticBag,
     runtime_error_happened: bool,
     debugger_state: debugger::DebuggerState,
     protected_pointers: Vec<u64>,
     pub project: Project,
 }
 
-impl EvaluatorState<'_> {
+impl EvaluatorState {
     fn set_variable(&mut self, variable: u64, value: FlaggedWord) {
         let variable = variable as usize;
         self.registers[variable] = value;
@@ -103,7 +103,7 @@ impl EvaluatorState<'_> {
 
 pub fn evaluate(
     program: Program,
-    source_text: &crate::text::SourceText<'_>,
+    _source_text: crate::text::SourceTextId,
     project: Project,
 ) -> ResultType {
     let debug_flags = project.debug_flags;
@@ -119,7 +119,7 @@ pub fn evaluate(
         pc: 0,
         instructions: program.instructions,
         is_main_call: true,
-        runtime_diagnostics: DiagnosticBag::new(source_text),
+        runtime_diagnostics: DiagnosticBag::new(),
         runtime_error_happened: false,
         debugger_state: debugger::DebuggerState::default(),
         protected_pointers: vec![],
@@ -321,7 +321,7 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
     let size_in_bytes = instruction.arg * WORD_SIZE_IN_BYTES;
     let address = state.reallocate(0, size_in_bytes);
     if address == 0 {
-        runtime_error!(state, no_heap_memory_left(instruction.span, size_in_bytes));
+        runtime_error!(state, no_heap_memory_left(instruction.location, size_in_bytes));
     } else {
         let mut writing_pointer = address;
         for _ in 0..instruction.arg {
@@ -337,7 +337,7 @@ fn evaluate_allocate(state: &mut EvaluatorState, instruction: Instruction) {
     let size_in_bytes = instruction.arg;
     let address = state.reallocate(0, size_in_bytes);
     if address == 0 {
-        runtime_error!(state, no_heap_memory_left(instruction.span, size_in_bytes));
+        runtime_error!(state, no_heap_memory_left(instruction.location, size_in_bytes));
     }
     state.stack.push_pointer(address);
 }
@@ -415,7 +415,7 @@ fn evaluate_division(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop().unwrap_value();
     let lhs = state.stack.pop().unwrap_value();
     if rhs == 0 {
-        runtime_error!(state, division_by_zero(instruction.span));
+        runtime_error!(state, division_by_zero(instruction.location));
         state.stack.push(0);
     } else {
         state.stack.push(lhs.wrapping_div(rhs));
@@ -572,7 +572,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
     if pointer == 0 {
         runtime_error!(
             state,
-            no_heap_memory_left(instruction.span, result_length + WORD_SIZE_IN_BYTES)
+            no_heap_memory_left(instruction.location, result_length + WORD_SIZE_IN_BYTES)
         );
     } else {
         let mut writing_pointer = pointer;

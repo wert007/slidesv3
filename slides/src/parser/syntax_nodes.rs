@@ -1,52 +1,48 @@
 use crate::{
     diagnostics::DiagnosticBag,
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
-    text::TextSpan,
+    text::{SourceTextCollection, TextLocation},
     value::Value,
 };
 
 #[derive(Debug, Clone)]
-pub struct SyntaxNode<'a> {
-    pub kind: SyntaxNodeKind<'a>,
-    pub span: TextSpan,
+pub struct SyntaxNode {
+    pub kind: SyntaxNodeKind,
+    pub location: TextLocation,
     pub is_inserted: bool,
 }
 
-impl<'a> SyntaxNode<'a> {
-    pub fn binary(
-        lhs: SyntaxNode<'a>,
-        operator_token: SyntaxToken<'a>,
-        rhs: SyntaxNode<'a>,
-    ) -> Self {
-        let span = TextSpan::bounds(lhs.span, rhs.span);
+impl SyntaxNode {
+    pub fn binary(lhs: SyntaxNode, operator_token: SyntaxToken, rhs: SyntaxNode) -> Self {
+        let span = TextLocation::bounds(lhs.location, rhs.location);
         Self {
             kind: SyntaxNodeKind::Binary(BinaryNodeKind {
                 lhs: Box::new(lhs),
                 operator_token,
                 rhs: Box::new(rhs),
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
-    pub fn error(start: usize) -> Self {
+    pub fn error(location: TextLocation) -> Self {
         let mut result =
-            Self::none_literal(SyntaxToken::error(start, SyntaxTokenKind::NoneKeyword));
+            Self::none_literal(SyntaxToken::error(location, SyntaxTokenKind::NoneKeyword));
         result.is_inserted = true;
         result
     }
 
     pub fn import_statement(
-        import_keyword: SyntaxToken<'a>,
-        expression: SyntaxNode<'a>,
-        as_keyword: SyntaxToken<'a>,
-        identifier: SyntaxToken<'a>,
-        semicolon_token: SyntaxToken<'a>,
+        import_keyword: SyntaxToken,
+        expression: SyntaxNode,
+        as_keyword: SyntaxToken,
+        identifier: SyntaxToken,
+        semicolon_token: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(import_keyword.span(), semicolon_token.span());
+        let span = TextLocation::bounds(import_keyword.location, semicolon_token.location);
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::ImportStatement(ImportStatementNodeKind {
                 import_keyword,
                 function: Box::new(expression),
@@ -59,21 +55,21 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn function_declaration(
-        optional_generic_keyword: Option<SyntaxToken<'a>>,
-        func_keyword: SyntaxToken<'a>,
-        identifier: SyntaxToken<'a>,
-        function_type: FunctionTypeNode<'a>,
-        body: SyntaxNode<'a>,
+        optional_generic_keyword: Option<SyntaxToken>,
+        func_keyword: SyntaxToken,
+        identifier: SyntaxToken,
+        function_type: FunctionTypeNode,
+        body: SyntaxNode,
     ) -> Self {
-        let span = TextSpan::bounds(
+        let span = TextLocation::bounds(
             optional_generic_keyword
                 .as_ref()
                 .unwrap_or(&func_keyword)
-                .span(),
-            body.span(),
+                .location,
+            body.location,
         );
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::FunctionDeclaration(Box::new(FunctionDeclarationNodeKind {
                 optional_generic_keyword,
                 func_keyword,
@@ -86,21 +82,21 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn struct_declaration(
-        optional_generic_keyword: Option<SyntaxToken<'a>>,
-        struct_keyword: SyntaxToken<'a>,
-        identifier: SyntaxToken<'a>,
-        optional_parent: Option<SyntaxToken<'a>>,
-        body: StructBodyNode<'a>,
+        optional_generic_keyword: Option<SyntaxToken>,
+        struct_keyword: SyntaxToken,
+        identifier: SyntaxToken,
+        optional_parent: Option<SyntaxToken>,
+        body: StructBodyNode,
     ) -> Self {
-        let span = TextSpan::bounds(
+        let span = TextLocation::bounds(
             optional_generic_keyword
                 .as_ref()
                 .unwrap_or(&struct_keyword)
-                .span(),
-            body.span,
+                .location,
+            body.location,
         );
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::StructDeclaration(StructDeclarationNodeKind {
                 optional_generic_keyword,
                 struct_keyword,
@@ -113,13 +109,13 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn enum_declaration(
-        enum_keyword: SyntaxToken<'a>,
-        identifier: SyntaxToken<'a>,
-        body: EnumBodyNode<'a>,
+        enum_keyword: SyntaxToken,
+        identifier: SyntaxToken,
+        body: EnumBodyNode,
     ) -> Self {
-        let span = TextSpan::bounds(enum_keyword.span(), body.span);
+        let span = TextLocation::bounds(enum_keyword.location, body.location);
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::EnumDeclaration(EnumDeclarationNodeKind {
                 enum_keyword,
                 identifier,
@@ -129,10 +125,10 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
-    pub fn struct_field(field: ParameterNode<'a>, semicolon_token: SyntaxToken<'a>) -> Self {
-        let span = TextSpan::bounds(field.span, semicolon_token.span());
+    pub fn struct_field(field: ParameterNode, semicolon_token: SyntaxToken) -> Self {
+        let span = TextLocation::bounds(field.location, semicolon_token.location);
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::StructField(StructFieldNodeKind {
                 field,
                 semicolon_token,
@@ -141,66 +137,69 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
-    pub fn literal(token: SyntaxToken<'a>, diagnostic_bag: &mut DiagnosticBag) -> Self {
+    pub fn literal(
+        token: SyntaxToken,
+        source_text_collection: &SourceTextCollection,
+        diagnostic_bag: &mut DiagnosticBag,
+    ) -> Self {
+        let lexeme = &source_text_collection[token.location];
         let value = match &token.kind {
             SyntaxTokenKind::NumberLiteral => {
-                match token.lexeme.parse::<u64>() {
+                match lexeme.parse::<u64>() {
                     Ok(value) => (value as i64).into(),
                     // TODO: Someday ParseIntError::kind() might allow to differentiate more
                     Err(_) => {
-                        diagnostic_bag.report_bad_integer(token.start, token.lexeme);
+                        diagnostic_bag.report_bad_integer(token.location.span.start(), token.location.source_text, lexeme);
                         Value::None
                     }
                 }
             }
-            SyntaxTokenKind::StringLiteral => {
-                token.lexeme[1..token.lexeme.len() - 1].to_owned().into()
-            }
+            SyntaxTokenKind::StringLiteral => lexeme[1..lexeme.len() - 1].to_owned().into(),
             error => unreachable!("Unexpected Literal SyntaxToken {:#?}!", error),
         };
         Self {
-            span: token.span(),
+            location: token.location,
             kind: SyntaxNodeKind::Literal(LiteralNodeKind { token, value }),
             is_inserted: false,
         }
     }
 
-    pub fn true_literal(token: SyntaxToken<'a>) -> Self {
+    pub fn true_literal(token: SyntaxToken) -> Self {
         let value = true.into();
         Self {
-            span: token.span(),
+            location: token.location,
             kind: SyntaxNodeKind::Literal(LiteralNodeKind { token, value }),
             is_inserted: false,
         }
     }
 
-    pub fn false_literal(token: SyntaxToken<'a>) -> Self {
+    pub fn false_literal(token: SyntaxToken) -> Self {
         let value = false.into();
         Self {
-            span: token.span(),
+            location: token.location,
             kind: SyntaxNodeKind::Literal(LiteralNodeKind { token, value }),
             is_inserted: false,
         }
     }
 
-    pub fn none_literal(token: SyntaxToken<'a>) -> Self {
+    pub fn none_literal(token: SyntaxToken) -> Self {
         let value = Value::None;
         Self {
-            span: token.span(),
+            location: token.location,
             kind: SyntaxNodeKind::Literal(LiteralNodeKind { token, value }),
             is_inserted: false,
         }
     }
 
     pub fn array_literal(
-        lbracket: SyntaxToken<'a>,
-        children: Vec<SyntaxNode<'a>>,
-        comma_tokens: Vec<SyntaxToken<'a>>,
-        rbracket: SyntaxToken<'a>,
+        lbracket: SyntaxToken,
+        children: Vec<SyntaxNode>,
+        comma_tokens: Vec<SyntaxToken>,
+        rbracket: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(lbracket.span(), rbracket.span());
+        let span = TextLocation::bounds(lbracket.location, rbracket.location);
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::ArrayLiteral(ArrayLiteralNodeKind {
                 lbracket,
                 children,
@@ -212,13 +211,13 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn repetition_node(
-        base_expression: SyntaxNode<'a>,
-        semicolon_token: SyntaxToken<'a>,
-        repetition: SyntaxNode<'a>,
+        base_expression: SyntaxNode,
+        semicolon_token: SyntaxToken,
+        repetition: SyntaxNode,
     ) -> Self {
-        let span = TextSpan::bounds(base_expression.span(), repetition.span());
+        let span = TextLocation::bounds(base_expression.location, repetition.location);
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::RepetitionNode(RepetitionNodeNodeKind {
                 base_expression: Box::new(base_expression),
                 semicolon_token,
@@ -229,14 +228,14 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn cast_expression(
-        cast_keyword: SyntaxToken<'a>,
-        expression: SyntaxNode<'a>,
-        colon_token: SyntaxToken<'a>,
-        type_: TypeNode<'a>,
+        cast_keyword: SyntaxToken,
+        expression: SyntaxNode,
+        colon_token: SyntaxToken,
+        type_: TypeNode,
     ) -> Self {
-        let span = TextSpan::bounds(cast_keyword.span(), type_.span());
+        let span = TextLocation::bounds(cast_keyword.location, type_.location());
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::CastExpression(CastExpressionNodeKind {
                 cast_keyword,
                 expression: Box::new(expression),
@@ -248,17 +247,17 @@ impl<'a> SyntaxNode<'a> {
     }
 
     pub fn constructor_call(
-        new_keyword: SyntaxToken<'a>,
-        library_name: Option<SyntaxToken<'a>>,
-        type_name: SyntaxToken<'a>,
-        open_parenthesis_token: SyntaxToken<'a>,
-        arguments: Vec<SyntaxNode<'a>>,
-        comma_tokens: Vec<SyntaxToken<'a>>,
-        close_parenthesis_token: SyntaxToken<'a>,
+        new_keyword: SyntaxToken,
+        library_name: Option<SyntaxToken>,
+        type_name: SyntaxToken,
+        open_parenthesis_token: SyntaxToken,
+        arguments: Vec<SyntaxNode>,
+        comma_tokens: Vec<SyntaxToken>,
+        close_parenthesis_token: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(new_keyword.span(), close_parenthesis_token.span());
+        let span = TextLocation::bounds(new_keyword.location, close_parenthesis_token.location);
         Self {
-            span,
+            location: span,
             kind: SyntaxNodeKind::ConstructorCall(ConstructorCallNodeKind {
                 new_keyword,
                 library_name,
@@ -272,51 +271,47 @@ impl<'a> SyntaxNode<'a> {
         }
     }
 
-    pub fn variable(token: SyntaxToken<'a>) -> Self {
+    pub fn variable(token: SyntaxToken) -> Self {
         Self {
-            span: token.span(),
+            location: token.location,
             kind: SyntaxNodeKind::Variable(VariableNodeKind { token }),
             is_inserted: false,
         }
     }
 
-    pub fn unary(operator_token: SyntaxToken<'a>, operand: SyntaxNode<'a>) -> Self {
-        let span = TextSpan::bounds(operator_token.span(), operand.span());
+    pub fn unary(operator_token: SyntaxToken, operand: SyntaxNode) -> Self {
+        let span = TextLocation::bounds(operator_token.location, operand.location);
         Self {
             kind: SyntaxNodeKind::Unary(UnaryNodeKind {
                 operator_token,
                 operand: Box::new(operand),
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
-    pub fn parenthesized(
-        lparen: SyntaxToken<'a>,
-        expression: SyntaxNode<'a>,
-        rparen: SyntaxToken<'a>,
-    ) -> Self {
-        let span = TextSpan::bounds(lparen.span(), rparen.span());
+    pub fn parenthesized(lparen: SyntaxToken, expression: SyntaxNode, rparen: SyntaxToken) -> Self {
+        let span = TextLocation::bounds(lparen.location, rparen.location);
         Self {
             kind: SyntaxNodeKind::Parenthesized(ParenthesizedNodeKind {
                 lparen,
                 expression: Box::new(expression),
                 rparen,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn function_call(
-        base: SyntaxNode<'a>,
-        open_parenthesis_token: SyntaxToken<'a>,
-        arguments: Vec<SyntaxNode<'a>>,
-        comma_tokens: Vec<SyntaxToken<'a>>,
-        close_parenthesis_token: SyntaxToken<'a>,
+        base: SyntaxNode,
+        open_parenthesis_token: SyntaxToken,
+        arguments: Vec<SyntaxNode>,
+        comma_tokens: Vec<SyntaxToken>,
+        close_parenthesis_token: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(base.span(), close_parenthesis_token.span());
+        let span = TextLocation::bounds(base.location, close_parenthesis_token.location);
         Self {
             kind: SyntaxNodeKind::FunctionCall(FunctionCallNodeKind {
                 base: Box::new(base),
@@ -325,18 +320,18 @@ impl<'a> SyntaxNode<'a> {
                 comma_tokens,
                 close_parenthesis_token,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn array_index(
-        base: SyntaxNode<'a>,
-        lbracket: SyntaxToken<'a>,
-        index: SyntaxNode<'a>,
-        rbracket: SyntaxToken<'a>,
+        base: SyntaxNode,
+        lbracket: SyntaxToken,
+        index: SyntaxNode,
+        rbracket: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(base.span(), rbracket.span());
+        let span = TextLocation::bounds(base.location, rbracket.location);
         Self {
             kind: SyntaxNodeKind::ArrayIndex(ArrayIndexNodeKind {
                 base: Box::new(base),
@@ -344,37 +339,33 @@ impl<'a> SyntaxNode<'a> {
                 index: Box::new(index),
                 rbracket,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
-    pub fn field_access(
-        base: SyntaxNode<'a>,
-        period: SyntaxToken<'a>,
-        field: SyntaxToken<'a>,
-    ) -> Self {
-        let span = TextSpan::bounds(base.span(), field.span());
+    pub fn field_access(base: SyntaxNode, period: SyntaxToken, field: SyntaxToken) -> Self {
+        let span = TextLocation::bounds(base.location, field.location);
         Self {
             kind: SyntaxNodeKind::FieldAccess(FieldAccessNodeKind {
                 base: Box::new(base),
                 period,
                 field,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn for_statement(
-        for_keyword: SyntaxToken<'a>,
-        optional_index_variable: Option<SyntaxToken<'a>>,
-        variable: SyntaxToken<'a>,
-        in_keyword: SyntaxToken<'a>,
-        collection: SyntaxNode<'a>,
-        body: SyntaxNode<'a>,
+        for_keyword: SyntaxToken,
+        optional_index_variable: Option<SyntaxToken>,
+        variable: SyntaxToken,
+        in_keyword: SyntaxToken,
+        collection: SyntaxNode,
+        body: SyntaxNode,
     ) -> Self {
-        let span = TextSpan::bounds(for_keyword.span(), body.span());
+        let span = TextLocation::bounds(for_keyword.location, body.location);
         Self {
             kind: SyntaxNodeKind::ForStatement(ForStatementNodeKind {
                 for_keyword,
@@ -384,18 +375,18 @@ impl<'a> SyntaxNode<'a> {
                 collection: Box::new(collection),
                 body: Box::new(body),
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn if_statement(
-        if_keyword: SyntaxToken<'a>,
-        condition: SyntaxNode<'a>,
-        body: SyntaxNode<'a>,
-        else_clause: Option<ElseClause<'a>>,
+        if_keyword: SyntaxToken,
+        condition: SyntaxNode,
+        body: SyntaxNode,
+        else_clause: Option<ElseClause>,
     ) -> Self {
-        let span = TextSpan::bounds(if_keyword.span(), body.span());
+        let span = TextLocation::bounds(if_keyword.location, body.location);
         Self {
             kind: SyntaxNodeKind::IfStatement(IfStatementNodeKind {
                 if_keyword,
@@ -403,20 +394,20 @@ impl<'a> SyntaxNode<'a> {
                 body: Box::new(body),
                 else_clause,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn variable_declaration(
-        let_keyword: SyntaxToken<'a>,
-        identifier: SyntaxToken<'a>,
-        optional_type_declaration: Option<TypeDeclaration<'a>>,
-        equals_token: SyntaxToken<'a>,
-        initializer: SyntaxNode<'a>,
-        semicolon_token: SyntaxToken<'a>,
+        let_keyword: SyntaxToken,
+        identifier: SyntaxToken,
+        optional_type_declaration: Option<TypeDeclaration>,
+        equals_token: SyntaxToken,
+        initializer: SyntaxNode,
+        semicolon_token: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(let_keyword.span(), semicolon_token.span());
+        let span = TextLocation::bounds(let_keyword.location, semicolon_token.location);
         Self {
             kind: SyntaxNodeKind::VariableDeclaration(VariableDeclarationNodeKind {
                 let_keyword,
@@ -426,156 +417,149 @@ impl<'a> SyntaxNode<'a> {
                 initializer: Box::new(initializer),
                 semicolon_token,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn return_statement(
-        return_keyword: SyntaxToken<'a>,
-        optional_expression: Option<SyntaxNode<'a>>,
-        semicolon_token: SyntaxToken<'a>,
+        return_keyword: SyntaxToken,
+        optional_expression: Option<SyntaxNode>,
+        semicolon_token: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(return_keyword.span(), semicolon_token.span());
+        let span = TextLocation::bounds(return_keyword.location, semicolon_token.location);
         Self {
             kind: SyntaxNodeKind::ReturnStatement(ReturnStatementNodeKind {
                 return_keyword,
                 optional_expression: optional_expression.map(Box::new),
                 semicolon_token,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn while_statement(
-        while_keyword: SyntaxToken<'a>,
-        condition: SyntaxNode<'a>,
-        body: SyntaxNode<'a>,
+        while_keyword: SyntaxToken,
+        condition: SyntaxNode,
+        body: SyntaxNode,
     ) -> Self {
-        let span = TextSpan::bounds(while_keyword.span(), body.span());
+        let span = TextLocation::bounds(while_keyword.location, body.location);
         Self {
             kind: SyntaxNodeKind::WhileStatement(WhileStatementNodeKind {
                 while_keyword,
                 condition: Box::new(condition),
                 body: Box::new(body),
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn assignment(
-        lhs: SyntaxNode<'a>,
-        expression: SyntaxNode<'a>,
-        semicolon_token: SyntaxToken<'a>,
+        lhs: SyntaxNode,
+        expression: SyntaxNode,
+        semicolon_token: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(lhs.span(), semicolon_token.span());
+        let span = TextLocation::bounds(lhs.location, semicolon_token.location);
         Self {
             kind: SyntaxNodeKind::Assignment(AssignmentNodeKind {
                 lhs: Box::new(lhs),
                 expression: Box::new(expression),
                 semicolon_token,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
     pub fn block_statement(
-        lbrace: SyntaxToken<'a>,
-        statements: Vec<SyntaxNode<'a>>,
-        rbrace: SyntaxToken<'a>,
+        lbrace: SyntaxToken,
+        statements: Vec<SyntaxNode>,
+        rbrace: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(lbrace.span(), rbrace.span());
+        let span = TextLocation::bounds(lbrace.location, rbrace.location);
         Self {
             kind: SyntaxNodeKind::BlockStatement(BlockStatementNodeKind {
                 lbrace,
                 statements,
                 rbrace,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
-    pub fn expression_statement(
-        expression: SyntaxNode<'a>,
-        semicolon_token: SyntaxToken<'a>,
-    ) -> Self {
-        let span = TextSpan::bounds(expression.span(), semicolon_token.span());
+    pub fn expression_statement(expression: SyntaxNode, semicolon_token: SyntaxToken) -> Self {
+        let span = TextLocation::bounds(expression.location, semicolon_token.location);
         Self {
             kind: SyntaxNodeKind::ExpressionStatement(ExpressionStatementNodeKind {
                 expression: Box::new(expression),
                 semicolon_token,
             }),
-            span,
+            location: span,
             is_inserted: false,
         }
     }
 
-    pub fn compilation_unit(statements: Vec<SyntaxNode<'a>>, eoi: SyntaxToken<'a>) -> Self {
-        let span = TextSpan::bounds(
+    pub fn compilation_unit(statements: Vec<SyntaxNode>, eoi: SyntaxToken) -> Self {
+        let span = TextLocation::bounds(
             statements
                 .first()
-                .map(|s| s.span())
-                .unwrap_or_else(TextSpan::zero),
+                .map(|s| s.location)
+                .unwrap_or_else(|| TextLocation::zero_in_file(eoi.location.source_text)),
             statements
                 .last()
-                .map(|s| s.span())
-                .unwrap_or_else(TextSpan::zero),
+                .map(|s| s.location)
+                .unwrap_or_else(|| TextLocation::zero_in_file(eoi.location.source_text)),
         );
         Self {
             kind: SyntaxNodeKind::CompilationUnit(CompilationUnitNodeKind { statements, eoi }),
-            span,
+            location: span,
             is_inserted: false,
         }
-    }
-
-    pub fn span(&self) -> TextSpan {
-        self.span
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum SyntaxNodeKind<'a> {
+pub enum SyntaxNodeKind {
     // Top Level Statements
-    CompilationUnit(CompilationUnitNodeKind<'a>),
-    _ConstDeclaration(ConstDeclarationNodeKind<'a>),
-    ImportStatement(ImportStatementNodeKind<'a>),
-    FunctionDeclaration(Box<FunctionDeclarationNodeKind<'a>>),
-    StructDeclaration(StructDeclarationNodeKind<'a>),
-    EnumDeclaration(EnumDeclarationNodeKind<'a>),
+    CompilationUnit(CompilationUnitNodeKind),
+    _ConstDeclaration(ConstDeclarationNodeKind),
+    ImportStatement(ImportStatementNodeKind),
+    FunctionDeclaration(Box<FunctionDeclarationNodeKind>),
+    StructDeclaration(StructDeclarationNodeKind),
+    EnumDeclaration(EnumDeclarationNodeKind),
 
     // Expressions
-    Literal(LiteralNodeKind<'a>),
-    ArrayLiteral(ArrayLiteralNodeKind<'a>),
-    RepetitionNode(RepetitionNodeNodeKind<'a>),
-    CastExpression(CastExpressionNodeKind<'a>),
-    ConstructorCall(ConstructorCallNodeKind<'a>),
-    Variable(VariableNodeKind<'a>),
-    Binary(BinaryNodeKind<'a>),
-    Unary(UnaryNodeKind<'a>),
-    Parenthesized(ParenthesizedNodeKind<'a>),
-    FunctionCall(FunctionCallNodeKind<'a>),
-    ArrayIndex(ArrayIndexNodeKind<'a>),
-    FieldAccess(FieldAccessNodeKind<'a>),
+    Literal(LiteralNodeKind),
+    ArrayLiteral(ArrayLiteralNodeKind),
+    RepetitionNode(RepetitionNodeNodeKind),
+    CastExpression(CastExpressionNodeKind),
+    ConstructorCall(ConstructorCallNodeKind),
+    Variable(VariableNodeKind),
+    Binary(BinaryNodeKind),
+    Unary(UnaryNodeKind),
+    Parenthesized(ParenthesizedNodeKind),
+    FunctionCall(FunctionCallNodeKind),
+    ArrayIndex(ArrayIndexNodeKind),
+    FieldAccess(FieldAccessNodeKind),
 
     // Statements
-    BlockStatement(BlockStatementNodeKind<'a>),
-    ForStatement(ForStatementNodeKind<'a>),
-    IfStatement(IfStatementNodeKind<'a>),
-    VariableDeclaration(VariableDeclarationNodeKind<'a>),
-    ReturnStatement(ReturnStatementNodeKind<'a>),
-    WhileStatement(WhileStatementNodeKind<'a>),
-    Assignment(AssignmentNodeKind<'a>),
-    ExpressionStatement(ExpressionStatementNodeKind<'a>),
+    BlockStatement(BlockStatementNodeKind),
+    ForStatement(ForStatementNodeKind),
+    IfStatement(IfStatementNodeKind),
+    VariableDeclaration(VariableDeclarationNodeKind),
+    ReturnStatement(ReturnStatementNodeKind),
+    WhileStatement(WhileStatementNodeKind),
+    Assignment(AssignmentNodeKind),
+    ExpressionStatement(ExpressionStatementNodeKind),
 
     // Trivia
-    StructField(StructFieldNodeKind<'a>),
+    StructField(StructFieldNodeKind),
 }
 
-impl SyntaxNodeKind<'_> {
+impl SyntaxNodeKind {
     pub fn is_assignable(&self) -> bool {
         matches!(
             self,
@@ -585,59 +569,59 @@ impl SyntaxNodeKind<'_> {
 }
 
 #[derive(Debug, Clone)]
-pub struct CompilationUnitNodeKind<'a> {
-    pub statements: Vec<SyntaxNode<'a>>,
-    pub eoi: SyntaxToken<'a>,
+pub struct CompilationUnitNodeKind {
+    pub statements: Vec<SyntaxNode>,
+    pub eoi: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct ConstDeclarationNodeKind<'a> {
-    pub const_keyword: SyntaxToken<'a>,
-    pub identifier: SyntaxToken<'a>,
-    pub equals_token: SyntaxToken<'a>,
-    pub initializer: Box<SyntaxNode<'a>>,
-    pub semicolon_token: SyntaxToken<'a>,
+pub struct ConstDeclarationNodeKind {
+    pub const_keyword: SyntaxToken,
+    pub identifier: SyntaxToken,
+    pub equals_token: SyntaxToken,
+    pub initializer: Box<SyntaxNode>,
+    pub semicolon_token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct ImportStatementNodeKind<'a> {
-    pub import_keyword: SyntaxToken<'a>,
-    pub function: Box<SyntaxNode<'a>>,
-    pub as_keyword: SyntaxToken<'a>,
-    pub identifier: SyntaxToken<'a>,
-    pub semicolon_token: SyntaxToken<'a>,
+pub struct ImportStatementNodeKind {
+    pub import_keyword: SyntaxToken,
+    pub function: Box<SyntaxNode>,
+    pub as_keyword: SyntaxToken,
+    pub identifier: SyntaxToken,
+    pub semicolon_token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionDeclarationNodeKind<'a> {
-    pub optional_generic_keyword: Option<SyntaxToken<'a>>,
-    pub func_keyword: SyntaxToken<'a>,
-    pub identifier: SyntaxToken<'a>,
-    pub function_type: FunctionTypeNode<'a>,
-    pub body: Box<SyntaxNode<'a>>,
+pub struct FunctionDeclarationNodeKind {
+    pub optional_generic_keyword: Option<SyntaxToken>,
+    pub func_keyword: SyntaxToken,
+    pub identifier: SyntaxToken,
+    pub function_type: FunctionTypeNode,
+    pub body: Box<SyntaxNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionTypeNode<'a> {
+pub struct FunctionTypeNode {
     // NOTE: Normally the type of a function comes after the identifier, but
     // generic comes before the func keyword. So this is just a flag and not the
     // token.
     pub is_generic: bool,
-    pub lparen: SyntaxToken<'a>,
-    pub parameters: Vec<ParameterNode<'a>>,
-    pub comma_tokens: Vec<SyntaxToken<'a>>,
-    pub rparen: SyntaxToken<'a>,
-    pub return_type: Option<ReturnTypeNode<'a>>,
+    pub lparen: SyntaxToken,
+    pub parameters: Vec<ParameterNode>,
+    pub comma_tokens: Vec<SyntaxToken>,
+    pub rparen: SyntaxToken,
+    pub return_type: Option<ReturnTypeNode>,
 }
 
-impl<'a> FunctionTypeNode<'a> {
+impl FunctionTypeNode {
     pub fn new(
         is_generic: bool,
-        lparen: SyntaxToken<'a>,
-        parameters: Vec<ParameterNode<'a>>,
-        comma_tokens: Vec<SyntaxToken<'a>>,
-        rparen: SyntaxToken<'a>,
-        return_type: Option<ReturnTypeNode<'a>>,
+        lparen: SyntaxToken,
+        parameters: Vec<ParameterNode>,
+        comma_tokens: Vec<SyntaxToken>,
+        rparen: SyntaxToken,
+        return_type: Option<ReturnTypeNode>,
     ) -> Self {
         Self {
             is_generic,
@@ -651,136 +635,134 @@ impl<'a> FunctionTypeNode<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructDeclarationNodeKind<'a> {
-    pub optional_generic_keyword: Option<SyntaxToken<'a>>,
-    pub struct_keyword: SyntaxToken<'a>,
-    pub identifier: SyntaxToken<'a>,
-    pub optional_parent: Option<SyntaxToken<'a>>,
-    pub body: Box<StructBodyNode<'a>>,
+pub struct StructDeclarationNodeKind {
+    pub optional_generic_keyword: Option<SyntaxToken>,
+    pub struct_keyword: SyntaxToken,
+    pub identifier: SyntaxToken,
+    pub optional_parent: Option<SyntaxToken>,
+    pub body: Box<StructBodyNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct StructBodyNode<'a> {
+pub struct StructBodyNode {
     pub is_generic: bool,
-    pub lbrace: SyntaxToken<'a>,
-    pub statements: Vec<SyntaxNode<'a>>,
-    pub rbrace: SyntaxToken<'a>,
-    pub span: TextSpan,
+    pub lbrace: SyntaxToken,
+    pub statements: Vec<SyntaxNode>,
+    pub rbrace: SyntaxToken,
+    pub location: TextLocation,
 }
 
-impl<'a> StructBodyNode<'a> {
+impl StructBodyNode {
     pub fn new(
         is_generic: bool,
-        lbrace: SyntaxToken<'a>,
-        statements: Vec<SyntaxNode<'a>>,
-        rbrace: SyntaxToken<'a>,
+        lbrace: SyntaxToken,
+        statements: Vec<SyntaxNode>,
+        rbrace: SyntaxToken,
     ) -> Self {
-        let span = TextSpan::bounds(lbrace.span(), rbrace.span());
+        let span = TextLocation::bounds(lbrace.location, rbrace.location);
         Self {
             is_generic,
             lbrace,
             statements,
             rbrace,
-            span,
+            location: span,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct EnumDeclarationNodeKind<'a> {
-    pub enum_keyword: SyntaxToken<'a>,
-    pub identifier: SyntaxToken<'a>,
-    pub body: Box<EnumBodyNode<'a>>,
+pub struct EnumDeclarationNodeKind {
+    pub enum_keyword: SyntaxToken,
+    pub identifier: SyntaxToken,
+    pub body: Box<EnumBodyNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct EnumBodyNode<'a> {
-    pub lbrace: SyntaxToken<'a>,
-    pub values: Vec<EnumValueNode<'a>>,
-    pub rbrace: SyntaxToken<'a>,
-    pub span: TextSpan,
+pub struct EnumBodyNode {
+    pub lbrace: SyntaxToken,
+    pub values: Vec<EnumValueNode>,
+    pub rbrace: SyntaxToken,
+    pub location: TextLocation,
 }
 
-impl<'a> EnumBodyNode<'a> {
-    pub fn new(
-        lbrace: SyntaxToken<'a>,
-        values: Vec<EnumValueNode<'a>>,
-        rbrace: SyntaxToken<'a>,
-    ) -> Self {
-        let span = TextSpan::bounds(lbrace.span(), rbrace.span());
-        Self { lbrace, values, rbrace, span }
+impl EnumBodyNode {
+    pub fn new(lbrace: SyntaxToken, values: Vec<EnumValueNode>, rbrace: SyntaxToken) -> Self {
+        let span = TextLocation::bounds(lbrace.location, rbrace.location);
+        Self {
+            lbrace,
+            values,
+            rbrace,
+            location: span,
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct EnumValueNode<'a> {
-    pub identifier: SyntaxToken<'a>,
-    // pub optional_value: Option<SyntaxToken<'a>>,
-    pub span: TextSpan,
+pub struct EnumValueNode {
+    pub identifier: SyntaxToken,
+    // pub optional_value: Option<SyntaxToken>,
+    pub location: TextLocation,
 }
 
-impl<'a> EnumValueNode<'a> {
-    pub fn new(
-        identifier: SyntaxToken<'a>,
-    ) -> Self {
-        let span = identifier.span();
-        Self { identifier, span }
+impl EnumValueNode {
+    pub fn new(identifier: SyntaxToken) -> Self {
+        let location = identifier.location;
+        Self {
+            identifier,
+            location,
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ParameterNode<'a> {
-    pub identifier: SyntaxToken<'a>,
-    pub type_declaration: TypeDeclaration<'a>,
-    pub span: TextSpan,
+pub struct ParameterNode {
+    pub identifier: SyntaxToken,
+    pub type_declaration: TypeDeclaration,
+    pub location: TextLocation,
 }
 
-impl<'a> ParameterNode<'a> {
-    pub fn new(
-        identifier: SyntaxToken<'a>,
-        colon_token: SyntaxToken<'a>,
-        type_: TypeNode<'a>,
-    ) -> Self {
-        let span = TextSpan::bounds(identifier.span(), type_.span());
+impl ParameterNode {
+    pub fn new(identifier: SyntaxToken, colon_token: SyntaxToken, type_: TypeNode) -> Self {
+        let span = TextLocation::bounds(identifier.location, type_.location());
         let type_declaration = TypeDeclaration { colon_token, type_ };
         Self {
             identifier,
             type_declaration,
-            span,
+            location: span,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ReturnTypeNode<'a> {
-    pub arrow_token: SyntaxToken<'a>,
-    pub return_type: TypeNode<'a>,
+pub struct ReturnTypeNode {
+    pub arrow_token: SyntaxToken,
+    pub return_type: TypeNode,
 }
 
 #[derive(Debug, Clone)]
-pub struct TypeDeclaration<'a> {
-    pub colon_token: SyntaxToken<'a>,
-    pub type_: TypeNode<'a>,
+pub struct TypeDeclaration {
+    pub colon_token: SyntaxToken,
+    pub type_: TypeNode,
 }
 
 #[derive(Debug, Clone)]
-pub struct TypeNode<'a> {
-    pub optional_ampersand_token: Option<SyntaxToken<'a>>,
-    pub library_name: Option<SyntaxToken<'a>>,
-    pub type_name: SyntaxToken<'a>,
-    pub generic_type_qualifier: Option<Box<TypeNode<'a>>>,
-    pub optional_question_mark: Option<SyntaxToken<'a>>,
-    pub brackets: Vec<SyntaxToken<'a>>,
+pub struct TypeNode {
+    pub optional_ampersand_token: Option<SyntaxToken>,
+    pub library_name: Option<SyntaxToken>,
+    pub type_name: SyntaxToken,
+    pub generic_type_qualifier: Option<Box<TypeNode>>,
+    pub optional_question_mark: Option<SyntaxToken>,
+    pub brackets: Vec<SyntaxToken>,
 }
 
-impl<'a> TypeNode<'a> {
+impl TypeNode {
     pub fn new(
-        optional_ampersand_token: Option<SyntaxToken<'a>>,
-        library_name: Option<SyntaxToken<'a>>,
-        type_name: SyntaxToken<'a>,
-        generic_type_qualifier: Option<TypeNode<'a>>,
-        optional_question_mark: Option<SyntaxToken<'a>>,
-        brackets: Vec<SyntaxToken<'a>>,
+        optional_ampersand_token: Option<SyntaxToken>,
+        library_name: Option<SyntaxToken>,
+        type_name: SyntaxToken,
+        generic_type_qualifier: Option<TypeNode>,
+        optional_question_mark: Option<SyntaxToken>,
+        brackets: Vec<SyntaxToken>,
     ) -> Self {
         Self {
             optional_ampersand_token,
@@ -792,155 +774,159 @@ impl<'a> TypeNode<'a> {
         }
     }
 
-    pub fn span(&self) -> TextSpan {
-        TextSpan::bounds(
+    pub fn location(&self) -> TextLocation {
+        TextLocation::bounds(
             self.optional_ampersand_token
                 .as_ref()
-                .map(|t| t.span())
-                .unwrap_or_else(|| self.type_name.span()),
-            self.brackets.last().unwrap_or(&self.type_name).span(),
+                .map(|t| t.location)
+                .unwrap_or_else(|| self.type_name.location),
+            self.brackets.last().unwrap_or(&self.type_name).location,
         )
     }
 
-    pub fn full_type_name(&self) -> String {
+    pub fn full_type_name(&self, source_text_collection: &SourceTextCollection) -> String {
         match &self.library_name {
-            Some(it) => format!("{}.{}", it.lexeme, self.type_name.lexeme),
-            None => self.type_name.lexeme.to_owned(),
+            Some(it) => format!(
+                "{}.{}",
+                &source_text_collection[it.location],
+                &source_text_collection[self.type_name.location]
+            ),
+            None => source_text_collection[self.type_name.location].to_owned(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct LiteralNodeKind<'a> {
-    pub token: SyntaxToken<'a>,
+pub struct LiteralNodeKind {
+    pub token: SyntaxToken,
     pub value: Value,
 }
 
 #[derive(Debug, Clone)]
-pub struct ArrayLiteralNodeKind<'a> {
-    pub lbracket: SyntaxToken<'a>,
-    pub children: Vec<SyntaxNode<'a>>,
-    pub comma_tokens: Vec<SyntaxToken<'a>>,
-    pub rbracket: SyntaxToken<'a>,
+pub struct ArrayLiteralNodeKind {
+    pub lbracket: SyntaxToken,
+    pub children: Vec<SyntaxNode>,
+    pub comma_tokens: Vec<SyntaxToken>,
+    pub rbracket: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct RepetitionNodeNodeKind<'a> {
-    pub base_expression: Box<SyntaxNode<'a>>,
-    pub semicolon_token: SyntaxToken<'a>,
-    pub repetition: Box<SyntaxNode<'a>>,
+pub struct RepetitionNodeNodeKind {
+    pub base_expression: Box<SyntaxNode>,
+    pub semicolon_token: SyntaxToken,
+    pub repetition: Box<SyntaxNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct CastExpressionNodeKind<'a> {
-    pub cast_keyword: SyntaxToken<'a>,
-    pub expression: Box<SyntaxNode<'a>>,
-    pub colon_token: SyntaxToken<'a>,
-    pub type_: TypeNode<'a>,
+pub struct CastExpressionNodeKind {
+    pub cast_keyword: SyntaxToken,
+    pub expression: Box<SyntaxNode>,
+    pub colon_token: SyntaxToken,
+    pub type_: TypeNode,
 }
 
 #[derive(Debug, Clone)]
-pub struct ConstructorCallNodeKind<'a> {
-    pub new_keyword: SyntaxToken<'a>,
-    pub library_name: Option<SyntaxToken<'a>>,
-    pub type_name: SyntaxToken<'a>,
-    pub open_parenthesis_token: SyntaxToken<'a>,
-    pub arguments: Vec<SyntaxNode<'a>>,
-    pub comma_tokens: Vec<SyntaxToken<'a>>,
-    pub close_parenthesis_token: SyntaxToken<'a>,
+pub struct ConstructorCallNodeKind {
+    pub new_keyword: SyntaxToken,
+    pub library_name: Option<SyntaxToken>,
+    pub type_name: SyntaxToken,
+    pub open_parenthesis_token: SyntaxToken,
+    pub arguments: Vec<SyntaxNode>,
+    pub comma_tokens: Vec<SyntaxToken>,
+    pub close_parenthesis_token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct VariableNodeKind<'a> {
-    pub token: SyntaxToken<'a>,
+pub struct VariableNodeKind {
+    pub token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct BinaryNodeKind<'a> {
-    pub lhs: Box<SyntaxNode<'a>>,
-    pub operator_token: SyntaxToken<'a>,
-    pub rhs: Box<SyntaxNode<'a>>,
+pub struct BinaryNodeKind {
+    pub lhs: Box<SyntaxNode>,
+    pub operator_token: SyntaxToken,
+    pub rhs: Box<SyntaxNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct UnaryNodeKind<'a> {
-    pub operator_token: SyntaxToken<'a>,
-    pub operand: Box<SyntaxNode<'a>>,
+pub struct UnaryNodeKind {
+    pub operator_token: SyntaxToken,
+    pub operand: Box<SyntaxNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ParenthesizedNodeKind<'a> {
-    pub lparen: SyntaxToken<'a>,
-    pub expression: Box<SyntaxNode<'a>>,
-    pub rparen: SyntaxToken<'a>,
+pub struct ParenthesizedNodeKind {
+    pub lparen: SyntaxToken,
+    pub expression: Box<SyntaxNode>,
+    pub rparen: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionCallNodeKind<'a> {
-    pub base: Box<SyntaxNode<'a>>,
-    pub open_parenthesis_token: SyntaxToken<'a>,
-    pub arguments: Vec<SyntaxNode<'a>>,
-    pub comma_tokens: Vec<SyntaxToken<'a>>,
-    pub close_parenthesis_token: SyntaxToken<'a>,
+pub struct FunctionCallNodeKind {
+    pub base: Box<SyntaxNode>,
+    pub open_parenthesis_token: SyntaxToken,
+    pub arguments: Vec<SyntaxNode>,
+    pub comma_tokens: Vec<SyntaxToken>,
+    pub close_parenthesis_token: SyntaxToken,
 }
 
-impl FunctionCallNodeKind<'_> {
-    pub fn argument_span(&self) -> TextSpan {
-        TextSpan::bounds(
-            self.open_parenthesis_token.span(),
-            self.close_parenthesis_token.span(),
+impl FunctionCallNodeKind {
+    pub fn argument_span(&self) -> TextLocation {
+        TextLocation::bounds(
+            self.open_parenthesis_token.location,
+            self.close_parenthesis_token.location,
         )
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct ArrayIndexNodeKind<'a> {
-    pub base: Box<SyntaxNode<'a>>,
-    pub lbracket: SyntaxToken<'a>,
-    pub index: Box<SyntaxNode<'a>>,
-    pub rbracket: SyntaxToken<'a>,
+pub struct ArrayIndexNodeKind {
+    pub base: Box<SyntaxNode>,
+    pub lbracket: SyntaxToken,
+    pub index: Box<SyntaxNode>,
+    pub rbracket: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct FieldAccessNodeKind<'a> {
-    pub base: Box<SyntaxNode<'a>>,
-    pub period: SyntaxToken<'a>,
-    pub field: SyntaxToken<'a>,
+pub struct FieldAccessNodeKind {
+    pub base: Box<SyntaxNode>,
+    pub period: SyntaxToken,
+    pub field: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct BlockStatementNodeKind<'a> {
-    pub lbrace: SyntaxToken<'a>,
-    pub statements: Vec<SyntaxNode<'a>>,
-    pub rbrace: SyntaxToken<'a>,
+pub struct BlockStatementNodeKind {
+    pub lbrace: SyntaxToken,
+    pub statements: Vec<SyntaxNode>,
+    pub rbrace: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct ForStatementNodeKind<'a> {
-    pub for_keyword: SyntaxToken<'a>,
-    pub optional_index_variable: Option<SyntaxToken<'a>>,
-    pub variable: SyntaxToken<'a>,
-    pub in_keyword: SyntaxToken<'a>,
-    pub collection: Box<SyntaxNode<'a>>,
-    pub body: Box<SyntaxNode<'a>>,
+pub struct ForStatementNodeKind {
+    pub for_keyword: SyntaxToken,
+    pub optional_index_variable: Option<SyntaxToken>,
+    pub variable: SyntaxToken,
+    pub in_keyword: SyntaxToken,
+    pub collection: Box<SyntaxNode>,
+    pub body: Box<SyntaxNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct IfStatementNodeKind<'a> {
-    pub if_keyword: SyntaxToken<'a>,
-    pub condition: Box<SyntaxNode<'a>>,
-    pub body: Box<SyntaxNode<'a>>,
-    pub else_clause: Option<ElseClause<'a>>,
+pub struct IfStatementNodeKind {
+    pub if_keyword: SyntaxToken,
+    pub condition: Box<SyntaxNode>,
+    pub body: Box<SyntaxNode>,
+    pub else_clause: Option<ElseClause>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ElseClause<'a> {
-    pub else_keyword: SyntaxToken<'a>,
-    pub body: Box<SyntaxNode<'a>>,
+pub struct ElseClause {
+    pub else_keyword: SyntaxToken,
+    pub body: Box<SyntaxNode>,
 }
 
-impl<'a> ElseClause<'a> {
-    pub fn new(else_keyword: SyntaxToken<'a>, body: SyntaxNode<'a>) -> Self {
+impl ElseClause {
+    pub fn new(else_keyword: SyntaxToken, body: SyntaxNode) -> Self {
         Self {
             else_keyword,
             body: Box::new(body),
@@ -949,44 +935,44 @@ impl<'a> ElseClause<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct VariableDeclarationNodeKind<'a> {
-    pub let_keyword: SyntaxToken<'a>,
-    pub identifier: SyntaxToken<'a>,
-    pub optional_type_declaration: Option<TypeDeclaration<'a>>,
-    pub equals_token: SyntaxToken<'a>,
-    pub initializer: Box<SyntaxNode<'a>>,
-    pub semicolon_token: SyntaxToken<'a>,
+pub struct VariableDeclarationNodeKind {
+    pub let_keyword: SyntaxToken,
+    pub identifier: SyntaxToken,
+    pub optional_type_declaration: Option<TypeDeclaration>,
+    pub equals_token: SyntaxToken,
+    pub initializer: Box<SyntaxNode>,
+    pub semicolon_token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct ReturnStatementNodeKind<'a> {
-    pub return_keyword: SyntaxToken<'a>,
-    pub optional_expression: Option<Box<SyntaxNode<'a>>>,
-    pub semicolon_token: SyntaxToken<'a>,
+pub struct ReturnStatementNodeKind {
+    pub return_keyword: SyntaxToken,
+    pub optional_expression: Option<Box<SyntaxNode>>,
+    pub semicolon_token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct WhileStatementNodeKind<'a> {
-    pub while_keyword: SyntaxToken<'a>,
-    pub condition: Box<SyntaxNode<'a>>,
-    pub body: Box<SyntaxNode<'a>>,
+pub struct WhileStatementNodeKind {
+    pub while_keyword: SyntaxToken,
+    pub condition: Box<SyntaxNode>,
+    pub body: Box<SyntaxNode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct AssignmentNodeKind<'a> {
-    pub lhs: Box<SyntaxNode<'a>>,
-    pub expression: Box<SyntaxNode<'a>>,
-    pub semicolon_token: SyntaxToken<'a>,
+pub struct AssignmentNodeKind {
+    pub lhs: Box<SyntaxNode>,
+    pub expression: Box<SyntaxNode>,
+    pub semicolon_token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct ExpressionStatementNodeKind<'a> {
-    pub expression: Box<SyntaxNode<'a>>,
-    pub semicolon_token: SyntaxToken<'a>,
+pub struct ExpressionStatementNodeKind {
+    pub expression: Box<SyntaxNode>,
+    pub semicolon_token: SyntaxToken,
 }
 
 #[derive(Debug, Clone)]
-pub struct StructFieldNodeKind<'a> {
-    pub field: ParameterNode<'a>,
-    pub semicolon_token: SyntaxToken<'a>,
+pub struct StructFieldNodeKind {
+    pub field: ParameterNode,
+    pub semicolon_token: SyntaxToken,
 }

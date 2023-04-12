@@ -10,21 +10,26 @@ use crate::{
         instruction::{op_codes::OpCode, Instruction},
         InstructionOrLabelReference, LabelReference,
     },
-    text::SourceText,
+    text::SourceTextCollection,
 };
 
-pub fn print_instructions_with_source_code(instructions: &[Instruction], source: &SourceText) {
-    let output = instructions_with_source_code_to_string(instructions, source);
+pub fn print_instructions_with_source_code(
+    instructions: &[Instruction],
+    source_text_collection: &SourceTextCollection,
+) {
+    let output = instructions_with_source_code_to_string(instructions, source_text_collection);
     println!("{}", output)
 }
 
 pub fn output_instructions_with_source_code_to_sldasm(
+    file_name: impl AsRef<Path>,
     instructions: &[Instruction],
-    source: &SourceText,
+    source_text_collection: &SourceTextCollection,
 ) {
-    let output = instructions_with_source_code_to_string(instructions, source);
+    let output = instructions_with_source_code_to_string(instructions, source_text_collection);
     let output_path = PathBuf::from("../debug-out").join(
-        Path::new(source.file_name)
+        file_name
+            .as_ref()
             .with_extension("sldasm")
             .file_name()
             .unwrap(),
@@ -34,35 +39,34 @@ pub fn output_instructions_with_source_code_to_sldasm(
 
 pub fn print_instructions_or_labels_with_source_code(
     instructions: &[InstructionOrLabelReference],
-    source: &SourceText,
+    source_text_collection: &SourceTextCollection,
 ) {
-    let output = instructions_or_labels_with_source_code_to_string(instructions, source);
+    let output =
+        instructions_or_labels_with_source_code_to_string(instructions, source_text_collection);
     println!("{}", output)
 }
 
 pub fn output_instructions_or_labels_with_source_code_to_sldasm(
+    file_name: impl AsRef<Path>,
     instructions: &[InstructionOrLabelReference],
-    source: &SourceText,
+    source_text_collection: &SourceTextCollection,
 ) {
-    let mut is_foreign = false;
     let mut current_span = None;
     let mut buffer = String::new();
     for (index, instruction) in instructions.iter().enumerate() {
-        let new_is_foreign = instruction.span().map(|s| s.is_foreign()).unwrap_or(true);
-        if new_is_foreign != is_foreign {
-            buffer.push_str("> Foreign instructions ");
-            if new_is_foreign {
-                buffer.push_str("start\n");
-            } else {
-                buffer.push_str("end\n");
-            }
-            is_foreign = new_is_foreign;
-        }
-        if !new_is_foreign && instruction.span() != current_span {
+        // if new_is_foreign != is_foreign {
+        //     buffer.push_str("> Foreign instructions ");
+        //     if new_is_foreign {
+        //         buffer.push_str("start\n");
+        //     } else {
+        //         buffer.push_str("end\n");
+        //     }
+        //     is_foreign = new_is_foreign;
+        // }
+        if instruction.span() != current_span {
             current_span = instruction.span();
             buffer.push_str("> { ");
-            buffer
-                .push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer.push_str(&source_text_collection[current_span.unwrap()]);
             buffer.push_str(" }\n");
         }
         buffer.push_str("  ");
@@ -83,7 +87,8 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
         buffer.push('\n');
     }
     let output_path = PathBuf::from("./debug-out").join(
-        Path::new(source.file_name)
+        file_name
+            .as_ref()
             .with_extension("sldasm")
             .file_name()
             .unwrap(),
@@ -93,27 +98,15 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
 
 fn instructions_with_source_code_to_string(
     instructions: &[Instruction],
-    source: &SourceText,
+    source_text_collection: &SourceTextCollection,
 ) -> String {
-    let mut is_foreign = false;
     let mut current_span = None;
     let mut buffer = String::new();
     for (index, instruction) in instructions.iter().enumerate() {
-        let new_is_foreign = instruction.span.map(|s| s.is_foreign()).unwrap_or(true);
-        if new_is_foreign != is_foreign {
-            buffer.push_str("> Foreign instructions ");
-            if new_is_foreign {
-                buffer.push_str("start\n");
-            } else {
-                buffer.push_str("end\n");
-            }
-            is_foreign = new_is_foreign;
-        }
-        if !new_is_foreign && instruction.span != current_span {
-            current_span = instruction.span;
+        if instruction.location != current_span {
+            current_span = instruction.location;
             buffer.push_str("> { ");
-            buffer
-                .push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer.push_str(&source_text_collection[current_span.unwrap()]);
             buffer.push_str(" }\n");
         }
         buffer.push_str("  ");
@@ -126,27 +119,15 @@ fn instructions_with_source_code_to_string(
 
 fn instructions_or_labels_with_source_code_to_string(
     instructions: &[InstructionOrLabelReference],
-    source: &SourceText,
+    source_text_collection: &SourceTextCollection,
 ) -> String {
-    let mut is_foreign = false;
     let mut current_span = None;
     let mut buffer = String::new();
     for (index, instruction) in instructions.iter().enumerate() {
-        let new_is_foreign = instruction.span().map(|s| s.is_foreign()).unwrap_or(true);
-        if new_is_foreign != is_foreign {
-            buffer.push_str("> Foreign instructions ");
-            if new_is_foreign {
-                buffer.push_str("start\n");
-            } else {
-                buffer.push_str("end\n");
-            }
-            is_foreign = new_is_foreign;
-        }
-        if !new_is_foreign && instruction.span() != current_span {
+        if instruction.span() != current_span {
             current_span = instruction.span();
             buffer.push_str("> { ");
-            buffer
-                .push_str(&source.text[current_span.unwrap().start()..current_span.unwrap().end()]);
+            buffer.push_str(&source_text_collection[current_span.unwrap()]);
             buffer.push_str(" }\n");
         }
         buffer.push_str("  ");
@@ -272,7 +253,9 @@ fn instruction_or_label_to_string(
         OpCode::LessThanEquals => instruction_no_arg_to_string("lte"),
         OpCode::GreaterThanEquals => instruction_no_arg_to_string("gte"),
         OpCode::StringConcat => instruction_no_arg_to_string("strconcat"),
-        OpCode::NoneableOrValue => instruction_dereference_arg_to_string("noneableor", instruction.arg),
+        OpCode::NoneableOrValue => {
+            instruction_dereference_arg_to_string("noneableor", instruction.arg)
+        }
         OpCode::Jump if !has_labels => {
             instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg)
         }

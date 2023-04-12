@@ -1,5 +1,5 @@
 use crate::evaluator::memory;
-
+use strum::{EnumIter, IntoEnumIterator};
 use super::{memory::FlaggedWord, EvaluatorState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,6 +95,11 @@ pub fn create_session(state: &mut EvaluatorState) {
                     Command::Heapdump(file_name) => {
                         crate::debug::output_allocator_to_dot(file_name, &state.heap);
                     }
+                    Command::Help => {
+                        for command in Command::iter() {
+                            println!("  {:14} {}", command.command_name(), command.help_text());
+                        }
+                    }
                 }
             }
             None => {
@@ -169,7 +174,7 @@ fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, EnumIter)]
 enum Command {
     Repeat,
     Quit,
@@ -184,11 +189,52 @@ enum Command {
     Replace(u64),
     RenameRegister(usize, String),
     Heapdump(String),
+    Help,
 }
 
 impl Default for Command {
     fn default() -> Self {
         Self::NextInstruction
+    }
+}
+
+impl Command {
+    fn help_text(&self) -> &'static str {
+        match self {
+            Command::Repeat => "Repeats the last command.",
+            Command::Quit => "Quits the debugger session.",
+            Command::NextInstruction => "Executes the next instruction.",
+            Command::Skip => "Skips the next function in the debugger.",
+            Command::Stack => "Prints the current stack.",
+            Command::Registers => "Prints the values in each register",
+            Command::Pointer(_) => "Reads the value of the address as pointer.",
+            Command::IndirectPointer(_) => "Reads the value of the address as indirect pointer.",
+            Command::Register(_, _) => "Reads the value of the register as pointer.",
+            Command::IndirectRegister(_, _) => "Reads the value of the register as indirect pointer.",
+            Command::Replace(_) => "Replaces the last added value on the stack with the supplied value.",
+            Command::RenameRegister(_, _) => "Renames a register to a given name.",
+            Command::Heapdump(_) => "Creates a heapdump file with the specified file name.",
+            Command::Help => "Prints this help.",
+        }
+    }
+
+    fn command_name(&self) -> &'static str {
+        match self {
+            Command::Repeat => "<enter>",
+            Command::Quit => "quit|q",
+            Command::NextInstruction => "next|n",
+            Command::Skip => "skip|s",
+            Command::Stack => "stack",
+            Command::Registers => "registers",
+            Command::Pointer(_) => "ptr",
+            Command::IndirectPointer(_) => "ptrptr",
+            Command::Register(_, _) => "ptr r#",
+            Command::IndirectRegister(_, _) => "ptrptr r#",
+            Command::Replace(_) => "replace",
+            Command::RenameRegister(_, _) => "rename",
+            Command::Heapdump(_) => "heapdump",
+            Command::Help => "help|h|?",
+        }
     }
 }
 
@@ -226,9 +272,8 @@ fn parse_command(input: &str) -> Option<Command> {
             ["n" | "next"] => Some(Command::NextInstruction),
             ["s" | "skip"] => Some(Command::Skip),
             [""] => Some(Command::Repeat),
-            ["heapdump", arg] => {
-                Some(Command::Heapdump(arg.into()))
-            }
+            ["heapdump", arg] => Some(Command::Heapdump(arg.into())),
+            ["h" | "help" | "?"] => Some(Command::Help),
             _ => None,
         }
     }

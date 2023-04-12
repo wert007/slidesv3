@@ -9,14 +9,14 @@ use crate::{
     parser::syntax_nodes::{
         CompilationUnitNodeKind, ImportStatementNodeKind, SyntaxNode, SyntaxNodeKind,
     },
-    text::TextSpan,
+    text::{SourceText, TextLocation},
     value::Value,
 };
 
 #[derive(Debug, Clone)]
-pub struct BoundImportStatement<'a> {
-    pub span: TextSpan,
-    pub name: &'a str,
+pub struct BoundImportStatement {
+    pub location: TextLocation,
+    pub name: String,
     pub function: ImportFunction,
 }
 
@@ -31,15 +31,15 @@ pub struct ImportLibraryFunction {
 }
 
 pub(super) fn bind_import_statements<'a>(
-    node: SyntaxNode<'a>,
-    binder: &mut BindingState<'a, '_>,
-) -> Option<SyntaxNode<'a>> {
+    node: SyntaxNode,
+    binder: &mut BindingState<'_>,
+) -> Option<SyntaxNode> {
     match node.kind {
         SyntaxNodeKind::CompilationUnit(compilation_unit) => Some(
             bind_import_statements_compilation_unit(compilation_unit, binder),
         ),
         SyntaxNodeKind::ImportStatement(import_statement) => {
-            bind_import_statements_import_statement(node.span, import_statement, binder);
+            bind_import_statements_import_statement(node.location, import_statement, binder);
             None
         }
         _ => Some(node),
@@ -47,9 +47,9 @@ pub(super) fn bind_import_statements<'a>(
 }
 
 fn bind_import_statements_compilation_unit<'a>(
-    compilation_unit: CompilationUnitNodeKind<'a>,
-    binder: &mut BindingState<'a, '_>,
-) -> SyntaxNode<'a> {
+    compilation_unit: CompilationUnitNodeKind,
+    binder: &mut BindingState<'_>,
+) -> SyntaxNode {
     let mut statements = Vec::with_capacity(compilation_unit.statements.len());
     for statement in compilation_unit.statements {
         if let Some(statement) = bind_import_statements(statement, binder) {
@@ -60,17 +60,17 @@ fn bind_import_statements_compilation_unit<'a>(
 }
 
 fn bind_import_statements_import_statement<'a>(
-    span: TextSpan,
-    import_statement: ImportStatementNodeKind<'a>,
-    binder: &mut BindingState<'a, '_>,
+    location: TextLocation,
+    import_statement: ImportStatementNodeKind,
+    binder: &mut BindingState<'_>,
 ) {
-    bind_import_statement(span, import_statement, binder);
+    bind_import_statement(location, import_statement, binder);
 }
 
 fn bind_import_statement<'a>(
-    span: TextSpan,
-    import_statement: ImportStatementNodeKind<'a>,
-    binder: &mut BindingState<'a, '_>,
+    location: TextLocation,
+    import_statement: ImportStatementNodeKind,
+    binder: &mut BindingState<'a>,
 ) {
     let import_function = if let Some(it) = bind_import_function(*import_statement.function, binder)
     {
@@ -78,23 +78,23 @@ fn bind_import_statement<'a>(
     } else {
         return;
     };
-    let name = import_statement.identifier.lexeme;
+    let name = binder.lexeme(import_statement.identifier).into();
     let import_statement = BoundImportStatement {
         function: import_function,
         name,
-        span,
+        location,
     };
     execute_import_function(import_statement, binder);
 }
 
 fn bind_import_function<'a>(
-    function: SyntaxNode<'a>,
-    binder: &mut BindingState<'a, '_>,
+    function: SyntaxNode,
+    binder: &mut BindingState<'_>,
 ) -> Option<ImportFunction> {
-    let function_span = function.span;
+    let function_span = function.location;
     if let SyntaxNodeKind::FunctionCall(mut function) = function.kind {
         if let SyntaxNodeKind::Variable(base) = function.base.kind {
-            match base.token.lexeme {
+            match binder.lexeme(base.token) {
                 "lib" => {
                     let path = function.arguments.pop();
                     if path.is_none() {
@@ -104,10 +104,10 @@ fn bind_import_function<'a>(
                         return None;
                     }
                     let path = path.unwrap();
-                    let argument_span = path.span;
+                    let argument_span = path.location;
                     let path = super::bind_node(path, binder);
                     if path.constant_value.is_none() {
-                        binder.diagnostic_bag.report_expected_constant(path.span);
+                        binder.diagnostic_bag.report_expected_constant(path.location);
                         return None;
                     }
                     let path = path.constant_value.unwrap().value;
@@ -122,46 +122,46 @@ fn bind_import_function<'a>(
                     let path = path.as_string()?.into();
                     Some(ImportFunction::Library(ImportLibraryFunction { path }))
                 }
-                function_name => {
+                _function_name => {
                     binder
                         .diagnostic_bag
-                        .report_unknown_import_function(base.token.span(), function_name);
+                        .report_unknown_import_function(base.token.location, base.token.location);
                     None
                 }
             }
         } else {
             binder
                 .diagnostic_bag
-                .report_only_function_call_in_import_statement(function.base.span);
+                .report_only_function_call_in_import_statement(function.base.location);
             None
         }
     } else {
         binder
             .diagnostic_bag
-            .report_only_function_call_in_import_statement(function.span);
+            .report_only_function_call_in_import_statement(function.location);
         None
     }
 }
 
 fn execute_import_function<'a>(
-    import: BoundImportStatement<'a>,
-    binder: &mut BindingState<'a, '_>,
+    import: BoundImportStatement,
+    binder: &mut BindingState<'_>,
 ) {
     match import.function {
         ImportFunction::Library(library) => {
-            let directory = PathBuf::from(binder.directory);
+            let directory = PathBuf::from(binder.directory());
             let path = directory.join(library.path).with_extension("sld");
-            load_library_from_path(binder, &path, import.span, import.name, true);
+            load_library_from_path(binder, &path, import.location, import.name, true);
         }
     }
 }
 
 pub(super) fn load_library_from_source<'a>(
-    binder: &mut BindingState<'a, '_>,
+    binder: &mut BindingState<'_>,
     path: &Path,
     source: &'static str,
-    span: TextSpan,
-    library_name: &'a str,
+    location: TextLocation,
+    library_name: String,
     import_std_lib: bool,
 ) {
     let (path, lib) = binder
@@ -170,9 +170,10 @@ pub(super) fn load_library_from_source<'a>(
         .find_map(|l| l.find_imported_library_by_path(path))
         .map(|(s, l)| (Some(s), l))
         .unwrap_or_else(|| {
+            let source_text = binder.project.source_text_collection.add(SourceText::new(source, "std"));
             (
                 None,
-                binder.project.load_library(source, "std", import_std_lib),
+                binder.project.load_library(source_text, import_std_lib),
             )
         });
     // If it is a std library, there is no path to it, but it might still be already loaded.
@@ -181,14 +182,14 @@ pub(super) fn load_library_from_source<'a>(
     } else {
         path
     };
-    load_library_into_binder(span, library_name, lib, path, binder);
+    load_library_into_binder(location, library_name, lib, path, binder);
 }
 
 pub(super) fn load_library_from_path<'a>(
-    binder: &mut BindingState<'a, '_>,
+    binder: &mut BindingState<'_>,
     path: &Path,
-    span: TextSpan,
-    library_name: &'a str,
+    location: TextLocation,
+    library_name: String,
     import_std_lib: bool,
 ) {
     let (path, lib) = binder
@@ -208,15 +209,15 @@ pub(super) fn load_library_from_path<'a>(
     } else {
         path
     };
-    load_library_into_binder(span, library_name, lib, path, binder);
+    load_library_into_binder(location, library_name, lib, path, binder);
 }
 
 fn load_library_into_binder<'a>(
-    span: TextSpan,
-    name: &'a str,
+    location: TextLocation,
+    name: String,
     mut lib: Library,
     path: Option<String>,
-    binder: &mut BindingState<'a, '_>,
+    binder: &mut BindingState<'_>,
 ) {
     binder.max_used_variables = binder
         .max_used_variables
@@ -224,32 +225,32 @@ fn load_library_into_binder<'a>(
     if lib.has_errors {
         binder
             .diagnostic_bag
-            .report_errors_in_referenced_library(span, name);
+            .report_errors_in_referenced_library(location, &name);
     }
     if !name.is_empty() {
         let index = binder.libraries.len();
         let mut should_load_library = true;
         let variable = if lib.has_errors {
             should_load_library = false;
-            binder.register_variable(name, typeid!(Type::Error), true)
+            binder.register_generated_variable(name.clone(), typeid!(Type::Error), true)
         } else {
             let type_ = binder
                 .project
                 .types
                 .look_up_or_add_type(Type::Library(index));
-            binder.register_variable(name, type_, true)
+            binder.register_generated_variable(name.clone(), type_, true)
         };
         if variable.is_none() {
             binder
                 .diagnostic_bag
-                .report_cannot_declare_variable(span, name);
+                .report_cannot_declare_variable(location, name.as_str());
             should_load_library = false;
         }
         if !should_load_library {
             return;
         }
     }
-    lib.name = name.into();
+    lib.name = name.clone();
     let need_to_load_std_libs = lib.name.is_empty() && binder.libraries.is_empty();
     if need_to_load_std_libs || path.is_none() {
         lib.relocate_labels(binder.label_offset);
@@ -259,7 +260,7 @@ fn load_library_into_binder<'a>(
         match &path {
             Some(empty) if empty.is_empty() => {
                 assert!(lib.name.is_empty());
-                binder.register_struct_name(strct.name.as_str(), (&strct.function_table).into());
+                binder.register_struct_name(strct.name.clone(), (&strct.function_table).into());
                 // binder.register_maybe_generic_struct_as(strct.name(), strct);
             }
             Some(path) => {

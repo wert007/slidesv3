@@ -1,4 +1,4 @@
-use crate::{binder::bound_nodes::BoundNodeKind, text::TextSpan};
+use crate::{binder::bound_nodes::BoundNodeKind, text::TextLocation};
 
 use super::{
     bound_nodes::{
@@ -38,80 +38,91 @@ fn flatten_node(node: BoundNode, flattener: &mut Flattener) -> Vec<BoundNode> {
     match node.kind {
         BoundNodeKind::VariableDeclaration(variable_declaration) => {
             vec![flatten_variable_declaration(
-                node.span,
+                node.location,
                 node.type_,
                 variable_declaration,
                 flattener,
             )]
         }
         BoundNodeKind::Assignment(assignment) => vec![flatten_assignment(
-            node.span, node.type_, assignment, flattener,
+            node.location,
+            node.type_,
+            assignment,
+            flattener,
         )],
         BoundNodeKind::ReturnStatement(return_statement) => vec![flatten_return_statement(
-            node.span,
+            node.location,
             node.type_,
             return_statement,
             flattener,
         )],
         BoundNodeKind::ExpressionStatement(expression_statement) => {
             vec![flatten_expression_statement(
-                node.span,
+                node.location,
                 node.type_,
                 expression_statement,
                 flattener,
             )]
         }
         BoundNodeKind::FieldAccess(field_access) => vec![flatten_field_access(
-            node.span,
+            node.location,
             node.type_,
             field_access,
             flattener,
         )],
         BoundNodeKind::Closure(closure) => {
-            vec![flatten_closure(node.span, node.type_, closure, flattener)]
+            vec![flatten_closure(
+                node.location,
+                node.type_,
+                closure,
+                flattener,
+            )]
         }
         BoundNodeKind::Conversion(conversion) => vec![flatten_conversion(
-            node.span, node.type_, conversion, flattener,
+            node.location,
+            node.type_,
+            conversion,
+            flattener,
         )],
         BoundNodeKind::ArrayIndex(array_index) => vec![flatten_array_index(
-            node.span,
+            node.location,
             node.type_,
             array_index,
             flattener,
         )],
         BoundNodeKind::SystemCall(system_call) => vec![flatten_system_call(
-            node.span,
+            node.location,
             node.type_,
             system_call,
             flattener,
         )],
         BoundNodeKind::FunctionCall(function_call) => vec![flatten_function_call(
-            node.span,
+            node.location,
             node.type_,
             function_call,
             flattener,
         )],
         BoundNodeKind::BinaryExpression(binary_expression) => vec![flatten_binary_expression(
-            node.span,
+            node.location,
             node.type_,
             binary_expression,
             flattener,
         )],
         BoundNodeKind::UnaryExpression(unary_expression) => vec![flatten_unary_expression(
-            node.span,
+            node.location,
             node.type_,
             unary_expression,
             flattener,
         )],
         BoundNodeKind::ConstructorCall(constructor_call) => vec![flatten_constructor_call(
-            node.span,
+            node.location,
             node.type_,
             *constructor_call,
             flattener,
         )],
         BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => {
             vec![flatten_array_literal_expression(
-                node.span,
+                node.location,
                 node.type_,
                 array_literal_expression,
                 flattener,
@@ -139,47 +150,47 @@ fn flatten_node(node: BoundNode, flattener: &mut Flattener) -> Vec<BoundNode> {
 fn flatten_expression(node: BoundNode, flattener: &mut Flattener) -> BoundNode {
     match node.kind {
         BoundNodeKind::VariableDeclaration(variable_declaration) => {
-            flatten_variable_declaration(node.span, node.type_, variable_declaration, flattener)
+            flatten_variable_declaration(node.location, node.type_, variable_declaration, flattener)
         }
         BoundNodeKind::Assignment(assignment) => {
-            flatten_assignment(node.span, node.type_, assignment, flattener)
+            flatten_assignment(node.location, node.type_, assignment, flattener)
         }
         BoundNodeKind::ReturnStatement(return_statement) => {
-            flatten_return_statement(node.span, node.type_, return_statement, flattener)
+            flatten_return_statement(node.location, node.type_, return_statement, flattener)
         }
         BoundNodeKind::ExpressionStatement(expression_statement) => {
-            flatten_expression_statement(node.span, node.type_, expression_statement, flattener)
+            flatten_expression_statement(node.location, node.type_, expression_statement, flattener)
         }
         BoundNodeKind::FieldAccess(field_access) => {
-            flatten_field_access(node.span, node.type_, field_access, flattener)
+            flatten_field_access(node.location, node.type_, field_access, flattener)
         }
         BoundNodeKind::Closure(closure) => {
-            flatten_closure(node.span, node.type_, closure, flattener)
+            flatten_closure(node.location, node.type_, closure, flattener)
         }
         BoundNodeKind::Conversion(conversion) => {
-            flatten_conversion(node.span, node.type_, conversion, flattener)
+            flatten_conversion(node.location, node.type_, conversion, flattener)
         }
         BoundNodeKind::ArrayIndex(array_index) => {
-            flatten_array_index(node.span, node.type_, array_index, flattener)
+            flatten_array_index(node.location, node.type_, array_index, flattener)
         }
         BoundNodeKind::SystemCall(system_call) => {
-            flatten_system_call(node.span, node.type_, system_call, flattener)
+            flatten_system_call(node.location, node.type_, system_call, flattener)
         }
         BoundNodeKind::FunctionCall(function_call) => {
-            flatten_function_call(node.span, node.type_, function_call, flattener)
+            flatten_function_call(node.location, node.type_, function_call, flattener)
         }
         BoundNodeKind::BinaryExpression(binary_expression) => {
-            flatten_binary_expression(node.span, node.type_, binary_expression, flattener)
+            flatten_binary_expression(node.location, node.type_, binary_expression, flattener)
         }
         BoundNodeKind::UnaryExpression(unary_expression) => {
-            flatten_unary_expression(node.span, node.type_, unary_expression, flattener)
+            flatten_unary_expression(node.location, node.type_, unary_expression, flattener)
         }
         BoundNodeKind::ConstructorCall(constructor_call) => {
-            flatten_constructor_call(node.span, node.type_, *constructor_call, flattener)
+            flatten_constructor_call(node.location, node.type_, *constructor_call, flattener)
         }
         BoundNodeKind::ArrayLiteralExpression(array_literal_expression) => {
             flatten_array_literal_expression(
-                node.span,
+                node.location,
                 node.type_,
                 array_literal_expression,
                 flattener,
@@ -196,12 +207,12 @@ fn flatten_expression(node: BoundNode, flattener: &mut Flattener) -> BoundNode {
         }
         BoundNodeKind::Jump(_) => unreachable!("Only the lowerer itself can emit Jump bound nodes"),
         BoundNodeKind::BlockStatement(block_statement) => BoundNode::block_expression(
-            node.span,
+            node.location,
             flatten_block_statement(block_statement, flattener),
             node.type_,
         ),
         BoundNodeKind::IfStatement(if_statement) => BoundNode::block_expression(
-            node.span,
+            node.location,
             flatten_if_statement(if_statement, flattener),
             node.type_,
         ),
@@ -209,7 +220,7 @@ fn flatten_expression(node: BoundNode, flattener: &mut Flattener) -> BoundNode {
 }
 
 fn flatten_variable_declaration(
-    span: TextSpan,
+    span: TextLocation,
     _type_: TypeId,
     variable_declaration: BoundVariableDeclarationNodeKind,
     flattener: &mut Flattener,
@@ -224,7 +235,7 @@ fn flatten_variable_declaration(
 }
 
 fn flatten_assignment(
-    span: TextSpan,
+    span: TextLocation,
     _type_: TypeId,
     assignment: BoundAssignmentNodeKind,
     flattener: &mut Flattener,
@@ -235,7 +246,7 @@ fn flatten_assignment(
 }
 
 fn flatten_return_statement(
-    span: TextSpan,
+    span: TextLocation,
     _type_: TypeId,
     return_statement: BoundReturnStatementNodeKind,
     flattener: &mut Flattener,
@@ -247,7 +258,7 @@ fn flatten_return_statement(
 }
 
 fn flatten_expression_statement(
-    span: TextSpan,
+    span: TextLocation,
     _type_: TypeId,
     expression_statement: BoundExpressionStatementNodeKind,
     flattener: &mut Flattener,
@@ -257,7 +268,7 @@ fn flatten_expression_statement(
 }
 
 fn flatten_field_access(
-    span: TextSpan,
+    span: TextLocation,
     _type_: TypeId,
     field_access: BoundFieldAccessNodeKind,
     flattener: &mut Flattener,
@@ -267,7 +278,7 @@ fn flatten_field_access(
 }
 
 fn flatten_closure(
-    span: TextSpan,
+    span: TextLocation,
     type_: TypeId,
     closure: BoundClosureNodeKind,
     flattener: &mut Flattener,
@@ -290,7 +301,7 @@ fn flatten_closure(
 }
 
 fn flatten_conversion(
-    span: TextSpan,
+    span: TextLocation,
     _type_: TypeId,
     conversion: BoundConversionNodeKind,
     flattener: &mut Flattener,
@@ -300,7 +311,7 @@ fn flatten_conversion(
 }
 
 fn flatten_array_index(
-    span: TextSpan,
+    span: TextLocation,
     type_: TypeId,
     array_index: BoundArrayIndexNodeKind,
     flattener: &mut Flattener,
@@ -311,7 +322,7 @@ fn flatten_array_index(
 }
 
 fn flatten_system_call(
-    span: TextSpan,
+    span: TextLocation,
     type_: TypeId,
     system_call: BoundSystemCallNodeKind,
     flattener: &mut Flattener,
@@ -324,7 +335,7 @@ fn flatten_system_call(
 }
 
 fn flatten_function_call(
-    span: TextSpan,
+    span: TextLocation,
     type_: TypeId,
     function_call: BoundFunctionCallNodeKind,
     flattener: &mut Flattener,
@@ -344,7 +355,7 @@ fn flatten_function_call(
 }
 
 fn flatten_binary_expression(
-    span: TextSpan,
+    span: TextLocation,
     type_: TypeId,
     binary_expression: BoundBinaryNodeKind,
     flattener: &mut Flattener,
@@ -355,7 +366,7 @@ fn flatten_binary_expression(
 }
 
 fn flatten_unary_expression(
-    span: TextSpan,
+    span: TextLocation,
     type_: TypeId,
     unary_expression: BoundUnaryNodeKind,
     flattener: &mut Flattener,
@@ -365,7 +376,7 @@ fn flatten_unary_expression(
 }
 
 fn flatten_constructor_call(
-    span: TextSpan,
+    span: TextLocation,
     _type_: TypeId,
     constructor_call: BoundConstructorCallNodeKind,
     flattener: &mut Flattener,
@@ -383,7 +394,7 @@ fn flatten_constructor_call(
 }
 
 fn flatten_array_literal_expression(
-    span: TextSpan,
+    span: TextLocation,
     type_: TypeId,
     array_literal_expression: BoundArrayLiteralNodeKind,
     flattener: &mut Flattener,
@@ -396,10 +407,10 @@ fn flatten_array_literal_expression(
 }
 
 fn flatten_function_declaration(
-    function_declaration: BoundFunctionDeclarationNodeKind,
+    _function_declaration: BoundFunctionDeclarationNodeKind,
     _flattener: &mut Flattener,
 ) -> Vec<BoundNode> {
-    let mut _result = vec![BoundNode::label(function_declaration.label)];
+    // let mut _result = vec![BoundNode::label(todo!("Location"), function_declaration.label)];
     // TODO: assign parameters here!
     unimplemented!();
     // result.append(&mut flatten_node(*function_declaration.body, flattener));
@@ -422,15 +433,16 @@ fn flatten_if_statement(
     flattener: &mut Flattener,
 ) -> Vec<BoundNode> {
     let mut result = vec![];
-    let (end_label, end_label_ref) = create_label(flattener);
+    let (end_label, end_label_ref) = create_label(if_statement.condition.location, flattener);
     let (else_label, else_label_ref) = if if_statement.else_body.is_some() {
-        create_label(flattener)
+        create_label(if_statement.else_body.as_ref().unwrap().location, flattener)
     } else {
         (end_label.clone(), end_label_ref.clone())
     };
-    let condition_span = if_statement.condition.span;
+    let condition_span = if_statement.condition.location;
     let condition_type = if_statement.condition.type_.clone();
     result.push(BoundNode::jump_if_false(
+        condition_span,
         BoundNode::block_expression(
             condition_span,
             flatten_node(*if_statement.condition, flattener),
@@ -440,7 +452,10 @@ fn flatten_if_statement(
     ));
     result.append(&mut flatten_node(*if_statement.body, flattener));
     if if_statement.else_body.is_some() {
-        result.push(BoundNode::jump(end_label_ref));
+        result.push(BoundNode::jump(
+            if_statement.else_body.as_ref().unwrap().location,
+            end_label_ref,
+        ));
         result.push(else_label);
     }
     if let Some(else_body) = if_statement.else_body {
@@ -455,20 +470,21 @@ fn flatten_while_statement(
     flattener: &mut Flattener,
 ) -> Vec<BoundNode> {
     let mut result = vec![];
-    let (label, label_ref) = create_label(flattener);
+    let (label, label_ref) = create_label(while_statement.body.location, flattener);
     result.push(label);
     result.append(&mut flatten_node(*while_statement.body, flattener));
     result.push(BoundNode::jump_if_true(
+        while_statement.condition.location,
         *while_statement.condition,
         label_ref,
     ));
     result
 }
 
-fn create_label(flattener: &mut Flattener) -> (BoundNode, BoundNode) {
+fn create_label(location: TextLocation, flattener: &mut Flattener) -> (BoundNode, BoundNode) {
     let index = flattener.next_label_index();
     (
-        BoundNode::label(index),
-        BoundNode::label_reference(index, typeid!(Type::Error)),
+        BoundNode::label(location, index),
+        BoundNode::label_reference(location, index, typeid!(Type::Error)),
     )
 }

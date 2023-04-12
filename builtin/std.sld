@@ -152,8 +152,8 @@ generic struct Array {
             // been bound yet?
             //
             // Not anymore! But also doesn't work!
-            // this[i] = basis;
-            this.buffer[i] = basis;
+            this[i] = basis;
+            // this.buffer[i] = basis;
         }
     }
 
@@ -186,7 +186,7 @@ generic struct Array {
             } else {
                 result = result + ', ';
             }
-            result = result + this.buffer[i];
+            result = result + this[i];
         }
         result = result + ' ]';
         return result;

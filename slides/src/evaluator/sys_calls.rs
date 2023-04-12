@@ -21,7 +21,7 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
         state
             .runtime_diagnostics
             .no_heap_memory_left(None, WORD_SIZE_IN_BYTES + string_length);
-        state.runtime_diagnostics.clone().flush_to_console();
+        state.runtime_diagnostics.clone().flush_to_console(&state.project.source_text_collection);
         state.runtime_diagnostics.diagnostics.clear();
         state.runtime_error_happened = true;
         state.stack.push_pointer(result);
@@ -65,7 +65,7 @@ fn to_string_native(
         | Type::GenericType
         | Type::IntegerLiteral
         | Type::Enum(..)
-        | Type::StructPlaceholder(..) => unreachable!(),
+        | Type::StructPlaceholder(..) => unreachable!("{:#?}", &state.project.types[type_]),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
