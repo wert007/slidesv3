@@ -1,6 +1,7 @@
 #![feature(round_char_boundary)]
 
 use std::path::PathBuf;
+use std::string::FromUtf8Error;
 use std::sync::atomic::{self, AtomicUsize};
 
 use clap::Parser;
@@ -17,6 +18,8 @@ struct Args {
     filter: Option<String>,
     #[arg(short, long)]
     directory: String,
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 #[tokio::main]
@@ -44,7 +47,7 @@ async fn main() {
                 .output()
                 .await
                 .unwrap();
-            let _errors_occured = if args.record {
+            let errors_occured = if args.record {
                 let (t1, t2) = join!(
                     fs::write(file.with_extension("out"), output.stdout),
                     fs::write(file.with_extension("err"), output.stderr),
@@ -54,50 +57,78 @@ async fn main() {
                 false
             } else {
                 let (t1, t2) = join!(
-                    ensure_equal(file.with_extension("out"), output.stdout,),
-                    ensure_equal(file.with_extension("err"), output.stderr,)
+                    ensure_equal(file.with_extension("out"), output.stdout, args.verbose),
+                    ensure_equal(file.with_extension("err"), output.stderr, args.verbose)
                 );
                 t1 || t2
             };
             files_done.fetch_add(1, atomic::Ordering::Relaxed);
-            println!(
+            print!(
                 "Completed {:3}/{total_files}: {}",
                 files_done.load(atomic::Ordering::Relaxed),
                 file.file_name().unwrap().to_string_lossy()
             );
+            if errors_occured {
+                colorize_println("   FAILED", Colors::RedFg);
+            } else {
+                colorize_println("   PASSED", Colors::BrightGreenFg);
+            }
         })
         .await;
 }
 
 enum Error {
     FileNotFound(PathBuf, std::io::Error),
-    FileLengthDifferent(Vec<u8>, Vec<u8>),
-    FileByteDifferentAt(usize, Vec<u8>, Vec<u8>),
+    FileLengthDifferent(String, String),
+    FileByteDifferentAt(usize, String, String),
+    InvalidUtf8(FromUtf8Error),
 }
 
 /// Returns true, if an error occured.
-async fn ensure_equal(file: PathBuf, output: Vec<u8>) -> bool {
+async fn ensure_equal(file: PathBuf, output: Vec<u8>, verbose: bool) -> bool {
     let file = match fs::read(&file).await {
         Ok(it) => it,
         Err(err) => {
-            report_error(Error::FileNotFound(file, err));
+            report_error(Error::FileNotFound(file, err), verbose);
+            return true;
+        }
+    };
+    let file = match convert_to_unix_newline(file) {
+        Ok(it) => it,
+        Err(err) => {
+            report_error(Error::InvalidUtf8(err), verbose);
+            return true;
+        }
+    };
+    let output = match convert_to_unix_newline(output) {
+        Ok(it) => it,
+        Err(err) => {
+            report_error(Error::InvalidUtf8(err), verbose);
             return true;
         }
     };
     if file.len() != output.len() {
-        report_error(Error::FileLengthDifferent(file, output));
+        report_error(Error::FileLengthDifferent(file, output), verbose);
         return true;
     }
-    for (index, (f, o)) in file.iter().copied().zip(output.iter().copied()).enumerate() {
+    for (index, (f, o)) in file.chars().zip(output.chars()).enumerate() {
         if f != o {
-            report_error(Error::FileByteDifferentAt(index, file, output));
+            report_error(Error::FileByteDifferentAt(index, file, output), verbose);
             return true;
         }
     }
     false
 }
 
-fn report_error(err: Error) {
+fn convert_to_unix_newline(bytes: Vec<u8>) -> Result<String, FromUtf8Error> {
+    let result = String::from_utf8(bytes)?;
+    Ok(result.replace('\r', "").to_owned())
+}
+
+fn report_error(err: Error, verbose: bool) {
+    if !verbose {
+        return;
+    }
     colorize_print("ERROR: ", Colors::RedFg);
     match err {
         Error::FileNotFound(file, err) => {
@@ -108,26 +139,37 @@ fn report_error(err: Error) {
             println!("{err}");
         }
         Error::FileLengthDifferent(file, output) => {
-            let file = String::from_utf8_lossy(&file);
-            let output = String::from_utf8_lossy(&output);
             println!(
                 "Different lengths. File was {} bytes long and the output {} bytes.",
                 file.len(),
                 output.len()
             );
-            println!("File read  '{file}'");
-            println!("Output was '{output}'");
+            print!("File read  ");
+            if file.is_empty() {
+                colorize_println("empty", Colors::BrightBlackFg);
+            } else {
+                println!("'{file}'");
+            }
+            print!("Output was ");
+            if output.is_empty() {
+                colorize_println("empty", Colors::BrightBlackFg);
+            } else {
+                println!("'{output}'");
+            }
         }
         Error::FileByteDifferentAt(index, file, output) => {
             println!("Different byte at {index}.");
-            let file = String::from_utf8_lossy(&file);
-            let output = String::from_utf8_lossy(&output);
             print!("File read  ");
             print_difference_highlighted(&file, index, Colors::BrightCyanFg);
             println!();
             print!("Output was ");
             print_difference_highlighted(&output, index, Colors::BrightCyanFg);
             println!();
+        }
+        Error::InvalidUtf8(err) => {
+            println!("Invalid utf8 found:");
+            println!();
+            println!("{err}");
         }
     }
 }
