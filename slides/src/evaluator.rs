@@ -503,29 +503,11 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
 fn evaluate_type_identifier_equals(state: &mut EvaluatorState, _: Instruction) {
     let rhs = state.stack.pop().unwrap_pointer();
     let lhs = state.stack.pop().unwrap_pointer();
-    let lhs_size_in_bytes = state.read_pointer(lhs).unwrap_value();
-    let result = if lhs == rhs {
-        true
-    } else {
-        let rhs_size_in_bytes = state.read_pointer(rhs).unwrap_value();
-        if lhs_size_in_bytes != rhs_size_in_bytes {
-            false
-        } else {
-            let size_in_words = memory::bytes_to_word(lhs_size_in_bytes);
-            let mut result = true;
-            for offset in 1..=size_in_words {
-                let lhs = state.read_pointer(lhs + offset * memory::WORD_SIZE_IN_BYTES);
-                let rhs = state.read_pointer(rhs + offset * memory::WORD_SIZE_IN_BYTES);
-                if lhs.value != rhs.value {
-                    result = false;
-                    break;
-                }
-            }
-            result
-        }
-    };
+    let rhs_type_identifier = state.read_pointer(rhs).unwrap_value();
+    let lhs_type_identifier = state.read_pointer(lhs).unwrap_value();
+    let result = lhs_type_identifier == rhs_type_identifier;
     if result {
-        let value = state.read_pointer(lhs + lhs_size_in_bytes + memory::WORD_SIZE_IN_BYTES);
+        let value = state.read_pointer(lhs + memory::WORD_SIZE_IN_BYTES);
         state.stack.push_flagged_word(value);
     } else {
         state.stack.push_pointer(0);

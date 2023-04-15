@@ -1,5 +1,5 @@
 use crate::{
-    binder::typing::{TypeCollection, TypeId},
+    binder::{typing::{TypeCollection, TypeId}, SourceCow},
     lexer::syntax_token::SyntaxTokenKind,
     parser::syntax_nodes::SyntaxNodeKind,
     text::{SourceTextCollection, SourceTextId, TextLocation, TextSpan},
@@ -58,6 +58,15 @@ impl From<TypeId> for Message {
 impl From<&[Message]> for Message {
     fn from(it: &[Message]) -> Self {
         Self::Composition(it.into())
+    }
+}
+
+impl From<SourceCow> for Message {
+    fn from(value: SourceCow) -> Self {
+        match value {
+            SourceCow::Source(it) => it.into(),
+            SourceCow::Owned(it) => it.into(),
+        }
     }
 }
 
@@ -548,7 +557,7 @@ impl DiagnosticBag {
     pub fn report_generic_type_in_ungeneric_struct(
         &mut self,
         span: TextLocation,
-        struct_name: TextLocation,
+        struct_name: impl Into<Message>,
     ) {
         let message = message_format!(
             "Used generic type in struct ",

@@ -8,12 +8,12 @@ use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 pub fn print(argument: FlaggedWord, state: &mut EvaluatorState) {
     println!(
         "{}",
-        to_string_native(typeid!(Type::Any), None, argument, state)
+        to_string_native(typeid!(Type::Any), argument, state)
     );
 }
 
 pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
-    let string = to_string_native(typeid!(Type::Any), None, argument, state);
+    let string = to_string_native(typeid!(Type::Any), argument, state);
     let string_length = string.len() as u64;
     let mut pointer = state.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
@@ -37,26 +37,28 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
     state.stack.push_pointer(result);
 }
 
-fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> (TypeId, Option<u64>) {
-    let address = address.unwrap_pointer();
-    let type_identifier = state.read_pointer(address).unwrap_value();
-    // SAFETY: This is actually only as safe as the implementation. If something
-    // gets read as TypeId, but it actually isn't, strange things will happen.
-    let type_identifier = unsafe { TypeId::from_raw(type_identifier) };
-    let to_string_function = state.project.types[type_identifier]
+fn get_to_string_function(type_id: TypeId, state: &EvaluatorState) -> Option<u64> {
+    state.project.types[type_id]
         .as_struct_type()
         .map(|s| {
             s.function_table
                 .to_string_function.as_ref()
                 .map(|f| f.function_label)
         })
-        .flatten();
-    (type_identifier, to_string_function)
+        .flatten()
+}
+
+fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> TypeId {
+    let address = address.unwrap_pointer();
+    let type_identifier = state.read_pointer(address).unwrap_value();
+    // SAFETY: This is actually only as safe as the implementation. If something
+    // gets read as TypeId, but it actually isn't, strange things will happen.
+    let type_identifier = unsafe { TypeId::from_raw(type_identifier) };
+    type_identifier
 }
 
 fn to_string_native(
     type_: TypeId,
-    to_string_function: Option<u64>,
     argument: FlaggedWord,
     state: &mut EvaluatorState,
 ) -> String {
@@ -69,23 +71,24 @@ fn to_string_native(
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
-            let (type_, to_string_function) = decode_type(argument, state);
+            let type_ = decode_type(argument, state);
             let address = argument.unwrap_pointer() + WORD_SIZE_IN_BYTES;
             let argument = state.read_pointer(address);
-            to_string_native(type_, to_string_function, argument, state)
+            to_string_native(type_, argument, state)
         }
         Type::None => "none".into(),
         Type::Noneable(base_type) => {
             if argument.unwrap_pointer() == 0 {
                 "none".into()
             } else if state.project.types[*base_type].is_pointer() {
-                to_string_native(*base_type, to_string_function, argument, state)
+                to_string_native(*base_type, argument, state)
             } else {
                 let argument = state.read_pointer(argument.unwrap_pointer());
-                to_string_native(*base_type, to_string_function, argument, state)
+                to_string_native(*base_type, argument, state)
             }
         }
         Type::Struct(struct_type) => {
+            let to_string_function = get_to_string_function(type_, state);
             match to_string_function {
                 Some(it) => {
                     // FIXME: If there is an Err(()) returned, this means, there was
@@ -95,7 +98,7 @@ fn to_string_native(
                         super::execute_function(state, it as usize, &[argument])
                             .unwrap()
                             .unwrap();
-                    to_string_native(typeid!(Type::String), None, return_value, state)
+                    to_string_native(typeid!(Type::String), return_value, state)
                 }
                 None => {
                     // TODO: General purpose to string
@@ -121,7 +124,7 @@ fn to_string_native(
                 } else {
                     state.read_pointer(ptr)
                 };
-                to_string_native(*base_type, to_string_function, argument, state)
+                to_string_native(*base_type, argument, state)
             }
         }
         Type::Boolean => {
@@ -132,7 +135,7 @@ fn to_string_native(
             }
         }
         Type::SystemCall(kind) => format!("system call {}", kind),
-        Type::Function(kind) => format!("fn {}", kind),
+        Type::Function(kind) => format!("fn {}", kind.display(&state.project.types)),
         Type::Closure(closure) => format!("fn {}", closure.base_function_type),
         Type::String => string_to_string_native(argument, state),
     }
@@ -160,7 +163,7 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
 }
 
 pub fn array_length(argument: FlaggedWord, state: &mut EvaluatorState) {
-    let (type_, _) = decode_type(argument, state);
+    let type_ = decode_type(argument, state);
     let argument = state.read_pointer(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES);
     let array_start = argument.unwrap_pointer();
     let pointer = state.read_pointer(array_start).unwrap_value();

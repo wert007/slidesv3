@@ -1,6 +1,7 @@
 mod allocator;
 mod basic_blocks;
 mod bound_nodes;
+mod syntax_nodes;
 mod instructions;
 
 pub use allocator::output_allocator_to_dot;
@@ -11,6 +12,19 @@ pub use instructions::output_instructions_or_labels_with_source_code_to_sldasm;
 pub use instructions::output_instructions_with_source_code_to_sldasm;
 pub use instructions::print_instructions_or_labels_with_source_code;
 pub use instructions::print_instructions_with_source_code;
+pub use syntax_nodes::print_syntax_node_as_code;
+
+// TODO: Move to own module.
+pub(crate) fn print_location_as_source_text(
+    location: crate::text::TextLocation,
+    source_text_collection: &crate::text::SourceTextCollection,
+) {
+    let text = &source_text_collection[location];
+    let file_name = &source_text_collection[location.source_text].file_name;
+    println!("// Source text snippet from {file_name}");
+    println!("{text}");
+    println!();
+}
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DebugFlags {
@@ -24,6 +38,7 @@ pub struct DebugFlags {
     pub print_heap_as_string: bool,
     pub print_static_memory_as_string: bool,
     pub print_bound_program: bool,
+    pub print_syntax_program: bool,
     pub print_stack: bool,
     pub print_labels: bool,
     pub print_type_table: bool,

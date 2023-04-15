@@ -17,6 +17,7 @@ fn main() -> Result<(), std::io::Error> {
         print_constant_table: matches.is_present("print-bound-constant-table"),
         print_struct_table: matches.is_present("print-bound-struct-table"),
         print_bound_program: matches.is_present("print-bound-program"),
+        print_syntax_program: matches.is_present("print-syntax-program"),
         print_labels: matches.is_present("print-labels"),
         print_heap_as_string: matches.is_present("print-heap-memory-as-string"),
         print_static_memory_as_string: matches.is_present("print-static-memory-as-string"),

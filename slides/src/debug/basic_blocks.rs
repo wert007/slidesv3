@@ -1,12 +1,14 @@
 use std::{collections::HashMap, process::Command};
 
 use crate::binder::control_flow_analyzer::BasicBlock;
+use crate::binder::typing::TypeCollection;
 use crate::binder::{bound_nodes::BoundNode, control_flow_analyzer::BasicBlockKind};
 
 pub fn output_basic_blocks_to_dot(
     function_name: &str,
     basic_blocks: &[BasicBlock],
     statements: &[BoundNode],
+    types: &TypeCollection,
 ) {
     let mut result = String::new();
     result.push_str("digraph \"");
@@ -42,7 +44,7 @@ pub fn output_basic_blocks_to_dot(
             let statements = &statements[code_block.index..][..code_block.length];
             let mut buffer = String::new();
             for statement in statements {
-                super::bound_nodes::bound_node_as_code_to_string(statement, &mut buffer);
+                super::bound_nodes::bound_node_as_code_to_string(statement, types, &mut buffer);
             }
             result.push_str(" [label = \"\\N\\n");
             result.push_str(&buffer.replace('\n', "\\l"));
@@ -74,7 +76,7 @@ pub fn output_basic_blocks_to_dot(
                 else_target,
             ) => {
                 let mut buffer = String::new();
-                super::bound_nodes::bound_node_as_code_to_string(condition, &mut buffer);
+                super::bound_nodes::bound_node_as_code_to_string(condition, types, &mut buffer);
                 add_connection(block_index, then_target, &format!("{} is true", buffer));
                 add_connection(block_index, else_target, "else");
             }
@@ -84,7 +86,7 @@ pub fn output_basic_blocks_to_dot(
                 else_target,
             ) => {
                 let mut buffer = String::new();
-                super::bound_nodes::bound_node_as_code_to_string(condition, &mut buffer);
+                super::bound_nodes::bound_node_as_code_to_string(condition, types, &mut buffer);
                 add_connection(block_index, then_target, &format!("{} is false", buffer));
                 add_connection(block_index, else_target, "else");
             }

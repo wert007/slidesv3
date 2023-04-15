@@ -100,6 +100,7 @@ impl Display for GenericTypeId {
     }
 }
 
+#[derive(Debug)]
 pub enum TypeOrGenericType {
     Type(Type),
     GenericType(GenericType),
@@ -348,6 +349,13 @@ impl TypeCollection {
             (Type::IntegerLiteral, Type::Integer(_)) => true,
             (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => {
                 from_integer_type.to_signed() == *to_integer_type
+            }
+            (this, other)
+                if this.as_function_type().is_some() && other.as_function_type().is_some() =>
+            {
+                let this = this.as_function_type().unwrap();
+                let other = other.as_function_type().unwrap();
+                this.can_be_converted_to(other)
             }
             _ => false,
         }
@@ -754,13 +762,13 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Any => unreachable!(),
-            Type::StructPlaceholder(..) => panic!("This is only a placeholder type!"),
             Type::Enum(..) => todo!("Implement enums at runtime"),
             Type::Error => 0,
             Type::Void => 0,
             Type::Integer(integer_type) => integer_type.size_in_bytes(),
             Type::None
             | Type::Struct(_)
+            | Type::StructPlaceholder(..)
             | Type::Function(_)
             | Type::Closure(_)
             | Type::IntegerLiteral
@@ -832,6 +840,8 @@ impl Type {
             Some(it.clone())
         } else if let Type::SystemCall(it) = self {
             Some(FunctionType::system_call(*it))
+        } else if let Type::Closure(it) = self {
+            Some(FunctionType::closure(*it.clone()))
         } else {
             None
         }
@@ -948,6 +958,13 @@ impl<T> std::fmt::Display for FunctionType<T> {
 }
 
 impl FunctionType<TypeId> {
+    pub fn closure(closure: ClosureType) -> Self {
+        // TODO: Are applied arguments already handled in the
+        // base_function_type? If not do this here!
+        let base = closure.base_function_type;
+        Self { ..base }
+    }
+
     pub fn system_call(system_call_kind: SystemCallKind) -> FunctionType<TypeId> {
         match system_call_kind {
             SystemCallKind::Print => Self {
@@ -1026,6 +1043,12 @@ impl FunctionType<TypeId> {
                 is_generic: false,
             },
         }
+    }
+
+    fn can_be_converted_to(&self, other: FunctionType<TypeId>) -> bool {
+        self.this_type == other.this_type
+            && self.return_type == other.return_type
+            && self.parameter_types == other.parameter_types
     }
 }
 

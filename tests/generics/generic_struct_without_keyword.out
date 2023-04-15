@@ -1,2 +1,2 @@
 Error in ..\tests\generics\generic_struct_without_keyword.sld:3:12: Used generic type in struct A without declaring it as 'generic'.
-Error in ..\tests\generics\generic_struct_without_keyword.sld:7:19: Cannot convert type int literal to type $Type.
+Error in ..\tests\generics\generic_struct_without_keyword.sld:7:19: Cannot convert type integer literal to type $Type.

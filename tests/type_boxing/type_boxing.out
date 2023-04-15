@@ -7,9 +7,9 @@ Log: [ 1, 2, 3 ]
 Log: [ [ 1 ], [ 2 ], [ 3 ] ]
 Log: system call print
 Log: Hello World!
-Log: fn (int) -> int
+Log: fn fib(int) -> int
 Log: Noneable strings work just fine
-Log: type struct id#12
+Log: struct Person
 Log: Value(42)
 Log: none
 Log: Value(42)

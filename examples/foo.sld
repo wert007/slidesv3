@@ -1,68 +1,95 @@
-// struct Presentation {
-//     slides: List<Slide>;
-// }
-// 
-// struct Slide {
-//     steps: List<Step>;
-// }
-// 
-// struct Step {
-//     elements: List<Label>;
-// }
-// 
-// struct Element {}
-// 
-// struct Label : Element {
-//     text: string;
-// }
-// 
-// func emitHtml(presentation: Presentation) {
-//     for slide in presentation.slides {
-//         emitHtmlForSlide(slide);
-//     }
-// }
-// 
-// func emitHtmlForSlide(slide: Slide) {
-//     for step in slide.steps {
-//         emitHtmlForStep(step);
-//     }
-// }
-// 
-// func emitHtmlForStep(step: Step) {
-//     for element in step.elements {
-//         emitHtmlForElementLabel(element);
-//     }
-// }
-// 
-// func emitHtmlForElementLabel(label: Label) {
-//     print('<p>' + label.text + '</p>');
-// }
-// 
-// func main() {
-//     let presentation = new Presentation(new List());
-//     let slide = new Slide(new List());
-//     let step = new Step(new List());
-//     let hello_world = new Label('Hello World!');
-//     step.elements.add(hello_world);
-//     slide.steps.add(step);
-//     presentation.slides.add(slide);
-//     emitHtml(presentation);
+// TODO: This should be an error!
+// generic struct A {
+//    generic_structs_dont_work: int;
 // }
 
-// TODO: doesnt work currently
-// struct Parent {}
-// 
-// struct Child : Parent {}
-// 
-// func main() {
-//     let p: Parent? = new Child();
-// 
-// }
+struct Point {
+    x: int;
+    y: int;
 
+    func length_squared() -> int {
+        return this.x * this.x + this.y * this.y;
+    }
+}
+
+struct Rect {
+    top_left: Point;
+    bottom_right: Point;
+
+    func $constructor(x: int, y: int, width: int, height: int) {
+        this.top_left = new Point(x, y);
+        this.bottom_right = new Point(x + width, y + height);
+    }
+}
+
+struct Cube {
+    // TODO: Arrays of structs do not work, since there is two representations
+    // of structs and each generates a different version of the generic array
+    // struct.
+    sides: Rect[];
+}
+
+struct Bar {
+    a: Foo;
+
+    func $constructor(a: int) {
+        this.a = new Foo(a);
+    }
+}
+
+struct Foo {
+    a: int;
+}
+
+struct ListNode {
+    value: int;
+    next: ListNode;
+}
+
+struct Square {
+    side: int;
+
+    func area() -> int {
+        return this.side * this.side;
+    }
+
+    func circumference() -> int {
+        return 4 * this.side;
+    }
+
+    func resize(side: int) {
+        this.side = side;
+    }
+}
+
+struct A {
+    // Maybe this should be illegal.
+    this : int;
+}
 
 func main() {
-    let a = [1, 2, 3];
-    // print(a[99]);
-    // a[99] = -55;
-    print(a);
+    let p = new Point(43, 87);
+    let r = new Rect(10, 10, 200, 300);
+    let c = new Cube([r, r, r, r, r, r]);
+    print('Point.x = ' + p.x);
+    print('Rect.bottom_right.y = ' + r.bottom_right.y);
+    r.bottom_right.x = 99;
+    print('Cube.sides[0].bottom_right.x = ' + c.sides[0].bottom_right.x);
+
+    let b = new Bar(2312);
+    print('Bar.Foo.a = ' + b.a.a);
+
+    let s = new Square(5);
+    print('Square.side = ' + s.side);
+    s.resize(7);
+    print('Square.area() = ' + s.area());
+    print('Square.circumference() = ' + s.circumference());
+    let area = s.area;
+    print('area as closure() = ' + area());
+
+    let this = 'Should this be a keyword??';
+    this = 'Idk';
+
+    // This needs noneable pointers!
+    // let impossible = new ListNode(0, new ListNode(1, new ListNode(2, '')));
 }

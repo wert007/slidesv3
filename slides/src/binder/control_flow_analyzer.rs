@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{binder::bound_nodes::BoundNodeKind, DebugFlags};
 
-use super::bound_nodes::BoundNode;
+use super::{bound_nodes::BoundNode, typing::TypeCollection};
 
 #[derive(Debug)]
 pub struct BasicBlock<'a> {
@@ -99,12 +99,13 @@ pub struct BasicCodeBlock {
 pub fn check_if_all_paths_return(
     function_name: &str,
     statements: &[BoundNode],
+    types: &TypeCollection,
     debug_flags: DebugFlags,
 ) -> bool {
     let mut basic_blocks = collect_basic_blocks(statements);
     connect_basic_blocks(&mut basic_blocks, statements);
     if debug_flags.output_basic_blocks_to_dot {
-        crate::debug::output_basic_blocks_to_dot(function_name, &basic_blocks, statements);
+        crate::debug::output_basic_blocks_to_dot(function_name, &basic_blocks, statements, types);
         println!(
             "Outputted BasicBlocks for func {}() to debug-out/{}.svg",
             function_name, function_name

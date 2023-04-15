@@ -30,7 +30,10 @@ args:
         help: Prints the struct names and the type indices, to which they belong
     - print-bound-program:
         long: dbp
-        help: Prints the bound representation of the programas source code
+        help: Prints the bound representation of the programs source code
+    - print-syntax-program:
+        long: dsp
+        help: Prints the parsed representation of the programs source code
     - print-labels:
         long: dlbl
         help: Prints the labels and their addresses
