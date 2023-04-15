@@ -190,6 +190,7 @@ impl From<&StructFunctionTable> for SimpleStructFunctionTable {
 
 #[derive(Clone, Debug)]
 struct StructDeclarationBody {
+    location: TextLocation,
     name: SourceCow,
     body: StructBodyNode,
     struct_function_table: SimpleStructFunctionTable,
@@ -1277,6 +1278,7 @@ fn bind_with_project_parameter<'a>(
 
     while let Some(node) = binder.generic_structs.pop() {
         let struct_type = bind_struct_body(
+            node.location,
             &node.name,
             node.parent_id,
             node.body,
@@ -1306,6 +1308,7 @@ fn bind_with_project_parameter<'a>(
     binder.structs.reverse();
     while let Some(node) = binder.structs.pop() {
         let struct_type = bind_struct_body(
+            node.location,
             &node.name,
             node.parent_id,
             node.body,
@@ -2204,6 +2207,7 @@ fn bind_struct_declaration<'a, 'b>(
                 )
                 .unwrap();
             binder.generic_structs.push(StructDeclarationBody {
+                location: struct_declaration.identifier.location,
                 name: struct_declaration.identifier.location.into(),
                 body: *struct_declaration.body,
                 struct_function_table,
@@ -2211,6 +2215,7 @@ fn bind_struct_declaration<'a, 'b>(
             });
         } else {
             binder.structs.push(StructDeclarationBody {
+                location: struct_declaration.identifier.location,
                 name: struct_declaration.identifier.location.into(),
                 body: *struct_declaration.body,
                 struct_function_table,
@@ -2323,6 +2328,7 @@ fn bind_generic_function_type<'a>(
 // FIXME: We already have struct which contains all the struct_ fields, why are
 // not using it directly??
 fn bind_struct_body<'a>(
+    struct_location: TextLocation,
     struct_name: &SourceCow,
     parent: Option<TypeId>,
     struct_body: StructBodyNode,
@@ -2334,6 +2340,7 @@ fn bind_struct_body<'a>(
     let mut function_table = StructFunctionTable::default();
     let mut offset = 0;
     let struct_is_generic = struct_body.is_generic;
+    let mut used_generic_type = false;
     for statement in struct_body.statements {
         let span = statement.location;
         let is_function;
@@ -2359,6 +2366,13 @@ fn bind_struct_body<'a>(
                     offset += type_.size_in_bytes();
                     offset - type_.size_in_bytes()
                 };
+                if binder
+                    .project
+                    .types
+                    .contains_type(type_, typeid!(Type::GenericType))
+                {
+                    used_generic_type = true;
+                }
                 if type_ == typeid!(Type::GenericType) && !struct_is_generic {
                     binder
                         .diagnostic_bag
@@ -2387,6 +2401,11 @@ fn bind_struct_body<'a>(
         } else {
             fields.push(member);
         }
+    }
+    if !used_generic_type && struct_is_generic {
+        binder
+            .diagnostic_bag
+            .report_generic_struct_without_generic_type(struct_location, struct_name.clone())
     }
     let mut size_in_bytes = fields
         .iter()
@@ -2730,7 +2749,7 @@ fn bind_cast_expression<'a>(
 }
 
 fn bind_constructor_call<'a>(
-    span: TextLocation,
+    location: TextLocation,
     constructor_call: ConstructorCallNodeKind,
     binder: &mut BindingState<'_>,
 ) -> BoundNode {
@@ -2753,14 +2772,14 @@ fn bind_constructor_call<'a>(
     let type_ = &binder.project.types[type_];
     let struct_type = match type_ {
         TypeOrGenericType::Type(Type::Struct(it)) => it,
-        TypeOrGenericType::Type(Type::Error) => return BoundNode::error(span),
+        TypeOrGenericType::Type(Type::Error) => return BoundNode::error(location),
         TypeOrGenericType::GenericType(GenericType::Struct(it, _)) => it,
         _ => {
             dbg!(&type_);
             binder
                 .diagnostic_bag
                 .report_unknown_type(type_name_location, constructor_call.type_name.location);
-            return BoundNode::error(span);
+            return BoundNode::error(location);
         }
     };
     let struct_type = struct_type.clone();
@@ -2770,7 +2789,7 @@ fn bind_constructor_call<'a>(
             if struct_type.is_generic {
                 let (arguments, label, struct_type) =
                     bind_arguments_for_generic_constructor_on_struct(
-                        span,
+                        location,
                         constructor_call.arguments,
                         function.function_label as usize,
                         function.function_type,
@@ -2781,7 +2800,7 @@ fn bind_constructor_call<'a>(
             } else {
                 (
                     bind_arguments_for_function(
-                        span,
+                        location,
                         constructor_call.arguments,
                         function.function_type,
                         binder,
@@ -2807,7 +2826,7 @@ fn bind_constructor_call<'a>(
             //     .collect();
             if constructor_call.arguments.len() != fields.len() {
                 binder.diagnostic_bag.report_unexpected_argument_count(
-                    span,
+                    location,
                     constructor_call.arguments.len(),
                     fields.len(),
                 );
@@ -2875,15 +2894,15 @@ fn bind_constructor_call<'a>(
                 arguments.push(argument);
             }
             binder.generic_type = None;
-            (
-                arguments,
-                None,
-                resolved_struct_type.unwrap().unwrap_type_id(),
-            )
+            match resolved_struct_type {
+                Some(it) => (arguments, None, it.unwrap_type_id()),
+                // An error should already been reported.
+                None => return BoundNode::error(location),
+            }
         }
     };
 
-    BoundNode::constructor_call(span, arguments, struct_type, function)
+    BoundNode::constructor_call(location, arguments, struct_type, function)
 }
 
 fn bind_generic_struct_type_for_type(

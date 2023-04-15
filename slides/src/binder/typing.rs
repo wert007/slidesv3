@@ -501,6 +501,18 @@ impl TypeCollection {
         }
     }
 
+    pub(crate) fn contains_type(&self, haystack: TypeId, needle: TypeId) -> bool {
+        if haystack == needle {
+            {
+                return true;
+            }
+        }
+        match &self[haystack] {
+            Type::Noneable(it) | Type::PointerOf(it) => self.contains_type(*it, needle),
+            _ => false,
+        }
+    }
+
     pub(crate) fn replace_in_type_for_type(
         &mut self,
         type_: TypeId,

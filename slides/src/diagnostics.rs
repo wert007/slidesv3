@@ -1,5 +1,8 @@
 use crate::{
-    binder::{typing::{TypeCollection, TypeId}, SourceCow},
+    binder::{
+        typing::{TypeCollection, TypeId},
+        SourceCow,
+    },
     lexer::syntax_token::SyntaxTokenKind,
     parser::syntax_nodes::SyntaxNodeKind,
     text::{SourceTextCollection, SourceTextId, TextLocation, TextSpan},
@@ -265,7 +268,11 @@ impl DiagnosticBag {
         self.report(message, location);
     }
 
-    pub fn report_variable_not_found(&mut self, location: TextLocation, variable_name: TextLocation) {
+    pub fn report_variable_not_found(
+        &mut self,
+        location: TextLocation,
+        variable_name: TextLocation,
+    ) {
         let message = message_format!("No variable named '", variable_name, "' could be found.");
         self.report(message, location);
     }
@@ -498,9 +505,15 @@ impl DiagnosticBag {
         self.report(message, location);
     }
 
-    pub(crate) fn report_unknown_library(&mut self, span: TextLocation, library_name: TextLocation) {
+    pub(crate) fn report_unknown_library(
+        &mut self,
+        span: TextLocation,
+        library_name: TextLocation,
+    ) {
         let message = message_format!(
-            "No library named ", library_name, " found. Did you misspell it? Or are you missing an import?",
+            "No library named ",
+            library_name,
+            " found. Did you misspell it? Or are you missing an import?",
         );
         self.report(message, span);
     }
@@ -522,7 +535,11 @@ impl DiagnosticBag {
         self.report(message.into(), span);
     }
 
-    pub fn report_unrecognized_operator_function(&mut self, span: TextLocation, identifier: TextLocation) {
+    pub fn report_unrecognized_operator_function(
+        &mut self,
+        span: TextLocation,
+        identifier: TextLocation,
+    ) {
         let message = message_format!("Function name ", identifier, " was not recognized as a valid operator functions. Remove the $ if you want to call this function. Or use a valid name like $constructor.");
         self.report(message, span);
     }
@@ -566,6 +583,19 @@ impl DiagnosticBag {
         );
         // TODO: Add hint to struct declaration.
         self.report(message, span);
+    }
+
+    pub fn report_generic_struct_without_generic_type(
+        &mut self,
+        location: TextLocation,
+        struct_name: SourceCow,
+    ) {
+        let message = message_format!(
+            "Declared struct ",
+            struct_name,
+            " as generic, but no $Type was used. Maybe you forgot it?"
+        );
+        self.report(message, location);
     }
 
     // Runtime Errors
