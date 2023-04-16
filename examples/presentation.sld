@@ -29,3 +29,7 @@ enum PrismSyntaxHighlighting {
     Twilight,
     Default,
 }
+
+struct Slide {}
+struct Style {}
+struct SvgFilterArgs {}

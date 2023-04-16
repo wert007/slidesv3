@@ -91,11 +91,10 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    pub(self) fn runtime(message: Message, location: Option<TextLocation>) -> Self {
+    pub(self) fn runtime(message: Message, location: TextLocation) -> Self {
         Self {
             message,
-            location: location
-                .expect("Instruction without location found. This should be removed!"),
+            location,
         }
     }
 
@@ -145,7 +144,7 @@ impl DiagnosticBag {
         self.diagnostics.push(diagnostic);
     }
 
-    fn report_runtime(&mut self, message: Message, location: Option<TextLocation>) {
+    fn report_runtime(&mut self, message: Message, location: TextLocation) {
         let diagnostic = Diagnostic::runtime(message, location);
         self.diagnostics.push(diagnostic);
     }
@@ -625,7 +624,7 @@ impl DiagnosticBag {
     }
 
     // Runtime Errors
-    pub fn no_heap_memory_left(&mut self, span: Option<TextLocation>, needed_memory_in_bytes: u64) {
+    pub fn no_heap_memory_left(&mut self, span: TextLocation, needed_memory_in_bytes: u64) {
         let message = format!(
             "Out of memory. No heap memory for {} bytes left.",
             needed_memory_in_bytes
@@ -633,7 +632,7 @@ impl DiagnosticBag {
         self.report_runtime(message.into(), span);
     }
 
-    pub fn division_by_zero(&mut self, span: Option<TextLocation>) {
+    pub fn division_by_zero(&mut self, span: TextLocation) {
         let message = "Divison by Zero.".into();
         self.report_runtime(message, span);
     }

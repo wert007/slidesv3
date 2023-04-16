@@ -6,10 +6,7 @@ use crate::{
 use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 
 pub fn print(argument: FlaggedWord, state: &mut EvaluatorState) {
-    println!(
-        "{}",
-        to_string_native(typeid!(Type::Any), argument, state)
-    );
+    println!("{}", to_string_native(typeid!(Type::Any), argument, state));
 }
 
 pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
@@ -18,10 +15,14 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
     let mut pointer = state.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
     if result == 0 {
+        state.runtime_diagnostics.no_heap_memory_left(
+            state.instructions[state.pc].location,
+            WORD_SIZE_IN_BYTES + string_length,
+        );
         state
             .runtime_diagnostics
-            .no_heap_memory_left(None, WORD_SIZE_IN_BYTES + string_length);
-        state.runtime_diagnostics.clone().flush_to_console(&state.project.source_text_collection);
+            .clone()
+            .flush_to_console(&state.project.source_text_collection);
         state.runtime_diagnostics.diagnostics.clear();
         state.runtime_error_happened = true;
         state.stack.push_pointer(result);
@@ -42,7 +43,8 @@ fn get_to_string_function(type_id: TypeId, state: &EvaluatorState) -> Option<u64
         .as_struct_type()
         .map(|s| {
             s.function_table
-                .to_string_function.as_ref()
+                .to_string_function
+                .as_ref()
                 .map(|f| f.function_label)
         })
         .flatten()
@@ -57,11 +59,7 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> TypeId {
     type_identifier
 }
 
-fn to_string_native(
-    type_: TypeId,
-    argument: FlaggedWord,
-    state: &mut EvaluatorState,
-) -> String {
+fn to_string_native(type_: TypeId, argument: FlaggedWord, state: &mut EvaluatorState) -> String {
     match &state.project.types[type_] {
         Type::Library(_)
         | Type::GenericType
@@ -94,10 +92,9 @@ fn to_string_native(
                     // FIXME: If there is an Err(()) returned, this means, there was
                     // a runtime error, this should be handled the same way as in
                     // evaluate.
-                    let return_value =
-                        super::execute_function(state, it as usize, &[argument])
-                            .unwrap()
-                            .unwrap();
+                    let return_value = super::execute_function(state, it as usize, &[argument])
+                        .unwrap()
+                        .unwrap();
                     to_string_native(typeid!(Type::String), return_value, state)
                 }
                 None => {

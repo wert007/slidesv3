@@ -10,318 +10,312 @@ pub mod op_codes;
 pub struct Instruction {
     pub op_code: OpCode,
     pub arg: u64,
-    pub location: Option<TextLocation>,
+    pub location: TextLocation,
 }
 
 #[allow(dead_code)]
 impl Instruction {
-    pub fn location(mut self, location: TextLocation) -> Self {
-        assert!(self.location.is_none());
-        self.location = Some(location);
-        self
-    }
-
-    pub const fn noop() -> Instruction {
+    pub const fn noop(location: TextLocation) -> Instruction {
         Self {
             op_code: OpCode::NoOp,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn load_immediate(immediate: u64) -> Self {
+    pub const fn load_immediate(immediate: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::LoadImmediate,
             arg: immediate,
-            location: None,
+            location,
         }
     }
 
-    pub const fn load_pointer(pointer: u64) -> Self {
+    pub const fn load_pointer(pointer: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::LoadPointer,
             arg: pointer,
-            location: None,
+            location,
         }
     }
 
-    pub const fn load_none_pointer() -> Self {
+    pub const fn load_none_pointer(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::LoadPointer,
             arg: u64::MAX,
-            location: None,
+            location,
         }
     }
 
-    pub const fn duplicate() -> Self {
-        Self::duplicate_over(0)
+    pub const fn duplicate(location: TextLocation) -> Self {
+        Self::duplicate_over(0, location)
     }
 
-    pub const fn duplicate_over(words_over: u64) -> Self {
+    pub const fn duplicate_over(words_over: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::DuplicateOver,
             arg: words_over,
-            location: None,
+            location,
         }
     }
 
-    pub const fn pop() -> Self {
+    pub const fn pop(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Pop,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn load_register(register: u64) -> Self {
+    pub const fn load_register(register: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::LoadRegister,
             arg: register,
-            location: None,
+            location,
         }
     }
 
-    pub const fn store_in_register(register: u64) -> Self {
+    pub const fn store_in_register(register: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::StoreInRegister,
             arg: register,
-            location: None,
+            location,
         }
     }
 
-    pub const fn store_in_memory() -> Self {
+    pub const fn store_in_memory(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::StoreInMemory,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn write_to_stack(address: u64) -> Self {
+    pub const fn write_to_stack(address: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::WriteToStack,
             arg: address,
-            location: None,
+            location,
         }
     }
 
-    pub const fn write_to_heap(word_count: u64) -> Self {
+    pub const fn write_to_heap(word_count: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::WriteToHeap,
             arg: word_count,
-            location: None,
+            location,
         }
     }
-    pub const fn allocate(size_in_bytes: u64) -> Self {
+    pub const fn allocate(size_in_bytes: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Allocate,
             arg: size_in_bytes,
-            location: None,
+            location,
         }
     }
 
-    pub const fn read_word_with_offset(offset: u64) -> Self {
+    pub const fn read_word_with_offset(offset: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::ReadWordWithOffset,
             arg: offset,
-            location: None,
+            location,
         }
     }
 
-    pub const fn memory_copy() -> Self {
+    pub const fn memory_copy(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::MemoryCopy,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub fn memory_copy_fixed_size(size_in_bytes: u64) -> Self {
+    pub fn memory_copy_fixed_size(size_in_bytes: u64, location: TextLocation) -> Self {
         assert_ne!(size_in_bytes, 0);
         Self {
             op_code: OpCode::MemoryCopy,
             arg: size_in_bytes,
-            location: None,
+            location,
         }
     }
 
-    pub const fn type_identifier(type_identifier: u64) -> Self {
+    pub const fn type_identifier(type_identifier: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::TypeIdentifier,
             arg: type_identifier,
-            location: None,
+            location,
         }
     }
 
-    pub const fn twos_complement() -> Self {
+    pub const fn twos_complement(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::BitwiseTwosComplement,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn xor() -> Self {
+    pub const fn xor(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::BitwiseXor,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn nxor() -> Self {
+    pub const fn nxor(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::BitwiseNxor,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn addition() -> Self {
+    pub const fn addition(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Addition,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn subtraction() -> Self {
+    pub const fn subtraction(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Subtraction,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn multiplication() -> Self {
+    pub const fn multiplication(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Multiplication,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn division() -> Self {
+    pub const fn division(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Division,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn equals() -> Self {
+    pub const fn equals(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Equals,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn not_equals() -> Self {
+    pub const fn not_equals(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::NotEquals,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn array_equals() -> Self {
+    pub const fn array_equals(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::ArrayEquals,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn array_not_equals() -> Self {
+    pub const fn array_not_equals(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::ArrayNotEquals,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn noneable_equals(size_in_bytes: u64) -> Self {
+    pub const fn noneable_equals(size_in_bytes: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::NoneableEquals,
             arg: size_in_bytes,
-            location: None,
+            location,
         }
     }
 
-    pub const fn type_identifier_equals() -> Self {
+    pub const fn type_identifier_equals(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::TypeIdentifierEquals,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn less_than() -> Self {
+    pub const fn less_than(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::LessThan,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn greater_than() -> Self {
+    pub const fn greater_than(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::GreaterThan,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn less_than_equals() -> Self {
+    pub const fn less_than_equals(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::LessThanEquals,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn greater_than_equals() -> Self {
+    pub const fn greater_than_equals(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::GreaterThanEquals,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn string_concat() -> Self {
+    pub const fn string_concat(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::StringConcat,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn noneable_or_value(needs_dereferencing: bool) -> Self {
+    pub const fn noneable_or_value(needs_dereferencing: bool, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::NoneableOrValue,
             arg: needs_dereferencing as _,
-            location: None,
+            location,
         }
     }
 
-    pub const fn jump_to_label(label_index: usize) -> Self {
+    pub const fn jump_to_label(label_index: usize, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Jump,
             arg: label_index as _,
-            location: None,
+            location,
         }
     }
 
-    pub const fn jump(address: u64) -> Self {
+    pub const fn jump(address: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Jump,
             arg: address,
-            location: None,
+            location,
         }
     }
 
-    pub const fn jump_to_label_conditionally(label_index: usize, jump_if_true: bool) -> Self {
+    pub const fn jump_to_label_conditionally(label_index: usize, jump_if_true: bool, location: TextLocation) -> Self {
         let op_code = if jump_if_true {
             OpCode::JumpIfTrue
         } else {
@@ -330,52 +324,52 @@ impl Instruction {
         Self {
             op_code,
             arg: label_index as _,
-            location: None,
+            location,
         }
     }
 
-    pub const fn jump_if_false(address: u64) -> Self {
+    pub const fn jump_if_false(address: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::JumpIfFalse,
             arg: address,
-            location: None,
+            location,
         }
     }
 
-    pub const fn jump_if_true(address: u64) -> Self {
+    pub const fn jump_if_true(address: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::JumpIfTrue,
             arg: address,
-            location: None,
+            location,
         }
     }
 
-    pub const fn system_call(call_kind: SystemCallKind) -> Self {
+    pub const fn system_call(call_kind: SystemCallKind, location: TextLocation) -> Self {
         let arg = call_kind as u64;
         Self {
             op_code: OpCode::SysCall,
             arg,
-            location: None,
+            location,
         }
     }
 
-    pub const fn function_call() -> Self {
+    pub const fn function_call(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::FunctionCall,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
-    pub const fn label(index: usize) -> Self {
+    pub const fn label(index: usize, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Label,
             arg: index as _,
-            location: None,
+            location,
         }
     }
 
-    pub fn return_from_function(returns_value: bool, restores_registers: bool) -> Self {
+    pub fn return_from_function(returns_value: bool, restores_registers: bool, location: TextLocation) -> Self {
         let mut arg = 0;
         if returns_value {
             arg += 1;
@@ -386,23 +380,23 @@ impl Instruction {
         Self {
             op_code: OpCode::Return,
             arg,
-            location: None,
+            location,
         }
     }
 
-    pub const fn decode_closure(argument_count: u64, has_function_pointer: bool) -> Self {
+    pub const fn decode_closure(argument_count: u64, has_function_pointer: bool, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::DecodeClosure,
             arg: (argument_count << 1) + has_function_pointer as u64,
-            location: None,
+            location,
         }
     }
 
-    pub const fn breakpoint() -> Self {
+    pub const fn breakpoint(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Breakpoint,
             arg: 0,
-            location: None,
+            location,
         }
     }
 
@@ -410,7 +404,7 @@ impl Instruction {
         Self {
             op_code: OpCode::Rotate,
             arg: offset,
-            location: Some(location),
+            location,
         }
     }
 }

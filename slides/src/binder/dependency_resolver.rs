@@ -107,7 +107,9 @@ fn bind_import_function<'a>(
                     let argument_span = path.location;
                     let path = super::bind_node(path, binder);
                     if path.constant_value.is_none() {
-                        binder.diagnostic_bag.report_expected_constant(path.location);
+                        binder
+                            .diagnostic_bag
+                            .report_expected_constant(path.location);
                         return None;
                     }
                     let path = path.constant_value.unwrap().value;
@@ -143,10 +145,7 @@ fn bind_import_function<'a>(
     }
 }
 
-fn execute_import_function<'a>(
-    import: BoundImportStatement,
-    binder: &mut BindingState<'_>,
-) {
+fn execute_import_function<'a>(import: BoundImportStatement, binder: &mut BindingState<'_>) {
     match import.function {
         ImportFunction::Library(library) => {
             let directory = PathBuf::from(binder.directory());
@@ -170,7 +169,10 @@ pub(super) fn load_library_from_source<'a>(
         .find_map(|l| l.find_imported_library_by_path(path))
         .map(|(s, l)| (Some(s), l))
         .unwrap_or_else(|| {
-            let source_text = binder.project.source_text_collection.add(SourceText::new(source, "std"));
+            let source_text = binder
+                .project
+                .source_text_collection
+                .add(SourceText::new(source, "std.sld"));
             (
                 None,
                 binder.project.load_library(source_text, import_std_lib),

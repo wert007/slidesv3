@@ -35,16 +35,16 @@ pub(crate) fn replace_labels(
         .map(|i_l| match i_l {
             InstructionOrLabelReference::Instruction(i) => i,
             InstructionOrLabelReference::LabelReference(l) => {
-                Instruction::load_pointer(labels[l.label_reference]).location(l.location)
+                Instruction::load_pointer(labels[l.label_reference], l.location)
             }
         })
         .map(|i| {
             // TODO: We loose the span here. This is easily fixable.
             match i.op_code {
-                OpCode::Label => Instruction::noop(),
-                OpCode::Jump => Instruction::jump(labels[i.arg as usize]),
-                OpCode::JumpIfFalse => Instruction::jump_if_false(labels[i.arg as usize]),
-                OpCode::JumpIfTrue => Instruction::jump_if_true(labels[i.arg as usize]),
+                OpCode::Label => Instruction::noop(i.location),
+                OpCode::Jump => Instruction::jump(labels[i.arg as usize], i.location),
+                OpCode::JumpIfFalse => Instruction::jump_if_false(labels[i.arg as usize], i.location),
+                OpCode::JumpIfTrue => Instruction::jump_if_true(labels[i.arg as usize], i.location),
                 _ => i,
             }
         })

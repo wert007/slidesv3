@@ -1666,11 +1666,9 @@ fn call_main(
         }
         VariableOrConstantKind::Variable(variable_id) => {
             vec![
-                Instruction::load_register(variable_id)
-                    .location(location)
-                    .into(),
-                Instruction::load_immediate(0).location(location).into(),
-                Instruction::function_call().location(location).into(),
+                Instruction::load_register(variable_id, location).into(),
+                Instruction::load_immediate(0, location).into(),
+                Instruction::function_call(location).into(),
             ]
         }
         VariableOrConstantKind::Constant(value) => {
@@ -1682,8 +1680,8 @@ fn call_main(
                 }
                 .into(),
             );
-            result.push(Instruction::load_immediate(0).location(location).into());
-            result.push(Instruction::function_call().location(location).into());
+            result.push(Instruction::load_immediate(0, location).into());
+            result.push(Instruction::function_call(location).into());
             result
         }
     }
@@ -2331,22 +2329,27 @@ fn bind_struct_body<'a>(
     let is_abstract = struct_node.is_abstract;
     let mut used_generic_type = false;
 
-    let parent_name = struct_node.parent_id.map(|p| binder.project.types.name_of_type_id(p).into_owned());
-    if let Some(is_abstract) = struct_node.parent_id.map(|t| match binder.project.types[t].as_struct_type() {
-        Some(it) => it.is_abstract,
-        None => {
-            binder.diagnostic_bag.report_expected_struct(
-                struct_node.location,
-                parent_name.as_ref().unwrap().as_str(),
-            );
-            true
-        }
-    }) {
+    let parent_name = struct_node
+        .parent_id
+        .map(|p| binder.project.types.name_of_type_id(p).into_owned());
+    if let Some(is_abstract) =
+        struct_node
+            .parent_id
+            .map(|t| match binder.project.types[t].as_struct_type() {
+                Some(it) => it.is_abstract,
+                None => {
+                    binder.diagnostic_bag.report_expected_struct(
+                        struct_node.location,
+                        parent_name.as_ref().unwrap().as_str(),
+                    );
+                    true
+                }
+            })
+    {
         if !is_abstract {
-            binder.diagnostic_bag.report_struct_parent_not_abstract(
-                struct_node.location,
-                parent_name.unwrap(),
-            );
+            binder
+                .diagnostic_bag
+                .report_struct_parent_not_abstract(struct_node.location, parent_name.unwrap());
         }
     }
 
@@ -3659,9 +3662,7 @@ fn bind_function_call<'a, 'b>(
             typing::FunctionKind::LabelReference(label_reference) => {
                 BoundNode::label_reference(location, label_reference, type_)
             }
-            typing::FunctionKind::VtableIndex(_) => {
-                function
-            },
+            typing::FunctionKind::VtableIndex(_) => function,
         }
     } else {
         function
@@ -3942,7 +3943,11 @@ fn field_access_in_struct<'a, 'b>(
     };
     if let Some(field) = field_symbol {
         if let Type::Function(function_type) = binder.project.types[field.type_].clone() {
-            let index = bound_struct_type.functions.iter().position(|f| f == field).unwrap();
+            let index = bound_struct_type
+                .functions
+                .iter()
+                .position(|f| f == field)
+                .unwrap();
             let mut current_type = id;
             loop {
                 let function_name = format!(

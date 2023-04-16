@@ -749,10 +749,6 @@ pub enum Type {
     PointerOf(TypeId),
     GenericType,
     StructPlaceholder(String, SimpleStructFunctionTable),
-    // FIXME: This is only used to save the type of the generic array struct
-    // during binding in the variable declaration. If this stays this way there
-    // is probably a better solution to store that type then this type here.
-    // TypedGenericStruct(Box<TypedGenericStructType>),
     Enum(String, Vec<String>),
 }
 
@@ -785,11 +781,11 @@ impl Type {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
             Type::Any => unreachable!(),
-            Type::Enum(..) => todo!("Implement enums at runtime"),
             Type::Error => 0,
             Type::Void => 0,
             Type::Integer(integer_type) => integer_type.size_in_bytes(),
             Type::None
+            | Type::Enum(..)
             | Type::Struct(_)
             | Type::StructPlaceholder(..)
             | Type::Function(_)
@@ -1256,9 +1252,16 @@ impl StructType {
             Some(it) => it,
             None => return Vec::new(),
         };
-        let mut functions: Vec<_> = self.functions.iter().filter(|f| parent.lookup_function_by_name(&f.name, types).is_some()).collect();
+        let mut functions: Vec<_> = self
+            .functions
+            .iter()
+            .filter(|f| parent.lookup_function_by_name(&f.name, types).is_some())
+            .collect();
         functions.sort_unstable_by_key(|f| &f.name);
-        functions.into_iter().map(|f| f.offset_or_address.unwrap_address()).collect()
+        functions
+            .into_iter()
+            .map(|f| f.offset_or_address.unwrap_address())
+            .collect()
     }
 }
 

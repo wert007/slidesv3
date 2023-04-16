@@ -1,4 +1,5 @@
-import lib('presentation.sld') as presentation;
+// Libraries do not work right now!
+// import lib('presentation.sld') as presentation;
 
 struct Step {
     elements: List<Element>;

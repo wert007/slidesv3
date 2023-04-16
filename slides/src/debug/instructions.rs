@@ -63,8 +63,8 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
         //     }
         //     is_foreign = new_is_foreign;
         // }
-        if instruction.span() != current_span {
-            current_span = instruction.span();
+        if Some(instruction.location()) != current_span {
+            current_span = Some(instruction.location());
             buffer.push_str("> { ");
             buffer.push_str(&source_text_collection[current_span.unwrap()]);
             buffer.push_str(" }\n");
@@ -103,8 +103,8 @@ fn instructions_with_source_code_to_string(
     let mut current_span = None;
     let mut buffer = String::new();
     for (index, instruction) in instructions.iter().enumerate() {
-        if instruction.location != current_span {
-            current_span = instruction.location;
+        if Some(instruction.location) != current_span {
+            current_span = Some(instruction.location);
             buffer.push_str("> { ");
             buffer.push_str(&source_text_collection[current_span.unwrap()]);
             buffer.push_str(" }\n");
@@ -124,8 +124,8 @@ fn instructions_or_labels_with_source_code_to_string(
     let mut current_span = None;
     let mut buffer = String::new();
     for (index, instruction) in instructions.iter().enumerate() {
-        if instruction.span() != current_span {
-            current_span = instruction.span();
+        if Some(instruction.location()) != current_span {
+            current_span = Some(instruction.location());
             buffer.push_str("> { ");
             buffer.push_str(&source_text_collection[current_span.unwrap()]);
             buffer.push_str(" }\n");
