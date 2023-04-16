@@ -241,6 +241,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction),
         OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
+        OpCode::Rotate => evaluate_rotate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),
         OpCode::BitwiseNxor => evaluate_bitwise_nxor(state, instruction),
@@ -286,6 +287,11 @@ fn evaluate_duplicate_over(state: &mut EvaluatorState, instruction: Instruction)
     let value = state
         .stack
         .read_flagged_word((state.stack.len() as u64 - instruction.arg - 1) * WORD_SIZE_IN_BYTES);
+    state.stack.push_flagged_word(value);
+}
+
+fn evaluate_rotate(state: &mut EvaluatorState, instruction: Instruction) {
+    let value = state.stack.remove_at_offset(instruction.arg);
     state.stack.push_flagged_word(value);
 }
 
@@ -719,7 +725,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
     let mut closure_pointer = state.stack.pop().unwrap_pointer();
 
     let closure_length_in_bytes = state.read_pointer(closure_pointer).unwrap_value();
-    let argument_count = memory::bytes_to_word(closure_length_in_bytes) - 1 + argument_count;
+    // let argument_count = memory::bytes_to_word(closure_length_in_bytes) - 1 + argument_count;
     closure_pointer += WORD_SIZE_IN_BYTES;
     let end_address = closure_pointer + closure_length_in_bytes;
 

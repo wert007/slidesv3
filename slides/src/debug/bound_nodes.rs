@@ -188,7 +188,7 @@ fn print_bound_node_constructor_call_as_code(
     buffer: &mut String,
 ) {
     buffer.push_str("new ");
-    buffer.push_str(&types.name(constructor_call.base_type));
+    buffer.push_str(&types.name_of_type_id(constructor_call.base_type));
     buffer.push('(');
     for (i, argument) in constructor_call.arguments.iter().enumerate() {
         if i != 0 {
@@ -206,7 +206,7 @@ fn print_bound_node_variable_expression_as_code(
     _: DebugPrinter,
     buffer: &mut String,
 ) {
-    buffer.push_str(&format!("r#{}:{}", variable_expression.variable_index, types.name(type_)));
+    buffer.push_str(&format!("r#{}:{}", variable_expression.variable_index, types.name_of_type_id(type_)));
 }
 
 fn print_bound_node_unary_expression_as_code(
@@ -281,7 +281,7 @@ fn print_bound_node_field_access_as_code(
     buffer.push_str(".field#");
     buffer.push_str(&field_access.offset.to_string());
     buffer.push(':');
-    buffer.push_str(&types.name(field_access.type_));
+    buffer.push_str(&types.name_of_type_id(field_access.type_));
 }
 
 fn print_bound_node_closure_as_code(
@@ -310,7 +310,7 @@ fn print_bound_node_conversion_as_code(
     buffer.push('(');
     print_bound_node_as_code_with_indent(&closure.base, types, printer, buffer);
     buffer.push_str(") as ");
-    buffer.push_str(&types.name(closure.type_));
+    buffer.push_str(&types.name_of_type_id(closure.type_));
 }
 
 fn print_bound_node_block_statement_as_code(

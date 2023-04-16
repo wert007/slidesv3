@@ -316,7 +316,14 @@ impl TypeCollection {
             })
     }
 
-    pub fn name(&self, type_id: TypeId) -> Cow<str> {
+    pub fn name(&self, type_: TypeOrGenericTypeId) -> Cow<str> {
+        match type_ {
+            TypeOrGenericTypeId::Type(it) => self.name_of_type_id(it),
+            TypeOrGenericTypeId::GenericType(it) => self.name_of_generic_type_id(it),
+        }
+    }
+
+    pub fn name_of_type_id(&self, type_id: TypeId) -> Cow<str> {
         self.name_of_type(&self[type_id])
     }
 
@@ -350,6 +357,10 @@ impl TypeCollection {
             (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => {
                 from_integer_type.to_signed() == *to_integer_type
             }
+            (Type::Struct(this), _) => match this.parent {
+                Some(parent) => self.can_be_converted(parent, to_id),
+                None => false,
+            },
             (this, other)
                 if this.as_function_type().is_some() && other.as_function_type().is_some() =>
             {
@@ -394,14 +405,14 @@ impl TypeCollection {
             Type::Boolean => "bool".into(),
             Type::None => "any?".into(),
             Type::SystemCall(call) => format!("{call}").into(),
-            Type::Noneable(inner) => format!("{}?", self.name(*inner)).into(),
+            Type::Noneable(inner) => format!("{}?", self.name_of_type_id(*inner)).into(),
             Type::String => "string".into(),
             Type::Function(f) => format!("function {}", f.display(self)).into(),
             Type::Closure(_) => "closure".into(),
             Type::Struct(s) => format!("{}", s.name).into(),
             Type::Library(_) => "library".into(),
             Type::Pointer => "ptr".into(),
-            Type::PointerOf(inner) => format!("&{}", self.name(*inner)).into(),
+            Type::PointerOf(inner) => format!("&{}", self.name_of_type_id(*inner)).into(),
             Type::GenericType => "$Type".into(),
             Type::Enum(name, _) => name.into(),
             Type::StructPlaceholder(name, _) => name.into(),
@@ -563,7 +574,7 @@ impl TypeCollection {
                         "{}<{}>",
                         // Get the base part of the generic struct
                         struct_type.name.split_once('<').unwrap().0,
-                        self.name(replace_with)
+                        self.name_of_type_id(replace_with)
                     ))
                     .expect(
                         "Convert the applied type of the struct in a better way then currently!",
@@ -1124,11 +1135,11 @@ impl<T> FunctionType<T> {
                 write!(result, ", ").unwrap();
             }
             is_first = false;
-            write!(result, "{}", types.name(parameter)).unwrap();
+            write!(result, "{}", types.name_of_type_id(parameter)).unwrap();
         }
         write!(result, ")").unwrap();
         if self.return_type != typeid!(Type::Void) {
-            write!(result, " -> {}", types.name(self.return_type)).unwrap();
+            write!(result, " -> {}", types.name_of_type_id(self.return_type)).unwrap();
         }
         result
     }
@@ -1155,6 +1166,7 @@ pub struct StructType {
     pub functions: Vec<Member>,
     pub function_table: StructFunctionTable,
     pub is_generic: bool,
+    pub is_abstract: bool,
     pub parent: Option<TypeId>,
     pub size_in_bytes: u64,
     /// If this struct was a generic struct, this is the type, that was applied
@@ -1231,6 +1243,23 @@ impl StructType {
                     .flatten()
             })
     }
+
+    pub fn has_parent(&self, parent_type: TypeId) -> bool {
+        match self.parent {
+            Some(p) => p == parent_type,
+            None => false,
+        }
+    }
+
+    pub(crate) fn vtable_functions(&self, types: &TypeCollection) -> Vec<usize> {
+        let parent = match self.parent(types) {
+            Some(it) => it,
+            None => return Vec::new(),
+        };
+        let mut functions: Vec<_> = self.functions.iter().filter(|f| parent.lookup_function_by_name(&f.name, types).is_some()).collect();
+        functions.sort_unstable_by_key(|f| &f.name);
+        functions.into_iter().map(|f| f.offset_or_address.unwrap_address()).collect()
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -1240,11 +1269,19 @@ pub enum MemberOffsetOrAddress {
 }
 
 impl MemberOffsetOrAddress {
-    pub(crate) fn unwrap_offset(&self) -> usize {
+    pub fn unwrap_offset(&self) -> usize {
         if let Self::Offset(it) = self {
             *it
         } else {
             panic!("Expected offset, but found address!");
+        }
+    }
+
+    pub fn unwrap_address(&self) -> usize {
+        if let Self::Address(it) = self {
+            *it
+        } else {
+            panic!("Expected address, but found offset!");
         }
     }
 }
@@ -1296,6 +1333,7 @@ pub enum FunctionKind {
     FunctionId(u64),
     SystemCall(SystemCallKind),
     LabelReference(usize),
+    VtableIndex(usize),
 }
 
 impl std::fmt::Display for FunctionKind {
@@ -1304,6 +1342,7 @@ impl std::fmt::Display for FunctionKind {
             FunctionKind::FunctionId(id) => write!(f, "fn#{}", id),
             FunctionKind::SystemCall(kind) => write!(f, "{}", kind),
             FunctionKind::LabelReference(label_reference) => write!(f, "L{:X}", label_reference),
+            FunctionKind::VtableIndex(vtable_index) => write!(f, "VTable[{vtable_index}]"),
         }
     }
 }

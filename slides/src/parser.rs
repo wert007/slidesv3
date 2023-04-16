@@ -116,20 +116,22 @@ fn parse_top_level_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
         SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
         SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
         SyntaxTokenKind::EnumKeyword => parse_enum_statement(parser),
-        SyntaxTokenKind::GenericKeyword => match parser.peek_n_token(1).kind {
-            SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
-            SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
-            _ => {
-                let token = parser.next_token();
-                let span = token.location;
-                parser.diagnostic_bag.report_unexpected_token_kind(
-                    span,
-                    token.kind,
-                    SyntaxTokenKind::FuncKeyword,
-                );
-                SyntaxNode::error(token.location)
+        SyntaxTokenKind::GenericKeyword | SyntaxTokenKind::AbstractKeyword => {
+            match parser.peek_n_token(1).kind {
+                SyntaxTokenKind::FuncKeyword => parse_function_statement(parser),
+                SyntaxTokenKind::StructKeyword => parse_struct_statement(parser),
+                _ => {
+                    let token = parser.next_token();
+                    let span = token.location;
+                    parser.diagnostic_bag.report_unexpected_token_kind(
+                        span,
+                        token.kind,
+                        SyntaxTokenKind::FuncKeyword,
+                    );
+                    SyntaxNode::error(token.location)
+                }
             }
-        },
+        }
         _ => {
             let token = parser.next_token();
             let span = token.location;
@@ -181,8 +183,15 @@ fn parse_function_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
 }
 
 fn parse_struct_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
+    // TODO: Make order of generic and abstract irrelevant.
     let optional_generic_keyword = if parser.peek_token().kind == SyntaxTokenKind::GenericKeyword {
         Some(parser.match_token(SyntaxTokenKind::GenericKeyword))
+    } else {
+        None
+    };
+    let optional_abstract_keyword = if parser.peek_token().kind == SyntaxTokenKind::AbstractKeyword
+    {
+        Some(parser.match_token(SyntaxTokenKind::AbstractKeyword))
     } else {
         None
     };
@@ -198,6 +207,7 @@ fn parse_struct_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
 
     SyntaxNode::struct_declaration(
         optional_generic_keyword,
+        optional_abstract_keyword,
         struct_keyword,
         identifier,
         parent,
@@ -451,10 +461,7 @@ fn parse_variable_declaration(parser: &mut Parser<'_, '_>) -> SyntaxNode {
         let token = parser.next_token();
         parser
             .diagnostic_bag
-            .report_cannot_declare_keyword_as_variable(
-                token.location,
-                token.location,
-            );
+            .report_cannot_declare_keyword_as_variable(token.location, token.location);
         SyntaxToken::identifier(token.span().start(), "", token.location.source_text)
     } else {
         parser.match_token(SyntaxTokenKind::Identifier)
@@ -594,9 +601,10 @@ fn parse_function_call(parser: &mut Parser<'_, '_>) -> SyntaxNode {
                 let period = parser.next_token();
                 let identifier = parser.match_token(SyntaxTokenKind::Identifier);
                 base = if parser.source_texts[identifier.location].starts_with('$') {
-                    parser
-                        .diagnostic_bag
-                        .report_invalid_field_name(identifier.location, &parser.source_texts[identifier.location]);
+                    parser.diagnostic_bag.report_invalid_field_name(
+                        identifier.location,
+                        &parser.source_texts[identifier.location],
+                    );
                     SyntaxNode::error(base.location)
                 } else {
                     SyntaxNode::field_access(base, period, identifier)

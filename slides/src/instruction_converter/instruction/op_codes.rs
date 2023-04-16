@@ -17,6 +17,7 @@ pub enum OpCode {
     MemoryCopy = 13,
     TypeIdentifier = 14,
     Label = 15,
+    Rotate = 16,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,

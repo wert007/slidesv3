@@ -36,7 +36,7 @@ use self::instruction::{op_codes::OpCode, Instruction};
 #[derive(Debug, Clone, Copy)]
 pub struct LabelReference {
     pub label_reference: usize,
-    pub span: TextLocation,
+    pub location: TextLocation,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,14 +65,14 @@ impl InstructionOrLabelReference {
     pub fn span(&self) -> Option<TextLocation> {
         match self {
             InstructionOrLabelReference::Instruction(instruction) => instruction.location,
-            InstructionOrLabelReference::LabelReference(label) => Some(label.span),
+            InstructionOrLabelReference::LabelReference(label) => Some(label.location),
         }
     }
 
     pub fn span_mut(&mut self) -> Option<&mut TextLocation> {
         match self {
             InstructionOrLabelReference::Instruction(instruction) => instruction.location.as_mut(),
-            InstructionOrLabelReference::LabelReference(label) => Some(&mut label.span),
+            InstructionOrLabelReference::LabelReference(label) => Some(&mut label.location),
         }
     }
 }
@@ -209,7 +209,11 @@ pub fn convert_with_project_parameter<'a>(
         }
     }
     instructions.append(&mut program_code);
-    if converter.project.debug_flags.output_instructions_and_labels_to_sldasm {
+    if converter
+        .project
+        .debug_flags
+        .output_instructions_and_labels_to_sldasm
+    {
         crate::debug::output_instructions_or_labels_with_source_code_to_sldasm(
             &converter.project.source_text_collection[source_text].file_name,
             &instructions,
@@ -456,7 +460,7 @@ fn convert_literal(
 }
 
 pub fn convert_value(
-    span: TextLocation,
+    location: TextLocation,
     value: Value,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -470,12 +474,12 @@ pub fn convert_value(
             }
         }
         Value::SystemCall(kind) => kind as u64,
-        Value::String(value) => return convert_string_literal(span, value, converter),
-        Value::None => return vec![Instruction::load_none_pointer().location(span).into()],
+        Value::String(value) => return convert_string_literal(location, value, converter),
+        Value::None => return vec![Instruction::load_none_pointer().location(location).into()],
         Value::LabelPointer(label_reference, _) => {
             return vec![LabelReference {
                 label_reference,
-                span,
+                location,
             }
             .into()]
         }
@@ -483,7 +487,7 @@ pub fn convert_value(
             todo!("This is probably unreachable? This should be meaningless at least.")
         }
     };
-    vec![Instruction::load_immediate(value).location(span).into()]
+    vec![Instruction::load_immediate(value).location(location).into()]
 }
 
 fn convert_string_literal(
@@ -733,7 +737,7 @@ fn convert_constructor_call(
             result.push(
                 LabelReference {
                     label_reference: function as _,
-                    span,
+                    location: span,
                 }
                 .into(),
             );
@@ -878,7 +882,7 @@ fn convert_field_access(
 }
 
 fn convert_closure(
-    span: TextLocation,
+    location: TextLocation,
     closure: BoundClosureNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -897,34 +901,55 @@ fn convert_closure(
     }
     match closure.function {
         FunctionKind::FunctionId(id) => {
-            result.push(Instruction::load_register(id).location(span).into());
+            result.push(Instruction::load_register(id).location(location).into());
         }
         FunctionKind::SystemCall(_) => {}
         FunctionKind::LabelReference(label_reference) => {
             result.push(
                 LabelReference {
                     label_reference,
-                    span,
+                    location,
                 }
                 .into(),
             );
         }
+        FunctionKind::VtableIndex(vtable_index) => {
+            // Read function pointer
+            result.push(
+                Instruction::read_word_with_offset(0)
+                    .location(location)
+                    .into(),
+            );
+            result.push(
+                Instruction::read_word_with_offset(vtable_index as u64 * WORD_SIZE_IN_BYTES)
+                    .location(location)
+                    .into(),
+            );
+            // Flatten fat pointer
+            result.push(Instruction::rotate(1, location).into());
+            result.push(
+                Instruction::read_word_with_offset(WORD_SIZE_IN_BYTES)
+                    .location(location)
+                    .into(),
+            );
+            result.push(Instruction::rotate(1, location).into());
+        }
     }
     result.push(
         Instruction::load_immediate(size_in_bytes)
-            .location(span)
+            .location(location)
             .into(),
     );
     result.push(
         Instruction::write_to_heap(size_in_words + 1)
-            .location(span)
+            .location(location)
             .into(),
     );
     result
 }
 
 fn convert_conversion(
-    span: TextLocation,
+    location: TextLocation,
     conversion: BoundConversionNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -939,11 +964,11 @@ fn convert_conversion(
     match conversion_kind {
         ConversionKind::None => {}
         ConversionKind::TypeBoxing => {
-            convert_type_identifier(base_type, span, &mut result);
+            convert_type_identifier(base_type, location, &mut result);
             result.push(
                 // The type id is 1 word big and the pointer to the inner value
-                // as well.
-                Instruction::write_to_heap(1 + 1).location(span).into(),
+                // is also 1 word big.
+                Instruction::write_to_heap(1 + 1).location(location).into(),
             );
         }
         ConversionKind::TypeUnboxing => {
@@ -952,60 +977,95 @@ fn convert_conversion(
                     .noneable_base_type()
                     .unwrap()
                     .clone(),
-                span,
+                location,
                 &mut result,
             );
             // Write to heap to keep code simpler. This can be optimized later!
             result.push(
                 // TypeIdentifier are now always just an u64 number as an index
                 // in a big type array. So we only have 1 word big type ids.
-                Instruction::write_to_heap(1).location(span).into(),
+                Instruction::write_to_heap(1).location(location).into(),
             );
-            result.push(Instruction::type_identifier_equals().location(span).into());
+            result.push(
+                Instruction::type_identifier_equals()
+                    .location(location)
+                    .into(),
+            );
             let label = converter.generate_label();
             result.push(
                 Instruction::jump_to_label_conditionally(label, false)
-                    .location(span)
+                    .location(location)
                     .into(),
             );
             // If types are equal, the value of the type needs to be converted into a noneable
             if !converter.project.types[base_type].is_pointer() {
-                result.push(Instruction::write_to_heap(1).location(span).into());
+                result.push(Instruction::write_to_heap(1).location(location).into());
             }
-            result.push(Instruction::label(label).location(span).into());
+            result.push(Instruction::label(label).location(location).into());
         }
         ConversionKind::Boxing => {
-            result.push(Instruction::write_to_heap(1).location(span).into());
+            result.push(Instruction::write_to_heap(1).location(location).into());
         }
         ConversionKind::Unboxing => {
-            result.push(Instruction::read_word_with_offset(0).location(span).into());
+            result.push(
+                Instruction::read_word_with_offset(0)
+                    .location(location)
+                    .into(),
+            );
         }
         ConversionKind::IntToUint => {
             let label_if_is_not_uint = converter.generate_label();
             let label_end_if = converter.generate_label();
-            result.push(Instruction::load_immediate(0).location(span).into());
-            result.push(Instruction::duplicate_over(1).location(span).into());
-            result.push(Instruction::greater_than().location(span).into());
+            result.push(Instruction::load_immediate(0).location(location).into());
+            result.push(Instruction::duplicate_over(1).location(location).into());
+            result.push(Instruction::greater_than().location(location).into());
             result.push(
                 Instruction::jump_to_label_conditionally(label_if_is_not_uint, true)
-                    .location(span)
+                    .location(location)
                     .into(),
             );
             // If the int is >= 0, it needs to be converted into a noneable
-            result.push(Instruction::write_to_heap(1).location(span).into());
+            result.push(Instruction::write_to_heap(1).location(location).into());
             result.push(
                 Instruction::jump_to_label(label_end_if)
-                    .location(span)
+                    .location(location)
                     .into(),
             );
             result.push(
                 Instruction::label(label_if_is_not_uint)
-                    .location(span)
+                    .location(location)
                     .into(),
             );
-            result.push(Instruction::pop().location(span).into());
-            result.push(Instruction::load_none_pointer().location(span).into());
-            result.push(Instruction::label(label_end_if).location(span).into());
+            result.push(Instruction::pop().location(location).into());
+            result.push(Instruction::load_none_pointer().location(location).into());
+            result.push(Instruction::label(label_end_if).location(location).into());
+        }
+        ConversionKind::AbstractTypeBoxing => {
+            // Create the vtable
+            let vtable_functions = converter.project.types[base_type]
+                .as_struct_type()
+                .unwrap()
+                .vtable_functions(&converter.project.types);
+            for &f in &vtable_functions {
+                result.push(
+                    LabelReference {
+                        label_reference: f as usize,
+                        location,
+                    }
+                    .into(),
+                );
+            }
+            result.push(
+                if vtable_functions.is_empty() {
+                    Instruction::load_none_pointer()
+                } else {
+                    Instruction::write_to_heap(vtable_functions.len() as u64)
+                }
+                .location(location)
+                .into(),
+            );
+            // Create the fat pointer.
+            result.push(Instruction::write_to_heap(2).location(location).into());
         }
     }
     result
@@ -1197,12 +1257,12 @@ fn convert_label(span: TextLocation, index: usize) -> Vec<InstructionOrLabelRefe
 }
 
 fn convert_label_reference(
-    span: TextLocation,
+    location: TextLocation,
     label_reference: usize,
 ) -> Vec<InstructionOrLabelReference> {
     vec![LabelReference {
         label_reference,
-        span,
+        location,
     }
     .into()]
 }

@@ -210,6 +210,24 @@ impl BoundNode {
         }
     }
 
+    pub fn closure_abstract(
+        span: TextLocation,
+        arguments: Vec<BoundNode>,
+        vtable_index: usize,
+        type_: TypeId,
+    ) -> Self {
+        Self {
+            location: span,
+            kind: BoundNodeKind::Closure(BoundClosureNodeKind {
+                arguments,
+                function: FunctionKind::VtableIndex(vtable_index),
+            }),
+            type_,
+            constant_value: None,
+        }
+    }
+
+
     pub fn closure_label(
         span: TextLocation,
         arguments: Vec<BoundNode>,
@@ -845,12 +863,20 @@ pub struct BoundConversionNodeKind {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ConversionKind {
+    /// Conversion only on type level with no implications at runtime.
     None,
+    /// Conversion ensures that current value always is a pointer.
     Boxing,
+    /// Conversion negates previous [`ConversionKind::Boxing`] conversion.
     Unboxing,
+    /// Conversion turns value into an any type, with a type identifier.
     TypeBoxing,
+    /// Reads the type of an any type and gives also the raw value.
     TypeUnboxing,
+    /// Turns signed ints to unsigned ints.
     IntToUint,
+    /// Conversion turns value into its parent type with a vtable.
+    AbstractTypeBoxing,
 }
 
 impl BoundConversionNodeKind {
@@ -892,6 +918,13 @@ impl BoundConversionNodeKind {
                     }
                 } else {
                     ConversionKind::Boxing
+                }
+            }
+            (Type::Struct(_), Type::Struct(from)) => {
+                if from.has_parent(self.type_) {
+                    ConversionKind::AbstractTypeBoxing
+                } else {
+                    ConversionKind::None
                 }
             }
             _ => ConversionKind::None,

@@ -405,6 +405,14 @@ impl Instruction {
             location: None,
         }
     }
+
+    pub(crate) fn rotate(offset: u64, location: TextLocation) -> Self {
+        Self {
+            op_code: OpCode::Rotate,
+            arg: offset,
+            location: Some(location),
+        }
+    }
 }
 
 impl std::fmt::Debug for Instruction {

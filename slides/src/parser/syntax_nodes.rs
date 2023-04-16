@@ -83,6 +83,7 @@ impl SyntaxNode {
 
     pub fn struct_declaration(
         optional_generic_keyword: Option<SyntaxToken>,
+        optional_abstract_keyword: Option<SyntaxToken>,
         struct_keyword: SyntaxToken,
         identifier: SyntaxToken,
         optional_parent: Option<SyntaxToken>,
@@ -99,6 +100,7 @@ impl SyntaxNode {
             location: span,
             kind: SyntaxNodeKind::StructDeclaration(StructDeclarationNodeKind {
                 optional_generic_keyword,
+                optional_abstract_keyword,
                 struct_keyword,
                 identifier,
                 optional_parent,
@@ -637,6 +639,7 @@ impl FunctionTypeNode {
 #[derive(Debug, Clone)]
 pub struct StructDeclarationNodeKind {
     pub optional_generic_keyword: Option<SyntaxToken>,
+    pub optional_abstract_keyword: Option<SyntaxToken>,
     pub struct_keyword: SyntaxToken,
     pub identifier: SyntaxToken,
     pub optional_parent: Option<SyntaxToken>,

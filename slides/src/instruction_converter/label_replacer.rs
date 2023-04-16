@@ -35,7 +35,7 @@ pub(crate) fn replace_labels(
         .map(|i_l| match i_l {
             InstructionOrLabelReference::Instruction(i) => i,
             InstructionOrLabelReference::LabelReference(l) => {
-                Instruction::load_pointer(labels[l.label_reference]).location(l.span)
+                Instruction::load_pointer(labels[l.label_reference]).location(l.location)
             }
         })
         .map(|i| {

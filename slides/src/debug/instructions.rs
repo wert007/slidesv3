@@ -235,6 +235,7 @@ fn instruction_or_label_to_string(
         OpCode::MemoryCopy => instruction_no_arg_to_string("memcpy"),
         OpCode::TypeIdentifier => instruction_dec_signed_arg_to_string("ldtyp", instruction.arg),
         OpCode::Label => instruction_label_arg_to_string("lbl", instruction.arg),
+        OpCode::Rotate => instruction_word_count_arg_to_string("rotate", instruction.arg),
         OpCode::BitwiseTwosComplement => instruction_no_arg_to_string("btwoscomplement"),
         OpCode::BitwiseXor => instruction_no_arg_to_string("bxor"),
         OpCode::BitwiseNxor => instruction_no_arg_to_string("bnxor"),

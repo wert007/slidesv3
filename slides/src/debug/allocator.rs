@@ -98,8 +98,8 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
     }
     result.push_str("}\n");
 
-    let out_dot_path = format!("../debug-out/{}.dot", file_name);
-    let out_svg_path = format!("../debug-out/{}.svg", file_name);
+    let out_dot_path = format!("./debug-out/{}.dot", file_name);
+    let out_svg_path = format!("./debug-out/{}.svg", file_name);
     std::fs::write(&out_dot_path, result).unwrap();
     let output = Command::new("dot")
         .args(&[&out_dot_path, "-Tsvg", &format!("-o{}", out_svg_path)])

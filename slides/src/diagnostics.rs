@@ -24,7 +24,7 @@ impl Message {
     ) -> String {
         match self {
             Message::String(it) => it.into(),
-            Message::TypeId(type_) => types.name(type_).into_owned(),
+            Message::TypeId(type_) => types.name_of_type_id(type_).into_owned(),
             Message::SourceTextSnippet(it) => source_text_collection[it].into(),
             Message::Composition(composition) => composition
                 .into_iter()
@@ -594,6 +594,32 @@ impl DiagnosticBag {
             "Declared struct ",
             struct_name,
             " as generic, but no $Type was used. Maybe you forgot it?"
+        );
+        self.report(message, location);
+    }
+
+    pub fn report_struct_parent_not_abstract(
+        &mut self,
+        location: TextLocation,
+        parent_name: impl Into<Message>,
+    ) {
+        let message = message_format!(
+            "Parent ",
+            parent_name,
+            " of struct is not abstract. It needs to be abstract to be a parent."
+        );
+        self.report(message, location);
+    }
+
+    pub fn report_expected_struct(
+        &mut self,
+        location: TextLocation,
+        parent_name: impl Into<Message>,
+    ) {
+        let message = message_format!(
+            "The type here needs to be a struct. ",
+            parent_name,
+            " is not a struct!"
         );
         self.report(message, location);
     }

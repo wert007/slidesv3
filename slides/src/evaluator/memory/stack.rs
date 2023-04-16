@@ -116,6 +116,14 @@ impl Stack {
         self.print_stack = print_stack_value;
         self.print_maybe_stack();
     }
+
+    pub fn remove_at_offset(&mut self, offset: u64) -> FlaggedWord {
+        let index = self.data.len() - offset as usize - 1;
+        let value = self.data.remove(index);
+        let flags = self.flags.remove(index);
+        self.print_maybe_stack();
+        FlaggedWord { value, flags }
+    }
 }
 
 impl std::fmt::Debug for Stack {

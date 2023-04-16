@@ -137,6 +137,7 @@ pub enum SyntaxTokenKind {
     Identifier,
 
     // Keywords
+    AbstractKeyword,
     AsKeyword,
     CastKeyword,
     ConstKeyword,
@@ -195,6 +196,7 @@ impl SyntaxTokenKind {
 
     pub fn keyword(identifier: &str) -> Option<Self> {
         match identifier {
+            "abstract" => Some(Self::AbstractKeyword),
             "as" => Some(Self::AsKeyword),
             "cast" => Some(Self::CastKeyword),
             "const" => Some(Self::ConstKeyword),
@@ -296,6 +298,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::EqualsEquals => write!(f, "Equals-Equals-Token"),
             SyntaxTokenKind::Arrow => write!(f, "Arrow-Token"),
             SyntaxTokenKind::Identifier => write!(f, "Identifier"),
+            SyntaxTokenKind::AbstractKeyword => write!(f, "abstract"),
             SyntaxTokenKind::AsKeyword => write!(f, "as"),
             SyntaxTokenKind::CastKeyword => write!(f, "cast"),
             SyntaxTokenKind::ConstKeyword => write!(f, "const"),

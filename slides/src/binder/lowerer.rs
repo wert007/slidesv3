@@ -297,6 +297,9 @@ fn flatten_closure(
         super::typing::FunctionKind::LabelReference(label_index) => {
             BoundNode::closure_label(span, arguments, label_index, type_)
         }
+        super::typing::FunctionKind::VtableIndex(vtable_index) => {
+            BoundNode::closure_abstract(span, arguments, vtable_index, type_)
+        }
     }
 }
 
