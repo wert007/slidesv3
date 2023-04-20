@@ -1,6 +1,6 @@
 use crate::evaluator::memory::{
     allocator::{self, Bucket},
-    is_heap_pointer, WORD_SIZE_IN_BYTES, Memory,
+    is_heap_pointer, Memory, WORD_SIZE_IN_BYTES,
 };
 
 use super::Allocator;
@@ -18,8 +18,9 @@ pub fn garbage_collect(mut unchecked_pointers: Vec<u64>, heap: &mut Allocator) {
             size_in_words,
             is_used,
             ..
-        } = heap.find_bucket_from_address(pointer).unwrap();
-        dbg!(address, size_in_words, is_used);
+        } = heap
+            .find_bucket_from_address(pointer)
+            .unwrap_or_else(|| panic!("Found very stale pointer! pointer = {pointer:X}"));
         if !is_used {
             panic!("Found stale pointer for some reason!");
         }
@@ -28,7 +29,6 @@ pub fn garbage_collect(mut unchecked_pointers: Vec<u64>, heap: &mut Allocator) {
         let mut address = address;
         let end_address = address + size_in_words * WORD_SIZE_IN_BYTES;
         while address + WORD_SIZE_IN_BYTES < end_address {
-
             let value = heap.read_flagged_word(address);
             if value.is_pointer() {
                 unchecked_pointers.push(value.unwrap_pointer());

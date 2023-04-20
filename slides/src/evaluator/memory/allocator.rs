@@ -107,10 +107,13 @@ impl Allocator {
                 } else {
                     None
                 }
-            }).chain(fallback.into_iter().copied());
+            })
+            .chain(fallback.into_iter());
         [
-            iter.next().expect("There should have been a fallback at least!"),
-            iter.next().expect("There should have been a fallback at least!"),
+            iter.next()
+                .expect("There should have been a fallback at least!"),
+            iter.next()
+                .expect("There should have been a fallback at least!"),
         ]
     }
 
@@ -258,11 +261,11 @@ impl Allocator {
         #[cfg(debug_assertions)]
         assert!(self.find_bucket_from_address(address).unwrap().is_used);
         let word_address = address & !(WORD_SIZE_IN_BYTES - 1);
-        let mut old_value = self.read_flagged_word_aligned(word_address).clone();
+        let old_value = self.read_flagged_word(word_address).clone();
         let mut bytes = old_value.value.to_be_bytes();
         bytes[(address % WORD_SIZE_IN_BYTES) as usize] = value;
-        old_value.value = u64::from_be_bytes(bytes);
-        self.write_flagged_word_aligned(word_address, old_value);
+        let value = u64::from_be_bytes(bytes);
+        self.write_flagged_word(word_address, FlaggedWord::value(value));
     }
 
     // pub fn write_word(&mut self, address: u64, value: u64) {
@@ -338,7 +341,6 @@ impl Memory for Allocator {
     }
 
     fn read_flagged_word_aligned(&self, address: u64) -> &FlaggedWord {
-        let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(
             self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
@@ -351,7 +353,6 @@ impl Memory for Allocator {
     }
 
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
-        let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(
             self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)

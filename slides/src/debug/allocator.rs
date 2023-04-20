@@ -1,4 +1,4 @@
-use std::{fmt::Write, process::Command};
+use std::{collections::HashMap, fmt::Write, process::Command};
 
 use crate::evaluator::memory::{
     self,
@@ -18,6 +18,18 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
     let mut node_ids = vec![];
     result.push_str("graph Heap {\n");
     result.push_str("    splines = ortho;\n");
+    let word_address_to_bucket_index: HashMap<_, _> = heap
+        .buckets
+        .iter()
+        .enumerate()
+        .filter_map(|(i, b)| {
+            if let BucketEntry::Bucket(b) = b {
+                Some((b.address, i))
+            } else {
+                None
+            }
+        })
+        .collect();
     for (index, bucket) in heap.buckets.iter().enumerate() {
         let node_id = match bucket {
             BucketEntry::Bucket(_) => format!("B{}", index),
@@ -54,12 +66,16 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
                     None
                 };
                 let mut bucket_data = String::new();
+                let mut potential_pointers_to_buckets = Vec::new();
                 for word in 0..bucket.size_in_words {
-                    for byte in heap.words[(bucket.address + word) as usize]
-                        .value
-                        .to_be_bytes()
-                    {
+                    let word = &heap.words[(bucket.address + word) as usize];
+                    for byte in word.value.to_be_bytes() {
                         write!(bucket_data, "{:02X} ", byte).unwrap();
+                    }
+                    if memory::is_heap_pointer(word.value) {
+                        let address = word.value & !memory::HEAP_POINTER;
+                        let address = address / memory::WORD_SIZE_IN_BYTES;
+                        potential_pointers_to_buckets.push(word_address_to_bucket_index[&address]);
                     }
                     writeln!(bucket_data).unwrap();
                 }
@@ -69,6 +85,12 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
                 );
                 if let Some(str) = potential_str {
                     write!(result, "String:\\l'{}'\\l", str).unwrap();
+                }
+                if !potential_pointers_to_buckets.is_empty() {
+                    write!(result, "References:\\l").unwrap();
+                    for b in potential_pointers_to_buckets {
+                        write!(result, "B{b}\\l").unwrap();
+                    }
                 }
             }
             BucketEntry::Parent(parent) => {

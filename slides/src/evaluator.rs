@@ -112,7 +112,7 @@ pub fn evaluate(
     let mut state = EvaluatorState {
         static_memory_size_in_words: stack.len(),
         stack,
-        // heap: Allocator::new(128, debug_flags),
+        // heap: Allocator::new(256, debug_flags),
         heap: Allocator::new(64 * 1024, debug_flags),
         registers: (0..program.max_used_variables)
             .into_iter()
@@ -201,6 +201,9 @@ fn execute_function(
             }
             _ => {}
         }
+        if nestedness < 0 {
+            break;
+        }
         execute_instruction(state, state.instructions[pc]);
         match state.debugger_state.session_state {
             debugger::SessionState::Continue => {
@@ -218,9 +221,6 @@ fn execute_function(
                 }
             }
             debugger::SessionState::Quit => {}
-        }
-        if nestedness < 0 {
-            break;
         }
         if state.runtime_error_happened {
             println!("Unusual termination.");
@@ -498,32 +498,32 @@ fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
     state.stack.push((lhs != rhs) as _);
 }
 
-fn array_equals(_state: &mut EvaluatorState) -> bool {
-    unimplemented!("Arrays have a $equals function! but strings might not!");
-    // let rhs = state.stack.pop().unwrap_pointer();
-    // let lhs = state.stack.pop().unwrap_pointer();
+fn array_equals(state: &mut EvaluatorState) -> bool {
+    // unimplemented!("Arrays have a $equals function! but strings might not!");
+    let rhs = state.stack.pop().unwrap_pointer();
+    let lhs = state.stack.pop().unwrap_pointer();
 
-    // let lhs_length_in_bytes = state.read_pointer(lhs).unwrap_value();
-    // let lhs_length_in_words = memory::bytes_to_word(lhs_length_in_bytes);
-    // let rhs_length_in_bytes = state.read_pointer(rhs).unwrap_value();
-    // let _rhs_length_in_words = memory::bytes_to_word(rhs_length_in_bytes);
-    // // If two arrays are not equal in length, we don't compare their elements.
-    // // But when we compare their elements we expect a true result and only
-    // // change it if its false.
-    // let mut result = lhs_length_in_bytes == rhs_length_in_bytes;
-    // if lhs != rhs && lhs_length_in_bytes == rhs_length_in_bytes {
-    //     for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
-    //         let lhs_index = lhs + i;
-    //         let rhs_index = rhs + i;
-    //         let lhs = state.read_pointer(lhs_index).unwrap_value();
-    //         let rhs = state.read_pointer(rhs_index).unwrap_value();
-    //         if lhs != rhs {
-    //             result = false;
-    //             break;
-    //         }
-    //     }
-    // }
-    // result
+    let lhs_length_in_bytes = state.read_pointer(lhs).unwrap_value();
+    let lhs_length_in_words = memory::bytes_to_word(lhs_length_in_bytes);
+    let rhs_length_in_bytes = state.read_pointer(rhs).unwrap_value();
+    let _rhs_length_in_words = memory::bytes_to_word(rhs_length_in_bytes);
+    // If two arrays are not equal in length, we don't compare their elements.
+    // But when we compare their elements we expect a true result and only
+    // change it if its false.
+    let mut result = lhs_length_in_bytes == rhs_length_in_bytes;
+    if lhs != rhs && lhs_length_in_bytes == rhs_length_in_bytes {
+        for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
+            let lhs_index = lhs + i;
+            let rhs_index = rhs + i;
+            let lhs = state.read_pointer(lhs_index).unwrap_value();
+            let rhs = state.read_pointer(rhs_index).unwrap_value();
+            if lhs != rhs {
+                result = false;
+                break;
+            }
+        }
+    }
+    result
 }
 
 fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
@@ -548,11 +548,11 @@ fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction
         let size_in_words = memory::bytes_to_word(size_in_bytes);
         let mut result = true;
         for offset in 0..size_in_words {
-            let rhs_address = rhs.unwrap_pointer() + offset;
-            let lhs_address = lhs.unwrap_pointer() + offset;
+            let rhs_address = rhs.unwrap_pointer() + offset * WORD_SIZE_IN_BYTES;
+            let lhs_address = lhs.unwrap_pointer() + offset * WORD_SIZE_IN_BYTES;
             let rhs_value = state.read_pointer(rhs_address);
             let lhs_value = state.read_pointer(lhs_address);
-            if rhs_value != lhs_value {
+            if rhs_value.value != lhs_value.value {
                 result = false;
                 break;
             }
@@ -620,7 +620,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
         );
     } else {
         let mut writing_pointer = pointer;
-        state.heap.write_flagged_word_aligned(
+        state.heap.write_flagged_word(
             writing_pointer,
             FlaggedWord::value(result_length).with_comment("String length from string concat"),
         );
@@ -634,9 +634,6 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
                 let bytes = word.to_be_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
-            println!("{pointer:X}");
-            println!("{writing_pointer:X}");
-            dbg!(pointer, writing_pointer, i, result_length);
             state.heap.write_byte(writing_pointer as _, lhs_byte);
             writing_pointer += 1;
         }
@@ -718,7 +715,9 @@ fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
     let base = state.stack.pop().unwrap_pointer();
     let return_address = if state.is_main_call {
         state.is_main_call = false;
-        usize::MAX - 1
+        // We need to make sure, that this fake return program counter gets not
+        // mistaken as pointer on the heap memory!
+        ((u64::MAX - 1) & !memory::HEAP_POINTER) as usize
     } else {
         state.pc
     };

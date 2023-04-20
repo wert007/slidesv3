@@ -160,7 +160,6 @@ generic struct Array {
         if index >= this.length {
             runtimeError('Index ' + index + ' is out of bounds of array with length ' + this.length + '.');
         }
-        break();
     }
 
     func $get(index: uint) -> $Type {

@@ -29,7 +29,7 @@ pub fn to_string(argument: &FlaggedWord, state: &mut EvaluatorState) {
         return;
     }
     // TODO: Clear bucket maybe?
-    state.heap.write_flagged_word_aligned(
+    state.heap.write_flagged_word(
         pointer,
         FlaggedWord::value(string_length).with_comment(format!("String length of {string:?}")),
     );
@@ -91,14 +91,17 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
             let to_string_function = get_to_string_function(type_, state);
             match to_string_function {
                 Some(it) => {
-                    // FIXME: If there is an Err(()) returned, this means, there was
-                    // a runtime error, this should be handled the same way as in
-                    // evaluate.
                     let return_value =
-                        super::execute_function(state, it as usize, &[argument.clone()])
-                            .unwrap()
-                            .unwrap();
-                    to_string_native(typeid!(Type::String), &return_value, state)
+                        super::execute_function(state, it as usize, &[argument.clone()]);
+                    match return_value {
+                        Ok(it) => {
+                            to_string_native(typeid!(Type::String), &it.unwrap(), state)
+                        }
+                        Err(()) => {
+                            println!("To string function failed!");
+                            String::new()
+                        },
+                    }
                 }
                 None => {
                     // TODO: General purpose to string
