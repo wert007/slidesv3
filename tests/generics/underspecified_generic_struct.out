@@ -1,0 +1,1 @@
+Error in ..\tests\generics\underspecified_generic_struct.sld:2:13: Struct List is a generic struct, but its generic type is undeclared.

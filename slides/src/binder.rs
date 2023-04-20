@@ -3963,12 +3963,17 @@ fn field_access_in_struct<'a, 'b>(
                 let variable = binder.look_up_variable_or_constant_by_name(&function_name);
                 break match variable.kind {
                     VariableOrConstantKind::None => {
-                        current_type = binder.project.types[current_type]
-                            .as_struct_type()
-                            .unwrap()
-                            .parent
-                            .expect("Failed to resolve a function.");
-                        continue;
+                        match binder.project.types[current_type]
+                        .as_struct_type()
+                        .unwrap()
+                        .parent {
+                            Some(it) => {
+                                current_type = it;
+                                continue;
+                            }
+                            // Probably somebody already reported an error here!
+                            None => BoundNode::error(span),
+                        }
                     }
                     VariableOrConstantKind::Variable(variable_id) => {
                         BoundNode::closure(span, vec![base], variable_id, type_)
@@ -4180,7 +4185,7 @@ fn bind_arguments_for_function<'a, 'b>(
 // }
 
 fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
-    span: TextLocation,
+    location: TextLocation,
     arguments: Vec<SyntaxNode>,
     label: usize,
     function_type: TypeId,
@@ -4195,7 +4200,7 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
         .clone();
     if parameter_types.len() != arguments.len() {
         binder.diagnostic_bag.report_unexpected_argument_count(
-            span,
+            location,
             arguments.len(),
             parameter_types.len(),
         );
@@ -4230,7 +4235,23 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
         result.push(argument);
     }
     binder.generic_type = None;
-    (result, label, struct_type.unwrap())
+    if let Some(struct_type) = struct_type {
+        (result, label, struct_type)
+    } else {
+        binder.diagnostic_bag.report_underspecified_generic_struct(
+            location,
+            binder
+                .project
+                .types
+                .name_of_generic_type_id(struct_id)
+                .as_ref(),
+        );
+        (
+            result,
+            label,
+            binder.project.types.to_fake_type_id(struct_id),
+        )
+    }
 }
 
 // TODO: Move this to after the binding.

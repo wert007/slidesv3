@@ -597,6 +597,11 @@ impl DiagnosticBag {
         self.report(message, location);
     }
 
+    pub fn report_underspecified_generic_struct(&mut self, location: TextLocation, struct_name: impl Into<Message>) {
+        let message = message_format!("Struct ", struct_name, " is a generic struct, but its generic type is undeclared.");
+        self.report(message, location);
+    }
+
     pub fn report_struct_parent_not_abstract(
         &mut self,
         location: TextLocation,
