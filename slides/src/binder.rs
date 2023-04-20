@@ -3802,6 +3802,8 @@ fn bind_array_index_for_assignment<'a, 'b>(
                 let type_ = set_function.function_type;
                 let type_ = binder.project.types.look_up_or_add_type(Type::closure(
                     binder.project.types[type_].as_function_type().unwrap(),
+                    // vec![],
+                    vec![base.type_, index.type_],
                 ));
                 return BoundNode::closure_label(
                     span,
@@ -3866,8 +3868,7 @@ fn bind_field_access<'a, 'b>(
                 .find(|e| e.1 == binder.lexeme(field));
             match value {
                 Some((literal_value, _)) => {
-                    // TODO: Tighter typing. Have the actual enum type be known.
-                    BoundNode::literal(span, Value::Integer(literal_value as _))
+                    BoundNode::literal(span, Value::EnumValue(literal_value, base.type_))
                 }
                 None => {
                     binder.diagnostic_bag.report_no_field_named_on_type(
@@ -3901,15 +3902,11 @@ fn bind_field_access<'a, 'b>(
             if binder.lexeme(field) == "length" {
                 let base = bind_conversion(base, typeid!(Type::Any), binder);
                 let function_type = FunctionType::system_call(SystemCallKind::ArrayLength);
-                BoundNode::system_call_closure(
-                    span,
-                    vec![base],
-                    SystemCallKind::ArrayLength,
-                    binder
-                        .project
-                        .types
-                        .look_up_or_add_type(Type::closure(function_type)),
-                )
+                let type_ = binder
+                    .project
+                    .types
+                    .look_up_or_add_type(Type::closure(function_type, vec![base.type_]));
+                BoundNode::system_call_closure(span, vec![base], SystemCallKind::ArrayLength, type_)
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     span,
@@ -3936,6 +3933,11 @@ fn field_access_in_struct<'a, 'b>(
     let field_name = binder.lexeme(field).to_string();
     let bound_struct_type = binder.project.types[id].as_struct_type().unwrap();
     let is_abstract = bound_struct_type.is_abstract;
+    // Normally we turn function calls on abstract structs into fat pointers,
+    // since the actual call gets decided at runtime, but the base variable is
+    // actually of type abstract struct, so we need to call into it directly.
+    let is_base_variable = binder.is_struct_function
+        && &binder.project.source_text_collection[base.location] == "base";
     let field_symbol = if binder.is_struct_function {
         bound_struct_type.member_fields_first(&field_name, &binder.project.types)
     } else {
@@ -3943,11 +3945,7 @@ fn field_access_in_struct<'a, 'b>(
     };
     if let Some(field) = field_symbol {
         if let Type::Function(function_type) = binder.project.types[field.type_].clone() {
-            let index = bound_struct_type
-                .functions
-                .iter()
-                .position(|f| f == field)
-                .unwrap();
+            let index = bound_struct_type.functions.iter().position(|f| f == field);
             let mut current_type = id;
             loop {
                 let function_name = format!(
@@ -3955,10 +3953,13 @@ fn field_access_in_struct<'a, 'b>(
                     binder.project.types.name_of_type_id(current_type),
                     field_name
                 );
+                let mut function_type = function_type.clone();
+                // The former this type is now an explicit argument in the closure.
+                function_type.this_type = None;
                 let type_ = binder
                     .project
                     .types
-                    .look_up_or_add_type(Type::closure(function_type.clone()));
+                    .look_up_or_add_type(Type::closure(function_type, vec![base.type_]));
                 let variable = binder.look_up_variable_or_constant_by_name(&function_name);
                 break match variable.kind {
                     VariableOrConstantKind::None => {
@@ -3973,8 +3974,8 @@ fn field_access_in_struct<'a, 'b>(
                         BoundNode::closure(span, vec![base], variable_id, type_)
                     }
                     VariableOrConstantKind::Constant(value) => {
-                        if is_abstract {
-                            BoundNode::closure_abstract(span, vec![base], index, type_)
+                        if is_abstract && !is_base_variable {
+                            BoundNode::closure_abstract(span, vec![base], index.expect("We found a valid variable kind, so we expect to also have a field on the current type! (Maybe not?)"), type_)
                         } else {
                             let label_index = value.as_label_pointer().unwrap().0;
                             BoundNode::closure_label(span, vec![base], label_index, type_)

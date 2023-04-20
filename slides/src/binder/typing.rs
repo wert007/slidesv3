@@ -753,8 +753,8 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn closure(base_function_type: FunctionType<TypeId>) -> Self {
-        Self::Closure(Box::new(base_function_type.into()))
+    pub fn closure(base_function_type: FunctionType<TypeId>, included_arguments: Vec<TypeId>) -> Self {
+        Self::Closure(Box::new(ClosureType { base_function_type, included_arguments }))
     }
 
     pub fn noneable_base_type(&self) -> Option<TypeId> {
@@ -861,6 +861,14 @@ impl Type {
             Some(FunctionType::system_call(*it))
         } else if let Type::Closure(it) = self {
             Some(FunctionType::closure(*it.clone()))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn as_closure_type(&self) -> Option<&ClosureType> {
+        if let Type::Closure(it) = self {
+            Some(it)
         } else {
             None
         }
@@ -1144,15 +1152,7 @@ impl<T> FunctionType<T> {
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ClosureType {
     pub base_function_type: FunctionType<TypeId>,
-}
-
-impl From<FunctionType<TypeId>> for ClosureType {
-    fn from(mut it: FunctionType<TypeId>) -> Self {
-        it.this_type = None;
-        Self {
-            base_function_type: it,
-        }
-    }
+    pub included_arguments: Vec<TypeId>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]

@@ -1,13 +1,12 @@
-use crate::{evaluator::memory::Flags, DebugFlags};
+use crate::DebugFlags;
 
-use super::{bytes_to_word, FlaggedWord, HEAP_POINTER, WORD_SIZE_IN_BYTES};
+use super::{bytes_to_word, FlaggedWord, Memory, HEAP_POINTER, WORD_SIZE_IN_BYTES};
 
 pub mod garbage_collector;
 
 #[derive(Debug)]
 pub struct Allocator {
-    pub data: Vec<u64>,
-    pub flags: Vec<Flags>,
+    pub words: Vec<FlaggedWord>,
     pub buckets: Vec<BucketEntry>,
     debug_heap_as_string: bool,
 }
@@ -18,8 +17,7 @@ impl Allocator {
         let size_in_words = bytes_to_word(size_in_bytes);
         assert!(size_in_words.is_power_of_two());
         Self {
-            data: vec![0; size_in_words as usize],
-            flags: vec![Flags::default(); size_in_words as usize],
+            words: vec![FlaggedWord::default(); size_in_words as usize],
             buckets: vec![BucketEntry::root(size_in_words)],
             debug_heap_as_string: debug_flags.print_heap_as_string,
         }
@@ -109,10 +107,10 @@ impl Allocator {
                 } else {
                     None
                 }
-            });
+            }).chain(fallback.into_iter().copied());
         [
-            iter.next().unwrap_or(fallback[0]),
-            iter.next().unwrap_or(fallback[1]),
+            iter.next().expect("There should have been a fallback at least!"),
+            iter.next().expect("There should have been a fallback at least!"),
         ]
     }
 
@@ -129,8 +127,7 @@ impl Allocator {
                     // If the user can supply arbitrary values as pointer this
                     // might not be true, but right now this is not the case.
                     assert!(old_bucket.is_some(), "address = {:#x}", address);
-                    old_bucket
-                        .filter(|b| b.size_in_words >= size_in_words)
+                    old_bucket.filter(|b| b.size_in_words >= size_in_words)
                 };
                 match bucket {
                     Some(bucket) => bucket.index,
@@ -194,147 +191,181 @@ impl Allocator {
                 for i in 0..old_bucket.size_in_words {
                     let new_index = (result_bucket.address + i) as usize;
                     let old_index = (old_bucket.address + i) as usize;
-                    self.data[new_index] = self.data[old_index];
-                    self.flags[new_index] = self.flags[old_index];
+                    // Speed up! Swap with a default word!
+                    self.words[new_index] = self.words[old_index].clone();
                 }
                 old_bucket.is_used = false;
             }
             result_bucket.address as u64 * WORD_SIZE_IN_BYTES
         };
         let result = result | HEAP_POINTER;
-        if self.debug_heap_as_string {
-            print_heap_as_string(&self.data);
-        }
+        self.maybe_print_heap_as_string();
         result
     }
 
-    pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
-        let address = clear_address(address) as u64;
-        #[cfg(debug_assertions)]
-        assert!(
-            self.find_bucket_from_address(address as _).expect("There is no bucket to read the word from!").is_used,
-            "address = 0x{:x}",
-            address
-        );
-        if address % WORD_SIZE_IN_BYTES == 0 {
-            self.read_flagged_word_aligned((address / WORD_SIZE_IN_BYTES) as _)
-        } else {
-            todo!("address = {:x}", address)
-        }
-    }
+    // pub fn read_flagged_word(&self, address: u64) -> FlaggedWord {
+    //     let address = clear_address(address) as u64;
+    //     #[cfg(debug_assertions)]
+    //     assert!(
+    //         self.find_bucket_from_address(address as _).expect("There is no bucket to read the word from!").is_used,
+    //         "address = 0x{:x}",
+    //         address
+    //     );
+    //     if address % WORD_SIZE_IN_BYTES == 0 {
+    //         self.read_flagged_word_aligned((address / WORD_SIZE_IN_BYTES) as _)
+    //     } else {
+    //         todo!("address = {:x}", address)
+    //     }
+    // }
 
-    pub fn read_flagged_word_unchecked(&self, address: u64) -> FlaggedWord {
-        let address = clear_address(address) as u64;
-        if address % WORD_SIZE_IN_BYTES == 0 {
-            self.read_flagged_word_aligned_unchecked((address / WORD_SIZE_IN_BYTES) as _)
-        } else {
-            todo!("address = {:x}", address)
-        }
-    }
+    // pub fn read_flagged_word_unchecked(&self, address: u64) -> FlaggedWord {
+    //     let address = clear_address(address) as u64;
+    //     if address % WORD_SIZE_IN_BYTES == 0 {
+    //         self.read_flagged_word_aligned((address / WORD_SIZE_IN_BYTES) as _)
+    //     } else {
+    //         todo!("address = {:x}", address)
+    //     }
+    // }
 
-    fn read_word_aligned(&self, address: u64) -> u64 {
-        let address = clear_address(address);
-        #[cfg(debug_assertions)]
-        assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
-                .is_used
-        );
-        self.data[address as usize]
-    }
+    // fn read_word_aligned(&self, address: u64) -> u64 {
+    //     let address = clear_address(address);
+    //     #[cfg(debug_assertions)]
+    //     assert!(
+    //         self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+    //             .unwrap()
+    //             .is_used
+    //     );
+    //     self.words[address as usize].value
+    // }
 
-    pub fn read_flagged_word_aligned(&self, address: u64) -> FlaggedWord {
-        let address = clear_address(address);
-        #[cfg(debug_assertions)]
-        assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
-                .is_used
-        );
-        FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
-    }
+    // pub fn read_flagged_word_aligned(&self, address: u64) -> FlaggedWord {
+    //     let address = clear_address(address);
+    //     #[cfg(debug_assertions)]
+    //     assert!(
+    //         self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
+    //             .is_used
+    //     );
+    //     FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
+    // }
 
-    pub fn read_flagged_word_aligned_unchecked(&self, address: u64) -> FlaggedWord {
-        let address = clear_address(address);
-        FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
-    }
+    // pub fn read_flagged_word_aligned_unchecked(&self, address: u64) -> FlaggedWord {
+    //     let address = clear_address(address);
+    //     FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
+    // }
 
     pub fn write_byte(&mut self, address: u64, value: u8) {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(self.find_bucket_from_address(address).unwrap().is_used);
         let word_address = address & !(WORD_SIZE_IN_BYTES - 1);
-        let old_value = self.read_word_aligned(word_address / WORD_SIZE_IN_BYTES);
-        let mut bytes = old_value.to_be_bytes();
+        let mut old_value = self.read_flagged_word_aligned(word_address).clone();
+        let mut bytes = old_value.value.to_be_bytes();
         bytes[(address % WORD_SIZE_IN_BYTES) as usize] = value;
-        let value = u64::from_be_bytes(bytes);
-        self.write_word_aligned(word_address / WORD_SIZE_IN_BYTES, value)
+        old_value.value = u64::from_be_bytes(bytes);
+        self.write_flagged_word_aligned(word_address, old_value);
     }
 
-    pub fn write_word(&mut self, address: u64, value: u64) {
-        let address = clear_address(address);
+    // pub fn write_word(&mut self, address: u64, value: u64) {
+    //     let address = clear_address(address);
 
-        #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).unwrap().is_used);
-        if address % WORD_SIZE_IN_BYTES == 0 {
-            self.write_word_aligned(address / WORD_SIZE_IN_BYTES, value)
-        } else {
-            todo!("address = {:x}", address)
+    //     #[cfg(debug_assertions)]
+    //     assert!(self.find_bucket_from_address(address).unwrap().is_used);
+    //     if address % WORD_SIZE_IN_BYTES == 0 {
+    //         self.write_word_aligned(address, value)
+    //     } else {
+    //         todo!("address = {:x}", address)
+    //     }
+    // }
+
+    // pub fn write_flagged_word(&mut self, address: u64, value: FlaggedWord) {
+    //     let address = clear_address(address);
+
+    //     #[cfg(debug_assertions)]
+    //     assert!(self.find_bucket_from_address(address).unwrap().is_used);
+    //     if address % WORD_SIZE_IN_BYTES == 0 {
+    //         self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, value)
+    //     } else {
+    //         todo!("address = {:x}", address)
+    //     }
+    // }
+
+    // fn write_word_aligned(&mut self, address: u64, value: u64) {
+    //     #[cfg(debug_assertions)]
+    //     assert!(
+    //         self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+    //             .unwrap()
+    //             .is_used,
+    //         "bucket = {:#?}, address = 0x{:x}",
+    //         self.find_bucket_from_address(address),
+    //         address
+    //     );
+    //     self.words[address as usize] = FlaggedWord::value(value);
+
+    //     self.maybe_print_heap_as_string();
+    // }
+
+    // fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
+    //     #[cfg(debug_assertions)]
+    //     assert!(
+    //         self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+    //             .unwrap()
+    //             .is_used,
+    //         "bucket = {:#?}, address = 0x{:x}",
+    //         self.find_bucket_from_address(address),
+    //         address
+    //     );
+    //     self.words[address as usize] = value;
+
+    //     self.maybe_print_heap_as_string();
+    // }
+
+    fn maybe_print_heap_as_string(&self) {
+        if !self.debug_heap_as_string {
+            return;
         }
-    }
-
-    pub fn write_flagged_word(&mut self, address: u64, value: FlaggedWord) {
-        let address = clear_address(address);
-
-        #[cfg(debug_assertions)]
-        assert!(self.find_bucket_from_address(address).unwrap().is_used);
-        if address % WORD_SIZE_IN_BYTES == 0 {
-            self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, value)
-        } else {
-            todo!("address = {:x}", address)
+        let mut string_buffer = Vec::with_capacity(self.len() * WORD_SIZE_IN_BYTES as usize);
+        for word in &self.words {
+            string_buffer.extend_from_slice(&word.value.to_be_bytes());
         }
-    }
-
-    fn write_word_aligned(&mut self, address: u64, value: u64) {
-        #[cfg(debug_assertions)]
-        assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
-                .is_used,
-            "bucket = {:#?}, address = 0x{:x}",
-            self.find_bucket_from_address(address),
-            address
-        );
-        self.data[address as usize] = value;
-        self.flags[address as usize] = Flags::default();
-
-        if self.debug_heap_as_string {
-            print_heap_as_string(&self.data);
-        }
-    }
-
-    fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
-        #[cfg(debug_assertions)]
-        assert!(
-            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES).unwrap()
-                .is_used,
-            "bucket = {:#?}, address = 0x{:x}",
-            self.find_bucket_from_address(address),
-            address
-        );
-        self.data[address as usize] = value.value;
-        self.flags[address as usize] = value.flags;
-
-        if self.debug_heap_as_string {
-            print_heap_as_string(&self.data);
-        }
+        // println!("heap = {:x?}", heap);
+        println!("= '{}'", String::from_utf8_lossy(&string_buffer));
     }
 }
 
-pub fn print_heap_as_string(heap: &[u64]) {
-    let mut string_buffer = Vec::with_capacity(heap.len() * WORD_SIZE_IN_BYTES as usize);
-    for &word in heap {
-        string_buffer.extend_from_slice(&word.to_be_bytes());
+impl Memory for Allocator {
+    fn transform_address(&self, address: u64) -> u64 {
+        clear_address(address)
     }
-    println!("heap = {:x?}", heap);
-    println!("= '{}'", String::from_utf8_lossy(&string_buffer));
+
+    fn read_flagged_word_aligned(&self, address: u64) -> &FlaggedWord {
+        let address = clear_address(address);
+        #[cfg(debug_assertions)]
+        assert!(
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+                .unwrap()
+                .is_used,
+            "address = {:X}",
+            address
+        );
+        &self.words[address as usize]
+    }
+
+    fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord) {
+        let address = clear_address(address);
+        #[cfg(debug_assertions)]
+        assert!(
+            self.find_bucket_from_address(address * WORD_SIZE_IN_BYTES)
+                .unwrap()
+                .is_used,
+            "address = {:X}",
+            address
+        );
+        self.words[address as usize] = value;
+    }
+
+    fn len(&self) -> usize {
+        self.words.len()
+    }
 }
 
 fn clear_address(address: u64) -> u64 {

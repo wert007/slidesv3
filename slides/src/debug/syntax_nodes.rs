@@ -451,6 +451,7 @@ fn print_syntax_node_literal_as_code_with_indent(
         crate::value::Value::String(it) => write!(buffer, "{it:?}"),
         crate::value::Value::LabelPointer(it, _) => write!(buffer, "L{it:X}"),
         crate::value::Value::EnumType(..) => write!(buffer, "ENUM TYPE"),
+        crate::value::Value::EnumValue(index, _) => write!(buffer, "ENUM VALUE#{index}"),
     }
 }
 

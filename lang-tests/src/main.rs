@@ -12,12 +12,16 @@ use tokio::{fs, join};
 
 #[derive(Debug, Parser)]
 struct Args {
+    /// Overwrite the old test records.
     #[arg(short, long)]
     record: bool,
+    /// Only run tests, which file names fit the filter.
     #[arg(short, long)]
     filter: Option<String>,
+    /// Directory of the tests.
     #[arg(short, long)]
     directory: String,
+    /// Prints the actual output of the running tests
     #[arg(short, long)]
     verbose: bool,
 }

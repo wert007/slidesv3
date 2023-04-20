@@ -1,15 +1,15 @@
 use crate::{
     binder::typing::{self, Type, TypeId},
-    evaluator::memory::bytes_to_word,
+    evaluator::memory::{bytes_to_word, Memory},
 };
 
 use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
 
-pub fn print(argument: FlaggedWord, state: &mut EvaluatorState) {
+pub fn print(argument: &FlaggedWord, state: &mut EvaluatorState) {
     println!("{}", to_string_native(typeid!(Type::Any), argument, state));
 }
 
-pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
+pub fn to_string(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let string = to_string_native(typeid!(Type::Any), argument, state);
     let string_length = string.len() as u64;
     let mut pointer = state.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
@@ -29,7 +29,10 @@ pub fn to_string(argument: FlaggedWord, state: &mut EvaluatorState) {
         return;
     }
     // TODO: Clear bucket maybe?
-    state.heap.write_word(pointer, string_length);
+    state.heap.write_flagged_word_aligned(
+        pointer,
+        FlaggedWord::value(string_length).with_comment(format!("String length of {string:?}")),
+    );
     pointer += WORD_SIZE_IN_BYTES;
     for &byte in string.as_bytes() {
         state.heap.write_byte(pointer, byte);
@@ -50,7 +53,7 @@ fn get_to_string_function(type_id: TypeId, state: &EvaluatorState) -> Option<u64
         .flatten()
 }
 
-fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> TypeId {
+fn decode_type(address: &FlaggedWord, state: &mut EvaluatorState) -> TypeId {
     let address = address.unwrap_pointer();
     let type_identifier = state.read_pointer(address).unwrap_value();
     // SAFETY: This is actually only as safe as the implementation. If something
@@ -59,20 +62,19 @@ fn decode_type(address: FlaggedWord, state: &mut EvaluatorState) -> TypeId {
     type_identifier
 }
 
-fn to_string_native(type_: TypeId, argument: FlaggedWord, state: &mut EvaluatorState) -> String {
+fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
     match &state.project.types[type_] {
         Type::Library(_)
         | Type::GenericType
         | Type::IntegerLiteral
-        | Type::Enum(..)
         | Type::StructPlaceholder(..) => unreachable!("{:#?}", &state.project.types[type_]),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::Any => {
             let type_ = decode_type(argument, state);
             let address = argument.unwrap_pointer() + WORD_SIZE_IN_BYTES;
-            let argument = state.read_pointer(address);
-            to_string_native(type_, argument, state)
+            let argument = state.read_pointer(address).clone();
+            to_string_native(type_, &argument, state)
         }
         Type::None => "none".into(),
         Type::Noneable(base_type) => {
@@ -81,8 +83,8 @@ fn to_string_native(type_: TypeId, argument: FlaggedWord, state: &mut EvaluatorS
             } else if state.project.types[*base_type].is_pointer() {
                 to_string_native(*base_type, argument, state)
             } else {
-                let argument = state.read_pointer(argument.unwrap_pointer());
-                to_string_native(*base_type, argument, state)
+                let argument = state.read_pointer(argument.unwrap_pointer()).clone();
+                to_string_native(*base_type, &argument, state)
             }
         }
         Type::Struct(struct_type) => {
@@ -92,10 +94,11 @@ fn to_string_native(type_: TypeId, argument: FlaggedWord, state: &mut EvaluatorS
                     // FIXME: If there is an Err(()) returned, this means, there was
                     // a runtime error, this should be handled the same way as in
                     // evaluate.
-                    let return_value = super::execute_function(state, it as usize, &[argument])
-                        .unwrap()
-                        .unwrap();
-                    to_string_native(typeid!(Type::String), return_value, state)
+                    let return_value =
+                        super::execute_function(state, it as usize, &[argument.clone()])
+                            .unwrap()
+                            .unwrap();
+                    to_string_native(typeid!(Type::String), &return_value, state)
                 }
                 None => {
                     // TODO: General purpose to string
@@ -119,9 +122,9 @@ fn to_string_native(type_: TypeId, argument: FlaggedWord, state: &mut EvaluatorS
                 let argument = if state.project.types[*base_type].is_pointer() {
                     FlaggedWord::pointer(ptr)
                 } else {
-                    state.read_pointer(ptr)
+                    state.read_pointer(ptr).clone()
                 };
-                to_string_native(*base_type, argument, state)
+                to_string_native(*base_type, &argument, state)
             }
         }
         Type::Boolean => {
@@ -135,10 +138,14 @@ fn to_string_native(type_: TypeId, argument: FlaggedWord, state: &mut EvaluatorS
         Type::Function(kind) => format!("fn {}", kind.display(&state.project.types)),
         Type::Closure(closure) => format!("fn {}", closure.base_function_type),
         Type::String => string_to_string_native(argument, state),
+        Type::Enum(a, b) => {
+            let index = argument.unwrap_value() as usize;
+            format!("{a}.{}", b[index])
+        }
     }
 }
 
-fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) -> String {
+fn string_to_string_native(argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
     let string_start = argument.unwrap_pointer();
     let pointer = state.read_pointer(string_start).unwrap_value();
 
@@ -159,7 +166,7 @@ fn string_to_string_native(argument: FlaggedWord, state: &mut EvaluatorState) ->
     String::from_utf8_lossy(&string_buffer[..string_length_in_bytes as usize]).into_owned()
 }
 
-pub fn array_length(argument: FlaggedWord, state: &mut EvaluatorState) {
+pub fn array_length(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let type_ = decode_type(argument, state);
     let argument = state.read_pointer(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES);
     let array_start = argument.unwrap_pointer();
@@ -170,26 +177,26 @@ pub fn array_length(argument: FlaggedWord, state: &mut EvaluatorState) {
     state.stack.push(array_length);
 }
 
-pub fn heap_dump(argument: FlaggedWord, state: &mut EvaluatorState) {
+pub fn heap_dump(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let argument = string_to_string_native(argument, state);
     let argument = argument.replace('\0', "");
     crate::debug::output_allocator_to_dot(&argument, &state.heap);
 }
 
-pub fn reallocate(pointer: FlaggedWord, size: FlaggedWord, state: &mut EvaluatorState) {
+pub fn reallocate(pointer: &FlaggedWord, size: &FlaggedWord, state: &mut EvaluatorState) {
     let pointer = pointer.unwrap_pointer();
     let size = size.unwrap_value();
     let result = state.reallocate(pointer, size);
     state.stack.push_flagged_word(FlaggedWord::pointer(result));
 }
 
-pub fn runtime_error(argument: FlaggedWord, state: &mut EvaluatorState) {
+pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let argument = string_to_string_native(argument, state);
     let argument = argument.replace('\0', "");
     println!("Runtime error happened: {}", argument);
     state.runtime_error_happened = true;
 }
 
-pub fn address_of(argument: FlaggedWord, state: &mut EvaluatorState) {
+pub fn address_of(argument: &FlaggedWord, state: &mut EvaluatorState) {
     state.stack.push(argument.value);
 }

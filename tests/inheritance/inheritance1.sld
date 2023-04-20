@@ -1,4 +1,4 @@
-struct Parent {
+abstract struct Parent {
     field1: int;
 
     func sayHello() {

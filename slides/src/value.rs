@@ -9,6 +9,7 @@ pub enum Value {
     String(String),
     LabelPointer(usize, TypeId),
     EnumType(Vec<String>, TypeId),
+    EnumValue(usize, TypeId),
 }
 
 #[allow(dead_code)]
@@ -51,9 +52,8 @@ impl Value {
             Value::Boolean(_) => typeid!(Type::Boolean),
             Value::String(_) => typeid!(Type::String),
             Value::None => typeid!(Type::None),
-            Value::LabelPointer(_, type_) => type_.clone(),
             Value::SystemCall(kind) => typeid!(Type::SystemCall(kind)),
-            Value::EnumType(_, it) => *it,
+            Value::LabelPointer(_, it) | Value::EnumType(_, it) | Value::EnumValue(_, it) => *it,
         }
     }
 }
@@ -86,6 +86,7 @@ impl std::fmt::Display for Value {
             Value::None => write!(f, "none"),
             Value::LabelPointer(label, type_) => write!(f, "L{:X} : {}", label, type_),
             Value::EnumType(_, t) => write!(f, "anomynous enum type {t}"),
+            Value::EnumValue(v, t) => write!(f, "anomynous enum type {t}.value{v}"),
         }
     }
 }

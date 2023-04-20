@@ -13,6 +13,32 @@ pub const fn is_heap_pointer(address: u64) -> bool {
     address & HEAP_POINTER > 0
 }
 
+pub trait Memory {
+    fn read_flagged_word_aligned(&self, address: u64) -> &FlaggedWord;
+    fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord);
+    fn len(&self) -> usize;
+    fn transform_address(&self, address: u64) -> u64 { address }
+
+
+    fn read_flagged_word(&self, address: u64) -> &FlaggedWord {
+        let address = self.transform_address(address);
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES)
+        } else {
+            unimplemented!("address = 0x{:x}", address)
+        }
+    }
+
+    fn write_flagged_word(&mut self, address: u64, value: FlaggedWord) {
+        let address = self.transform_address(address);
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            self.write_flagged_word_aligned(address / WORD_SIZE_IN_BYTES, value);
+        } else {
+            unimplemented!("address = 0x{:x}", address);
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Flags {
     pub is_pointer: bool,
@@ -25,20 +51,31 @@ impl Flags {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct FlaggedWord {
     pub value: u64,
     pub flags: Flags,
+    pub comment: String,
 }
 
 impl FlaggedWord {
-    pub fn unwrap_value(self) -> u64 {
+    pub fn with_comment(mut self, comment: impl Into<String>) -> Self {
+        self.comment = comment.into();
+        self
+    }
+
+    pub fn replace_comment(mut self, cb: impl FnOnce(String) -> String) -> Self {
+        self.comment = cb(self.comment);
+        self
+    }
+
+    pub fn unwrap_value(&self) -> u64 {
         #[cfg(debug_assertions)]
         assert!(!self.flags.is_pointer, "{:#?}", self);
         self.value
     }
 
-    pub fn unwrap_pointer(self) -> u64 {
+    pub fn unwrap_pointer(&self) -> u64 {
         #[cfg(debug_assertions)]
         assert!(self.flags.is_pointer, "{:#?}", self);
         self.value
@@ -48,6 +85,7 @@ impl FlaggedWord {
         Self {
             value,
             flags: Flags::default(),
+            comment: String::new(),
         }
     }
 
@@ -55,6 +93,7 @@ impl FlaggedWord {
         Self {
             value,
             flags: Flags::default().pointer(),
+            comment: String::new(),
         }
     }
 
@@ -65,5 +104,19 @@ impl FlaggedWord {
 
     pub fn is_pointer(&self) -> bool {
         self.flags.is_pointer
+    }
+}
+
+impl std::fmt::Debug for FlaggedWord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = if self.flags.is_pointer {
+            format!("#{:x}", self.value)
+        } else {
+            format!("{}", self.value)
+        };
+        f.debug_struct("FlaggedWord")
+            .field("value", &value)
+            .field("comment", &self.comment)
+            .finish()
     }
 }

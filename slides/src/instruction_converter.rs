@@ -411,20 +411,13 @@ fn convert_function_declaration(
     function_declaration: BoundFunctionDeclarationNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let mut result = vec![Instruction::label(function_declaration.label, span)
-        .into()];
+    let mut result = vec![Instruction::label(function_declaration.label, span).into()];
     for parameter in function_declaration.parameters.into_iter().rev() {
-        result.push(
-            Instruction::store_in_register(parameter, span)
-                .into(),
-        );
+        result.push(Instruction::store_in_register(parameter, span).into());
     }
     if let Some(register) = function_declaration.base_register {
         result.push(Instruction::load_register(0, span).into());
-        result.push(
-            Instruction::store_in_register(register, span)
-                .into(),
-        );
+        result.push(Instruction::store_in_register(register, span).into());
     }
     result.append(&mut convert_node(*function_declaration.body, converter));
     result
@@ -480,6 +473,7 @@ pub fn convert_value(
             }
             .into()]
         }
+        Value::EnumValue(value, _) => value as u64,
         Value::EnumType(_, _) => {
             todo!("This is probably unreachable? This should be meaningless at least.")
         }
@@ -506,14 +500,8 @@ fn convert_array_literal(
     for child in array_literal.children.into_iter().rev() {
         result.append(&mut convert_node(child, converter));
     }
-    result.push(
-        Instruction::write_to_heap(element_count, span)
-            .into(),
-    );
-    result.push(
-        Instruction::load_immediate(element_count, span)
-            .into(),
-    );
+    result.push(Instruction::write_to_heap(element_count, span).into());
+    result.push(Instruction::load_immediate(element_count, span).into());
     result.push(Instruction::write_to_heap(2, span).into());
     result
 }
@@ -522,16 +510,14 @@ fn convert_variable(
     span: TextLocation,
     variable: BoundVariableNodeKind,
 ) -> Vec<InstructionOrLabelReference> {
-    vec![Instruction::load_register(variable.variable_index, span)
-        .into()]
+    vec![Instruction::load_register(variable.variable_index, span).into()]
 }
 
 fn convert_variable_for_assignment(
     span: TextLocation,
     variable: BoundVariableNodeKind,
 ) -> Vec<InstructionOrLabelReference> {
-    vec![Instruction::store_in_register(variable.variable_index, span)
-        .into()]
+    vec![Instruction::store_in_register(variable.variable_index, span).into()]
 }
 
 fn convert_array_index_for_assignment(
@@ -547,10 +533,7 @@ fn convert_array_index_for_assignment(
     let mut result = convert_node(*array_index.base, converter);
     // index
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(
-        Instruction::load_immediate(base_type_size, span)
-            .into(),
-    );
+    result.push(Instruction::load_immediate(base_type_size, span).into());
     result.push(Instruction::multiplication(span).into());
 
     result.push(Instruction::store_in_memory(span).into());
@@ -563,10 +546,7 @@ fn convert_field_access_for_assignment(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
-    result.push(
-        Instruction::load_immediate(field_access.offset, span)
-            .into(),
-    );
+    result.push(Instruction::load_immediate(field_access.offset, span).into());
     result.push(Instruction::store_in_memory(span).into());
     result
 }
@@ -648,9 +628,10 @@ fn convert_binary(
         BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(span),
         BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(span),
         BoundBinaryOperator::StringConcat => Instruction::string_concat(span),
-        BoundBinaryOperator::NoneableOrValue => {
-            Instruction::noneable_or_value(!converter.project.types[binary.rhs.type_].is_pointer(), span)
-        }
+        BoundBinaryOperator::NoneableOrValue => Instruction::noneable_or_value(
+            !converter.project.types[binary.rhs.type_].is_pointer(),
+            span,
+        ),
         operator @ (BoundBinaryOperator::LogicalAnd
         | BoundBinaryOperator::LogicalOr
         | BoundBinaryOperator::Range) => {
@@ -665,7 +646,7 @@ fn convert_binary(
 }
 
 fn convert_function_call(
-    span: TextLocation,
+    location: TextLocation,
     function_call: BoundFunctionCallNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -679,23 +660,15 @@ fn convert_function_call(
     for argument in function_call.arguments {
         result.append(&mut convert_node(argument, converter));
     }
-    let is_closure = matches!(
-        converter.project.types[function_call.base.type_],
-        Type::Closure(_)
-    );
+    let closure_included_arguments = 
+    converter.project.types[function_call.base.type_].as_closure_type().map(|c| c.included_arguments.len());
     result.append(&mut convert_node(*function_call.base, converter));
-    if is_closure {
-        result.push(
-            Instruction::decode_closure(argument_count as _, true, span)
-                .into(),
-        );
+    if let Some(extra_arguments) = closure_included_arguments {
+        result.push(Instruction::decode_closure((extra_arguments + argument_count) as _, true, location).into());
     } else {
-        result.push(
-            Instruction::load_immediate(argument_count as _, span)
-                .into(),
-        );
+        result.push(Instruction::load_immediate(argument_count as _, location).into());
     }
-    result.push(Instruction::function_call(span).into());
+    result.push(Instruction::function_call(location).into());
     result
 }
 
@@ -710,17 +683,11 @@ fn convert_constructor_call(
     match constructor_call.function {
         Some(function) => {
             let argument_count = constructor_call.arguments.len() as u64;
-            result.push(
-                Instruction::allocate(word_count * WORD_SIZE_IN_BYTES,span)
-                    .into(),
-            );
+            result.push(Instruction::allocate(word_count * WORD_SIZE_IN_BYTES, span).into());
             for argument in constructor_call.arguments.into_iter() {
                 result.append(&mut convert_node(argument, converter));
             }
-            result.push(
-                Instruction::duplicate_over(argument_count,span)
-                    .into(),
-            );
+            result.push(Instruction::duplicate_over(argument_count, span).into());
             result.push(
                 LabelReference {
                     label_reference: function as _,
@@ -728,10 +695,7 @@ fn convert_constructor_call(
                 }
                 .into(),
             );
-            result.push(
-                Instruction::load_immediate(argument_count + 1,span)
-                    .into(),
-            );
+            result.push(Instruction::load_immediate(argument_count + 1, span).into());
             result.push(Instruction::function_call(span).into());
         }
         None => {
@@ -773,14 +737,8 @@ fn convert_system_call(
             for argument in system_call.arguments {
                 result.append(&mut convert_node(argument, converter));
             }
-            result.push(
-                Instruction::load_immediate(argument_count,span)
-                    .into(),
-            );
-            result.push(
-                Instruction::system_call(system_call.base,span)
-                    .into(),
-            );
+            result.push(Instruction::load_immediate(argument_count, span).into());
+            result.push(Instruction::system_call(system_call.base, span).into());
             result
         }
         SystemCallKind::ArrayLength => {
@@ -807,10 +765,7 @@ fn convert_array_length_system_call(
         result.push(Instruction::load_immediate(1, span).into());
     }
 
-    result.push(
-        Instruction::system_call(system_call.base, span)
-            .into(),
-    );
+    result.push(Instruction::system_call(system_call.base, span).into());
     result
 }
 
@@ -826,10 +781,7 @@ fn convert_array_index(
 
     let mut result = convert_node(*array_index.base, converter);
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(
-        Instruction::load_immediate(base_type_size, span)
-            .into(),
-    );
+    result.push(Instruction::load_immediate(base_type_size, span).into());
     result.push(Instruction::multiplication(span).into());
 
     result.push(Instruction::addition(span).into());
@@ -846,16 +798,10 @@ fn convert_field_access(
     match &converter.project.types[field_access.type_] {
         Type::SystemCall(_) => {}
         Type::Function(_) => {
-            result.push(
-                Instruction::load_register(field_access.offset,span)
-                    .into(),
-            );
+            result.push(Instruction::load_register(field_access.offset, span).into());
         }
         _ => {
-            result.push(
-                Instruction::read_word_with_offset(field_access.offset,span)
-                    .into(),
-            );
+            result.push(Instruction::read_word_with_offset(field_access.offset, span).into());
         }
     }
     result
@@ -895,31 +841,22 @@ fn convert_closure(
         }
         FunctionKind::VtableIndex(vtable_index) => {
             // Read function pointer
+            result.push(Instruction::read_word_with_offset(0, location).into());
             result.push(
-                Instruction::read_word_with_offset(0,location)
-                    .into(),
-            );
-            result.push(
-                Instruction::read_word_with_offset(vtable_index as u64 * WORD_SIZE_IN_BYTES,location)
-                    .into(),
+                Instruction::read_word_with_offset(
+                    vtable_index as u64 * WORD_SIZE_IN_BYTES,
+                    location,
+                )
+                .into(),
             );
             // Flatten fat pointer
             result.push(Instruction::rotate(1, location).into());
-            result.push(
-                Instruction::read_word_with_offset(WORD_SIZE_IN_BYTES,location)
-                    .into(),
-            );
+            result.push(Instruction::read_word_with_offset(WORD_SIZE_IN_BYTES, location).into());
             result.push(Instruction::rotate(1, location).into());
         }
     }
-    result.push(
-        Instruction::load_immediate(size_in_bytes, location)
-            .into(),
-    );
-    result.push(
-        Instruction::write_to_heap(size_in_words + 1, location)
-            .into(),
-    );
+    result.push(Instruction::load_immediate(size_in_bytes, location).into());
+    result.push(Instruction::write_to_heap(size_in_words + 1, location).into());
     result
 }
 
@@ -961,15 +898,9 @@ fn convert_conversion(
                 // in a big type array. So we only have 1 word big type ids.
                 Instruction::write_to_heap(1, location).into(),
             );
-            result.push(
-                Instruction::type_identifier_equals(location)
-                    .into(),
-            );
+            result.push(Instruction::type_identifier_equals(location).into());
             let label = converter.generate_label();
-            result.push(
-                Instruction::jump_to_label_conditionally(label, false,location)
-                    .into(),
-            );
+            result.push(Instruction::jump_to_label_conditionally(label, false, location).into());
             // If types are equal, the value of the type needs to be converted into a noneable
             if !converter.project.types[base_type].is_pointer() {
                 result.push(Instruction::write_to_heap(1, location).into());
@@ -980,10 +911,7 @@ fn convert_conversion(
             result.push(Instruction::write_to_heap(1, location).into());
         }
         ConversionKind::Unboxing => {
-            result.push(
-                Instruction::read_word_with_offset(0,location)
-                    .into(),
-            );
+            result.push(Instruction::read_word_with_offset(0, location).into());
         }
         ConversionKind::IntToUint => {
             let label_if_is_not_uint = converter.generate_label();
@@ -992,19 +920,13 @@ fn convert_conversion(
             result.push(Instruction::duplicate_over(1, location).into());
             result.push(Instruction::greater_than(location).into());
             result.push(
-                Instruction::jump_to_label_conditionally(label_if_is_not_uint, true,location)
+                Instruction::jump_to_label_conditionally(label_if_is_not_uint, true, location)
                     .into(),
             );
             // If the int is >= 0, it needs to be converted into a noneable
             result.push(Instruction::write_to_heap(1, location).into());
-            result.push(
-                Instruction::jump_to_label(label_end_if,location)
-                    .into(),
-            );
-            result.push(
-                Instruction::label(label_if_is_not_uint,location)
-                    .into(),
-            );
+            result.push(Instruction::jump_to_label(label_end_if, location).into());
+            result.push(Instruction::label(label_if_is_not_uint, location).into());
             result.push(Instruction::pop(location).into());
             result.push(Instruction::load_none_pointer(location).into());
             result.push(Instruction::label(label_end_if, location).into());
@@ -1141,10 +1063,7 @@ fn convert_type_identifier(
     //         .into(),
     // );
     // result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
-    result.push(
-        Instruction::load_immediate(base_type.as_raw(), span)
-            .into(),
-    );
+    result.push(Instruction::load_immediate(base_type.as_raw(), span).into());
 }
 
 fn convert_variable_declaration(
@@ -1153,10 +1072,7 @@ fn convert_variable_declaration(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*variable_declaration.initializer, converter);
-    result.push(
-        Instruction::store_in_register(variable_declaration.variable_index, span)
-            .into(),
-    );
+    result.push(Instruction::store_in_register(variable_declaration.variable_index, span).into());
     result
 }
 
@@ -1211,8 +1127,12 @@ fn convert_return_statement(
         vec![]
     };
     result.push(
-        Instruction::return_from_function(pushes_on_stack, return_statement.restores_variables, span)
-            .into(),
+        Instruction::return_from_function(
+            pushes_on_stack,
+            return_statement.restores_variables,
+            span,
+        )
+        .into(),
     );
     result
 }
@@ -1248,8 +1168,7 @@ fn convert_jump(
         Some(condition) => {
             let mut result = convert_node(*condition, converter);
             result.push(
-                Instruction::jump_to_label_conditionally(label, jump.jump_if_true,span)
-                    .into(),
+                Instruction::jump_to_label_conditionally(label, jump.jump_if_true, span).into(),
             );
             result
         }

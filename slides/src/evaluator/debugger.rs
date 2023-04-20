@@ -1,6 +1,6 @@
 use crate::evaluator::memory;
 use strum::{EnumIter, IntoEnumIterator};
-use super::{memory::FlaggedWord, EvaluatorState};
+use super::{memory::{FlaggedWord, Memory}, EvaluatorState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionState {
@@ -167,10 +167,12 @@ fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
     for i in skip..stack.len() {
         let entry = stack.read_flagged_word(i as u64 * memory::WORD_SIZE_IN_BYTES);
         if entry.is_pointer() {
-            println!("#{:x}", entry.unwrap_pointer());
+            print!("#{:x}", entry.unwrap_pointer());
         } else {
-            println!("{}", entry.unwrap_value());
+            print!("{}", entry.unwrap_value());
         }
+        print!("  {}", entry.comment);
+        println!();
     }
 }
 

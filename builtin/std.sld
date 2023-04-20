@@ -87,7 +87,6 @@ struct Range {
     }
 
     func $get(index: uint) -> int {
-        print('hii');
         return this.start + this.stepSize * index;
     }
 
@@ -161,6 +160,7 @@ generic struct Array {
         if index >= this.length {
             runtimeError('Index ' + index + ' is out of bounds of array with length ' + this.length + '.');
         }
+        break();
     }
 
     func $get(index: uint) -> $Type {
