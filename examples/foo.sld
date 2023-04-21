@@ -1,5 +1,10 @@
+import lib('presentation.sld') as presentation;
+
 func main() {
-    let l = new List();
-    l.add(5);
-    l.add(9);
+    let pf = new presentation.PresentationFlags(
+        presentation.PresentationColorTheme.Dark,
+        false,
+        presentation.PrismSyntaxHighlighting.Tomorrow
+    );
+    print(pf);
 }

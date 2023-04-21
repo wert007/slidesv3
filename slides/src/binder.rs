@@ -458,16 +458,6 @@ struct BindingState<'b> {
     /// variable, the type it has and if it is read only, which means it cannot
     /// be on the left side of an assignment.
     variable_table: Vec<BoundVariableName>,
-    /// When registering a type for the type table, it is also registered in the
-    /// struct table if it is a struct. The struct table is used to access field
-    /// information on a struct. Since the type of a struct only has the types of
-    /// the fields and their offset into the struct it cannot be used to check if
-    /// a struct has a field with a certain name. This is what this is used for.
-    /// So this is used by constructors or field accesses. Fields can also be
-    /// read only, even though this is currently (12.10.2021) only used for
-    /// functions on structs since they are also fields in some way. But
-    /// functions on structs are still registered in the functions table.
-    struct_table: Vec<StructSymbol>,
     /// This contains all function declarations the binder found while walking
     /// the top level statements and after that the struct fields. The function
     /// declaration body contains the necessary information for the function
@@ -490,6 +480,9 @@ struct BindingState<'b> {
     /// This collects all the structs, which fields still need to be bound by the
     /// binder. This should be empty, before starting to bind the functions.
     structs: Vec<StructDeclarationBody>,
+    exported_structs: Vec<TypeId>,
+    exported_enums: Vec<TypeId>,
+    exported_generic_structs: Vec<GenericTypeId>,
     generic_structs: Vec<StructDeclarationBody>,
     generic_type: Option<TypeId>,
     /// This has all libraries which where loaded by imports. They can be
@@ -579,211 +572,6 @@ impl BindingState<'_> {
             Some(index)
         }
     }
-
-    // fn register_struct_name(
-    //     &mut self,
-    //     name: &'a str,
-    //     struct_function_table: SimpleStructFunctionTable,
-    // ) -> Option<u64> {
-    //     let id = self.type_table.len() as u64;
-    //     self.register_type(
-    //         name,
-    //         Type::StructReference(StructReferenceType {
-    //             id,
-    //             simple_function_table: struct_function_table,
-    //         }),
-    //     )
-    // }
-
-    // fn register_generated_struct_name(
-    //     &mut self,
-    //     name: String,
-    //     struct_function_table: SimpleStructFunctionTable,
-    // ) -> Option<u64> {
-    //     let id = self.type_table.len() as u64;
-    //     self.register_generated_type(
-    //         name,
-    //         Type::StructReference(StructReferenceType {
-    //             id,
-    //             simple_function_table: struct_function_table,
-    //         }),
-    //     )
-    // }
-
-    // fn register_generic_struct(
-    //     &mut self,
-    //     id: u64,
-    //     fields: Vec<BoundStructFieldSymbol<'a>>,
-    //     function_table: StructFunctionTable,
-    // ) -> u64 {
-    //     let name = self.type_table[id as usize].identifier.clone();
-    //     let bound_struct_type = BoundGenericStructSymbol {
-    //         struct_type: BoundStructSymbol {
-    //             name,
-    //             fields,
-    //             function_table,
-    //             is_generic: true,
-    //             parent: None, // TODO
-    //         },
-    //         functions: vec![],
-    //     };
-    //     let struct_id = id as usize - type_table().len();
-    //     while struct_id >= self.struct_table.len() {
-    //         self.struct_table.push(BoundMaybeGenericStructSymbol::Empty);
-    //     }
-    //     assert!(self.struct_table[struct_id].is_empty());
-    //     self.struct_table[struct_id] = bound_struct_type.into();
-    //     id
-    // }
-
-    // fn register_struct(
-    //     &mut self,
-    //     id: u64,
-    //     parent_id: Option<u64>,
-    //     fields: Vec<BoundStructFieldSymbol<'a>>,
-    //     function_table: StructFunctionTable,
-    // ) -> u64 {
-    //     let mut struct_type = StructType {
-    //         id,
-    //         fields: fields
-    //             .iter()
-    //             .filter(|f| !matches!(f.type_, Type::Function(_)))
-    //             .map(|f| f.type_.clone())
-    //             .collect(),
-    //         functions: fields
-    //             .iter()
-    //             .filter(|f| matches!(f.type_, Type::Function(_)))
-    //             .map(|f| f.type_.clone())
-    //             .collect(),
-    //         function_table: function_table.clone(),
-    //         is_generic: false,
-    //         parent_id,
-    //         size_in_bytes: 0,
-    //     };
-    //     self.insert_into_struct_table(
-    //         id,
-    //         parent_id,
-    //         fields.into_iter().map(Into::into).collect(),
-    //         function_table,
-    //     );
-    //     struct_type.size_in_bytes = self.get_struct_type_by_id(id).unwrap().size_in_bytes();
-    //     self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
-    //     id
-    // }
-
-    // pub fn register_maybe_generic_struct_as(
-    //     &mut self,
-    //     name: &str,
-    //     maybe_generic_struct: &MaybeGenericStructSymbol,
-    // ) -> Option<u64> {
-    //     let id = self.register_generated_struct_name(
-    //         name.to_owned(),
-    //         maybe_generic_struct.function_table().into(),
-    //     )?;
-    //     let fields = maybe_generic_struct.fields().to_vec();
-    //     let function_table = maybe_generic_struct.function_table().clone();
-    //     let struct_type = StructType {
-    //         id,
-    //         fields: fields
-    //             .iter()
-    //             .filter(|f| !matches!(f.type_, Type::Function(_)))
-    //             .map(|f| f.type_.clone())
-    //             .collect(),
-    //         functions: fields
-    //             .iter()
-    //             .filter(|f| matches!(f.type_, Type::Function(_)))
-    //             .map(|f| f.type_.clone())
-    //             .collect(),
-    //         function_table,
-    //         is_generic: false,
-    //         parent_id: None, // TODO
-    //         size_in_bytes: fields
-    //             .iter()
-    //             .filter(|f| !matches!(f.type_, Type::Function(_)))
-    //             .map(|f| f.type_.size_in_bytes())
-    //             .sum(),
-    //     };
-    //     self.type_table[id as usize].type_ = Type::Struct(Box::new(struct_type));
-
-    //     let struct_id = id as usize - type_table().len();
-    //     while struct_id >= self.struct_table.len() {
-    //         self.struct_table.push(BoundMaybeGenericStructSymbol::Empty);
-    //     }
-
-    //     assert!(self.struct_table[struct_id].is_empty());
-    //     self.struct_table[struct_id] = maybe_generic_struct.to_owned().into();
-    //     self.struct_table[struct_id].set_name(name.to_owned());
-
-    //     Some(id)
-    // }
-
-    // pub fn insert_into_struct_table(
-    //     &mut self,
-    //     id: u64,
-    //     parent_id: Option<u64>,
-    //     fields: Vec<BoundStructFieldSymbol<'a>>,
-    //     function_table: StructFunctionTable,
-    // ) {
-    //     let name = self.type_table[id as usize].identifier.clone();
-    //     let bound_struct_type = BoundStructSymbol {
-    //         name,
-    //         fields,
-    //         function_table,
-    //         is_generic: false,
-    //         parent: parent_id.map(|id| {
-    //             Box::new(
-    //                 self.get_struct_type_by_id(id)
-    //                     .expect(
-    //                         "This should never happen. Since it should already be checked before.",
-    //                     )
-    //                     .clone(),
-    //             )
-    //         }), // TODO
-    //     };
-    //     let struct_id = id as usize - type_table().len();
-    //     while struct_id >= self.struct_table.len() {
-    //         self.struct_table.push(BoundMaybeGenericStructSymbol::Empty);
-    //     }
-
-    //     assert!(self.struct_table[struct_id].is_empty());
-    //     self.struct_table[struct_id] = bound_struct_type.into();
-    // }
-
-    // fn register_type(&mut self, name: &'a str, type_: Type) -> Option<u64> {
-    //     let index = self.type_table.len() as u64;
-    //     let type_name_already_registered = self
-    //         .type_table
-    //         .iter()
-    //         .any(|type_| type_.identifier.as_ref() == name);
-    //     if type_name_already_registered {
-    //         None
-    //     } else {
-    //         self.type_table.push(BoundVariableName {
-    //             identifier: name.into(),
-    //             type_,
-    //             is_read_only: true,
-    //         });
-    //         Some(index)
-    //     }
-    // }
-
-    // fn register_generated_type(&mut self, name: String, type_: Type) -> Option<u64> {
-    //     let index = self.type_table.len() as u64;
-    //     let type_name_already_registered = self
-    //         .type_table
-    //         .iter()
-    //         .any(|type_| type_.identifier.as_ref() == name);
-    //     if type_name_already_registered {
-    //         None
-    //     } else {
-    //         self.type_table.push(BoundVariableName {
-    //             identifier: name.into(),
-    //             type_,
-    //             is_read_only: true,
-    //         });
-    //         Some(index)
-    //     }
-    // }
 
     fn register_constant(&mut self, name: TextLocation, value: Value) -> Option<u64> {
         let index = self.constants.len() as u64;
@@ -898,10 +686,6 @@ impl BindingState<'_> {
             .map(|v| v.identifier.as_str(&self.project.source_text_collection))
     }
 
-    // fn look_up_std_struct_id(&self, kind: StdTypeKind) -> u64 {
-    //     self.look_up_struct_id_by_name(kind.name())
-    //         .unwrap_or_else(|| panic!("Could not load std type {}.", kind.name()))
-    // }
     fn look_up_type_by_source_cow(&self, name: &SourceCow) -> Option<TypeOrGenericTypeId> {
         self.project
             .types
@@ -909,147 +693,8 @@ impl BindingState<'_> {
     }
 
     fn look_up_type_by_name(&self, name: &str) -> Option<TypeOrGenericTypeId> {
-        // if name == "$Type" && self.generic_type.is_some() {
-        //     return Some(self.generic_type.clone().unwrap());
-        // }
         self.project.types.look_up_type_by_name(name)
-        // self.type_table
-        //     .iter()
-        //     .find(|v| v.identifier.as_ref() == name)
-        //     .map(|v| v.type_.clone())
-        //     .map(|t| {
-        //         if let Type::Struct(struct_type) = t {
-        //             Type::StructReference(StructReferenceType {
-        //                 id: struct_type.id,
-        //                 simple_function_table: (&struct_type.function_table).into(),
-        //             })
-        //         } else {
-        //             t
-        //         }
-        //     })
     }
-
-    // fn look_up_type_by_name(&&self, name: String) -> Option<Type> {
-    //     self.type_table
-    //         .iter()
-    //         .find(|v| v.identifier.as_ref() == name)
-    //         .map(|v| v.type_.clone())
-    //         .map(|t| {
-    //             if let Type::Struct(struct_type) = t {
-    //                 Type::StructReference(StructReferenceType {
-    //                     id: struct_type.id,
-    //                     simple_function_table: (&struct_type.function_table).into(),
-    //                 })
-    //             } else {
-    //                 t
-    //             }
-    //         })
-    // }
-
-    // fn get_struct_type_by_id(&self, id: u64) -> Option<&BoundStructSymbol<'a>> {
-    //     let index = id as usize - type_table().len();
-
-    //     self.struct_table
-    //         .get(index)
-    //         .filter(|e| !e.is_empty())
-    //         .map(|e| {
-    //             e.as_struct()
-    //                 .or_else(|| e.as_generic_struct().map(|e| &e.struct_type))
-    //         })
-    //         .flatten()
-    // }
-
-    // fn get_generic_struct_type_by_id(&self, id: u64) -> Option<&BoundGenericStructSymbol<'a>> {
-    //     self.struct_table
-    //         .get(id as usize - type_table().len())
-    //         .map(|e| e.as_generic_struct())
-    //         .flatten()
-    // }
-
-    // fn get_generic_struct_type_by_id_mut(
-    //     &mut self,
-    //     id: u64,
-    // ) -> Option<&mut BoundGenericStructSymbol<'a>> {
-    //     self.struct_table
-    //         .get_mut(id as usize - type_table().len())
-    //         .map(|e| e.as_generic_struct_mut())
-    //         .flatten()
-    // }
-
-    // fn get_struct_by_id(&self, id: u64) -> Option<StructType> {
-    //     let mut iterator =
-    //         self.type_table
-    //             .iter()
-    //             .filter_map(|BoundVariableName { type_, .. }| {
-    //                 if let Type::Struct(it) = type_ {
-    //                     if it.id == id {
-    //                         Some(*it.clone())
-    //                     } else {
-    //                         None
-    //                     }
-    //                 } else {
-    //                     None
-    //                 }
-    //             });
-    //     let result = iterator.next();
-    //     assert!(iterator.next().is_none());
-    //     result
-    // }
-
-    // pub fn look_up_struct_id_by_name(&self, name: &str) -> Option<u64> {
-    //     self.struct_table
-    //         .iter()
-    //         .enumerate()
-    //         .find(|(_, s)| s.name() == name)
-    //         .map(|(i, _)| (i + type_table().len()) as u64)
-    // }
-
-    // pub fn rename_struct_by_id(&mut self, struct_id: u64, new_name: String) {
-    //     self.struct_table[struct_id as usize - type_table().len()].set_name(new_name.clone());
-    //     self.type_table
-    //         .iter_mut()
-    //         .find(|t| match &t.type_ {
-    //             Type::Struct(struct_type) => struct_type.id == struct_id,
-    //             // NOTE: Is there a reason to format this like it currently is?
-    //             Type::StructReference(id) if id.id == struct_id => true,
-    //             _ => false,
-    //         })
-    //         .unwrap()
-    //         .identifier = new_name.into();
-    // }
-
-    // fn convert_struct_reference_to_struct(&self, type_: Type) -> Type {
-    //     match type_ {
-    //         Type::Error
-    //         | Type::Void
-    //         | Type::Any
-    //         | Type::Integer(_)
-    //         | Type::IntegerLiteral
-    //         | Type::Boolean
-    //         | Type::None
-    //         | Type::String
-    //         | Type::Function(_)
-    //         | Type::Closure(_)
-    //         | Type::Library(_)
-    //         | Type::GenericType
-    //         | Type::Struct(_)
-    //         | Type::TypedGenericStruct(_)
-    //         | Type::Pointer
-    //         | Type::SystemCall(_)
-    //         | Type::Enum(_) => type_,
-    //         Type::Noneable(base_type) => {
-    //             Type::noneable(self.convert_struct_reference_to_struct(*base_type))
-    //         }
-    //         Type::StructReference(id) => {
-    //             debug_assert!(self.generic_structs.is_empty());
-    //             debug_assert!(self.structs.is_empty());
-    //             Type::Struct(Box::new(self.get_struct_by_id(id.id).unwrap()))
-    //         }
-    //         Type::PointerOf(base_type) => {
-    //             Type::pointer_of(self.convert_struct_reference_to_struct(*base_type))
-    //         }
-    //     }
-    // }
 
     pub fn generate_label(&mut self) -> usize {
         let result = self.label_offset;
@@ -1084,13 +729,18 @@ impl BindingState<'_> {
         struct_function_table: SimpleStructFunctionTable,
     ) -> Option<TypeId> {
         let name = name.into();
-        self.project
+        let result = self
+            .project
             .types
             .add_type(Type::StructPlaceholder(
                 name.to_owned(&self.project.source_text_collection),
                 struct_function_table,
             ))
-            .ok()
+            .ok();
+        if let Some(it) = result {
+            self.exported_structs.push(it)
+        }
+        result
     }
 
     fn register_generic_struct_name(
@@ -1099,13 +749,19 @@ impl BindingState<'_> {
         struct_function_table: SimpleStructFunctionTable,
     ) -> Option<GenericTypeId> {
         let name = name.into();
-        self.project
+        let result = self
+            .project
             .types
             .add_generic_type(GenericType::StructPlaceholder(
                 name.to_owned(&self.project.source_text_collection),
                 struct_function_table,
             ))
-            .ok()
+            .ok();
+
+        if let Some(it) = result {
+            self.exported_generic_structs.push(it)
+        }
+        result
     }
 
     fn lexeme(&self, token: SyntaxToken) -> &str {
@@ -1177,8 +833,9 @@ impl BoundProgram {
 pub struct BoundLibrary {
     pub program: BoundProgram,
     pub exported_functions: Vec<FunctionSymbol>,
-    pub exported_structs: Vec<StructSymbol>,
-    pub exported_generic_structs: Vec<GenericType>,
+    pub exported_structs: Vec<TypeId>,
+    pub exported_enums: Vec<TypeId>,
+    pub exported_generic_structs: Vec<GenericTypeId>,
 }
 
 impl BoundLibrary {
@@ -1187,6 +844,7 @@ impl BoundLibrary {
             program: BoundProgram::error(location),
             exported_functions: vec![],
             exported_structs: vec![],
+            exported_enums: vec![],
             exported_generic_structs: vec![],
         }
     }
@@ -1235,7 +893,6 @@ fn bind_with_project_parameter<'a>(
         diagnostic_bag,
         variable_table: vec![],
         generic_type: None,
-        struct_table: vec![],
         functions: vec![],
         generic_functions: vec![],
         bound_generic_functions: vec![],
@@ -1243,6 +900,9 @@ fn bind_with_project_parameter<'a>(
         label_offset: 0,
         structs: vec![],
         generic_structs: vec![],
+        exported_structs: vec![],
+        exported_enums: vec![],
+        exported_generic_structs: vec![],
         libraries: vec![],
         constants: vec![],
         safe_nodes: vec![],
@@ -1366,9 +1026,7 @@ fn bind_with_project_parameter<'a>(
         crate::debug::print_bound_node_as_code(&functions, &binder.project.types);
     }
     if debug_flags.print_struct_table {
-        for (id, entry) in binder.struct_table.iter().enumerate() {
-            println!("  {}: {}", id, entry.name);
-        }
+        unimplemented!();
     }
     if debug_flags.print_constant_table {
         print_constant_table(&binder.constants, &binder.project.source_text_collection);
@@ -1388,8 +1046,9 @@ fn bind_with_project_parameter<'a>(
             label_count: binder.label_offset,
             referenced_libraries: binder.libraries,
         },
-        exported_structs: binder.struct_table,
-        exported_generic_structs: vec![],
+        exported_structs: binder.exported_structs,
+        exported_enums: binder.exported_enums,
+        exported_generic_structs: binder.exported_generic_structs,
     }
 }
 
@@ -2232,6 +1891,7 @@ fn bind_enum_declaration<'a>(
         binder.lexeme(enum_declaration.identifier).into(),
         values.clone(),
     ));
+    binder.exported_enums.push(type_);
     binder.register_constant(
         enum_declaration.identifier.location,
         Value::EnumType(values, type_),
@@ -3830,7 +3490,7 @@ fn bind_array_index_for_assignment<'a, 'b>(
 }
 
 fn bind_field_access<'a, 'b>(
-    span: TextLocation,
+    location: TextLocation,
     field_access: FieldAccessNodeKind,
     binder: &mut BindingState<'b>,
 ) -> BoundNode {
@@ -3839,26 +3499,31 @@ fn bind_field_access<'a, 'b>(
     let base = bind_node(*field_access.base, binder);
     match binder.project.types[base.type_].clone() {
         Type::Error => base,
-        Type::Struct(_) => field_access_in_struct(field, base.type_, base, binder, span),
+        Type::Struct(_) => field_access_in_struct(field, base.type_, base, binder, location),
         Type::Library(index) => {
             let library = &binder.libraries[index];
-            let function_name = binder.lexeme(field);
-            if let Some(function) = library.look_up_function_by_name(function_name) {
+            let field_name = binder.lexeme(field);
+            if let Some(function) = library.look_up_function_by_name(field_name) {
                 BoundNode::label_reference(
-                    span,
+                    location,
                     function.function_label as _,
                     function.function_type,
                 )
+            } else if let Some(enum_type) =
+                library.look_up_enum_by_name(field_name, &binder.project.types)
+            {
+                BoundNode::field_access(location, base, 0, enum_type)
             } else {
+                dbg!(&library);
                 binder.diagnostic_bag.report_no_field_named_on_type(
-                    span,
+                    location,
                     field.location,
                     binder
                         .project
                         .types
                         .look_up_or_add_type(Type::Library(index)),
                 );
-                BoundNode::error(span)
+                BoundNode::error(location)
             }
         }
         Type::Enum(_name, values) => {
@@ -3868,15 +3533,15 @@ fn bind_field_access<'a, 'b>(
                 .find(|e| e.1 == binder.lexeme(field));
             match value {
                 Some((literal_value, _)) => {
-                    BoundNode::literal(span, Value::EnumValue(literal_value, base.type_))
+                    BoundNode::literal(location, Value::EnumValue(literal_value, base.type_))
                 }
                 None => {
                     binder.diagnostic_bag.report_no_field_named_on_type(
-                        span,
+                        location,
                         field.location,
                         base.type_,
                     );
-                    BoundNode::error(span)
+                    BoundNode::error(location)
                 }
             }
         }
@@ -3896,7 +3561,7 @@ fn bind_field_access<'a, 'b>(
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base_location, base.type_);
-            BoundNode::error(span)
+            BoundNode::error(location)
         }
         Type::String => {
             if binder.lexeme(field) == "length" {
@@ -3906,14 +3571,19 @@ fn bind_field_access<'a, 'b>(
                     .project
                     .types
                     .look_up_or_add_type(Type::closure(function_type, vec![base.type_]));
-                BoundNode::system_call_closure(span, vec![base], SystemCallKind::ArrayLength, type_)
+                BoundNode::system_call_closure(
+                    location,
+                    vec![base],
+                    SystemCallKind::ArrayLength,
+                    type_,
+                )
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(
-                    span,
+                    location,
                     field.location,
                     base.type_,
                 );
-                BoundNode::error(span)
+                BoundNode::error(location)
             }
         }
         Type::StructPlaceholder(name, ..) => unreachable!(
@@ -3964,9 +3634,10 @@ fn field_access_in_struct<'a, 'b>(
                 break match variable.kind {
                     VariableOrConstantKind::None => {
                         match binder.project.types[current_type]
-                        .as_struct_type()
-                        .unwrap()
-                        .parent {
+                            .as_struct_type()
+                            .unwrap()
+                            .parent
+                        {
                             Some(it) => {
                                 current_type = it;
                                 continue;

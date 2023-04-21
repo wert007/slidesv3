@@ -9,18 +9,20 @@ use crate::instruction_converter::{
 };
 
 use super::{
-    bound_nodes::BoundNode, typing::{TypeId, GenericTypeId, GenericType},
+    bound_nodes::BoundNode,
+    typing::{GenericTypeId, TypeId, TypeCollection},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Library {
     pub name: String,
     pub instructions: Vec<InstructionOrLabelReference>,
     pub startup: Vec<InstructionOrLabelReference>,
     pub program: Program,
     pub functions: Vec<FunctionSymbol>,
-    pub structs: Vec<StructSymbol>,
-    pub generic_structs: Vec<GenericType>,
+    pub structs: Vec<TypeId>,
+    pub enums: Vec<TypeId>,
+    pub generic_structs: Vec<GenericTypeId>,
     pub has_errors: bool,
     pub path: PathBuf,
     pub referenced_libraries: Vec<Library>,
@@ -36,6 +38,7 @@ impl Library {
             program: Program::error(),
             functions: vec![],
             structs: vec![],
+            enums: vec![],
             generic_structs: vec![],
             has_errors: true,
             path: PathBuf::new(),
@@ -67,15 +70,16 @@ impl Library {
         self.functions.iter().find(|f| f.name == name)
     }
 
+    pub fn look_up_enum_by_name(&self, name: &str, types: &TypeCollection) -> Option<TypeId> {
+        self.enums.iter().find(|e| types.name_of_type_id(**e) == name).copied()
+    }
+
     pub fn relocate_labels(&mut self, label_offset: usize) {
         if label_offset == 0 {
             return;
         }
         for function in self.functions.iter_mut() {
             function.function_label += label_offset as u64;
-        }
-        for strct in self.structs.iter_mut() {
-            strct.function_table.relocate_labels(label_offset);
         }
         for inst in self.instructions.iter_mut().chain(self.startup.iter_mut()) {
             match inst {
@@ -95,6 +99,21 @@ impl Library {
                 _ => {}
             }
         }
+    }
+}
+
+impl std::fmt::Debug for Library {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Library")
+            .field("name", &self.name)
+            .field("functions", &self.functions)
+            .field("structs", &self.structs)
+            .field("generic_structs", &self.generic_structs)
+            .field("has_errors", &self.has_errors)
+            .field("path", &self.path)
+            .field("referenced_libraries", &self.referenced_libraries)
+            .field("is_already_loaded", &self.is_already_loaded)
+            .finish()
     }
 }
 
@@ -132,12 +151,6 @@ pub struct StructSymbol {
     pub function_table: StructFunctionTable,
 }
 
-impl StructSymbol {
-    pub fn field(&self, name: &str) -> Option<&StructFieldSymbol> {
-        self.fields.iter().find(|f| f.name == name)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct GenericStructSymbol {
     pub name: String,
@@ -153,17 +166,6 @@ pub struct StructFieldSymbol {
     pub offset: u64,
     pub is_read_only: bool,
 }
-
-// impl From<BoundStructFieldSymbol> for StructFieldSymbol {
-//     fn from(it: BoundStructFieldSymbol) -> Self {
-//         Self {
-//             name: it.name.into(),
-//             type_: it.type_,
-//             offset: it.offset,
-//             is_read_only: it.is_read_only,
-//         }
-//     }
-// }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StructFunctionTable {
@@ -231,27 +233,27 @@ impl StructFunctionTable {
         result
     }
 
-    fn relocate_labels(&mut self, label_offset: usize) {
-        if label_offset == 0 {
-            return;
-        }
-        self.function_symbols_iter_mut()
-            .for_each(|f| f.function_label += label_offset as u64);
-    }
+    // fn relocate_labels(&mut self, label_offset: usize) {
+    //     if label_offset == 0 {
+    //         return;
+    //     }
+    //     self.function_symbols_iter_mut()
+    //         .for_each(|f| f.function_label += label_offset as u64);
+    // }
 
-    pub fn replace_labels(mut self, label_relocation: Vec<(u64, u64)>) -> Self {
-        let find_label = |lbl: &mut u64| {
-            *lbl = *label_relocation
-                .iter()
-                .find(|(old, _)| *old == *lbl)
-                .map(|(_, new)| new)
-                .unwrap();
-        };
-        self.function_symbols_iter_mut()
-            .for_each(|c| find_label(&mut c.function_label));
-        self.label_relocation = label_relocation;
-        self
-    }
+    // pub fn replace_labels(mut self, label_relocation: Vec<(u64, u64)>) -> Self {
+    //     let find_label = |lbl: &mut u64| {
+    //         *lbl = *label_relocation
+    //             .iter()
+    //             .find(|(old, _)| *old == *lbl)
+    //             .map(|(_, new)| new)
+    //             .unwrap();
+    //     };
+    //     self.function_symbols_iter_mut()
+    //         .for_each(|c| find_label(&mut c.function_label));
+    //     self.label_relocation = label_relocation;
+    //     self
+    // }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -291,7 +293,10 @@ pub struct GenericFunction {
 
 impl PartialEq for GenericFunction {
     fn eq(&self, other: &Self) -> bool {
-        self.function_label == other.function_label && self.function_name == other.function_name && self.function_type == other.function_type && self.labels == other.labels
+        self.function_label == other.function_label
+            && self.function_name == other.function_name
+            && self.function_type == other.function_type
+            && self.labels == other.labels
     }
 }
 

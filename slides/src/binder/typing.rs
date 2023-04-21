@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt::Display, ops::Index};
+use std::{borrow::Cow, fmt::Display, ops::{Index, IndexMut}};
 
 use num_enum::TryFromPrimitive;
 
@@ -230,6 +230,12 @@ impl<T: TypeCollectionIndex> Index<T> for TypeCollection {
 
     fn index(&self, index: T) -> &Self::Output {
         index.get_element(self)
+    }
+}
+
+impl IndexMut<TypeId> for TypeCollection {
+    fn index_mut(&mut self, index: TypeId) -> &mut Self::Output {
+        &mut self.types[index.0 as usize]
     }
 }
 
@@ -763,10 +769,6 @@ impl Type {
         } else {
             None
         }
-    }
-
-    pub fn type_identifier_size_in_words(&self) -> u64 {
-        1
     }
 
     pub fn raw_size_in_bytes(&self) -> u64 {

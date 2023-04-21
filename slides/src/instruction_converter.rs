@@ -262,6 +262,7 @@ pub fn convert_library_with_project_parameter<'a>(
     }
     let exported_functions = bound_program.exported_functions;
     let exported_structs = bound_program.exported_structs;
+    let exported_enums = bound_program.exported_enums;
     let exported_generic_structs = bound_program.exported_generic_structs;
     let mut bound_program = bound_program.program;
     let bound_node = bound_program.functions;
@@ -338,6 +339,7 @@ pub fn convert_library_with_project_parameter<'a>(
         },
         functions: exported_functions,
         structs: exported_structs,
+        enums: exported_enums,
         has_errors: false,
         is_already_loaded: false,
         generic_structs: exported_generic_structs,

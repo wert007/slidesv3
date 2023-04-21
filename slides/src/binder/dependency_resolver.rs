@@ -258,27 +258,25 @@ fn load_library_into_binder<'a>(
         lib.relocate_labels(binder.label_offset);
         binder.label_offset += lib.program.label_count;
     }
-    for strct in &lib.structs {
+    for &strct in &lib.structs {
         match &path {
             Some(empty) if empty.is_empty() => {
                 assert!(lib.name.is_empty());
-                binder.register_struct_name(strct.name.clone(), (&strct.function_table).into());
-                // binder.register_maybe_generic_struct_as(strct.name(), strct);
             }
-            Some(path) => {
-                let _old_name = format!("{}.{}", path, strct.name);
-                let _new_name = format!("{}.{}", name, strct.name);
+            Some(_path) => {
+                // let _old_name = format!("{}.{}", path, strct.name);
+                // let _new_name = format!("{}.{}", name, strct.name);
                 todo!("Libraries are not working yet.")
                 // let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
                 // binder.rename_struct_by_id(struct_id, new_name);
             }
             None => {
                 let struct_name = if lib.name.is_empty() {
-                    strct.name.to_owned()
+                    binder.project.types.name_of_type_id(strct)
                 } else {
-                    format!("{}.{}", name, strct.name)
+                    format!("{}.{}", name, binder.project.types.name_of_type_id(strct)).into()
                 };
-                binder.register_struct_name(struct_name, (&strct.function_table).into());
+                binder.project.types[strct].as_struct_type_mut().unwrap().name = struct_name.into();
             }
         }
     }
