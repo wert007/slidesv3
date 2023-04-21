@@ -94,18 +94,34 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
                     let return_value =
                         super::execute_function(state, it as usize, &[argument.clone()]);
                     match return_value {
-                        Ok(it) => {
-                            to_string_native(typeid!(Type::String), &it.unwrap(), state)
-                        }
+                        Ok(it) => to_string_native(typeid!(Type::String), &it.unwrap(), state),
                         Err(()) => {
                             println!("To string function failed!");
                             String::new()
-                        },
+                        }
                     }
                 }
                 None => {
-                    // TODO: General purpose to string
-                    format!("struct {}", struct_type.name)
+                    use std::fmt::Write;
+                    let mut result = format!("struct {} {{\n", struct_type.name);
+                    for field in struct_type.fields.clone() {
+                        let value = state
+                            .read_pointer(
+                                argument.unwrap_pointer()
+                                    + field.offset_or_address.unwrap_offset() as u64,
+                            )
+                            .clone();
+                        let value = to_string_native(field.type_, &value, state);
+                        let mut value = value.lines();
+                        write!(result, "    {} = {}", field.name, value.next().unwrap()).unwrap();
+                        for line in value {
+                            writeln!(result).unwrap();
+                            write!(result, "    {line}").unwrap();
+                        }
+                        writeln!(result, ",").unwrap();
+                    }
+                    result.push('}');
+                    result
                 }
             }
         }
