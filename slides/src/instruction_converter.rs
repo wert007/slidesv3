@@ -2,6 +2,7 @@ pub mod instruction;
 // #[cfg(test)]
 // mod tests;
 
+mod control_flow_analyzer;
 mod label_replacer;
 
 use std::path::PathBuf;
@@ -353,7 +354,8 @@ fn convert_node(
     match node.kind {
         BoundNodeKind::IfStatement(_)
         | BoundNodeKind::WhileStatement(_)
-        | BoundNodeKind::ErrorExpression => unreachable!(),
+        | BoundNodeKind::ErrorExpression
+        | BoundNodeKind::RepetitionNode(_) => unreachable!(),
         BoundNodeKind::FunctionDeclaration(function_declaration) => {
             convert_function_declaration(node.location, function_declaration, converter)
         }
@@ -361,7 +363,7 @@ fn convert_node(
             convert_literal(node.location, literal, converter)
         }
         BoundNodeKind::ArrayLiteralExpression(array_literal) => {
-            convert_array_literal(node.location, array_literal, converter)
+            convert_array_literal(node.location, node.type_, array_literal, converter)
         }
         BoundNodeKind::VariableExpression(variable) => convert_variable(node.location, variable),
         BoundNodeKind::UnaryExpression(unary) => convert_unary(node.location, unary, converter),
@@ -422,6 +424,14 @@ fn convert_function_declaration(
         result.push(Instruction::store_in_register(register, span).into());
     }
     result.append(&mut convert_node(*function_declaration.body, converter));
+    if converter.project.debug_flags.check_stack_corruption {
+        control_flow_analyzer::check_stack_usage(
+            &result,
+            &converter.project.types[function_declaration.function_type]
+                .as_function_type()
+                .unwrap(),
+        );
+    }
     result
 }
 
@@ -493,18 +503,83 @@ fn convert_string_literal(
 }
 
 fn convert_array_literal(
-    span: TextLocation,
+    location: TextLocation,
+    type_: TypeId,
     array_literal: BoundArrayLiteralNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let element_count = array_literal.children.len() as _;
+    let mut const_element_count = 0;
+    let mut variable_element_count = vec![];
     for child in array_literal.children.into_iter().rev() {
-        result.append(&mut convert_node(child, converter));
+        if let BoundNodeKind::RepetitionNode(repetition) = child.kind {
+            let mut node = convert_node(*repetition.expression, converter);
+            if let Some(count) = repetition.repetition.constant_value {
+                let count = count.value.as_integer().unwrap() as u64;
+                const_element_count += count;
+                for _ in 0..count {
+                    result.extend_from_slice(&node);
+                }
+            } else {
+                let location = repetition.repetition.location;
+                let start_label = converter.generate_label();
+                result.append(&mut convert_node(*repetition.repetition.clone(), converter));
+                result.push(Instruction::label(start_label, location).into());
+                result.push(
+                    Instruction::store_in_register(repetition.counting_variable, location).into(),
+                );
+                result.push(
+                    Instruction::load_register(repetition.counting_variable, location).into(),
+                );
+                result.push(Instruction::load_immediate(0, location).into());
+                result.push(Instruction::equals(location).into());
+                let end_label = converter.generate_label();
+                result.push(Instruction::jump_if_true(end_label as _, location).into());
+                result.append(&mut node);
+                result.push(
+                    Instruction::load_register(repetition.counting_variable, location).into(),
+                );
+                result.push(Instruction::load_immediate(1, location).into());
+                result.push(Instruction::subtraction(location).into());
+                result.push(Instruction::jump(start_label as _, location).into());
+                result.push(Instruction::label(end_label, location).into());
+                variable_element_count.push(*repetition.repetition);
+            }
+        } else {
+            const_element_count += 1;
+            result.append(&mut convert_node(child, converter));
+        }
     }
-    result.push(Instruction::write_to_heap(element_count, span).into());
-    result.push(Instruction::load_immediate(element_count, span).into());
-    result.push(Instruction::write_to_heap(2, span).into());
+    let mut element_count = vec![];
+    element_count.push(Instruction::load_immediate(const_element_count, location).into());
+    for count in variable_element_count {
+        let location = count.location;
+        element_count.append(&mut convert_node(count, converter));
+        element_count.push(Instruction::addition(location).into());
+    }
+    result.extend_from_slice(&element_count);
+    result.push(Instruction::write_to_heap_runtime(location).into());
+    result.extend_from_slice(&element_count);
+    let array_type = converter.project.types[type_]
+        .as_struct_type()
+        .unwrap()
+        .generic_base_type
+        .unwrap();
+    match converter
+        .project
+        .types
+        .name_of_generic_type_id(array_type)
+        .as_ref()
+    {
+        "List" => {
+            result.append(&mut element_count);
+            result.push(Instruction::write_to_heap(3, location).into());
+        }
+        "Array" => {
+            result.push(Instruction::write_to_heap(2, location).into());
+        }
+        err => unreachable!("Unknown type for array literal {err}!"),
+    }
     result
 }
 
@@ -653,24 +728,31 @@ fn convert_function_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = vec![];
-    let argument_count = function_call.arguments.len()
-        + if function_call.has_this_argument {
-            1
-        } else {
-            0
-        };
+    let argument_count = function_call.arguments.len();
     for argument in function_call.arguments {
         result.append(&mut convert_node(argument, converter));
     }
-    let closure_included_arguments = 
-    converter.project.types[function_call.base.type_].as_closure_type().map(|c| c.included_arguments.len());
+    let closure_included_arguments = converter.project.types[function_call.base.type_]
+        .as_closure_type()
+        .map(|c| c.included_arguments.len());
     result.append(&mut convert_node(*function_call.base, converter));
-    if let Some(extra_arguments) = closure_included_arguments {
-        result.push(Instruction::decode_closure((extra_arguments + argument_count) as _, true, location).into());
+    let argument_count = if let Some(extra_arguments) = closure_included_arguments {
+        let argument_count = (extra_arguments + argument_count) as _;
+        result.push(Instruction::decode_closure(argument_count, true, location).into());
+        argument_count
     } else {
-        result.push(Instruction::load_immediate(argument_count as _, location).into());
-    }
-    result.push(Instruction::function_call(location).into());
+        let argument_count = (argument_count
+            + if function_call.has_this_argument {
+                1
+            } else {
+                0
+            }) as _;
+        result.push(Instruction::load_immediate(argument_count, location).into());
+        argument_count
+    };
+    result.push(
+        Instruction::function_call(location, argument_count, function_call.returns_value).into(),
+    );
     result
 }
 
@@ -698,7 +780,9 @@ fn convert_constructor_call(
                 .into(),
             );
             result.push(Instruction::load_immediate(argument_count + 1, span).into());
-            result.push(Instruction::function_call(span).into());
+            // Technically the constructor does not return the value, it only
+            // changes a value that already exists. So it has no return value.
+            result.push(Instruction::function_call(span, argument_count + 1, false).into());
         }
         None => {
             for argument in constructor_call.arguments.into_iter().rev() {
@@ -722,7 +806,8 @@ fn convert_system_call(
         | SystemCallKind::RuntimeError
         | SystemCallKind::Reallocate
         | SystemCallKind::AddressOf
-        | SystemCallKind::GarbageCollect => {
+        | SystemCallKind::GarbageCollect
+        | SystemCallKind::Hash => {
             let mut result = vec![];
             let argument_count = match system_call.base {
                 SystemCallKind::GarbageCollect => 0,
@@ -731,7 +816,8 @@ fn convert_system_call(
                 | SystemCallKind::ArrayLength
                 | SystemCallKind::HeapDump
                 | SystemCallKind::RuntimeError
-                | SystemCallKind::AddressOf => 1,
+                | SystemCallKind::AddressOf
+                | SystemCallKind::Hash => 1,
                 SystemCallKind::Reallocate => 2,
                 SystemCallKind::Break => unreachable!(),
             };
@@ -842,6 +928,8 @@ fn convert_closure(
             );
         }
         FunctionKind::VtableIndex(vtable_index) => {
+            // Create copy for function pointer and actual pointer to struct.
+            result.push(Instruction::duplicate(location).into());
             // Read function pointer
             result.push(Instruction::read_word_with_offset(0, location).into());
             result.push(

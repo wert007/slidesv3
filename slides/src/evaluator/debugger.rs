@@ -41,7 +41,7 @@ pub fn create_session(state: &mut EvaluatorState) {
     println!(
         "{:5X}: {}",
         state.pc,
-        crate::debug::instruction_to_string(current_instruction, reg_name)
+        crate::debug::instruction_to_string(current_instruction, false, reg_name)
     );
     let mut line = String::new();
     loop {
@@ -162,7 +162,7 @@ fn _print_heap_at(heap: &memory::allocator::Allocator, address: usize) {
     }
 }
 
-fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
+pub fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
     println!("{} Entries in stack:", stack.len() - skip);
     for i in skip..stack.len() {
         let entry = stack.read_flagged_word(i as u64 * memory::WORD_SIZE_IN_BYTES);

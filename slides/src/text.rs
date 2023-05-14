@@ -3,6 +3,12 @@ use std::ops::Index;
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SourceTextId(usize);
 
+impl SourceTextId {
+    pub fn as_raw(self) -> usize {
+        self.0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SourceTextCollection {
     texts: Vec<SourceText>,

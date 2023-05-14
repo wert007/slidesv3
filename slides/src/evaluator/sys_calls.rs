@@ -65,7 +65,7 @@ fn decode_type(address: &FlaggedWord, state: &mut EvaluatorState) -> TypeId {
 fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
     match &state.project.types[type_] {
         Type::Library(_)
-        | Type::GenericType
+        | Type::GenericType(_)
         | Type::IntegerLiteral
         | Type::StructPlaceholder(..) => unreachable!("{:#?}", &state.project.types[type_]),
         Type::Error => todo!(),
@@ -212,10 +212,73 @@ pub fn reallocate(pointer: &FlaggedWord, size: &FlaggedWord, state: &mut Evaluat
 pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let argument = string_to_string_native(argument, state);
     let argument = argument.replace('\0', "");
-    println!("Runtime error happened: {}", argument);
+    println!(
+        "Runtime error happened in {}: {}",
+        state.instructions[state.pc]
+            .location
+            .display(&state.project.source_text_collection),
+        argument
+    );
     state.runtime_error_happened = true;
 }
 
 pub fn address_of(argument: &FlaggedWord, state: &mut EvaluatorState) {
     state.stack.push(argument.value);
+}
+
+pub fn hash(argument: &FlaggedWord, state: &mut EvaluatorState) {
+    let hash = hash_value(argument, typeid!(Type::Any), state);
+    state.stack.push(hash);
+}
+
+fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState) -> u64 {
+    match &state.project.types[type_] {
+        Type::Error
+        | Type::Void
+        | Type::IntegerLiteral
+        | Type::Library(_)
+        | Type::GenericType(_)
+        | Type::StructPlaceholder(_, _) => unreachable!(),
+        Type::Any => {
+            let type_ = decode_type(argument, state);
+            let argument = state
+                .read_pointer(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES)
+                .clone();
+            hash_value(&argument, type_, state)
+        }
+        Type::Integer(_) | Type::Boolean | Type::None | Type::Enum(_, _) | Type::SystemCall(_) => {
+            argument.unwrap_value()
+        }
+        Type::Noneable(_) => todo!(),
+        Type::String => {
+            let ptr = argument.unwrap_pointer();
+            let length = state.read_pointer(ptr).unwrap_value();
+            hash_array(length, ptr + WORD_SIZE_IN_BYTES, state)
+        }
+        Type::Function(_) => todo!(),
+        Type::Closure(_) => todo!(),
+        Type::Struct(s) => hash_array(
+            s.size_in_bytes,
+            argument.unwrap_pointer(),
+            state,
+        ),
+        Type::Pointer => argument.unwrap_value(),
+        Type::PointerOf(type_) => {
+            let argument = state.read_pointer(argument.unwrap_pointer()).clone();
+            hash_value(&argument, *type_, state)
+        }
+    }
+}
+
+fn hash_array(length: u64, pointer: u64, state: &mut EvaluatorState) -> u64 {
+    let mut hash = 5381;
+    for i in 0..length / WORD_SIZE_IN_BYTES {
+        hash = ((hash << 5) + hash) + state.read_pointer(pointer + i * WORD_SIZE_IN_BYTES).value;
+    }
+    let too_many_bits = length % WORD_SIZE_IN_BYTES;
+    hash = ((hash << 5) + hash)
+        + (state
+            .read_pointer(pointer + bytes_to_word(length) * WORD_SIZE_IN_BYTES).value
+            & ((1 << too_many_bits) - 1));
+    hash
 }

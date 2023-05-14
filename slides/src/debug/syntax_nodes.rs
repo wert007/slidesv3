@@ -378,14 +378,18 @@ fn print_syntax_node_struct_declaration_as_code_with_indent(
     buffer: &mut String,
 ) -> std::fmt::Result {
     printer.output_indentation(buffer);
-    if struct_declaration.optional_generic_keyword.is_some() {
-        write!(buffer, "generic ")?;
-    }
     write!(
         buffer,
         "struct {}",
         &source_text_collection[struct_declaration.identifier.location]
     )?;
+    if !struct_declaration.generic_parameters.is_empty() {
+        write!(buffer, "<")?;
+        for p in &struct_declaration.generic_parameters {
+            write!(buffer, "{}, ", &source_text_collection[p.location])?;
+        }
+        write!(buffer, ">")?;
+    }
     if let Some(parent) = &struct_declaration.optional_parent {
         write!(buffer, " < {}", &source_text_collection[parent.location])?;
     }

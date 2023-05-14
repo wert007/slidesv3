@@ -1,6 +1,9 @@
-use crate::binder::{bound_nodes::*, typing::{TypeCollection, TypeId}};
-
 use super::DebugPrinter;
+use crate::binder::{
+    bound_nodes::*,
+    typing::{TypeCollection, TypeId},
+};
+use std::fmt::Write;
 
 pub fn print_bound_node_as_code(node: &BoundNode, types: &TypeCollection) {
     let mut buffer = String::new();
@@ -83,6 +86,9 @@ fn print_bound_node_as_code_with_indent(
         BoundNodeKind::Conversion(conversion) => {
             print_bound_node_conversion_as_code(conversion, types, printer, buffer)
         }
+        BoundNodeKind::RepetitionNode(repetition_node) => {
+            print_bound_node_repetition_node_as_code(repetition_node, types, printer, buffer)
+        }
         BoundNodeKind::BlockStatement(block_statement) => {
             print_bound_node_block_statement_as_code(block_statement, types, printer, buffer)
         }
@@ -125,11 +131,12 @@ fn print_bound_node_function_declaration_as_code(
     buffer: &mut String,
 ) {
     if function_declaration.is_main {
-        buffer.push_str("fn main() ");
+        buffer.push_str("func main() ");
     } else {
-        buffer.push_str(&format!("fn f{}(...) -> ... ", function_declaration.label));
+        write!(buffer, "{} ", types.name_of_type_id(function_declaration.function_type)).unwrap();
     }
     print_bound_node_as_code_with_indent(&function_declaration.body, types, printer, buffer);
+    writeln!(buffer).unwrap();
 }
 
 fn print_bound_node_error_expression_as_code(
@@ -160,11 +167,11 @@ fn print_bound_node_label_reference_as_code(
 
 fn print_bound_node_literal_expression_as_code(
     literal_expression: &BoundLiteralNodeKind,
-    _: &TypeCollection,
+    types: &TypeCollection,
     _: DebugPrinter,
     buffer: &mut String,
 ) {
-    buffer.push_str(&format!("{}", literal_expression.value));
+    buffer.push_str(&literal_expression.value.display(types));
 }
 
 fn print_bound_node_array_literal_expression_as_code(
@@ -206,7 +213,11 @@ fn print_bound_node_variable_expression_as_code(
     _: DebugPrinter,
     buffer: &mut String,
 ) {
-    buffer.push_str(&format!("r#{}:{}", variable_expression.variable_index, types.name_of_type_id(type_)));
+    buffer.push_str(&format!(
+        "r#{}:{}",
+        variable_expression.variable_index,
+        types.name_of_type_id(type_)
+    ));
 }
 
 fn print_bound_node_unary_expression_as_code(
@@ -313,6 +324,12 @@ fn print_bound_node_conversion_as_code(
     buffer.push_str(&types.name_of_type_id(closure.type_));
 }
 
+fn print_bound_node_repetition_node_as_code(repetition_node: &BoundRepetitionNodeKind, types: &TypeCollection, printer: DebugPrinter, buffer: &mut String) {
+    print_bound_node_as_code_with_indent(&repetition_node.expression, types, printer, buffer);
+    write!(buffer, "; ").unwrap();
+    print_bound_node_as_code_with_indent(&repetition_node.repetition, types, printer, buffer);
+}
+
 fn print_bound_node_block_statement_as_code(
     block_statement: &BoundBlockStatementNodeKind,
     types: &TypeCollection,
@@ -415,7 +432,8 @@ fn print_bound_node_jump_as_code(
     if let Some(condition) = &jump.condition {
         buffer.push_str("jump if ");
         print_bound_node_as_code_with_indent(condition, types, printer, buffer);
-        buffer.push_str(&format!(" is {} to  ", jump.jump_if_true));
+        printer.output_indentation(buffer);
+        buffer.push_str(&format!("is {} to ", jump.jump_if_true));
     } else {
         buffer.push_str("jump to ");
     }

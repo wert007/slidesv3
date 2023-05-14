@@ -24,6 +24,7 @@ fn main() -> Result<(), std::io::Error> {
         print_stack: matches.is_present("print-stack"),
         print_type_table: matches.is_present("print-type-table"),
         output_basic_blocks_to_dot: matches.is_present("output-basic-blocks-to-dot"),
+        check_stack_corruption: matches.is_present("check-stack-corruption"),
         output_instructions_to_sldasm: matches.is_present("output-instructions-to-sldasm"),
         output_instructions_and_labels_to_sldasm: matches
             .is_present("output-instructions-and-labels-to-sldasm"),

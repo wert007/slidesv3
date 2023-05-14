@@ -190,6 +190,17 @@ impl StructFunctionTable {
         }
     }
 
+    pub fn get(&self, kind: StructFunctionKind) -> Option<&FunctionSymbol> {
+        match kind {
+            StructFunctionKind::Constructor => self.constructor_function.as_ref(),
+            StructFunctionKind::ToString => self.to_string_function.as_ref(),
+            StructFunctionKind::Get => self.get_function.as_ref(),
+            StructFunctionKind::Set => self.set_function.as_ref(),
+            StructFunctionKind::ElementCount => self.element_count_function.as_ref(),
+            StructFunctionKind::Equals => self.equals_function.as_ref(),
+        }
+    }
+
     pub fn function_symbols_iter_mut(&mut self) -> impl Iterator<Item = &mut FunctionSymbol> {
         self.constructor_function
             .iter_mut()

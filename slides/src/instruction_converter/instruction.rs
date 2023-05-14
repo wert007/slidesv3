@@ -99,13 +99,23 @@ impl Instruction {
         }
     }
 
-    pub const fn write_to_heap(word_count: u64, location: TextLocation) -> Self {
+    pub fn write_to_heap(word_count: u64, location: TextLocation) -> Self {
+        assert_ne!(word_count, 0);
         Self {
             op_code: OpCode::WriteToHeap,
             arg: word_count,
             location,
         }
     }
+
+    pub const fn write_to_heap_runtime(location: TextLocation) -> Self {
+        Self {
+            op_code: OpCode::WriteToHeap,
+            arg: 0,
+            location,
+        }
+    }
+
     pub const fn allocate(size_in_bytes: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Allocate,
@@ -353,10 +363,11 @@ impl Instruction {
         }
     }
 
-    pub const fn function_call(location: TextLocation) -> Self {
+    pub const fn function_call(location: TextLocation, argument_count: u64, returns_value: bool) -> Self {
+        let arg = argument_count << 1 | if returns_value { 1 } else { 0 };
         Self {
             op_code: OpCode::FunctionCall,
-            arg: 0,
+            arg,
             location,
         }
     }

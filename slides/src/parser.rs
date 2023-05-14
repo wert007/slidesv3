@@ -183,12 +183,11 @@ fn parse_function_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
 }
 
 fn parse_struct_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
-    // TODO: Make order of generic and abstract irrelevant.
-    let optional_generic_keyword = if parser.peek_token().kind == SyntaxTokenKind::GenericKeyword {
-        Some(parser.match_token(SyntaxTokenKind::GenericKeyword))
-    } else {
-        None
-    };
+    // let optional_generic_keyword = if parser.peek_token().kind == SyntaxTokenKind::GenericKeyword {
+    //     Some(parser.match_token(SyntaxTokenKind::GenericKeyword))
+    // } else {
+    //     None
+    // };
     let optional_abstract_keyword = if parser.peek_token().kind == SyntaxTokenKind::AbstractKeyword
     {
         Some(parser.match_token(SyntaxTokenKind::AbstractKeyword))
@@ -197,19 +196,44 @@ fn parse_struct_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     };
     let struct_keyword = parser.match_token(SyntaxTokenKind::StructKeyword);
     let identifier = parser.match_token(SyntaxTokenKind::Identifier);
+    let generic_parameters = if parser.peek_token().kind == SyntaxTokenKind::LessThan {
+        let _less_than = parser.next_token();
+        let mut parameters = vec![];
+        while !matches!(
+            parser.peek_token().kind,
+            SyntaxTokenKind::GreaterThan | SyntaxTokenKind::Eoi
+        ) {
+            let token_count = parser.token_count();
+            if !parameters.is_empty() {
+                if parser.peek_token().kind == SyntaxTokenKind::Comma {
+                    parser.next_token();
+                } else {
+                    break;
+                }
+            }
+            parameters.push(parser.match_token(SyntaxTokenKind::Identifier));
+            if parser.token_count() == token_count {
+                parser.next_token();
+            }
+        }
+        let _greater_than = parser.match_token(SyntaxTokenKind::GreaterThan);
+        parameters
+    } else {
+        vec![]
+    };
     let parent = if parser.peek_token().kind == SyntaxTokenKind::Colon {
         let _colon = parser.next_token();
         Some(parser.match_token(SyntaxTokenKind::Identifier))
     } else {
         None
     };
-    let body = parse_struct_body(optional_generic_keyword.is_some(), parser);
+    let body = parse_struct_body(!generic_parameters.is_empty(), parser);
 
     SyntaxNode::struct_declaration(
-        optional_generic_keyword,
         optional_abstract_keyword,
         struct_keyword,
         identifier,
+        generic_parameters,
         parent,
         body,
     )
@@ -347,11 +371,26 @@ fn parse_type(parser: &mut Parser<'_, '_>) -> TypeNode {
     };
     let generic_type_qualifier = if parser.peek_token().kind == SyntaxTokenKind::LessThan {
         parser.next_token();
-        let generic_type_qualifier = parse_type(parser);
+        let mut result = Vec::new();
+        while parser.peek_token().kind != SyntaxTokenKind::GreaterThan && parser.peek_token().kind != SyntaxTokenKind::Eoi {
+            let token_count = parser.token_count();
+
+            result.push(parse_type(parser));
+
+            if parser.peek_token().kind != SyntaxTokenKind::Comma {
+                break;
+            }
+
+            parser.match_token(SyntaxTokenKind::Comma);
+
+            if parser.token_count() == token_count {
+                parser.next_token();
+            }
+        }
         parser.match_token(SyntaxTokenKind::GreaterThan);
-        Some(generic_type_qualifier)
+        result
     } else {
-        None
+        Vec::new()
     };
     let optional_question_mark = if parser.peek_token().kind == SyntaxTokenKind::QuestionMark {
         Some(parser.next_token())
@@ -625,7 +664,7 @@ fn parse_primary(parser: &mut Parser<'_, '_>) -> SyntaxNode {
             let rparen = parser.match_token(SyntaxTokenKind::RParen);
             SyntaxNode::parenthesized(lparen, expression, rparen)
         }
-        SyntaxTokenKind::LBracket => parse_array_literal(parser),
+        SyntaxTokenKind::ListKeyword | SyntaxTokenKind::LBracket => parse_array_literal(parser),
         SyntaxTokenKind::NumberLiteral => parse_number_literal(parser),
         SyntaxTokenKind::StringLiteral => parse_string_literal(parser),
         SyntaxTokenKind::TrueKeyword | SyntaxTokenKind::FalseKeyword => {
@@ -648,6 +687,11 @@ fn parse_primary(parser: &mut Parser<'_, '_>) -> SyntaxNode {
 }
 
 fn parse_array_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {
+    let optional_array_list_keyword = if parser.peek_token().kind == SyntaxTokenKind::ListKeyword {
+        Some(parser.next_token())
+    } else {
+        None
+    };
     let lbracket = parser.match_token(SyntaxTokenKind::LBracket);
     let mut children = vec![];
     let mut comma_tokens = vec![];
@@ -672,14 +716,13 @@ fn parse_array_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {
         }
     }
     let rbracket = parser.match_token(SyntaxTokenKind::RBracket);
-    if children.is_empty() {
-        let location = TextLocation::bounds(lbracket.location, rbracket.location);
-        parser.diagnostic_bag.report_not_supported(
-            location,
-            "Empty Array literals (`[]`) are not supported currently.",
-        );
-    }
-    SyntaxNode::array_literal(lbracket, children, comma_tokens, rbracket)
+    SyntaxNode::array_literal(
+        optional_array_list_keyword,
+        lbracket,
+        children,
+        comma_tokens,
+        rbracket,
+    )
 }
 
 fn parse_number_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {

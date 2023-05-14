@@ -1,70 +1,74 @@
-name: Slides
-version: "0.1"
-author: Pablo H.
+---
 about: Compiles and runs .sld files to create awesome presentations!
 args:
-    - FILE:
-        help: Sets the input file to use
-        required: true
-        index: 1
-    - print-instructions:
-        long: di
-        help: Prints generated instructions before running and at runtime
-    - print-runtime-instructions:
-        long: drti
-        help: Prints generated instructions at runtime
-    - print-instructions-and-labels:
-        long: dil
-        help: Prints generated instructions with labels before running
-    - print-tokens:
-        long: dt
-        help: Prints the tokens, the lexer found
-    - print-bound-variable-table:
-        long: dbvt
-        help: Prints the variable names and the registers, to which they assign
-    - print-bound-constant-table:
-        long: dbct
-        help: Prints the constant names and their values
-    - print-bound-struct-table:
-        long: dbst
-        help: Prints the struct names and the type indices, to which they belong
-    - print-bound-program:
-        long: dbp
-        help: Prints the bound representation of the programs source code
-    - print-syntax-program:
-        long: dsp
-        help: Prints the parsed representation of the programs source code
-    - print-labels:
-        long: dlbl
-        help: Prints the labels and their addresses
-    - print-heap-memory-as-string:
-        long: dheap
-        help: Prints the heap as a string, whenever it changes
-    - print-static-memory-as-string:
-        long: dstaticmem
-        help: Prints the static memory as a string
-    - print-stack:
-        long: dstack
-        help: Prints the stack, whenever it changes
-    - print-type-table:
-        long: dptt
-        help: Prints the type table
-    - output-basic-blocks-to-dot:
-        long: dbb
-        help: Writes the basic blocks of each function to debug-out/FUNCTION_NAME.dot
-    - output-instructions-to-sldasm:
-        long: -dasm
-        help: Write the instructions of the source file to debug-out/SOURCE_FILE_NAME.sldasm
-    - output-instructions-and-labels-to-sldasm:
-        long: -dasml
-        help: Write the instructions and labels of the source file to debug-out/SOURCE_FILE_NAME.sldasm
-    - no-run:
-        long: no-run
-        help: Only compiles a program, but does not run it
-    # Give slow a parameter to change the wait time.
-    - slow:
-        long: slow
-        help: Waits half a second between each instruction
-    - debugger:
-        long: debugger
-        help: Starts the debugger, if a program had a runtime error
+  - FILE:
+      help: Sets the input file to use
+      index: 1
+      required: true
+  - print-instructions:
+      help: Prints generated instructions before running and at runtime
+      long: di
+  - print-runtime-instructions:
+      help: Prints generated instructions at runtime
+      long: drti
+  - print-instructions-and-labels:
+      help: Prints generated instructions with labels before running
+      long: dil
+  - print-tokens:
+      help: Prints the tokens, the lexer found
+      long: dt
+  - print-bound-variable-table:
+      help: Prints the variable names and the registers, to which they assign
+      long: dbvt
+  - print-bound-constant-table:
+      help: Prints the constant names and their values
+      long: dbct
+  - print-bound-struct-table:
+      help: Prints the struct names and the type indices, to which they belong
+      long: dbst
+  - print-bound-program:
+      help: Prints the bound representation of the programs source code
+      long: dbp
+  - print-syntax-program:
+      help: Prints the parsed representation of the programs source code
+      long: dsp
+  - print-labels:
+      help: Prints the labels and their addresses
+      long: dlbl
+  - print-heap-memory-as-string:
+      help: Prints the heap as a string, whenever it changes
+      long: dheap
+  - print-static-memory-as-string:
+      help: Prints the static memory as a string
+      long: dstaticmem
+  - print-stack:
+      help: Prints the stack, whenever it changes
+      long: dstack
+  - print-type-table:
+      help: Prints the type table
+      long: dptt
+  - output-basic-blocks-to-dot:
+      help: Writes the basic blocks of each function to debug-out/FUNCTION_NAME.dot
+      long: dbb
+  - check-stack-corruption:
+      help: Writes every function as basic block diagram (see --dbb), but does this with instructions and makes sure the stack does not get corrupted.
+      long: dsc
+  - output-instructions-to-sldasm:
+      help: Write the instructions of the source file to debug-out/SOURCE_FILE_NAME.sldasm
+      long: '-dasm'
+  - output-instructions-and-labels-to-sldasm:
+      help: Write the instructions and labels of the source file to debug-out/SOURCE_FILE_NAME.sldasm
+      long: '-dasml'
+  - no-run:
+      help: Only compiles a program, but does not run it
+      long: no-run
+      # Give slow a parameter to change the wait time.
+  - slow:
+      help: Waits half a second between each instruction
+      long: slow
+  - debugger:
+      help: Starts the debugger, if a program had a runtime error
+      long: debugger
+author: Pablo H.
+name: Slides
+version: '0.1'

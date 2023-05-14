@@ -1,4 +1,6 @@
-use crate::binder::typing::{SystemCallKind, TypeId};
+use std::borrow::Cow;
+
+use crate::binder::typing::{SystemCallKind, TypeId, TypeCollection};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -54,6 +56,19 @@ impl Value {
             Value::None => typeid!(Type::None),
             Value::SystemCall(kind) => typeid!(Type::SystemCall(kind)),
             Value::LabelPointer(_, it) | Value::EnumType(_, it) | Value::EnumValue(_, it) => *it,
+        }
+    }
+
+    pub(crate) fn display(&self, types: &TypeCollection) -> Cow<str> {
+        match self {
+            Value::None => "none".into(),
+            Value::Integer(it) => it.to_string().into(),
+            Value::Boolean(it) => it.to_string().into(),
+            Value::SystemCall(it) => it.to_string().into(),
+            Value::String(it) => format!("'{it}'").into(),
+            Value::LabelPointer(label, type_) => format!("L{:X} : {}", label, types.name_of_type_id(*type_)).into(),
+            Value::EnumType(_, t) => types.name_of_type_id(*t).to_string().into(),
+            Value::EnumValue(v, t) => format!("{}.value{v}", types.name_of_type_id(*t)).into(),
         }
     }
 }

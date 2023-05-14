@@ -92,10 +92,7 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     pub(self) fn runtime(message: Message, location: TextLocation) -> Self {
-        Self {
-            message,
-            location,
-        }
+        Self { message, location }
     }
 
     pub fn into_string(
@@ -112,7 +109,7 @@ impl Diagnostic {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DiagnosticBag {
     pub diagnostics: Vec<Diagnostic>,
     pub registered_types: TypeCollection,
@@ -407,8 +404,16 @@ impl DiagnosticBag {
         self.report(message.into(), span);
     }
 
-    pub fn report_unknown_type(&mut self, location: TextLocation, type_name: impl Into<Message>) {
-        let message = message_format!("Unknown type ", type_name, " found.");
+    pub fn report_unknown_type(&mut self, location: TextLocation, type_name: &str) {
+        let message = if type_name.starts_with('$') {
+            message_format!(
+                "Unknown type ",
+                type_name,
+                " found. It seems like you want to use a generic type. Add it in <brackets>."
+            )
+        } else {
+            message_format!("Unknown type ", type_name, " found.")
+        };
         self.report(message, location);
     }
 
@@ -588,17 +593,28 @@ impl DiagnosticBag {
         &mut self,
         location: TextLocation,
         struct_name: SourceCow,
+        type_name: SourceCow,
     ) {
         let message = message_format!(
             "Declared struct ",
             struct_name,
-            " as generic, but no $Type was used. Maybe you forgot it?"
+            " as generic, but generic type $",
+            type_name,
+            " was not used. Maybe you forgot it?"
         );
         self.report(message, location);
     }
 
-    pub fn report_underspecified_generic_struct(&mut self, location: TextLocation, struct_name: impl Into<Message>) {
-        let message = message_format!("Struct ", struct_name, " is a generic struct, but its generic type is undeclared.");
+    pub fn report_underspecified_generic_struct(
+        &mut self,
+        location: TextLocation,
+        struct_name: impl Into<Message>,
+    ) {
+        let message = message_format!(
+            "Struct ",
+            struct_name,
+            " is a generic struct, but its generic type is undeclared."
+        );
         self.report(message, location);
     }
 
@@ -640,5 +656,13 @@ impl DiagnosticBag {
     pub fn division_by_zero(&mut self, span: TextLocation) {
         let message = "Divison by Zero.".into();
         self.report_runtime(message, span);
+    }
+}
+
+impl std::fmt::Debug for DiagnosticBag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DiagnosticBag")
+            .field("diagnostics", &self.diagnostics)
+            .finish()
     }
 }

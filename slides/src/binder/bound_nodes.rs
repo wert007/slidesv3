@@ -162,6 +162,7 @@ impl BoundNode {
                 base: Box::new(base),
                 arguments,
                 has_this_argument,
+                returns_value: type_ != typeid!(Type::Void),
             }),
             type_,
             constant_value: None,
@@ -226,7 +227,6 @@ impl BoundNode {
             constant_value: None,
         }
     }
-
 
     pub fn closure_label(
         span: TextLocation,
@@ -522,6 +522,7 @@ impl BoundNode {
         body: BoundNode,
         parameters: Vec<u64>,
         base_register: Option<u64>,
+        function_type: TypeId,
     ) -> Self {
         Self {
             location: body.location,
@@ -531,6 +532,7 @@ impl BoundNode {
                 body: Box::new(body),
                 parameters,
                 base_register,
+                function_type,
             }),
             type_: typeid!(Type::Void),
             constant_value: None,
@@ -609,6 +611,24 @@ impl BoundNode {
             constant_value: None,
         }
     }
+
+    pub(crate) fn repetition_node(
+        location: TextLocation,
+        counting_variable: u64,
+        expression: BoundNode,
+        repetition: BoundNode,
+    ) -> BoundNode {
+        Self {
+            location,
+            type_: expression.type_,
+            kind: BoundNodeKind::RepetitionNode(BoundRepetitionNodeKind {
+                counting_variable,
+                expression: Box::new(expression),
+                repetition: Box::new(repetition),
+            }),
+            constant_value: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -620,6 +640,10 @@ pub enum BoundNodeKind {
     Label(usize),
     LabelReference(usize),
     Jump(BoundJumpNodeKind),
+
+    // Trivia
+    RepetitionNode(BoundRepetitionNodeKind),
+
     // Expressions
     LiteralExpression(BoundLiteralNodeKind),
     ArrayLiteralExpression(BoundArrayLiteralNodeKind),
@@ -671,6 +695,7 @@ impl BoundNodeKind {
             BoundNodeKind::Assignment(base) => base.for_each_child_mut(function),
             BoundNodeKind::ExpressionStatement(base) => base.for_each_child_mut(function),
             BoundNodeKind::ReturnStatement(base) => base.for_each_child_mut(function),
+            BoundNodeKind::RepetitionNode(base) => base.for_each_child_mut(function),
         }
     }
 }
@@ -682,6 +707,7 @@ pub struct BoundFunctionDeclarationNodeKind {
     pub body: Box<BoundNode>,
     pub parameters: Vec<u64>,
     pub base_register: Option<u64>,
+    pub function_type: TypeId,
 }
 
 impl BoundFunctionDeclarationNodeKind {
@@ -706,6 +732,21 @@ impl BoundJumpNodeKind {
         }
         function(&mut self.target);
         self.target.for_each_child_mut(function);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundRepetitionNodeKind {
+    pub counting_variable: u64,
+    pub expression: Box<BoundNode>,
+    pub repetition: Box<BoundNode>,
+}
+impl BoundRepetitionNodeKind {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
+        function(&mut self.expression);
+        self.expression.for_each_child_mut(function);
+        function(&mut self.repetition);
+        self.repetition.for_each_child_mut(function);
     }
 }
 
@@ -783,6 +824,7 @@ pub struct BoundFunctionCallNodeKind {
     pub base: Box<BoundNode>,
     pub arguments: Vec<BoundNode>,
     pub has_this_argument: bool,
+    pub returns_value: bool,
 }
 
 impl BoundFunctionCallNodeKind {

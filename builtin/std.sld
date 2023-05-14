@@ -135,7 +135,7 @@ func stepBy(range: Range, stepSize: int) -> Range {
     return result;
 }
 
-generic struct Array {
+struct Array<Type> {
     length: uint;
     buffer: &$Type;
 
@@ -231,7 +231,7 @@ func toHex(value: uint) -> string {
     return '0x' + result;
 }
 
-generic struct List {
+struct List<Type> {
     capacity: uint;
     length: uint;
     buffer: &$Type;
@@ -312,6 +312,18 @@ generic struct List {
 
     func length() -> uint {
         return this.length;
+    }
+
+    func clone() -> List<$Type> {
+        let buffer: &$Type = reallocate(none, this.capacity * 8);
+        for i in 0..this.length {
+            buffer[i] = this.buffer[i];
+        }
+        let result: List<$Type> = new List();
+        result.capacity = this.capacity;
+        result.length = this.length;
+        result.buffer = buffer;
+        return result;
     }
 
     // func $cast() -> Array<$Type> {

@@ -82,15 +82,15 @@ impl SyntaxNode {
     }
 
     pub fn struct_declaration(
-        optional_generic_keyword: Option<SyntaxToken>,
         optional_abstract_keyword: Option<SyntaxToken>,
         struct_keyword: SyntaxToken,
         identifier: SyntaxToken,
+        generic_parameters: Vec<SyntaxToken>,
         optional_parent: Option<SyntaxToken>,
         body: StructBodyNode,
     ) -> Self {
         let span = TextLocation::bounds(
-            optional_generic_keyword
+            optional_abstract_keyword
                 .as_ref()
                 .unwrap_or(&struct_keyword)
                 .location,
@@ -99,10 +99,10 @@ impl SyntaxNode {
         Self {
             location: span,
             kind: SyntaxNodeKind::StructDeclaration(StructDeclarationNodeKind {
-                optional_generic_keyword,
                 optional_abstract_keyword,
                 struct_keyword,
                 identifier,
+                generic_parameters,
                 optional_parent,
                 body: Box::new(body),
             }),
@@ -151,7 +151,11 @@ impl SyntaxNode {
                     Ok(value) => (value as i64).into(),
                     // TODO: Someday ParseIntError::kind() might allow to differentiate more
                     Err(_) => {
-                        diagnostic_bag.report_bad_integer(token.location.span.start(), token.location.source_text, lexeme);
+                        diagnostic_bag.report_bad_integer(
+                            token.location.span.start(),
+                            token.location.source_text,
+                            lexeme,
+                        );
                         Value::None
                     }
                 }
@@ -194,15 +198,22 @@ impl SyntaxNode {
     }
 
     pub fn array_literal(
+        optional_array_list_keyword: Option<SyntaxToken>,
         lbracket: SyntaxToken,
         children: Vec<SyntaxNode>,
         comma_tokens: Vec<SyntaxToken>,
         rbracket: SyntaxToken,
     ) -> Self {
-        let span = TextLocation::bounds(lbracket.location, rbracket.location);
+        let span = TextLocation::bounds(
+            optional_array_list_keyword
+                .map(|t| t.location)
+                .unwrap_or(lbracket.location),
+            rbracket.location,
+        );
         Self {
             location: span,
             kind: SyntaxNodeKind::ArrayLiteral(ArrayLiteralNodeKind {
+                optional_array_list_keyword,
                 lbracket,
                 children,
                 comma_tokens,
@@ -638,10 +649,10 @@ impl FunctionTypeNode {
 
 #[derive(Debug, Clone)]
 pub struct StructDeclarationNodeKind {
-    pub optional_generic_keyword: Option<SyntaxToken>,
     pub optional_abstract_keyword: Option<SyntaxToken>,
     pub struct_keyword: SyntaxToken,
     pub identifier: SyntaxToken,
+    pub generic_parameters: Vec<SyntaxToken>,
     pub optional_parent: Option<SyntaxToken>,
     pub body: Box<StructBodyNode>,
 }
@@ -753,7 +764,7 @@ pub struct TypeNode {
     pub optional_ampersand_token: Option<SyntaxToken>,
     pub library_name: Option<SyntaxToken>,
     pub type_name: SyntaxToken,
-    pub generic_type_qualifier: Option<Box<TypeNode>>,
+    pub generic_type_qualifier: Vec<TypeNode>,
     pub optional_question_mark: Option<SyntaxToken>,
     pub brackets: Vec<SyntaxToken>,
 }
@@ -763,7 +774,7 @@ impl TypeNode {
         optional_ampersand_token: Option<SyntaxToken>,
         library_name: Option<SyntaxToken>,
         type_name: SyntaxToken,
-        generic_type_qualifier: Option<TypeNode>,
+        generic_type_qualifier: Vec<TypeNode>,
         optional_question_mark: Option<SyntaxToken>,
         brackets: Vec<SyntaxToken>,
     ) -> Self {
@@ -771,7 +782,7 @@ impl TypeNode {
             optional_ampersand_token,
             library_name,
             type_name,
-            generic_type_qualifier: generic_type_qualifier.map(Box::new),
+            generic_type_qualifier,
             optional_question_mark,
             brackets,
         }
@@ -807,6 +818,7 @@ pub struct LiteralNodeKind {
 
 #[derive(Debug, Clone)]
 pub struct ArrayLiteralNodeKind {
+    pub optional_array_list_keyword: Option<SyntaxToken>,
     pub lbracket: SyntaxToken,
     pub children: Vec<SyntaxNode>,
     pub comma_tokens: Vec<SyntaxToken>,

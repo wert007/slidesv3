@@ -2,6 +2,7 @@ use crate::DebugFlags;
 
 use super::{static_memory::StaticMemory, FlaggedWord, Memory};
 
+#[derive(Clone)]
 pub struct Stack {
     pub words: Vec<FlaggedWord>,
     // pub data: Vec<u64>,

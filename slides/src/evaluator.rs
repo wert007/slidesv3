@@ -31,7 +31,6 @@ macro_rules! runtime_error {
 
 type ResultType = Value;
 
-#[derive(Debug)]
 pub struct EvaluatorState {
     stack: Stack,
     static_memory_size_in_words: usize,
@@ -101,6 +100,25 @@ impl EvaluatorState {
     }
 }
 
+impl std::fmt::Debug for EvaluatorState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EvaluatorState")
+            .field("stack", &self.stack)
+            .field(
+                "static_memory_size_in_words",
+                &self.static_memory_size_in_words,
+            )
+            .field("registers", &self.registers)
+            .field("protected_registers", &self.protected_registers)
+            .field("pc", &self.pc)
+            .field("is_main_call", &self.is_main_call)
+            .field("runtime_diagnostics", &self.runtime_diagnostics)
+            .field("runtime_error_happened", &self.runtime_error_happened)
+            .field("debugger_state", &self.debugger_state)
+            .finish()
+    }
+}
+
 pub fn evaluate(
     program: Program,
     _source_text: crate::text::SourceTextId,
@@ -156,6 +174,7 @@ fn execute_function(
 ) -> Result<Option<FlaggedWord>, ()> {
     let old_pc = state.pc;
     let old_registers = state.registers.clone();
+    let old_protected_registers = state.protected_registers;
     state.pc = entry_point;
     state.runtime_error_happened = false;
     let min_stack_count = state.stack.len();
@@ -176,7 +195,7 @@ fn execute_function(
                 "  CI {:X}*{}: {}",
                 pc,
                 nestedness,
-                crate::debug::instruction_to_string(state.instructions[pc], None)
+                crate::debug::instruction_to_string(state.instructions[pc], false, None)
             );
         }
         if state.project.debug_flags.slow_mode {
@@ -236,6 +255,7 @@ fn execute_function(
     }
     state.pc = old_pc;
     state.registers = old_registers;
+    state.protected_registers = old_protected_registers;
     Ok(
         if !state.runtime_error_happened && state.stack.len() > min_stack_count {
             Some(state.stack.pop())
@@ -359,7 +379,12 @@ fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction)
 }
 
 fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) {
-    let size_in_bytes = instruction.arg * WORD_SIZE_IN_BYTES;
+    let size_in_words = if instruction.arg == 0 {
+        state.stack.pop().unwrap_value()
+    } else {
+        instruction.arg
+    };
+    let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
     let address = state.reallocate(0, size_in_bytes);
     if address == 0 {
         runtime_error!(
@@ -368,7 +393,7 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
         );
     } else {
         let mut writing_pointer = address;
-        for _ in 0..instruction.arg {
+        for _ in 0..size_in_words {
             let value = state.stack.pop();
             state.heap.write_flagged_word(writing_pointer as _, value);
             writing_pointer += WORD_SIZE_IN_BYTES;
@@ -513,8 +538,8 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     let mut result = lhs_length_in_bytes == rhs_length_in_bytes;
     if lhs != rhs && lhs_length_in_bytes == rhs_length_in_bytes {
         for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
-            let lhs_index = lhs + i;
-            let rhs_index = rhs + i;
+            let lhs_index = lhs + i + WORD_SIZE_IN_BYTES;
+            let rhs_index = rhs + i + WORD_SIZE_IN_BYTES;
             let lhs = state.read_pointer(lhs_index).unwrap_value();
             let rhs = state.read_pointer(rhs_index).unwrap_value();
             if lhs != rhs {
@@ -706,6 +731,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::AddressOf => sys_calls::address_of(&arguments[0], state),
         SystemCallKind::GarbageCollect => state.garbage_collect(),
         SystemCallKind::Break => unreachable!(),
+        SystemCallKind::Hash => sys_calls::hash(&arguments[0], state),
     }
 }
 
@@ -730,11 +756,15 @@ fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
     );
 
     for register in state.registers.iter().skip(state.protected_registers) {
-        state.stack.push_flagged_word(register.clone().replace_comment(|c| format!("{c} saved")));
+        state
+            .stack
+            .push_flagged_word(register.clone().replace_comment(|c| format!("{c} saved")));
     }
 
     for v in argument_values.into_iter().rev() {
-        state.stack.push_flagged_word(v.replace_comment(|c| format!("{c} as argument")));
+        state
+            .stack
+            .push_flagged_word(v.replace_comment(|c| format!("{c} as argument")));
     }
     state.stack.push_print_stack(print_stack_value);
     state.pc = base as _;
@@ -769,6 +799,8 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
             .skip(state.protected_registers)
             .rev()
         {
+            // Protect registers after main function returns, just in case we
+            // want to check them later!
             if instruction.arg & 0x2 == 0x2 {
                 state.stack.pop();
             } else {

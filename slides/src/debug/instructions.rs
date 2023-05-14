@@ -76,7 +76,7 @@ pub fn output_instructions_or_labels_with_source_code_to_sldasm(
                     buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     buffer.push_str(&format!("{:3X}: ", index));
-                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, None));
+                    buffer.push_str(&instruction_to_string(*instruction, true, None));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -111,7 +111,7 @@ fn instructions_with_source_code_to_string(
         }
         buffer.push_str("  ");
         buffer.push_str(&format!("{:3X}: ", index));
-        buffer.push_str(&instruction_to_string(*instruction, None));
+        buffer.push_str(&instruction_to_string(*instruction, false, None));
         buffer.push('\n');
     }
     buffer
@@ -137,7 +137,7 @@ fn instructions_or_labels_with_source_code_to_string(
                     buffer.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     buffer.push_str(&format!("{:3X}: ", index));
-                    buffer.push_str(&instruction_or_label_to_string(*instruction, true, None));
+                    buffer.push_str(&instruction_to_string(*instruction, true, None));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -164,7 +164,7 @@ fn instructions_or_labels_to_string(
                     result.push_str(&format!("L{:02X}: {:3X}", instruction.arg, index));
                 } else {
                     result.push_str(&format!("{:3X}: ", index));
-                    result.push_str(&instruction_or_label_to_string(*instruction, true, None));
+                    result.push_str(&instruction_to_string(*instruction, true, None));
                 }
             }
             InstructionOrLabelReference::LabelReference(label) => {
@@ -193,7 +193,7 @@ fn instructions_to_string(
         } else {
             None
         };
-        result.push_str(&instruction_to_string(*instruction, reg_name));
+        result.push_str(&instruction_to_string(*instruction, false, reg_name));
         index += 1;
         result.push('\n');
     }
@@ -204,11 +204,18 @@ fn label_reference_to_string(label: LabelReference) -> String {
     format!("ldlbl L{:02X}", label.label_reference)
 }
 
-pub fn instruction_to_string(instruction: Instruction, reg_name: Option<&str>) -> String {
-    instruction_or_label_to_string(instruction, false, reg_name)
+// pub fn instruction_to_string(instruction: Instruction, reg_name: Option<&str>) -> String {
+//     instruction_or_label_to_string(instruction, false, reg_name)
+// }
+
+pub fn instruction_or_label_to_string(instruction_or_label: InstructionOrLabelReference) -> String {
+    match instruction_or_label {
+        InstructionOrLabelReference::Instruction(instruction) => instruction_to_string(instruction, true, None),
+        InstructionOrLabelReference::LabelReference(label) => label_reference_to_string(label),
+    }
 }
 
-fn instruction_or_label_to_string(
+pub fn instruction_to_string(
     instruction: Instruction,
     has_labels: bool,
     reg_name: Option<&str>,

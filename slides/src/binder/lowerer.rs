@@ -6,8 +6,9 @@ use super::{
         BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
         BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind,
         BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind,
-        BoundIfStatementNodeKind, BoundNode, BoundReturnStatementNodeKind, BoundSystemCallNodeKind,
-        BoundUnaryNodeKind, BoundVariableDeclarationNodeKind, BoundWhileStatementNodeKind,
+        BoundIfStatementNodeKind, BoundNode, BoundRepetitionNodeKind, BoundReturnStatementNodeKind,
+        BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind,
+        BoundWhileStatementNodeKind,
     },
     typing::TypeId,
 };
@@ -128,6 +129,12 @@ fn flatten_node(node: BoundNode, flattener: &mut Flattener) -> Vec<BoundNode> {
                 flattener,
             )]
         }
+        BoundNodeKind::RepetitionNode(repetition_node) => vec![flatten_repetition_node(
+            node.location,
+            node.type_,
+            repetition_node,
+            flattener,
+        )],
         BoundNodeKind::VariableExpression(_)
         | BoundNodeKind::LiteralExpression(_)
         | BoundNodeKind::Label(_)
@@ -216,6 +223,9 @@ fn flatten_expression(node: BoundNode, flattener: &mut Flattener) -> BoundNode {
             flatten_if_statement(if_statement, flattener),
             node.type_,
         ),
+        BoundNodeKind::RepetitionNode(repetition_node) => {
+            flatten_repetition_node(node.location, node.type_, repetition_node, flattener)
+        }
     }
 }
 
@@ -409,6 +419,17 @@ fn flatten_array_literal_expression(
     BoundNode::array_literal(span, children, type_)
 }
 
+fn flatten_repetition_node(
+    location: TextLocation,
+    _type_: TypeId,
+    repetition_node: BoundRepetitionNodeKind,
+    flattener: &mut Flattener,
+) -> BoundNode {
+    let expression = flatten_expression(*repetition_node.expression, flattener);
+    let repetition = flatten_expression(*repetition_node.repetition, flattener);
+    BoundNode::repetition_node(location, repetition_node.counting_variable, expression, repetition)
+}
+
 fn flatten_function_declaration(
     _function_declaration: BoundFunctionDeclarationNodeKind,
     _flattener: &mut Flattener,
@@ -473,14 +494,21 @@ fn flatten_while_statement(
     flattener: &mut Flattener,
 ) -> Vec<BoundNode> {
     let mut result = vec![];
-    let (label, label_ref) = create_label(while_statement.body.location, flattener);
-    result.push(label);
+    let (label_repeat, label_repeat_ref) = create_label(while_statement.body.location, flattener);
+    let (label_skip, label_skip_ref) = create_label(while_statement.body.location, flattener);
+    result.push(BoundNode::jump_if_false(
+        while_statement.condition.location,
+        *while_statement.condition.clone(),
+        label_skip_ref,
+    ));
+    result.push(label_repeat);
     result.append(&mut flatten_node(*while_statement.body, flattener));
     result.push(BoundNode::jump_if_true(
         while_statement.condition.location,
         *while_statement.condition,
-        label_ref,
+        label_repeat_ref,
     ));
+    result.push(label_skip);
     result
 }
 

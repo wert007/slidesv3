@@ -1,19 +1,20 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
-use crate::{binder::bound_nodes::BoundNodeKind, DebugFlags};
+use crate::{binder::bound_nodes::BoundNodeKind, DebugFlags, debug::basic_blocks::DebugBasicBlock};
 
 use super::{bound_nodes::BoundNode, typing::TypeCollection};
 
 #[derive(Debug)]
-pub struct BasicBlock<'a> {
+pub struct BasicBlock<T, C=()> {
     pub index: usize,
     pub label_indices: Vec<usize>,
     pub kind: BasicBlockKind,
     pub incoming_connections: IncomingConnections,
-    pub outgoing_connections: OutgoingConnections<'a>,
+    pub outgoing_connections: OutgoingConnections<T>,
+    pub comment: Option<C>,
 }
 
-impl<'a> BasicBlock<'a> {
+impl<T, C> BasicBlock<T, C> {
     pub fn start() -> Self {
         Self {
             index: 0,
@@ -21,6 +22,7 @@ impl<'a> BasicBlock<'a> {
             kind: BasicBlockKind::Start,
             incoming_connections: IncomingConnections::None,
             outgoing_connections: OutgoingConnections::None,
+            comment: None,
         }
     }
 
@@ -31,6 +33,7 @@ impl<'a> BasicBlock<'a> {
             kind: BasicBlockKind::End,
             incoming_connections: IncomingConnections::None,
             outgoing_connections: OutgoingConnections::None,
+            comment: None,
         }
     }
 
@@ -41,7 +44,26 @@ impl<'a> BasicBlock<'a> {
             kind: BasicBlockKind::CodeBlock(code_block),
             incoming_connections: IncomingConnections::None,
             outgoing_connections: OutgoingConnections::None,
+            comment: None,
         }
+    }
+}
+
+impl<T: Copy, C: Display + Copy> DebugBasicBlock<T, C> for BasicBlock<T, C> {
+    fn kind(&self) -> BasicBlockKind {
+        self.kind
+    }
+
+    fn label_indices(&self) -> &[usize] {
+        &self.label_indices
+    }
+
+    fn outgoing_connections(&self) -> OutgoingConnections<T> {
+        self.outgoing_connections
+    }
+
+    fn comment(&self) -> Option<C> {
+        self.comment
     }
 }
 
@@ -69,15 +91,15 @@ impl IncomingConnections {
     }
 }
 
-#[derive(Debug)]
-pub enum OutgoingConnections<'a> {
+#[derive(Debug, Clone)]
+pub enum OutgoingConnections<T> {
     None,
     Single(usize),
-    IfTrue(&'a BoundNode, usize, usize),
-    IfFalse(&'a BoundNode, usize, usize),
+    IfTrue(T, usize, usize),
+    IfFalse(T, usize, usize),
 }
 
-impl OutgoingConnections<'_> {
+impl<T> OutgoingConnections<T> {
     pub fn to_vec(&self) -> Vec<usize> {
         match self {
             OutgoingConnections::None => vec![],
@@ -89,6 +111,8 @@ impl OutgoingConnections<'_> {
         }
     }
 }
+
+impl<T: Copy> Copy for OutgoingConnections<T> {}
 
 #[derive(Debug, Clone, Copy)]
 pub struct BasicCodeBlock {
@@ -129,7 +153,7 @@ pub fn check_if_all_paths_return(
     true
 }
 
-fn collect_paths_to_end(basic_blocks: &[BasicBlock]) -> Vec<usize> {
+fn collect_paths_to_end(basic_blocks: &[BasicBlock<&BoundNode, &'static str>]) -> Vec<usize> {
     let mut result = vec![];
     let mut gray_list = basic_blocks[0].outgoing_connections.to_vec();
     let mut already_seen = vec![];
@@ -150,7 +174,7 @@ fn collect_paths_to_end(basic_blocks: &[BasicBlock]) -> Vec<usize> {
     result
 }
 
-fn collect_basic_blocks<'a>(statements: &[BoundNode]) -> Vec<BasicBlock<'a>> {
+fn collect_basic_blocks<'a>(statements: &[BoundNode]) -> Vec<BasicBlock<&'a BoundNode, &'static str>> {
     let mut result = vec![BasicBlock::start()];
     let mut current_block = BasicCodeBlock {
         index: 0,
@@ -214,7 +238,7 @@ fn collect_basic_blocks<'a>(statements: &[BoundNode]) -> Vec<BasicBlock<'a>> {
     result
 }
 
-fn connect_basic_blocks<'a>(basic_blocks: &mut Vec<BasicBlock<'a>>, statements: &'a [BoundNode]) {
+fn connect_basic_blocks<'a>(basic_blocks: &mut Vec<BasicBlock<&'a BoundNode, &'static str>>, statements: &'a [BoundNode]) {
     let end_index = basic_blocks.last().unwrap().index;
     let mut incoming_connections = vec![];
     let label_index_to_basic_block_index: HashMap<usize, usize> = basic_blocks
