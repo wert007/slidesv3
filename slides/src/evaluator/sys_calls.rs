@@ -213,7 +213,7 @@ pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let argument = string_to_string_native(argument, state);
     let argument = argument.replace('\0', "");
     println!(
-        "Runtime error happened in {}: {}",
+        "Runtime error happened {}: {}",
         state.instructions[state.pc]
             .location
             .display(&state.project.source_text_collection),

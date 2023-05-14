@@ -1,4 +1,4 @@
-generic struct A {
+struct A<Type> {
     a: int;
 }
 

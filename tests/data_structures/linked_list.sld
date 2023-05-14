@@ -54,21 +54,21 @@ func gc() {}
 func main() {
     let i = 0;
     {
-        let list = new ListNode(i, none);
+        let l = new ListNode(i, none);
         while i < 95 {
             i = i + 1;
-            list.add(i);
+            l.add(i);
         }
         // heapdump('heap_before_print');
-        list.print();
+        l.print();
     }
     {
         i = 0;
-        let list: List<int> = new List();
+        let l: List<int> = new List();
         while i < 95 {
             i = i + 1;
-            list.add(i);
+            l.add(i);
         }
-        print(list);
+        print(l);
     }
 }

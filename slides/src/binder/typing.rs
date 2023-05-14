@@ -830,7 +830,7 @@ pub struct GenericStructPlaceholder {
     pub function_table: SimpleStructFunctionTable,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct GenericStruct {
     pub struct_type: StructType,
     pub generic_parameters: Vec<String>,
@@ -858,6 +858,7 @@ impl GenericType {
     fn as_struct_type_with_generic_parameters(&self) -> Option<&[String]> {
         match self {
             GenericType::Struct(it) => Some(&it.generic_parameters),
+            GenericType::StructPlaceholder(it) => Some(&it.generic_parameters),
             _ => None,
         }
     }
@@ -1331,7 +1332,7 @@ pub struct ClosureType {
     pub included_arguments: Vec<TypeId>,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct StructType {
     pub name: String,
     pub fields: Vec<Member>,
@@ -1439,6 +1440,23 @@ impl StructType {
             .into_iter()
             .map(|f| f.offset_or_address.unwrap_address())
             .collect()
+    }
+}
+
+impl std::fmt::Debug for StructType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StructType")
+            .field("name", &self.name)
+            .field("fields", &self.fields)
+            .field("functions", &self.functions)
+            .field("function_table", &self.function_table)
+            .field("is_generic", &self.is_generic)
+            .field("is_abstract", &self.is_abstract)
+            .field("parent", &self.parent)
+            .field("size_in_bytes", &self.size_in_bytes)
+            .field("applied_types", &self.applied_types)
+            .field("generic_base_type", &self.generic_base_type)
+            .finish()
     }
 }
 

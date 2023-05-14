@@ -1,1 +1,1 @@
-Error in ..\tests\generics\generic_struct_without_generic_type.sld:1:16: Declared struct A as generic, but no $Type was used. Maybe you forgot it?
+Error in ..\tests\generics\generic_struct_without_generic_type.sld:1:8: Declared struct A as generic, but generic type $Type was not used. Maybe you forgot it?

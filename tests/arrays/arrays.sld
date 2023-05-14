@@ -2,6 +2,7 @@ func main() {
     arrays_in_arrays();
     arrays();
     weird_arrays();
+    array_types();
 }
 
 func arrays_in_arrays() {
@@ -127,3 +128,8 @@ func weird_arrays() {
     }
 }
 
+func array_types() {
+    let l = list [1, 2, 3];
+    l.add(5);
+    print(l);
+}

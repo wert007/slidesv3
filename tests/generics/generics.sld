@@ -18,7 +18,7 @@
 //     }
 // }
 
-generic struct Value {
+struct Value<Type> {
     value: $Type;
 
     func set(value: $Type) {
