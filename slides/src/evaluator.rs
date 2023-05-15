@@ -10,7 +10,7 @@ use crate::{
         Program,
     },
     value::Value,
-    DiagnosticBag, Project,
+    DiagnosticBag, Project, text::TextLocation,
 };
 use num_enum::TryFromPrimitive;
 
@@ -45,6 +45,7 @@ pub struct EvaluatorState {
     debugger_state: debugger::DebuggerState,
     protected_pointers: Vec<u64>,
     pub project: Project,
+    stack_trace: Vec<TextLocation>,
 }
 
 impl EvaluatorState {
@@ -138,6 +139,7 @@ pub fn evaluate(
             .collect(),
         protected_registers: program.protected_variables,
         pc: 0,
+        stack_trace: Vec::new(),
         instructions: program.instructions,
         is_main_call: true,
         runtime_diagnostics: DiagnosticBag::new(),
@@ -714,6 +716,7 @@ fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
 }
 
 fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
+    state.stack_trace.push(instruction.location);
     let sys_call_kind = SystemCallKind::try_from_primitive(instruction.arg as u8).unwrap();
     let argument_count = state.stack.pop().unwrap_value() as usize;
     let mut arguments = Vec::with_capacity(argument_count);
@@ -733,9 +736,11 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::Break => unreachable!(),
         SystemCallKind::Hash => sys_calls::hash(&arguments[0], state),
     }
+    state.stack_trace.pop();
 }
 
-fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) {
+    state.stack_trace.push(instruction.location);
     let print_stack_value = state.stack.pop_print_stack();
     let argument_count = state.stack.pop().unwrap_value();
     let base = state.stack.pop().unwrap_pointer();
@@ -771,6 +776,7 @@ fn evaluate_function_call(state: &mut EvaluatorState, _: Instruction) {
 }
 
 fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
+    state.stack_trace.pop();
     let print_stack_value = state.stack.pop_print_stack();
     let has_return_value = instruction.arg & 0x1 == 0x1;
     if has_return_value {

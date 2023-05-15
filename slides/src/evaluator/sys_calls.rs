@@ -219,6 +219,9 @@ pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
             .display(&state.project.source_text_collection),
         argument
     );
+    for location in &state.stack_trace {
+        println!("  ...{}", location.display(&state.project.source_text_collection));
+    }
     state.runtime_error_happened = true;
 }
 
