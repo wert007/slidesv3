@@ -276,7 +276,10 @@ fn load_library_into_binder<'a>(
                 } else {
                     format!("{}.{}", name, binder.project.types.name_of_type_id(strct)).into()
                 };
-                binder.project.types[strct].as_struct_type_mut().unwrap().name = struct_name.into();
+                binder.project.types[strct]
+                    .as_struct_type_mut()
+                    .unwrap()
+                    .name = struct_name.into();
             }
         }
     }

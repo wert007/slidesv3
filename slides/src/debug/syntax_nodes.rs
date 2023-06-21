@@ -201,6 +201,14 @@ fn print_syntax_node_as_code_with_indent(
                 buffer,
             )
         }
+        SyntaxNodeKind::MatchStatement(match_statement) => {
+            print_syntax_node_match_statement_as_code_with_indent(
+                match_statement,
+                source_text_collection,
+                printer,
+                buffer,
+            )
+        }
         SyntaxNodeKind::Assignment(assignment) => print_syntax_node_assignment_as_code_with_indent(
             assignment,
             source_text_collection,
@@ -835,6 +843,47 @@ fn print_syntax_node_while_statement_as_code_with_indent(
         printer,
         buffer,
     )?;
+    Ok(())
+}
+
+fn print_syntax_node_match_statement_as_code_with_indent(
+    match_statement: &MatchStatementNodeKind,
+    source_text_collection: &SourceTextCollection,
+    mut printer: DebugPrinter,
+    buffer: &mut String,
+) -> Result<(), std::fmt::Error> {
+    printer.output_indentation(buffer);
+    write!(buffer, "match ")?;
+    print_syntax_node_as_code_with_indent(
+        &match_statement.expression,
+        source_text_collection,
+        printer,
+        buffer,
+    )?;
+    writeln!(buffer, "{{")?;
+    printer.indent += 4;
+    for case in &match_statement.match_cases {
+        printer.output_indentation(buffer);
+        match case.expression.as_ref() {
+            either::Either::Left(_) => write!(buffer, "else ")?,
+            either::Either::Right(node) => {
+                print_syntax_node_as_code_with_indent(
+                    node,
+                    source_text_collection,
+                    printer,
+                    buffer,
+                )?;
+            }
+        }
+        write!(buffer, " => ")?;
+        printer.indent += 4;
+        print_syntax_node_as_code_with_indent(&case.body, source_text_collection, printer, buffer)?;
+        printer.indent -= 4;
+        writeln!(buffer)?;
+    }
+    printer.indent -= 4;
+    printer.output_indentation(buffer);
+    writeln!(buffer, "}}")?;
     Ok(())
 }
 

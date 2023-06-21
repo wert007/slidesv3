@@ -1,6 +1,6 @@
 use num_enum::TryFromPrimitive;
 
-use crate::{binder::typing::SystemCallKind, text::TextLocation};
+use crate::{binder::typing::SystemCallKind, text::{TextLocation, SourceTextId}};
 
 use self::op_codes::OpCode;
 
@@ -15,6 +15,14 @@ pub struct Instruction {
 
 #[allow(dead_code)]
 impl Instruction {
+    pub const fn unknown() -> Instruction {
+        Self {
+            op_code: OpCode::Unknown,
+            arg: 0,
+            location: TextLocation::zero_in_file(unsafe { SourceTextId::from_raw(0) }),
+        }
+    }
+
     pub const fn noop(location: TextLocation) -> Instruction {
         Self {
             op_code: OpCode::NoOp,

@@ -7,6 +7,10 @@ impl SourceTextId {
     pub fn as_raw(self) -> usize {
         self.0
     }
+
+    pub const unsafe fn from_raw(value: usize) -> Self {
+        Self(value)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -167,7 +171,7 @@ impl TextLocation {
         }
     }
 
-    pub(crate) fn zero_in_file(source_text: SourceTextId) -> TextLocation {
+    pub(crate) const fn zero_in_file(source_text: SourceTextId) -> TextLocation {
         Self {
             span: TextSpan::zero(),
             source_text,
@@ -205,7 +209,7 @@ pub struct TextSpan {
 
 #[allow(dead_code)]
 impl TextSpan {
-    pub fn zero() -> Self {
+    pub const fn zero() -> Self {
         Self {
             start: 0,
             length: 0,

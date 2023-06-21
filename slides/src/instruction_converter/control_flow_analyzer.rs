@@ -155,6 +155,7 @@ pub(crate) fn check_stack_usage(
                                 argument_count as i32 + has_function_pointer
                             }
                             OpCode::Breakpoint => 0,
+                            OpCode::Unknown => 0,
                         }
                     } else {
                         1
@@ -189,11 +190,11 @@ pub(crate) fn check_stack_usage(
             .collect();
         gray_blocks.append(&mut append);
     }
-    // crate::debug::basic_blocks::output_basic_instruction_blocks_to_dot(
-    //     function_type.name().as_str(),
-    //     &blocks,
-    //     instructions,
-    // );
+    crate::debug::basic_blocks::output_basic_instruction_blocks_to_dot(
+        function_type.name().as_str(),
+        &blocks,
+        instructions,
+    );
 }
 
 fn collect_basic_blocks(instructions: &[InstructionOrLabelReference]) -> Vec<BasicBlock<(), i32>> {

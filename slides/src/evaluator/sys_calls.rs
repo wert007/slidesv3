@@ -241,7 +241,7 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         | Type::IntegerLiteral
         | Type::Library(_)
         | Type::GenericType(_)
-        | Type::StructPlaceholder(_, _) => unreachable!(),
+        | Type::StructPlaceholder(_) => unreachable!(),
         Type::Any => {
             let type_ = decode_type(argument, state);
             let argument = state

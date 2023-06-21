@@ -1,6 +1,9 @@
-use crate::evaluator::memory;
+use super::{
+    memory::{FlaggedWord, Memory},
+    EvaluatorState,
+};
+use crate::{evaluator::memory, instruction_converter::instruction::Instruction};
 use strum::{EnumIter, IntoEnumIterator};
-use super::{memory::{FlaggedWord, Memory}, EvaluatorState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionState {
@@ -29,10 +32,11 @@ impl DebuggerState {
 }
 
 pub fn create_session(state: &mut EvaluatorState) {
-    if state.pc >= state.instructions.len() {
-        return;
-    }
-    let current_instruction = state.instructions[state.pc];
+    let current_instruction = state
+        .instructions
+        .get(state.pc)
+        .copied()
+        .unwrap_or(Instruction::unknown());
     let reg_name = if current_instruction.arg < state.debugger_state.register_names.len() as u64 {
         state.debugger_state.register_names[current_instruction.arg as usize].as_deref()
     } else {
@@ -212,8 +216,12 @@ impl Command {
             Command::Pointer(_) => "Reads the value of the address as pointer.",
             Command::IndirectPointer(_) => "Reads the value of the address as indirect pointer.",
             Command::Register(_, _) => "Reads the value of the register as pointer.",
-            Command::IndirectRegister(_, _) => "Reads the value of the register as indirect pointer.",
-            Command::Replace(_) => "Replaces the last added value on the stack with the supplied value.",
+            Command::IndirectRegister(_, _) => {
+                "Reads the value of the register as indirect pointer."
+            }
+            Command::Replace(_) => {
+                "Replaces the last added value on the stack with the supplied value."
+            }
             Command::RenameRegister(_, _) => "Renames a register to a given name.",
             Command::Heapdump(_) => "Creates a heapdump file with the specified file name.",
             Command::Help => "Prints this help.",

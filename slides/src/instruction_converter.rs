@@ -354,6 +354,7 @@ fn convert_node(
     match node.kind {
         BoundNodeKind::IfStatement(_)
         | BoundNodeKind::WhileStatement(_)
+        | BoundNodeKind::MatchStatement(_)
         | BoundNodeKind::ErrorExpression
         | BoundNodeKind::RepetitionNode(_) => unreachable!(),
         BoundNodeKind::FunctionDeclaration(function_declaration) => {

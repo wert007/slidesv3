@@ -1,5 +1,5 @@
 
-struct Dict<Key, Value> {
+struct MyDict<Key, Value> {
     bucket: List<List<KeyValuePair<$Key, $Value> > >;
     length: uint;
 
@@ -91,7 +91,7 @@ struct KeyValuePair<Key, Value> {
 
 
 func main() {
-    let a: Dict<string, int> = new Dict();
+    let a: MyDict<string, int> = new MyDict();
     a['tom'] = 5;
     a['roger'] = 2;
     a['steve'] = 8;

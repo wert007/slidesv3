@@ -222,6 +222,7 @@ pub fn instruction_to_string(
 ) -> String {
     match instruction.op_code {
         OpCode::NoOp => instruction_no_arg_to_string("noop"),
+        OpCode::Unknown => instruction_no_arg_to_string("???"),
         OpCode::LoadImmediate => instruction_dec_signed_arg_to_string("ldimm", instruction.arg),
         OpCode::LoadPointer => instruction_ptr_unsigned_arg_to_string("ldptr", instruction.arg),
         OpCode::DuplicateOver => instruction_word_count_arg_to_string("dupover", instruction.arg),

@@ -7,7 +7,7 @@ use std::collections::VecDeque;
 use crate::{
     diagnostics::DiagnosticBag,
     lexer::syntax_token::SyntaxToken,
-    text::{TextSpan, SourceTextId, SourceTextCollection, TextLocation},
+    text::{SourceTextCollection, SourceTextId, TextLocation, TextSpan},
     DebugFlags,
 };
 
@@ -108,7 +108,11 @@ pub fn lex<'a>(
                 }
                 (State::Default, ws) if ws.is_whitespace() => {}
                 (State::Default, o) if is_operator(o) => {
-                    result.push_back(SyntaxToken::operator(char_index, &text[byte_index..][..1], source_text));
+                    result.push_back(SyntaxToken::operator(
+                        char_index,
+                        &text[byte_index..][..1],
+                        source_text,
+                    ));
                 }
                 (State::Default, '!') => {
                     state = State::MaybeTwoCharOperator(index, '=');
@@ -130,7 +134,7 @@ pub fn lex<'a>(
                     result.push_back(SyntaxToken::operator(
                         start.char_index,
                         &text[start.byte_index..][..1],
-                        source_text
+                        source_text,
                     ));
                     state = State::Default;
                     continue 'start;
@@ -177,8 +181,10 @@ pub fn lex<'a>(
                                 char_index - start.char_index,
                                 false,
                             );
-                            diagnostic_bag
-                                .report_unterminated_string(TextLocation { span, source_text }, string_state.enclosing_char);
+                            diagnostic_bag.report_unterminated_string(
+                                TextLocation { span, source_text },
+                                string_state.enclosing_char,
+                            );
                         }
                         result.push_back(SyntaxToken::string_literal(
                             start.char_index,
@@ -205,7 +211,11 @@ pub fn lex<'a>(
                         state = State::MultiCharOperator(start);
                     } else {
                         let lexeme = &text[start.byte_index..byte_index];
-                        result.push_back(SyntaxToken::operator(start.char_index, lexeme, source_text));
+                        result.push_back(SyntaxToken::operator(
+                            start.char_index,
+                            lexeme,
+                            source_text,
+                        ));
                         continue 'start;
                     }
                 }
@@ -214,7 +224,11 @@ pub fn lex<'a>(
                         state = State::Default;
                         let lexeme = &text[start.byte_index..byte_index];
                         if is_valid_operator(lexeme) {
-                            result.push_back(SyntaxToken::operator(start.char_index, lexeme, source_text));
+                            result.push_back(SyntaxToken::operator(
+                                start.char_index,
+                                lexeme,
+                                source_text,
+                            ));
                         } else {
                             diagnostic_bag.report_bad_input(
                                 start.char_index,
@@ -244,7 +258,10 @@ pub fn lex<'a>(
         }
         State::String(start, string_state) => {
             let span = TextSpan::new(start.char_index, char_len - start.char_index, false);
-            diagnostic_bag.report_unterminated_string(TextLocation { span, source_text }, string_state.enclosing_char);
+            diagnostic_bag.report_unterminated_string(
+                TextLocation { span, source_text },
+                string_state.enclosing_char,
+            );
             result.push_back(SyntaxToken::string_literal(
                 start.char_index,
                 &text[start.byte_index..],
@@ -266,8 +283,11 @@ pub fn lex<'a>(
         State::MultiCharOperator(start) => {
             let lexeme = &text[start.byte_index..];
             if !is_valid_operator(lexeme) {
-                diagnostic_bag
-                    .report_bad_input(start.char_index, source_text, text.as_bytes()[start.byte_index] as _)
+                diagnostic_bag.report_bad_input(
+                    start.char_index,
+                    source_text,
+                    text.as_bytes()[start.byte_index] as _,
+                )
             } else {
                 result.push_back(SyntaxToken::operator(start.char_index, lexeme, source_text));
             }
@@ -280,9 +300,8 @@ pub fn lex<'a>(
         State::SingleLineComment(_start) => {
             // Here you would emit a token.
         }
-        State::MaybeCloseMultiLineComment(start) | State::MultiLineComment(start) => {
-            diagnostic_bag.report_unterminated_comment(start.char_index, source_text, &text[start.byte_index..])
-        }
+        State::MaybeCloseMultiLineComment(start) | State::MultiLineComment(start) => diagnostic_bag
+            .report_unterminated_comment(start.char_index, source_text, &text[start.byte_index..]),
     }
     result.push_back(SyntaxToken::eoi(text.len(), source_text));
     if debug_flags.print_tokens() {
@@ -314,6 +333,7 @@ fn is_valid_operator(operator: &str) -> bool {
             | "<"
             | ">"
             | "->"
+            | "=>"
             | "-"
             | "?"
             | "??"

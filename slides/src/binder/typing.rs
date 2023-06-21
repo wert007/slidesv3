@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     fmt::{Display, Write},
-    ops::{Index, IndexMut},
+    ops::{Index, IndexMut}, collections::HashMap,
 };
 
 use num_enum::TryFromPrimitive;
@@ -471,13 +471,13 @@ impl TypeCollection {
             Type::PointerOf(inner) => format!("&{}", self.name_of_type_id(*inner)).into(),
             Type::GenericType(index) => format!("$Type#{index}").into(),
             Type::Enum(name, _) => name.into(),
-            Type::StructPlaceholder(name, _) => name.into(),
+            Type::StructPlaceholder(it) => it.name.clone().into(),
         }
     }
 
     fn name_of_type_debug<'a>(&self, type_: &'a Type) -> Cow<'a, str> {
         match type_ {
-            Type::StructPlaceholder(name, _) => format!("placeholder {}", name).into(),
+            Type::StructPlaceholder(it) => format!("placeholder {}", it.name).into(),
             type_ => self.name_of_type(type_),
         }
     }
@@ -583,6 +583,10 @@ impl TypeCollection {
                 .applied_types
                 .iter()
                 .any(|h| self.contains_type(*h, needle)),
+            Type::StructPlaceholder(it) => it
+                .applied_types
+                .iter()
+                .any(|h| self.contains_type(*h, needle)),
             _ => false,
         }
     }
@@ -598,8 +602,8 @@ impl TypeCollection {
         }
         assert_eq!(replace.len(), replace_with.len());
         match &self[type_] {
-            Type::StructPlaceholder(name, _) => {
-                dbg!(name);
+            Type::StructPlaceholder(it) => {
+                dbg!(&it.name);
                 todo!()
             }
             Type::Function(it) => {
@@ -699,7 +703,14 @@ impl TypeCollection {
                     write!(result, ">").unwrap();
                     result
                 };
-                self.look_up_or_add_type(Type::StructPlaceholder(name, it.function_table))
+                let applied_types = (0..it.generic_parameters.len())
+                    .map(|i| self.look_up_or_add_type(Type::GenericType(i)))
+                    .collect();
+                self.look_up_or_add_type(Type::StructPlaceholder(StructPlaceholderType {
+                    name,
+                    function_table: it.function_table,
+                    applied_types,
+                }))
             }
             GenericType::Struct(generic_struct) => {
                 // todo!()
@@ -845,6 +856,10 @@ impl GenericStruct {
             functions: Vec::new(),
         }
     }
+
+    pub fn function_bodies(&self) -> HashMap<&str, &GenericFunction> {
+        self.functions.iter().map(|f| (f.function_name.as_str(), f)).collect()
+    }
 }
 
 impl GenericType {
@@ -914,7 +929,7 @@ pub enum Type {
     Pointer,
     PointerOf(TypeId),
     GenericType(usize),
-    StructPlaceholder(String, SimpleStructFunctionTable),
+    StructPlaceholder(StructPlaceholderType),
     Enum(String, Vec<String>),
 }
 
@@ -1458,6 +1473,13 @@ impl std::fmt::Debug for StructType {
             .field("generic_base_type", &self.generic_base_type)
             .finish()
     }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct StructPlaceholderType {
+    pub name: String,
+    pub function_table: SimpleStructFunctionTable,
+    pub applied_types: Vec<TypeId>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]

@@ -1,3 +1,5 @@
+use either::Either;
+
 use crate::{
     diagnostics::DiagnosticBag,
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
@@ -469,6 +471,27 @@ impl SyntaxNode {
         }
     }
 
+    pub fn match_statement(
+        match_keyword: SyntaxToken,
+        expression: SyntaxNode,
+        open_brace: SyntaxToken,
+        match_cases: Vec<MatchCaseNode>,
+        close_brace: SyntaxToken,
+    ) -> SyntaxNode {
+        let location = TextLocation::bounds(match_keyword.location, close_brace.location);
+        Self {
+            kind: SyntaxNodeKind::MatchStatement(MatchStatementNodeKind {
+                match_keyword,
+                expression: Box::new(expression),
+                open_brace,
+                match_cases,
+                close_brace,
+            }),
+            location,
+            is_inserted: false,
+        }
+    }
+
     pub fn assignment(
         lhs: SyntaxNode,
         expression: SyntaxNode,
@@ -565,6 +588,7 @@ pub enum SyntaxNodeKind {
     VariableDeclaration(VariableDeclarationNodeKind),
     ReturnStatement(ReturnStatementNodeKind),
     WhileStatement(WhileStatementNodeKind),
+    MatchStatement(MatchStatementNodeKind),
     Assignment(AssignmentNodeKind),
     ExpressionStatement(ExpressionStatementNodeKind),
 
@@ -971,6 +995,40 @@ pub struct WhileStatementNodeKind {
     pub while_keyword: SyntaxToken,
     pub condition: Box<SyntaxNode>,
     pub body: Box<SyntaxNode>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchStatementNodeKind {
+    pub match_keyword: SyntaxToken,
+    pub expression: Box<SyntaxNode>,
+    pub open_brace: SyntaxToken,
+    pub match_cases: Vec<MatchCaseNode>,
+    pub close_brace: SyntaxToken,
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchCaseNode {
+    pub expression: Either<SyntaxToken, SyntaxNode>,
+    pub fat_arrow: SyntaxToken,
+    pub body: SyntaxNode,
+}
+
+impl MatchCaseNode {
+    pub(crate) fn new(
+        expression: Either<SyntaxToken, SyntaxNode>,
+        fat_arrow: SyntaxToken,
+        body: SyntaxNode,
+    ) -> MatchCaseNode {
+        Self {
+            expression,
+            fat_arrow,
+            body,
+        }
+    }
+
+    // pub fn location(&self) -> TextLocation {
+    //     TextLocation::bounds(for_both!(&self.expression, e => e.location), self.body.location)
+    // }
 }
 
 #[derive(Debug, Clone)]

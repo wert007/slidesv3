@@ -255,6 +255,17 @@ fn execute_function(
         );
         state.pc += 1;
     }
+    match state.debugger_state.session_state {
+        debugger::SessionState::Continue => {
+            debugger::create_session(state);
+        }
+        debugger::SessionState::SkipFunction => {
+            if nestedness == debug_nestedness {
+                debugger::create_session(state);
+            }
+        }
+        debugger::SessionState::Quit => {}
+    }
     state.pc = old_pc;
     state.registers = old_registers;
     state.protected_registers = old_protected_registers;
@@ -269,7 +280,7 @@ fn execute_function(
 
 fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
     match instruction.op_code {
-        OpCode::Label => unreachable!(),
+        OpCode::Label | OpCode::Unknown => unreachable!(),
         OpCode::NoOp => {}
         OpCode::Breakpoint => evaluate_breakpoint(state, instruction),
         OpCode::LoadImmediate => evaluate_load_immediate(state, instruction),

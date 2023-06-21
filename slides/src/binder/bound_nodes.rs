@@ -300,6 +300,22 @@ impl BoundNode {
         }
     }
 
+    pub(crate) fn match_statement(
+        location: TextLocation,
+        expression: BoundNode,
+        cases: Vec<BoundMatchCase>,
+    ) -> Self {
+        Self {
+            location,
+            kind: BoundNodeKind::MatchStatement(BoundMatchStatementNodeKind {
+                expression: Box::new(expression),
+                cases,
+            }),
+            type_: typeid!(Type::Void),
+            constant_value: None,
+        }
+    }
+
     /// for i in iterator {
     ///     body
     /// }
@@ -663,6 +679,7 @@ pub enum BoundNodeKind {
     IfStatement(BoundIfStatementNodeKind),
     VariableDeclaration(BoundVariableDeclarationNodeKind),
     WhileStatement(BoundWhileStatementNodeKind),
+    MatchStatement(BoundMatchStatementNodeKind),
     Assignment(BoundAssignmentNodeKind),
     ExpressionStatement(BoundExpressionStatementNodeKind),
     ReturnStatement(BoundReturnStatementNodeKind),
@@ -692,6 +709,7 @@ impl BoundNodeKind {
             BoundNodeKind::IfStatement(base) => base.for_each_child_mut(function),
             BoundNodeKind::VariableDeclaration(base) => base.for_each_child_mut(function),
             BoundNodeKind::WhileStatement(base) => base.for_each_child_mut(function),
+            BoundNodeKind::MatchStatement(base) => base.for_each_child_mut(function),
             BoundNodeKind::Assignment(base) => base.for_each_child_mut(function),
             BoundNodeKind::ExpressionStatement(base) => base.for_each_child_mut(function),
             BoundNodeKind::ReturnStatement(base) => base.for_each_child_mut(function),
@@ -1025,6 +1043,46 @@ impl BoundWhileStatementNodeKind {
         self.condition.for_each_child_mut(function);
         function(&mut self.body);
         self.body.for_each_child_mut(function);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundMatchStatementNodeKind {
+    pub expression: Box<BoundNode>,
+    pub cases: Vec<BoundMatchCase>,
+}
+
+impl BoundMatchStatementNodeKind {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
+        function(&mut self.expression);
+        self.expression.for_each_child_mut(function);
+        for case in &mut self.cases {
+            case.for_each_child_mut(function);
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoundMatchCase {
+    pub expression: Option<Box<BoundNode>>,
+    pub body: Box<BoundNode>,
+}
+
+impl BoundMatchCase {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
+        if let Some(e) = &mut self.expression {
+            function(e);
+            e.for_each_child_mut(function);
+        }
+        function(&mut self.body);
+        self.body.for_each_child_mut(function);
+    }
+
+    pub fn new(expression: Option<BoundNode>, body: BoundNode) -> BoundMatchCase {
+        Self {
+            expression: expression.map(Box::new),
+            body: Box::new(body),
+        }
     }
 }
 

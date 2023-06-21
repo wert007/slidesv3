@@ -18,6 +18,7 @@ pub enum OpCode {
     TypeIdentifier = 14,
     Label = 15,
     Rotate = 16,
+    Unknown = 17,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,

@@ -3,7 +3,7 @@ pub mod syntax_nodes;
 mod tests;
 
 use std::collections::VecDeque;
-
+use either::Either;
 use crate::{
     diagnostics::DiagnosticBag,
     lexer::{
@@ -16,7 +16,7 @@ use crate::{
 };
 
 use self::syntax_nodes::{
-    ElseClause, EnumBodyNode, EnumValueNode, ParameterNode, StructBodyNode, SyntaxNode, TypeNode,
+    ElseClause, EnumBodyNode, EnumValueNode, ParameterNode, StructBodyNode, SyntaxNode, TypeNode, MatchCaseNode,
 };
 
 struct Parser<'a, 'b> {
@@ -426,6 +426,7 @@ fn parse_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
         SyntaxTokenKind::LetKeyword => parse_variable_declaration(parser),
         SyntaxTokenKind::ReturnKeyword => parse_return_statement(parser),
         SyntaxTokenKind::WhileKeyword => parse_while_statement(parser),
+        SyntaxTokenKind::MatchKeyword => parse_match_statement(parser),
         _ => parse_assignment_statement(parser),
     }
 }
@@ -542,6 +543,33 @@ fn parse_while_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
     let condition = parse_expression(parser);
     let body = parse_block_statement(parser);
     SyntaxNode::while_statement(while_keyword, condition, body)
+}
+
+fn parse_match_statement(parser: &mut Parser) -> SyntaxNode {
+    let match_keyword = parser.match_token(SyntaxTokenKind::MatchKeyword);
+    let expression = parse_expression(parser);
+    let open_brace = parser.match_token(SyntaxTokenKind::LBrace);
+    let mut match_cases = Vec::new();
+    while parser.peek_token().kind != SyntaxTokenKind::Eoi && parser.peek_token().kind != SyntaxTokenKind::RBrace {
+        let token_count = parser.token_count();
+        match_cases.push(parse_match_case(parser));
+        if parser.token_count() == token_count {
+            parser.next_token();
+        }
+    }
+    let close_brace = parser.match_token(SyntaxTokenKind::RBrace);
+    SyntaxNode::match_statement(match_keyword, expression, open_brace, match_cases, close_brace)
+}
+
+fn parse_match_case(parser: &mut Parser) -> MatchCaseNode {
+    let expression = if parser.peek_token().kind == SyntaxTokenKind::ElseKeyword {
+        Either::Left(parser.next_token())
+    } else {
+        Either::Right(parse_expression(parser))
+    };
+    let fat_arrow = parser.match_token(SyntaxTokenKind::FatArrow);
+    let body = parse_block_statement(parser);
+    MatchCaseNode::new(expression, fat_arrow, body)
 }
 
 fn parse_assignment_statement(parser: &mut Parser<'_, '_>) -> SyntaxNode {
@@ -664,6 +692,7 @@ fn parse_primary(parser: &mut Parser<'_, '_>) -> SyntaxNode {
             let rparen = parser.match_token(SyntaxTokenKind::RParen);
             SyntaxNode::parenthesized(lparen, expression, rparen)
         }
+        SyntaxTokenKind::DictKeyword => parse_dictionary_literal(parser),
         SyntaxTokenKind::ListKeyword | SyntaxTokenKind::LBracket => parse_array_literal(parser),
         SyntaxTokenKind::NumberLiteral => parse_number_literal(parser),
         SyntaxTokenKind::StringLiteral => parse_string_literal(parser),
@@ -684,6 +713,25 @@ fn parse_primary(parser: &mut Parser<'_, '_>) -> SyntaxNode {
             SyntaxNode::error(location)
         }
     }
+}
+
+#[allow(unused_variables)]
+fn parse_dictionary_literal(parser: &mut Parser) -> SyntaxNode {
+    let dict_keyword = parser.match_token(SyntaxTokenKind::DictKeyword);
+    let open_bracket = parser.match_token(SyntaxTokenKind::LBracket);
+    let mut values = Vec::new();
+    while parser.peek_token().kind != SyntaxTokenKind::Eoi && parser.peek_token().kind != SyntaxTokenKind::RBracket {
+        let key = parse_expression(parser);
+        let fat_arrow = parser.match_token(SyntaxTokenKind::FatArrow);
+        let value = parse_expression(parser);
+        if parser.peek_token().kind != SyntaxTokenKind::RBracket {
+            let comma = parser.match_token(SyntaxTokenKind::Comma);
+        }
+        values.push((key, value));
+    }
+    let close_bracket = parser.match_token(SyntaxTokenKind::RBracket);
+    unimplemented!()
+    // SyntaxNode::dictionary_literal(dict_keyword, open_bracket, values, close_bracket)
 }
 
 fn parse_array_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {

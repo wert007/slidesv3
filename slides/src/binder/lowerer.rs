@@ -6,9 +6,9 @@ use super::{
         BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
         BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind,
         BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind,
-        BoundIfStatementNodeKind, BoundNode, BoundRepetitionNodeKind, BoundReturnStatementNodeKind,
-        BoundSystemCallNodeKind, BoundUnaryNodeKind, BoundVariableDeclarationNodeKind,
-        BoundWhileStatementNodeKind,
+        BoundIfStatementNodeKind, BoundMatchStatementNodeKind, BoundNode, BoundRepetitionNodeKind,
+        BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
+        BoundVariableDeclarationNodeKind, BoundWhileStatementNodeKind,
     },
     typing::TypeId,
 };
@@ -150,6 +150,9 @@ fn flatten_node(node: BoundNode, flattener: &mut Flattener) -> Vec<BoundNode> {
         BoundNodeKind::WhileStatement(while_statement) => {
             flatten_while_statement(while_statement, flattener)
         }
+        BoundNodeKind::MatchStatement(match_statement) => {
+            flatten_match_statement(match_statement, flattener)
+        }
         BoundNodeKind::Jump(_) => unreachable!(),
     }
 }
@@ -208,7 +211,8 @@ fn flatten_expression(node: BoundNode, flattener: &mut Flattener) -> BoundNode {
         | BoundNodeKind::Label(_)
         | BoundNodeKind::LabelReference(_)
         | BoundNodeKind::ErrorExpression => node,
-        BoundNodeKind::WhileStatement(_) => unreachable!("WhileStatments are no expressions!"),
+        BoundNodeKind::WhileStatement(_) => unreachable!("WhileStatements are no expressions!"),
+        BoundNodeKind::MatchStatement(_) => unreachable!("MatchStatements are no expressions!"),
         BoundNodeKind::FunctionDeclaration(_) => {
             unreachable!("FunctionDeclarations are no expressions!")
         }
@@ -427,7 +431,12 @@ fn flatten_repetition_node(
 ) -> BoundNode {
     let expression = flatten_expression(*repetition_node.expression, flattener);
     let repetition = flatten_expression(*repetition_node.repetition, flattener);
-    BoundNode::repetition_node(location, repetition_node.counting_variable, expression, repetition)
+    BoundNode::repetition_node(
+        location,
+        repetition_node.counting_variable,
+        expression,
+        repetition,
+    )
 }
 
 fn flatten_function_declaration(
@@ -510,6 +519,14 @@ fn flatten_while_statement(
     ));
     result.push(label_skip);
     result
+}
+
+#[allow(unused_variables)]
+fn flatten_match_statement(
+    match_statement: BoundMatchStatementNodeKind,
+    flattener: &mut Flattener,
+) -> Vec<BoundNode> {
+    todo!()
 }
 
 fn create_label(location: TextLocation, flattener: &mut Flattener) -> (BoundNode, BoundNode) {

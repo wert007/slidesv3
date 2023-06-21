@@ -106,6 +106,9 @@ fn print_bound_node_as_code_with_indent(
         BoundNodeKind::WhileStatement(while_statement) => {
             print_bound_node_while_statement_as_code(while_statement, types, printer, buffer)
         }
+        BoundNodeKind::MatchStatement(match_statement) => {
+            print_bound_node_match_statement_as_code(match_statement, types, printer, buffer).unwrap()
+        }
         BoundNodeKind::Assignment(assignment) => {
             print_bound_node_assignment_as_code(assignment, types, printer, buffer)
         }
@@ -133,7 +136,12 @@ fn print_bound_node_function_declaration_as_code(
     if function_declaration.is_main {
         buffer.push_str("func main() ");
     } else {
-        write!(buffer, "{} ", types.name_of_type_id(function_declaration.function_type)).unwrap();
+        write!(
+            buffer,
+            "{} ",
+            types.name_of_type_id(function_declaration.function_type)
+        )
+        .unwrap();
     }
     print_bound_node_as_code_with_indent(&function_declaration.body, types, printer, buffer);
     writeln!(buffer).unwrap();
@@ -324,7 +332,12 @@ fn print_bound_node_conversion_as_code(
     buffer.push_str(&types.name_of_type_id(closure.type_));
 }
 
-fn print_bound_node_repetition_node_as_code(repetition_node: &BoundRepetitionNodeKind, types: &TypeCollection, printer: DebugPrinter, buffer: &mut String) {
+fn print_bound_node_repetition_node_as_code(
+    repetition_node: &BoundRepetitionNodeKind,
+    types: &TypeCollection,
+    printer: DebugPrinter,
+    buffer: &mut String,
+) {
     print_bound_node_as_code_with_indent(&repetition_node.expression, types, printer, buffer);
     write!(buffer, "; ").unwrap();
     print_bound_node_as_code_with_indent(&repetition_node.repetition, types, printer, buffer);
@@ -385,6 +398,36 @@ fn print_bound_node_while_statement_as_code(
     print_bound_node_as_code_with_indent(&while_statement.condition, types, printer, buffer);
     buffer.push(' ');
     print_bound_node_as_code_with_indent(&while_statement.body, types, printer, buffer);
+}
+
+fn print_bound_node_match_statement_as_code(
+    match_statement: &BoundMatchStatementNodeKind,
+    types: &TypeCollection,
+    mut printer: DebugPrinter,
+    buffer: &mut String,
+) -> std::fmt::Result {
+    printer.output_indentation(buffer);
+    write!(buffer, "match ")?;
+    print_bound_node_as_code_with_indent(&match_statement.expression, types, printer, buffer);
+    writeln!(buffer, "{{")?;
+    printer.indent += 4;
+    for case in &match_statement.cases {
+        printer.output_indentation(buffer);
+        if let Some(expression) = &case.expression {
+            print_bound_node_as_code_with_indent(expression, types, printer, buffer);
+        } else {
+            write!(buffer, "else")?;
+        }
+        write!(buffer, " => ")?;
+        printer.indent += 4;
+        print_bound_node_as_code_with_indent(&case.body, types, printer, buffer);
+        printer.indent -= 4;
+        writeln!(buffer)?;
+    }
+    printer.indent -= 4;
+    printer.output_indentation(buffer);
+    writeln!(buffer, "}}")?;
+    Ok(())
 }
 
 fn print_bound_node_assignment_as_code(

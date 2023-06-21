@@ -10,7 +10,7 @@ use crate::instruction_converter::{
 
 use super::{
     bound_nodes::BoundNode,
-    typing::{GenericTypeId, TypeId, TypeCollection},
+    typing::{GenericTypeId, TypeCollection, TypeId},
 };
 
 #[derive(Clone)]
@@ -71,7 +71,10 @@ impl Library {
     }
 
     pub fn look_up_enum_by_name(&self, name: &str, types: &TypeCollection) -> Option<TypeId> {
-        self.enums.iter().find(|e| types.name_of_type_id(**e) == name).copied()
+        self.enums
+            .iter()
+            .find(|e| types.name_of_type_id(**e) == name)
+            .copied()
     }
 
     pub fn relocate_labels(&mut self, label_offset: usize) {
@@ -293,7 +296,7 @@ impl<'a> TryFrom<&'a str> for StructFunctionKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct GenericFunction {
     pub function_label: u64,
     pub function_name: String,
@@ -312,3 +315,14 @@ impl PartialEq for GenericFunction {
 }
 
 impl Eq for GenericFunction {}
+
+impl std::fmt::Debug for GenericFunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GenericFunction")
+            .field("function_label", &self.function_label)
+            .field("function_name", &self.function_name)
+            .field("function_type", &self.function_type)
+            .field("labels", &self.labels)
+            .finish()
+    }
+}
