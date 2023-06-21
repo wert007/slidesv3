@@ -1168,24 +1168,22 @@ fn bind_with_project_parameter<'a>(
             .iter()
             .filter(|f| {
                 let (_, name) = f.function_name.split_once("::").unwrap();
-                name == unfixed.function_name
+                name == unfixed.function_name || f.function_name == unfixed.function_name
             })
             .next()
-            .unwrap()
+            .unwrap_or_else(|| panic!("Expected some function with name {}!", unfixed.function_name))
             .body
             .clone();
-        let label_relocations: HashMap<_, _> = binder.project.types[unfixed.base_generic_struct]
+        let old_struct_type = binder.project.types[unfixed.base_generic_struct]
             .as_struct_type()
-            .unwrap()
+            .unwrap();
+        let new_struct_type = binder.project.types[unfixed.base_struct]
+            .as_struct_type()
+            .unwrap();
+        let label_relocations: HashMap<_, _> = old_struct_type
             .functions
             .iter()
-            .zip(
-                binder.project.types[unfixed.base_struct]
-                    .as_struct_type()
-                    .unwrap()
-                    .functions
-                    .iter(),
-            )
+            .zip(new_struct_type.functions.iter())
             .map(|(old, new)| {
                 assert_eq!(new.name, old.name);
                 (
@@ -1193,6 +1191,13 @@ fn bind_with_project_parameter<'a>(
                     new.offset_or_address.unwrap_address(),
                 )
             })
+            .chain(
+                old_struct_type
+                    .function_table
+                    .function_symbols_iter()
+                    .zip(new_struct_type.function_table.function_symbols_iter())
+                    .map(|(old, new)| (old.function_label as usize, new.function_label as usize)),
+            )
             .collect();
         generic_function.for_each_child_mut(&mut |n| {
             n.type_ = binder
@@ -1398,6 +1403,7 @@ fn bind_function_declaration_body<'a>(
     }
     let body = BoundNode::block_statement(location, body_statements);
     let result = BoundNode::function_declaration(
+        TextLocation::bounds(node.header_location, body.location),
         label,
         node.is_main,
         body,
@@ -3020,6 +3026,71 @@ fn bind_generic_struct_type_for_types_no_lookup(
             m
         })
         .collect();
+    generic_struct
+        .function_table
+        .function_symbols_iter()
+        .for_each(|f| {
+            // FIXME: This assertions sadly does not hold true. It would very
+            // nice if it would, but right now there is no code hitting this.
+            // let new_type = binder
+            //     .project
+            //     .types
+            //     .replace_in_type_for_types(f.function_type, &replace, types)
+            //     .expect("Da fuck?");
+            // assert_eq!(
+            //     f.function_type,
+            //     new_type,
+            //     "{} vs {}
+            //     {:#?}
+            //     VERSUS
+            //     {:#?}",
+            //     binder.project.types.name_of_type_id_debug(f.function_type),
+            //     binder.project.types.name_of_type_id_debug(new_type),
+            //     binder.project.types[f.function_type],
+            //     binder.project.types[new_type],
+            // );
+            // let label = binder.generate_label();
+            let parameters = binder.project.types[f.function_type]
+                .as_function_type()
+                .unwrap()
+                .parameter_types
+                .iter()
+                // This is the "this" argument of the function. It doesn't
+                // really matter, what type we use, since we are only interested
+                // in a numbered list!
+                .chain(Some(&typeid!(Type::Error)))
+                .enumerate()
+                .map(|(i, _)| i as u64)
+                .collect();
+            let mut body = BoundNode::function_declaration(
+                TextLocation::zero_in_file(binder.source_text),
+                f.function_label as _,
+                false,
+                BoundNode::error(TextLocation::zero_in_file(binder.source_text)),
+                parameters,
+                None,
+                f.function_type,
+            );
+            body.for_each_child_mut(&mut |n| {
+                n.type_ = binder
+                    .project
+                    .types
+                    .replace_in_type_for_types(n.type_, &replace, types)
+                    .expect("Da fuck..");
+            });
+            let index_to_change = binder.bound_functions.len();
+            binder
+                .bound_functions_without_actual_body
+                .push(UnfixedBoundFunction {
+                    bound_function_index: index_to_change,
+                    base_generic_struct: struct_id,
+                    function_name: f.name.clone(),
+                    applied_types: types.to_vec(),
+                    base_struct: id,
+                });
+            binder.bound_functions.push(body);
+            // new_f.function_label = label as _;
+        });
     let mut functions: Vec<_> = generic_struct
         .functions
         .iter()
@@ -3044,6 +3115,7 @@ fn bind_generic_struct_type_for_types_no_lookup(
                 .map(|(i, _)| i as u64)
                 .collect();
             let mut body = BoundNode::function_declaration(
+                TextLocation::zero_in_file(binder.source_text),
                 label,
                 false,
                 BoundNode::error(TextLocation::zero_in_file(binder.source_text)),
@@ -3132,15 +3204,17 @@ fn bind_generic_struct_type_for_types_no_lookup(
             binder,
         );
         match StructFunctionKind::try_from(bare_function_name) {
-            Ok(it) => function_table.set(
-                it,
-                FunctionSymbol {
-                    name: function_name.clone(),
-                    function_type: function,
-                    function_label: label as u64,
-                    is_member_function: false,
-                },
-            ),
+            Ok(it) => {
+                function_table.set(
+                    it,
+                    FunctionSymbol {
+                        name: function_name.clone(),
+                        function_type: function,
+                        function_label: label as u64,
+                        is_member_function: false,
+                    },
+                );
+            }
             Err(_) => {}
         }
         functions.push(Member {
@@ -4515,8 +4589,15 @@ fn bind_generic_function_for_type(
             _ => {}
         }
     });
-    let function =
-        BoundNode::function_declaration(label, false, body, parameters, None, function_type);
+    let function = BoundNode::function_declaration(
+        generic_function.body.location,
+        label,
+        false,
+        body,
+        parameters,
+        None,
+        function_type,
+    );
     binder.bound_functions.push(function);
     function_type
 }

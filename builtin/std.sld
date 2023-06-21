@@ -349,7 +349,7 @@ struct Dict<Key, Value> {
         this.bucket = list [hack3_1.clone(); length];
         this.length = 0;
 
-        for b in this.bucket {
+        for b in oldBucket {
             for e in b {
                 this[e.key] = e.value;
             }

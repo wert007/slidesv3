@@ -533,6 +533,7 @@ impl BoundNode {
     }
 
     pub fn function_declaration(
+        location: TextLocation,
         label: usize,
         is_main: bool,
         body: BoundNode,
@@ -541,7 +542,7 @@ impl BoundNode {
         function_type: TypeId,
     ) -> Self {
         Self {
-            location: body.location,
+            location,
             kind: BoundNodeKind::FunctionDeclaration(BoundFunctionDeclarationNodeKind {
                 label,
                 is_main,

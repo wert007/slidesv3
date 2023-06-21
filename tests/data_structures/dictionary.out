@@ -1,1 +1,6 @@
-Error in ..\tests\data_structures\dictionary.sld:86:8: A struct named KeyValuePair was already declared.
+[steve => 8, tom => 5, roger => 2, ]
+steve is the name of 8 people
+tom is the name of 5 people
+roger is the name of 2 people
+[tom10 => 4, tom => 4, tom1 => 4, tom2 => 4, tom3 => 4, tom4 => 4, tom5 => 4, tom6 => 4, tom7 => 4, tom8 => 4, tom9 => 4, ]
+= 0
