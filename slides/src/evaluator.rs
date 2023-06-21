@@ -151,14 +151,7 @@ pub fn evaluate(
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
         Ok(None) => {
-            for (variable, value) in state.registers.iter().enumerate() {
-                if value.is_pointer() {
-                    println!("{:00}: #{}", variable, value.unwrap_pointer())
-                } else {
-                    println!("{:00}: {}", variable, value.unwrap_value() as i64)
-                }
-            }
-            Value::Integer(-1)
+            Value::Integer(0)
         }
         Err(()) => {
             if debug_flags.use_debugger {
