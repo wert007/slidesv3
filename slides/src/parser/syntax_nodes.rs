@@ -225,6 +225,25 @@ impl SyntaxNode {
         }
     }
 
+    pub fn dictionary_literal(
+        dict_keyword: SyntaxToken,
+        lbracket: SyntaxToken,
+        values: Vec<(SyntaxNode, SyntaxNode)>,
+        rbracket: SyntaxToken,
+    ) -> Self {
+        let location = TextLocation::bounds(dict_keyword.location, rbracket.location);
+        Self {
+            kind: SyntaxNodeKind::DictionaryLiteral(DictionaryLiteralNodeKind {
+                dict_keyword,
+                lbracket,
+                values,
+                rbracket,
+            }),
+            location,
+            is_inserted: false,
+        }
+    }
+
     pub fn repetition_node(
         base_expression: SyntaxNode,
         semicolon_token: SyntaxToken,
@@ -570,6 +589,7 @@ pub enum SyntaxNodeKind {
     // Expressions
     Literal(LiteralNodeKind),
     ArrayLiteral(ArrayLiteralNodeKind),
+    DictionaryLiteral(DictionaryLiteralNodeKind),
     RepetitionNode(RepetitionNodeNodeKind),
     CastExpression(CastExpressionNodeKind),
     ConstructorCall(ConstructorCallNodeKind),
@@ -846,6 +866,15 @@ pub struct ArrayLiteralNodeKind {
     pub lbracket: SyntaxToken,
     pub children: Vec<SyntaxNode>,
     pub comma_tokens: Vec<SyntaxToken>,
+    pub rbracket: SyntaxToken,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct DictionaryLiteralNodeKind {
+    pub dict_keyword: SyntaxToken,
+    pub lbracket: SyntaxToken,
+    pub values: Vec<(SyntaxNode, SyntaxNode)>,
     pub rbracket: SyntaxToken,
 }
 

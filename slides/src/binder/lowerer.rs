@@ -1,15 +1,7 @@
 use crate::{binder::bound_nodes::BoundNodeKind, text::TextLocation};
 
 use super::{
-    bound_nodes::{
-        BoundArrayIndexNodeKind, BoundArrayLiteralNodeKind, BoundAssignmentNodeKind,
-        BoundBinaryNodeKind, BoundBlockStatementNodeKind, BoundClosureNodeKind,
-        BoundConstructorCallNodeKind, BoundConversionNodeKind, BoundExpressionStatementNodeKind,
-        BoundFieldAccessNodeKind, BoundFunctionCallNodeKind, BoundFunctionDeclarationNodeKind,
-        BoundIfStatementNodeKind, BoundMatchStatementNodeKind, BoundNode, BoundRepetitionNodeKind,
-        BoundReturnStatementNodeKind, BoundSystemCallNodeKind, BoundUnaryNodeKind,
-        BoundVariableDeclarationNodeKind, BoundWhileStatementNodeKind,
-    },
+    bound_nodes::*,
     typing::TypeId,
 };
 

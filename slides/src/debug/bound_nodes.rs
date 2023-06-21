@@ -188,6 +188,7 @@ fn print_bound_node_array_literal_expression_as_code(
     printer: DebugPrinter,
     buffer: &mut String,
 ) {
+    // FIXME: How do we print list literals?
     buffer.push_str("[ ");
     for element in &array_literal_expression.children {
         print_bound_node_as_code_with_indent(element, types, printer, buffer);

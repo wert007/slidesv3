@@ -1171,7 +1171,12 @@ fn bind_with_project_parameter<'a>(
                 name == unfixed.function_name || f.function_name == unfixed.function_name
             })
             .next()
-            .unwrap_or_else(|| panic!("Expected some function with name {}!", unfixed.function_name))
+            .unwrap_or_else(|| {
+                panic!(
+                    "Expected some function with name {}!",
+                    unfixed.function_name
+                )
+            })
             .body
             .clone();
         let old_struct_type = binder.project.types[unfixed.base_generic_struct]
@@ -2528,6 +2533,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode, binder: &mut BindingState<'b>) -> BoundNo
         SyntaxNodeKind::ArrayLiteral(array_literal) => {
             bind_array_literal(node.location, array_literal, binder)
         }
+        SyntaxNodeKind::DictionaryLiteral(dictionary_literal) => {
+            bind_dictionary_literal(node.location, dictionary_literal, binder)
+        }
         SyntaxNodeKind::CastExpression(cast_expression) => {
             bind_cast_expression(node.location, cast_expression, binder)
         }
@@ -2684,6 +2692,154 @@ fn bind_array_literal_first_child<'a>(
     let children = children
         .into_iter()
         .map(|c| bind_conversion(c, type_, binder))
+        .collect();
+    (type_, children)
+}
+
+fn bind_dictionary_literal<'a, 'b>(
+    span: TextLocation,
+    mut dictionary_literal: DictionaryLiteralNodeKind,
+    binder: &mut BindingState<'b>,
+) -> BoundNode {
+    let dict_type = binder
+        .project
+        .types
+        .look_up_type_by_name("Dict")
+        .expect("Failed to load type Dict from std lib.")
+        .unwrap_generic_type_id();
+    let expected_type = if let Some(struct_type) = binder
+        .expected_type
+        .map(|t| binder.project.types[t].as_struct_type())
+        .flatten()
+    {
+        let key_type = struct_type.applied_types[0];
+        let value_type = struct_type.applied_types[1];
+        Some((key_type, value_type))
+    } else {
+        None
+    };
+    if dictionary_literal.values.is_empty() {
+        assert!(
+            expected_type.is_some(),
+            "TODO: Add diagnostic for underspecified dictionary literals!"
+        );
+        let type_ = bind_generic_struct_type_for_types(
+            dict_type,
+            &[expected_type.unwrap().0, expected_type.unwrap().1],
+            binder,
+        );
+        let function = binder.project.types[type_]
+            .as_struct_type()
+            .unwrap()
+            .function_table
+            .constructor_function
+            .as_ref()
+            .map(|f| f.function_label);
+        return BoundNode::constructor_call(span, Vec::new(), type_, function);
+    }
+    let first_child = dictionary_literal.values.remove(0);
+    let (mut type_, mut values) =
+        bind_dictionary_literal_first_child(first_child, expected_type, binder);
+    for (key, value) in dictionary_literal.values {
+        let key = bind_node(key, binder);
+        // If we only read integer literals until now, and the current entry is
+        // not an integer literal, try using it as the element type of the
+        // array.
+        if type_.0 == typeid!(Type::IntegerLiteral) && key.type_ != typeid!(Type::IntegerLiteral) {
+            if binder.project.types.can_be_converted(type_.0, key.type_) {
+                // FIXME: Do we need to update all children until now??
+                type_.0 = key.type_.clone();
+            }
+        }
+        let key = bind_conversion(key, type_.0, binder);
+
+        let value = bind_node(value, binder);
+        // If we only read integer literals until now, and the current entry is
+        // not an integer literal, try using it as the element type of the
+        // array.
+        if type_.1 == typeid!(Type::IntegerLiteral) && value.type_ != typeid!(Type::IntegerLiteral)
+        {
+            if binder.project.types.can_be_converted(type_.1, value.type_) {
+                // FIXME: Do we need to update all children until now??
+                type_.1 = value.type_.clone();
+            }
+        }
+        let value = bind_conversion(value, type_.1, binder);
+
+        values.push((key, value));
+    }
+    if type_.0 == typeid!(Type::IntegerLiteral) {
+        type_.0 = typeid!(Type::Integer(IntegerType::Signed64));
+    }
+    if type_.1 == typeid!(Type::IntegerLiteral) {
+        type_.1 = typeid!(Type::Integer(IntegerType::Signed64));
+    }
+    let type_ = bind_generic_struct_type_for_types(dict_type, &[type_.0, type_.1], binder);
+    let mut expressions = Vec::with_capacity(values.len());
+    let temporary_variable = binder
+        .register_variable("$tmpDictionary".to_owned(), type_, false)
+        .expect("Failed to declare temporary variable!");
+    let function = binder.project.types[type_]
+        .as_struct_type()
+        .unwrap()
+        .function_table
+        .constructor_function
+        .as_ref()
+        .map(|f| f.function_label);
+
+    expressions.push(BoundNode::assignment(
+        span,
+        BoundNode::variable(span, temporary_variable, type_),
+        BoundNode::constructor_call(span, Vec::new(), type_, function),
+    ));
+    let set_function = binder.project.types[type_]
+        .as_struct_type()
+        .unwrap()
+        .function_table
+        .set_function
+        .clone()
+        .unwrap();
+    let set_function = BoundNode::label_reference(
+        span,
+        set_function.function_label as _,
+        set_function.function_type,
+    );
+    for (key, value) in values {
+        expressions.push(BoundNode::expression_statement(span, BoundNode::function_call(
+            span,
+            set_function.clone(),
+            vec![
+                key,
+                value,
+                BoundNode::variable(span, temporary_variable, type_),
+            ],
+            false,
+            typeid!(Type::Void),
+        )));
+    }
+    expressions.push(BoundNode::variable(span, temporary_variable, type_));
+    BoundNode::block_expression(span, expressions, type_)
+}
+
+fn bind_dictionary_literal_first_child<'a>(
+    first_child: (SyntaxNode, SyntaxNode),
+    expected_type: Option<(TypeId, TypeId)>,
+    binder: &mut BindingState<'_>,
+) -> ((TypeId, TypeId), Vec<(BoundNode, BoundNode)>) {
+    let children = vec![(
+        bind_node(first_child.0, binder),
+        bind_node(first_child.1, binder),
+    )];
+    let type_ = expected_type.unwrap_or_else(|| (children[0].0.type_, children[0].1.type_));
+    // If expected_type was None, this would be a noop.
+    let children = children
+        .into_iter()
+        .map(|c| {
+            (
+                bind_conversion(c.0, type_.0, binder),
+                bind_conversion(c.1, type_.1, binder),
+            )
+        })
         .collect();
     (type_, children)
 }

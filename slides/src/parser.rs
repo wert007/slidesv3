@@ -730,8 +730,7 @@ fn parse_dictionary_literal(parser: &mut Parser) -> SyntaxNode {
         values.push((key, value));
     }
     let close_bracket = parser.match_token(SyntaxTokenKind::RBracket);
-    unimplemented!()
-    // SyntaxNode::dictionary_literal(dict_keyword, open_bracket, values, close_bracket)
+    SyntaxNode::dictionary_literal(dict_keyword, open_bracket, values, close_bracket)
 }
 
 fn parse_array_literal(parser: &mut Parser<'_, '_>) -> SyntaxNode {

@@ -79,6 +79,14 @@ fn print_syntax_node_as_code_with_indent(
                 buffer,
             )
         }
+        SyntaxNodeKind::DictionaryLiteral(dictionary_literal) => {
+            print_syntax_node_dictionary_literal_as_code_with_indent(
+                dictionary_literal,
+                source_text_collection,
+                printer,
+                buffer,
+            )
+        }
         SyntaxNodeKind::RepetitionNode(repetition_node) => {
             print_syntax_node_repetition_node_as_code_with_indent(
                 repetition_node,
@@ -473,11 +481,35 @@ fn print_syntax_node_array_literal_as_code_with_indent(
     printer: DebugPrinter,
     buffer: &mut String,
 ) -> std::fmt::Result {
+    if array_literal.optional_array_list_keyword.is_some() {
+        write!(buffer, "list ")?;
+    }
     write!(buffer, "[ ")?;
     for child in &array_literal.children {
         print_syntax_node_as_code_with_indent(child, source_text_collection, printer, buffer)?;
         write!(buffer, ", ")?;
     }
+    write!(buffer, "]")?;
+    Ok(())
+}
+
+fn print_syntax_node_dictionary_literal_as_code_with_indent(
+    dictionary_literal: &DictionaryLiteralNodeKind,
+    source_text_collection: &SourceTextCollection,
+    mut printer: DebugPrinter,
+    buffer: &mut String,
+) -> std::fmt::Result {
+    writeln!(buffer, "dict [ ")?;
+    printer.indent += 4;
+    for (key, value) in &dictionary_literal.values {
+        printer.output_indentation(buffer);
+        print_syntax_node_as_code_with_indent(key, source_text_collection, printer, buffer)?;
+        write!(buffer, " => ")?;
+        print_syntax_node_as_code_with_indent(value, source_text_collection, printer, buffer)?;
+        writeln!(buffer, ", ")?;
+    }
+    printer.indent -= 4;
+    printer.output_indentation(buffer);
     write!(buffer, "]")?;
     Ok(())
 }

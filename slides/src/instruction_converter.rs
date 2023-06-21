@@ -233,7 +233,7 @@ pub fn convert_with_project_parameter<'a>(
         );
     }
     if converter.project.debug_flags.print_static_memory_as_string {
-        memory::static_memory::print_static_memory_as_string(&converter.static_memory);
+        println!("{:?}", memory::static_memory::print_static_memory_as_string(&converter.static_memory));
     }
     Program {
         startup_instructions: vec![],

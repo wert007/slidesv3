@@ -220,7 +220,10 @@ pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
         argument
     );
     for location in &state.stack_trace {
-        println!("  ...{}", location.display(&state.project.source_text_collection));
+        println!(
+            "  ...{}",
+            location.display(&state.project.source_text_collection)
+        );
     }
     state.runtime_error_happened = true;
 }
@@ -260,11 +263,7 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         }
         Type::Function(_) => todo!(),
         Type::Closure(_) => todo!(),
-        Type::Struct(s) => hash_array(
-            s.size_in_bytes,
-            argument.unwrap_pointer(),
-            state,
-        ),
+        Type::Struct(s) => hash_array(s.size_in_bytes, argument.unwrap_pointer(), state),
         Type::Pointer => argument.unwrap_value(),
         Type::PointerOf(type_) => {
             let argument = state.read_pointer(argument.unwrap_pointer()).clone();
@@ -281,7 +280,8 @@ fn hash_array(length: u64, pointer: u64, state: &mut EvaluatorState) -> u64 {
     let too_many_bits = length % WORD_SIZE_IN_BYTES;
     hash = ((hash << 5) + hash)
         + (state
-            .read_pointer(pointer + bytes_to_word(length) * WORD_SIZE_IN_BYTES).value
+            .read_pointer(pointer + bytes_to_word(length) * WORD_SIZE_IN_BYTES - WORD_SIZE_IN_BYTES)
+            .value
             & ((1 << too_many_bits) - 1));
     hash
 }
