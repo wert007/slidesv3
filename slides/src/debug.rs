@@ -50,6 +50,7 @@ pub struct DebugFlags {
     pub run_program: bool,
     pub slow_mode: bool,
     pub use_debugger: bool,
+    pub print_lines: bool,
 }
 
 impl DebugFlags {

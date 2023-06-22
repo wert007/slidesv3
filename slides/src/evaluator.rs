@@ -10,7 +10,7 @@ use crate::{
         Program,
     },
     value::Value,
-    DiagnosticBag, Project, text::TextLocation,
+    DiagnosticBag, Project, text::{TextLocation, SourceTextId},
 };
 use num_enum::TryFromPrimitive;
 
@@ -46,6 +46,7 @@ pub struct EvaluatorState {
     protected_pointers: Vec<u64>,
     pub project: Project,
     stack_trace: Vec<TextLocation>,
+    last_visible_source_line: (SourceTextId, usize),
 }
 
 impl EvaluatorState {
@@ -99,6 +100,20 @@ impl EvaluatorState {
     fn protect_pointer(&mut self, pointer: u64) {
         self.protected_pointers.push(pointer);
     }
+
+    fn maybe_print_source_code_line(&mut self) {
+        if !self.project.debug_flags.print_lines {
+            return;
+        }
+        let location = self.instructions[self.pc].location;
+        let position = (location.source_text, location.line_index(&self.project.source_text_collection));
+        if self.last_visible_source_line == position {
+            return;
+        }
+        self.last_visible_source_line = position;
+        let line = self.project.source_text_collection[self.last_visible_source_line.0].line(self.last_visible_source_line.1).trim();
+        println!("{:4}: {line}", position.1 + 1);
+    }
 }
 
 impl std::fmt::Debug for EvaluatorState {
@@ -147,6 +162,7 @@ pub fn evaluate(
         debugger_state: debugger::DebuggerState::default(),
         protected_pointers: vec![],
         project,
+        last_visible_source_line: (unsafe {SourceTextId::from_raw(0)}, 0),
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
@@ -185,6 +201,7 @@ fn execute_function(
     let mut stack_sizes = vec![state.stack.len()];
     while state.pc < state.instructions.len() {
         let pc = state.pc;
+        state.maybe_print_source_code_line();
         if state.project.debug_flags.print_current_instruction() {
             println!(
                 "  CI {:X}*{}: {}",

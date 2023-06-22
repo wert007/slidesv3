@@ -69,6 +69,9 @@ args:
   - debugger:
       help: Starts the debugger, if a program had a runtime error
       long: debugger
+  - print-lines:
+      help: Prints the current line of the source code, that is executed. Similiar to --di but less details.
+      long: dlines
 author: Pablo H.
 name: Slides
 version: '0.1'

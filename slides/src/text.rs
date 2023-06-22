@@ -95,6 +95,11 @@ impl SourceText {
             .to_str()
             .unwrap()
     }
+
+    pub(crate) fn line(&self, index: usize) -> &str {
+        let line = self.lines[index];
+        &self.text[line.start..][..line.length]
+    }
 }
 
 fn parse_text_lines(text: &str) -> Vec<TextLine> {
@@ -192,6 +197,11 @@ impl TextLocation {
                 source_text.file_name, start_line, start_column
             )
         }
+    }
+
+    pub(crate) fn line_index(&self, source_text_collection: &SourceTextCollection) -> usize {
+        let source_text = &source_text_collection[self.source_text];
+        source_text.line_index(self.span.start())
     }
 }
 

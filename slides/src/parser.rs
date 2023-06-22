@@ -721,11 +721,15 @@ fn parse_dictionary_literal(parser: &mut Parser) -> SyntaxNode {
     let open_bracket = parser.match_token(SyntaxTokenKind::LBracket);
     let mut values = Vec::new();
     while parser.peek_token().kind != SyntaxTokenKind::Eoi && parser.peek_token().kind != SyntaxTokenKind::RBracket {
+        let token_count = parser.token_count();
         let key = parse_expression(parser);
         let fat_arrow = parser.match_token(SyntaxTokenKind::FatArrow);
         let value = parse_expression(parser);
         if parser.peek_token().kind != SyntaxTokenKind::RBracket {
             let comma = parser.match_token(SyntaxTokenKind::Comma);
+        }
+        if token_count == parser.token_count() {
+            parser.next_token();
         }
         values.push((key, value));
     }
