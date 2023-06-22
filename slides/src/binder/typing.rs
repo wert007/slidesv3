@@ -312,30 +312,6 @@ impl TypeCollection {
                 result
             }
         };
-        if id == 28 {
-            // panic!();
-        }
-        if id == 31 {
-            // thread 'main' panicked at 'explicit panic', slides\src\binder\typing.rs:300:13
-            // stack backtrace:
-            //    0: std::panicking::begin_panic_handler
-            //              at /rustc/84c898d65adf2f39a5a98507f1fe0ce10a2b8dbc/library\std\src\panicking.rs:579
-            //    1: core::panicking::panic_fmt
-            //              at /rustc/84c898d65adf2f39a5a98507f1fe0ce10a2b8dbc/library\core\src\panicking.rs:64
-            //    2: core::panicking::panic
-            //              at /rustc/84c898d65adf2f39a5a98507f1fe0ce10a2b8dbc/library\core\src\panicking.rs:114
-            //    3: slides::binder::typing::TypeCollection::look_up_or_add_type
-            //              at .\slides\src\binder\typing.rs:300
-            //    4: slides::binder::typing::TypeCollection::to_fake_type_id
-            //              at .\slides\src\binder\typing.rs:641
-            //    5: slides::binder::bind_function_declaration_for_struct
-            //              at .\slides\src\binder.rs:1630
-            //    6: slides::binder::bind_struct_body
-            //              at .\slides\src\binder.rs:2097
-            //    7: slides::binder::bind_with_project_parameter
-            //              at .\slides\src\binder.rs:964
-            // panic!();
-        }
         TypeId(id as u64)
     }
 
@@ -469,7 +445,7 @@ impl TypeCollection {
             Type::Library(_) => "library".into(),
             Type::Pointer => "ptr".into(),
             Type::PointerOf(inner) => format!("&{}", self.name_of_type_id(*inner)).into(),
-            Type::GenericType(index) => format!("$Type#{index}").into(),
+            Type::GenericType(_index, name) => format!("${name}").into(),
             Type::Enum(name, _) => name.into(),
             Type::StructPlaceholder(it) => it.name.clone().into(),
         }
@@ -597,10 +573,20 @@ impl TypeCollection {
         replace: &[TypeId],
         replace_with: &[TypeId],
     ) -> Result<TypeId, (StructType, Vec<TypeId>)> {
+        if replace.len() != replace_with.len() {
+            eprintln!("replace (len = {})", replace.len());
+            for r in replace {
+                eprintln!("  {}", self.name_of_type_id_debug(*r));
+            }
+            eprintln!("replace_with (len = {})", replace_with.len());
+            for r in replace_with {
+                eprintln!("  {}", self.name_of_type_id_debug(*r));
+            }
+            panic!();
+        }
         if let Some(index) = replace.iter().position(|r| type_ == *r) {
             return Ok(replace_with[index]);
         }
-        assert_eq!(replace.len(), replace_with.len());
         match &self[type_] {
             Type::StructPlaceholder(it) => {
                 dbg!(&it.name);
@@ -644,20 +630,12 @@ impl TypeCollection {
             Type::Struct(struct_type) if !struct_type.applied_types.is_empty() => {
                 let mut name = format!("{}<", struct_type.name.split_once('<').unwrap().0);
                 let mut applied_types = struct_type.applied_types.clone();
-                let generic_base_type = struct_type.generic_base_type;
                 let struct_type = struct_type.clone();
                 for t in &mut applied_types {
                     *t = self.replace_in_type_for_types(*t, replace, replace_with)?;
                 }
-                let generic_parameter_names = generic_base_type
-                    .map(|i| self[i].as_struct_type_with_generic_parameters().unwrap());
                 for t in &applied_types {
-                    let type_name = if let Type::GenericType(index) = &self[*t] {
-                        generic_parameter_names.unwrap()[*index].as_str().into()
-                    } else {
-                        self.name_of_type_id(*t)
-                    };
-                    write!(name, "{}, ", type_name).unwrap();
+                    write!(name, "{}, ", self.name_of_type_id(*t)).unwrap();
                 }
                 write!(name, ">").unwrap();
                 match self.look_up_type_by_name(&name).map(|s| s.unwrap_type_id()) {
@@ -674,16 +652,9 @@ impl TypeCollection {
         struct_id: GenericTypeId,
         types: &[TypeId],
     ) -> String {
-        let parameter_names = self[struct_id]
-            .as_struct_type_with_generic_parameters()
-            .unwrap();
         let mut result = format!("{}<", self.name_of_generic_type_id(struct_id));
         for type_ in types {
-            if let Type::GenericType(index) = &self[*type_] {
-                write!(result, "{}, ", parameter_names[*index]).unwrap();
-            } else {
-                write!(result, "{}, ", self.name_of_type_id(*type_)).unwrap();
-            }
+            write!(result, "{}, ", self.name_of_type_id(*type_)).unwrap();
         }
         write!(result, ">").unwrap();
         result
@@ -703,8 +674,8 @@ impl TypeCollection {
                     write!(result, ">").unwrap();
                     result
                 };
-                let applied_types = (0..it.generic_parameters.len())
-                    .map(|i| self.look_up_or_add_type(Type::GenericType(i)))
+                let applied_types = (it.generic_parameters.iter().enumerate())
+                    .map(|(i, n)| self.look_up_or_add_type(Type::GenericType(i, n.to_owned())))
                     .collect();
                 self.look_up_or_add_type(Type::StructPlaceholder(StructPlaceholderType {
                     name,
@@ -714,13 +685,13 @@ impl TypeCollection {
             }
             GenericType::Struct(generic_struct) => {
                 // todo!()
-                let applied_types = (0..generic_struct.generic_parameters.len())
-                    .map(|i| self.look_up_or_add_type(Type::GenericType(i)))
+                let applied_types = (generic_struct.generic_parameters.iter().enumerate())
+                    .map(|(i, n)| self.look_up_or_add_type(Type::GenericType(i, n.to_owned())))
                     .collect();
                 let name = {
                     let mut result = format!("{}<", generic_struct.struct_type.name);
                     for t in &generic_struct.generic_parameters {
-                        write!(result, "{t}, ").unwrap();
+                        write!(result, "${t}, ").unwrap();
                     }
                     write!(result, ">").unwrap();
                     result
@@ -870,14 +841,6 @@ impl GenericType {
         }
     }
 
-    fn as_struct_type_with_generic_parameters(&self) -> Option<&[String]> {
-        match self {
-            GenericType::Struct(it) => Some(&it.generic_parameters),
-            GenericType::StructPlaceholder(it) => Some(&it.generic_parameters),
-            _ => None,
-        }
-    }
-
     pub(crate) fn as_struct_type_mut(&mut self) -> Option<&mut StructType> {
         match self {
             GenericType::Struct(it) => Some(&mut it.struct_type),
@@ -928,7 +891,7 @@ pub enum Type {
     Library(usize),
     Pointer,
     PointerOf(TypeId),
-    GenericType(usize),
+    GenericType(usize, String),
     StructPlaceholder(StructPlaceholderType),
     Enum(String, Vec<String>),
 }
@@ -979,7 +942,7 @@ impl Type {
             | Type::Noneable(_)
             | Type::Pointer
             | Type::PointerOf(_)
-            | Type::GenericType(_)
+            | Type::GenericType(_, _)
             | Type::String => WORD_SIZE_IN_BYTES,
         }
     }
@@ -987,7 +950,7 @@ impl Type {
     pub fn array_element_size_in_bytes(&self) -> u64 {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
-            Type::GenericType(_) => panic!("Generic Types should only be accessed during binding!"),
+            Type::GenericType(_, _) => panic!("Generic Types should only be accessed during binding!"),
             Type::Void | Type::Any | Type::Error => unreachable!(),
             Type::String => 1,
             _ => unreachable!("TODO: String should be a struct I think, then this function would not be needed anymore at all!"),
@@ -997,7 +960,7 @@ impl Type {
     pub fn is_pointer(&self) -> bool {
         match self {
             Type::Library(_) => panic!("Libraries should only be accessed during binding!"),
-            Type::GenericType(_) => panic!("Generic Types should only be accessed during binding!"),
+            Type::GenericType(_, _) => panic!("Generic Types should only be accessed during binding!"),
             Type::Enum(..) => todo!("Implement enums at runtime"),
             Type::StructPlaceholder(..) => panic!("This is only a placeholder type!"),
             Type::Error

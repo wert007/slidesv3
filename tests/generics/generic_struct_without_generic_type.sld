@@ -3,5 +3,6 @@ struct A<Type> {
 }
 
 func main() {
-    let a = new A(3);
+    let a: A<string> = new A(99);
+    let b = new A(3);
 }

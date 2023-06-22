@@ -326,7 +326,7 @@ struct List<Type> {
         return result;
     }
 
-    // func $cast() -> Array<$Type> {
+    // func $cast<$Type[]>() -> $Type[] {
     //     return new Array(this.length, this.buffer);
     // }
 }
@@ -421,10 +421,6 @@ struct KeyValuePair<Key, Value> {
     value: $Value;
 }
 
-// generic cast List<$Type> : Array<$Type> {
-//     return new Array(this.length, this.buffer);
-// }
-
 // generic struct Noneable {
 //     buffer: &$Type;
 
@@ -453,6 +449,14 @@ struct KeyValuePair<Key, Value> {
 //         this.value = reallocate(none, 8);
 //         this.value[0] = value;
 //         this.type_identifier = typeOf : $Type;
+//     }
+
+//     func $cast<Type>() -> $Type {
+//         if this.type_identifier == typeOf : $Type {
+//             return ignoreTypechecking(this.value);
+//         } else {
+//             return none;
+//         }
 //     }
 // }
 

@@ -288,7 +288,7 @@ fn load_library_into_binder<'a>(
             let function_type = binder.project.types[function.function_type].clone();
             let function_type = binder.project.types.look_up_or_add_type(function_type);
 
-            binder.register_generated_constant(
+            binder.register_constant(
                 function.name.clone(),
                 Value::LabelPointer(function.function_label as usize, function_type),
             );
@@ -299,7 +299,7 @@ fn load_library_into_binder<'a>(
                 let function_type = binder.project.types[function.function_type].clone();
                 let function_type = binder.project.types.look_up_or_add_type(function_type);
 
-                binder.register_generated_constant(
+                binder.register_constant(
                     format!("{}.{}", name, function.name),
                     Value::LabelPointer(function.function_label as usize, function_type),
                 );

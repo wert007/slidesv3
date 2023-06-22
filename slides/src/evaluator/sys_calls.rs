@@ -65,7 +65,7 @@ fn decode_type(address: &FlaggedWord, state: &mut EvaluatorState) -> TypeId {
 fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
     match &state.project.types[type_] {
         Type::Library(_)
-        | Type::GenericType(_)
+        | Type::GenericType(_, _)
         | Type::IntegerLiteral
         | Type::StructPlaceholder(..) => unreachable!("{:#?}", &state.project.types[type_]),
         Type::Error => todo!(),
@@ -243,7 +243,7 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         | Type::Void
         | Type::IntegerLiteral
         | Type::Library(_)
-        | Type::GenericType(_)
+        | Type::GenericType(_, _)
         | Type::StructPlaceholder(_) => unreachable!(),
         Type::Any => {
             let type_ = decode_type(argument, state);

@@ -480,6 +480,13 @@ struct UnfixedBoundFunction {
     applied_types: Vec<TypeId>,
 }
 
+struct UnfixedGenericType {
+    location: TextLocation,
+    struct_id: GenericTypeId,
+    type_id: TypeId,
+    applied_types: Vec<TypeId>,
+}
+
 struct BindingState<'b> {
     project: &'b mut Project,
     // debug_flags: DebugFlags,
@@ -558,8 +565,7 @@ struct BindingState<'b> {
     /// afterwards.
     expected_type: Option<TypeId>,
 
-    generic_placeholder_types_that_need_to_be_bound_for_a_type:
-        VecDeque<(GenericTypeId, TypeId, Vec<TypeId>)>,
+    generic_placeholder_types_that_need_to_be_bound_for_a_type: VecDeque<UnfixedGenericType>,
     bound_functions_without_actual_body: Vec<UnfixedBoundFunction>,
 }
 
@@ -617,29 +623,13 @@ impl BindingState<'_> {
         }
     }
 
-    fn register_constant(&mut self, name: TextLocation, value: Value) -> Option<u64> {
+    fn register_constant(&mut self, name: impl Into<SourceCow>, value: Value) -> Option<u64> {
         let index = self.constants.len() as u64;
+        let name = name.into();
         let constant_name_already_registered = self.constants.iter().any(|c| {
             c.identifier.as_str(&self.project.source_text_collection)
-                == &self.project.source_text_collection[name]
+                == name.as_str(&self.project.source_text_collection)
         });
-        if constant_name_already_registered {
-            None
-        } else {
-            self.constants.push(BoundConstant {
-                identifier: name.into(),
-                value,
-            });
-            Some(index)
-        }
-    }
-
-    fn register_generated_constant(&mut self, name: String, value: Value) -> Option<u64> {
-        let index = self.constants.len() as u64;
-        let constant_name_already_registered = self
-            .constants
-            .iter()
-            .any(|c| c.identifier.as_str(&self.project.source_text_collection) == name);
         if constant_name_already_registered {
             None
         } else {
@@ -737,8 +727,13 @@ impl BindingState<'_> {
     }
 
     fn look_up_type_by_name(&mut self, name: &str) -> Option<TypeOrGenericTypeId> {
-        let generic_types: Vec<_> = (0..self.available_generic_types.len())
-            .map(|i| self.project.types.look_up_or_add_type(Type::GenericType(i)))
+        let generic_types: Vec<_> = (self.available_generic_types.iter().enumerate())
+            .map(|(i, n)| {
+                self.project.types.look_up_or_add_type(Type::GenericType(
+                    i,
+                    n.clone().to_owned(&self.project.source_text_collection),
+                ))
+            })
             .collect();
         self.available_generic_types
             .iter()
@@ -747,7 +742,19 @@ impl BindingState<'_> {
                     && t.as_str(&self.project.source_text_collection) == &name[1..]
             })
             .map(|i| generic_types[i].into())
-            .or_else(|| self.project.types.look_up_type_by_name(name))
+            .or_else(|| {
+                self.project
+                    .types
+                    .look_up_type_by_name(name)
+                    .filter(|t| match t {
+                        TypeOrGenericTypeId::Type(id)
+                            if matches!(self.project.types[*id], Type::GenericType(..)) =>
+                        {
+                            false
+                        }
+                        _ => true,
+                    })
+            })
     }
 
     pub fn generate_label(&mut self) -> usize {
@@ -824,6 +831,7 @@ impl BindingState<'_> {
 
     fn replace_in_type_for_types(
         &mut self,
+        location: TextLocation,
         type_: TypeId,
         replace: &[TypeId],
         replace_with: &[TypeId],
@@ -836,11 +844,12 @@ impl BindingState<'_> {
             Ok(it) => it,
             Err((struct_type, applied_types)) => {
                 let t = bind_generic_struct_type_for_types(
+                    location,
                     struct_type.generic_base_type.unwrap(),
                     &applied_types,
                     self,
                 );
-                self.replace_in_type_for_types(t, replace, replace_with)
+                self.replace_in_type_for_types(location, t, replace, replace_with)
             }
         }
     }
@@ -1048,12 +1057,13 @@ fn bind_with_project_parameter<'a>(
             generic_parameter_count,
             binder.available_generic_types.len()
         );
-        let applied_types: Vec<_> = (0..binder.available_generic_types.len())
-            .map(|i| {
-                binder
-                    .project
-                    .types
-                    .look_up_or_add_type(Type::GenericType(i))
+        let applied_types: Vec<_> = (binder.available_generic_types.iter().enumerate())
+            .map(|(i, n)| {
+                binder.project.types.look_up_or_add_type(Type::GenericType(
+                    i,
+                    n.to_owned()
+                        .to_owned(&binder.project.source_text_collection),
+                ))
             })
             .collect();
         let name = binder
@@ -1073,25 +1083,33 @@ fn bind_with_project_parameter<'a>(
         );
     }
 
-    while let Some((struct_id, type_id, applied_type)) = binder
+    while let Some(unfixed) = binder
         .generic_placeholder_types_that_need_to_be_bound_for_a_type
         .pop_back()
     {
-        let struct_name = binder.project.types.name_of_type_id(type_id).into_owned();
+        let struct_name = binder
+            .project
+            .types
+            .name_of_type_id(unfixed.type_id)
+            .into_owned();
         bind_generic_struct_type_for_types_no_lookup(
+            unfixed.location,
             &mut binder,
-            type_id,
-            struct_id,
+            unfixed.type_id,
+            unfixed.struct_id,
             struct_name,
-            &applied_type,
+            &unfixed.applied_types,
         );
-        let new_type = binder.project.types[type_id].clone();
+        let new_type = binder.project.types[unfixed.type_id].clone();
         if matches!(new_type, Type::StructPlaceholder(..)) {
             binder
                 .generic_placeholder_types_that_need_to_be_bound_for_a_type
-                .push_front((struct_id, type_id, applied_type));
+                .push_front(unfixed);
         } else {
-            binder.project.types.overwrite_type(type_id, new_type);
+            binder
+                .project
+                .types
+                .overwrite_type(unfixed.type_id, new_type);
         }
     }
 
@@ -1151,14 +1169,15 @@ fn bind_with_project_parameter<'a>(
     }
 
     while let Some(unfixed) = binder.bound_functions_without_actual_body.pop() {
-        let replace: Vec<_> = (0..binder.project.types[unfixed.base_generic_struct]
+        let generic_parameters = binder.project.types[unfixed.base_generic_struct]
             .generic_parameters()
-            .len())
-            .map(|i| {
+            .to_owned();
+        let replace: Vec<_> = (generic_parameters.into_iter().enumerate())
+            .map(|(i, n)| {
                 binder
                     .project
                     .types
-                    .look_up_or_add_type(Type::GenericType(i))
+                    .look_up_or_add_type(Type::GenericType(i, n.clone()))
             })
             .collect();
 
@@ -1219,6 +1238,7 @@ fn bind_with_project_parameter<'a>(
                 }
                 BoundNodeKind::Conversion(it) => {
                     it.type_ = binder.replace_in_type_for_types(
+                        n.location,
                         it.type_,
                         &replace,
                         &unfixed.applied_types,
@@ -1226,6 +1246,7 @@ fn bind_with_project_parameter<'a>(
                 }
                 BoundNodeKind::ConstructorCall(it) => {
                     it.base_type = binder.replace_in_type_for_types(
+                        n.location,
                         it.base_type,
                         &replace,
                         &unfixed.applied_types,
@@ -1427,11 +1448,6 @@ fn bind_generic_function_declaration_body<'a>(
 ) -> (BoundNode, Vec<usize>) {
     binder.available_generic_types = node.available_generic_types;
     let fixed_variable_count = binder.variable_table.len();
-    // let label = node.function_label as usize;
-    binder
-        .project
-        .types
-        .maybe_print_type_table(binder.project.debug_flags);
     let mut parameters = Vec::with_capacity(node.parameters.len());
     for (variable_name, variable_type) in node.parameters {
         let variable_type = match variable_type {
@@ -1538,29 +1554,29 @@ fn bind_generic_function_declaration_body<'a>(
 }
 
 fn default_statements(binder: &mut BindingState) {
-    binder.register_generated_constant("print".into(), Value::SystemCall(SystemCallKind::Print));
-    binder.register_generated_constant(
-        "heapdump".into(),
+    binder.register_constant("print".to_owned(), Value::SystemCall(SystemCallKind::Print));
+    binder.register_constant(
+        "heapdump".to_owned(),
         Value::SystemCall(SystemCallKind::HeapDump),
     );
-    binder.register_generated_constant("break".into(), Value::SystemCall(SystemCallKind::Break));
-    binder.register_generated_constant(
-        "reallocate".into(),
+    binder.register_constant("break".to_owned(), Value::SystemCall(SystemCallKind::Break));
+    binder.register_constant(
+        "reallocate".to_owned(),
         Value::SystemCall(SystemCallKind::Reallocate),
     );
-    binder.register_generated_constant(
-        "runtimeError".into(),
+    binder.register_constant(
+        "runtimeError".to_owned(),
         Value::SystemCall(SystemCallKind::RuntimeError),
     );
-    binder.register_generated_constant(
-        "addressOf".into(),
+    binder.register_constant(
+        "addressOf".to_owned(),
         Value::SystemCall(SystemCallKind::AddressOf),
     );
-    binder.register_generated_constant(
-        "garbageCollect".into(),
+    binder.register_constant(
+        "garbageCollect".to_owned(),
         Value::SystemCall(SystemCallKind::GarbageCollect),
     );
-    binder.register_generated_constant("hash".into(), Value::SystemCall(SystemCallKind::Hash));
+    binder.register_constant("hash".to_owned(), Value::SystemCall(SystemCallKind::Hash));
 }
 
 fn std_imports(binder: &mut BindingState, source_text: SourceTextId) {
@@ -1790,7 +1806,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                         None
                     } else {
                         let function_label = binder.generate_label() as u64;
-                        binder.register_generated_constant(
+                        binder.register_constant(
                             function_name.clone(),
                             Value::LabelPointer(function_label as usize, type_.clone()),
                         );
@@ -1916,7 +1932,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                             for t in &binder.available_generic_types {
                                 write!(
                                     result,
-                                    "{}, ",
+                                    "${}, ",
                                     t.as_str(&binder.project.source_text_collection)
                                 )
                                 .unwrap();
@@ -1924,7 +1940,7 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                             write!(result, ">::{}", function_name).unwrap();
                             result
                         };
-                        binder.register_generated_constant(
+                        binder.register_constant(
                             function_name.clone(),
                             Value::LabelPointer(function_label as usize, type_.clone()),
                         );
@@ -2138,12 +2154,13 @@ fn bind_struct_declaration<'a, 'b>(
                 .unwrap();
             }
             write!(name, ">").unwrap();
-            let applied_types = (0..generic_parameters.len())
-                .map(|i| {
-                    binder
-                        .project
-                        .types
-                        .look_up_or_add_type(Type::GenericType(i))
+            let applied_types = (generic_parameters.iter().enumerate())
+                .map(|(i, n)| {
+                    binder.project.types.look_up_or_add_type(Type::GenericType(
+                        i,
+                        n.to_owned()
+                            .to_owned(&binder.project.source_text_collection),
+                    ))
                 })
                 .collect();
             binder
@@ -2335,11 +2352,12 @@ fn bind_struct_body<'a>(
                     offset += type_.size_in_bytes();
                     offset - type_.size_in_bytes()
                 };
-                for i in 0..binder.available_generic_types.len() {
-                    let generic_type = binder
-                        .project
-                        .types
-                        .look_up_or_add_type(Type::GenericType(i));
+                for (i, n) in binder.available_generic_types.iter().enumerate() {
+                    let generic_type = binder.project.types.look_up_or_add_type(Type::GenericType(
+                        i,
+                        n.to_owned()
+                            .to_owned(&binder.project.source_text_collection),
+                    ));
                     if binder.project.types.contains_type(type_, generic_type) {
                         used_generic_type[i] = true;
                     }
@@ -2434,7 +2452,7 @@ fn bind_parameter(
 
 fn bind_type(type_: TypeNode, binder: &mut BindingState) -> TypeOrGenericTypeId {
     let type_name = binder.lexeme(type_.type_name);
-    let type_span = type_.location();
+    let type_location = type_.location();
     let mut result = if let Some(library_token) = &type_.library_name {
         let library_name = binder.lexeme(*library_token);
         let library_variable = binder.look_up_variable_or_constant_by_name(library_name);
@@ -2465,7 +2483,7 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> TypeOrGenericTypeId 
     }
     .unwrap_or_else(|| {
         binder.diagnostic_bag.report_unknown_type(
-            type_span,
+            type_location,
             &type_.full_type_name(&binder.project.source_text_collection),
         );
         typeid!(Type::Error).into()
@@ -2478,7 +2496,7 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> TypeOrGenericTypeId 
     if !generic_type_qualifiers.is_empty() {
         if generic_type_qualifiers
             .iter()
-            .all(|t| matches!(&binder.project.types[*t], Type::GenericType(_)))
+            .all(|t| matches!(&binder.project.types[*t], Type::GenericType(_, _)))
         {
             result = binder
                 .project
@@ -2487,6 +2505,7 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> TypeOrGenericTypeId 
                 .into();
         } else {
             result = bind_generic_struct_type_for_types(
+                type_location,
                 result.unwrap_generic_type_id(),
                 &generic_type_qualifiers,
                 binder,
@@ -2517,6 +2536,7 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> TypeOrGenericTypeId 
             .unwrap_generic_type_id();
         for _ in &type_.brackets {
             let new_type = bind_generic_struct_type_for_types(
+                type_location,
                 array_base_type,
                 &[result.unwrap_type_id()],
                 binder,
@@ -2620,7 +2640,7 @@ fn bind_literal(span: TextLocation, literal: LiteralNodeKind, _: &mut BindingSta
 }
 
 fn bind_array_literal<'a, 'b>(
-    span: TextLocation,
+    location: TextLocation,
     mut array_literal: ArrayLiteralNodeKind,
     binder: &mut BindingState<'b>,
 ) -> BoundNode {
@@ -2653,9 +2673,13 @@ fn bind_array_literal<'a, 'b>(
             expected_type.is_some(),
             "TODO: Add diagnostic for underspecified array literals!"
         );
-        let type_ =
-            bind_generic_struct_type_for_types(array_type, &[expected_type.unwrap()], binder);
-        return BoundNode::array_literal(span, Vec::new(), type_);
+        let type_ = bind_generic_struct_type_for_types(
+            location,
+            array_type,
+            &[expected_type.unwrap()],
+            binder,
+        );
+        return BoundNode::array_literal(location, Vec::new(), type_);
     }
     let first_child = array_literal.children.remove(0);
     let (mut type_, mut children) =
@@ -2677,8 +2701,8 @@ fn bind_array_literal<'a, 'b>(
     if type_ == typeid!(Type::IntegerLiteral) {
         type_ = typeid!(Type::Integer(IntegerType::Signed64));
     }
-    let type_ = bind_generic_struct_type_for_types(array_type, &[type_], binder);
-    BoundNode::array_literal(span, children, type_)
+    let type_ = bind_generic_struct_type_for_types(location, array_type, &[type_], binder);
+    BoundNode::array_literal(location, children, type_)
 }
 
 fn bind_array_literal_first_child<'a>(
@@ -2697,7 +2721,7 @@ fn bind_array_literal_first_child<'a>(
 }
 
 fn bind_dictionary_literal<'a, 'b>(
-    span: TextLocation,
+    location: TextLocation,
     mut dictionary_literal: DictionaryLiteralNodeKind,
     binder: &mut BindingState<'b>,
 ) -> BoundNode {
@@ -2724,6 +2748,7 @@ fn bind_dictionary_literal<'a, 'b>(
             "TODO: Add diagnostic for underspecified dictionary literals!"
         );
         let type_ = bind_generic_struct_type_for_types(
+            location,
             dict_type,
             &[expected_type.unwrap().0, expected_type.unwrap().1],
             binder,
@@ -2735,7 +2760,7 @@ fn bind_dictionary_literal<'a, 'b>(
             .constructor_function
             .as_ref()
             .map(|f| f.function_label);
-        return BoundNode::constructor_call(span, Vec::new(), type_, function);
+        return BoundNode::constructor_call(location, Vec::new(), type_, function);
     }
     let first_child = dictionary_literal.values.remove(0);
     let (mut type_, mut values) =
@@ -2774,7 +2799,8 @@ fn bind_dictionary_literal<'a, 'b>(
     if type_.1 == typeid!(Type::IntegerLiteral) {
         type_.1 = typeid!(Type::Integer(IntegerType::Signed64));
     }
-    let type_ = bind_generic_struct_type_for_types(dict_type, &[type_.0, type_.1], binder);
+    let type_ =
+        bind_generic_struct_type_for_types(location, dict_type, &[type_.0, type_.1], binder);
     let mut expressions = Vec::with_capacity(values.len());
     let temporary_variable = binder
         .register_variable("$tmpDictionary".to_owned(), type_, false)
@@ -2788,9 +2814,9 @@ fn bind_dictionary_literal<'a, 'b>(
         .map(|f| f.function_label);
 
     expressions.push(BoundNode::assignment(
-        span,
-        BoundNode::variable(span, temporary_variable, type_),
-        BoundNode::constructor_call(span, Vec::new(), type_, function),
+        location,
+        BoundNode::variable(location, temporary_variable, type_),
+        BoundNode::constructor_call(location, Vec::new(), type_, function),
     ));
     let set_function = binder.project.types[type_]
         .as_struct_type()
@@ -2800,25 +2826,28 @@ fn bind_dictionary_literal<'a, 'b>(
         .clone()
         .unwrap();
     let set_function = BoundNode::label_reference(
-        span,
+        location,
         set_function.function_label as _,
         set_function.function_type,
     );
     for (key, value) in values {
-        expressions.push(BoundNode::expression_statement(span, BoundNode::function_call(
-            span,
-            set_function.clone(),
-            vec![
-                key,
-                value,
-                BoundNode::variable(span, temporary_variable, type_),
-            ],
-            false,
-            typeid!(Type::Void),
-        )));
+        expressions.push(BoundNode::expression_statement(
+            location,
+            BoundNode::function_call(
+                location,
+                set_function.clone(),
+                vec![
+                    key,
+                    value,
+                    BoundNode::variable(location, temporary_variable, type_),
+                ],
+                false,
+                typeid!(Type::Void),
+            ),
+        ));
     }
-    expressions.push(BoundNode::variable(span, temporary_variable, type_));
-    BoundNode::block_expression(span, expressions, type_)
+    expressions.push(BoundNode::variable(location, temporary_variable, type_));
+    BoundNode::block_expression(location, expressions, type_)
 }
 
 fn bind_dictionary_literal_first_child<'a>(
@@ -3015,14 +3044,14 @@ fn bind_constructor_call<'a>(
                 binder.expected_type = old_expected_type;
                 // TODO: Make this more general!
                 let parameter_type = if struct_type.is_generic {
-                    if let Type::GenericType(generic_type_index) =
-                        binder.project.types[parameter_type]
+                    if let Type::GenericType(generic_type_index, _name) =
+                        &binder.project.types[parameter_type]
                     {
-                        while binder.generic_types.len() <= generic_type_index {
+                        while binder.generic_types.len() <= *generic_type_index {
                             binder.generic_types.push(typeid!(Type::Void));
                         }
-                        if binder.generic_types[generic_type_index] == typeid!(Type::Void) {
-                            binder.generic_types[generic_type_index] = argument.type_.clone();
+                        if binder.generic_types[*generic_type_index] == typeid!(Type::Void) {
+                            binder.generic_types[*generic_type_index] = argument.type_.clone();
                         }
                         argument.type_.clone()
                     // } else if parameter_type
@@ -3067,6 +3096,7 @@ fn bind_constructor_call<'a>(
             {
                 resolved_struct_type = Some(
                     bind_generic_struct_type_for_types(
+                        location,
                         struct_id.unwrap_generic_type_id(),
                         &binder.generic_types.clone(),
                         binder,
@@ -3090,6 +3120,7 @@ fn bind_constructor_call<'a>(
 }
 
 fn bind_generic_struct_type_for_types(
+    location: TextLocation,
     struct_id: GenericTypeId,
     types: &[TypeId],
     binder: &mut BindingState,
@@ -3111,34 +3142,58 @@ fn bind_generic_struct_type_for_types(
         let id = binder
             .register_struct_name(struct_name.clone(), struct_function_table, types.to_vec())
             .expect("Add diagnostic message here?");
-        bind_generic_struct_type_for_types_no_lookup(binder, id, struct_id, struct_name, types);
+        bind_generic_struct_type_for_types_no_lookup(
+            location,
+            binder,
+            id,
+            struct_id,
+            struct_name,
+            types,
+        );
         id
     };
     id
 }
 
 fn bind_generic_struct_type_for_types_no_lookup(
+    location: TextLocation,
     binder: &mut BindingState,
     id: TypeId,
     struct_id: GenericTypeId,
     struct_name: String,
     types: &[TypeId],
 ) {
-    let replace: Vec<_> = (0..types.len())
-        .map(|i| {
-            binder
-                .project
-                .types
-                .look_up_or_add_type(Type::GenericType(i))
-        })
-        .collect();
+    let replace: Vec<_> = (binder.project.types[struct_id]
+        .generic_parameters()
+        .to_vec()
+        .iter()
+        .enumerate())
+    .map(|(i, n)| {
+        binder
+            .project
+            .types
+            .look_up_or_add_type(Type::GenericType(i, n.to_owned()))
+    })
+    .collect();
+
+    if types.len() != replace.len() {
+        binder
+            .diagnostic_bag
+            .report_underspecified_generic_struct(location, struct_name);
+        return;
+    }
 
     let (generic_struct, _function_bodies): (_, HashMap<_, _>) =
         match &binder.project.types[struct_id] {
             GenericType::StructPlaceholder(_) => {
                 binder
                     .generic_placeholder_types_that_need_to_be_bound_for_a_type
-                    .push_back((struct_id, id, types.into()));
+                    .push_back(UnfixedGenericType {
+                        location,
+                        struct_id,
+                        type_id: id,
+                        applied_types: types.to_vec(),
+                    });
                 return;
             }
             GenericType::Struct(it) => (
@@ -3178,7 +3233,7 @@ fn bind_generic_struct_type_for_types_no_lookup(
         .iter()
         .cloned()
         .map(|mut m| {
-            m.type_ = binder.replace_in_type_for_types(m.type_, &replace, types);
+            m.type_ = binder.replace_in_type_for_types(location, m.type_, &replace, types);
             m
         })
         .collect();
@@ -3187,7 +3242,7 @@ fn bind_generic_struct_type_for_types_no_lookup(
         .function_symbols_iter()
         .for_each(|f| {
             // FIXME: This assertions sadly does not hold true. It would very
-            // nice if it would, but right now there is no code hitting this.
+            // nice if it would, but right now it is not necessary, it seems.
             // let new_type = binder
             //     .project
             //     .types
@@ -3298,7 +3353,7 @@ fn bind_generic_struct_type_for_types_no_lookup(
                 });
             binder.bound_functions.push(body);
             new_f.offset_or_address = MemberOffsetOrAddress::Address(label);
-            binder.register_generated_constant(
+            binder.register_constant(
                 format!(
                     "{}::{}",
                     binder.project.types.name_of_type_id(id),
@@ -3351,6 +3406,7 @@ fn bind_generic_struct_type_for_types_no_lookup(
         let bare_function_name = generic_function.function_name.split_once("::").unwrap().1;
         let function_name = format!("{}::{}", struct_name, bare_function_name,);
         let function = bind_generic_function_for_type(
+            location,
             generic_function,
             label,
             &function_labels_map,
@@ -4224,7 +4280,7 @@ fn bind_field_access<'a, 'b>(
         | Type::Closure(_)
         | Type::SystemCall(_)
         | Type::Pointer
-        | Type::GenericType(_)
+        | Type::GenericType(_, _)
         | Type::PointerOf(_)
         | Type::Noneable(_) => {
             binder
@@ -4385,7 +4441,7 @@ fn bind_field_access_for_assignment<'a>(
         | Type::Function(_)
         | Type::Pointer
         | Type::PointerOf(_)
-        | Type::GenericType(_)
+        | Type::GenericType(_, _)
         | Type::Closure(_) => {
             binder
                 .diagnostic_bag
@@ -4593,17 +4649,17 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
             result.push(BoundNode::error(argument.location));
             continue;
         }
-        let parameter_type = if let Type::GenericType(index) = &binder.project.types[parameter_type]
-        {
-            if binder.generic_types[*index] == typeid!(Type::Void) {
-                binder.generic_types[*index] = argument.type_;
-                argument.type_
+        let parameter_type =
+            if let Type::GenericType(index, _name) = &binder.project.types[parameter_type] {
+                if binder.generic_types[*index] == typeid!(Type::Void) {
+                    binder.generic_types[*index] = argument.type_;
+                    argument.type_
+                } else {
+                    parameter_type
+                }
             } else {
                 parameter_type
-            }
-        } else {
-            parameter_type
-        };
+            };
 
         argument = bind_conversion(argument, parameter_type, binder);
         result.push(argument);
@@ -4617,7 +4673,8 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
         let mut applied_types = vec![typeid!(Type::Void); binder.generic_types.len()];
         binder.generic_types.swap_with_slice(&mut applied_types);
         binder.generic_types.clear();
-        let type_id = bind_generic_struct_type_for_types(struct_id, &applied_types, binder);
+        let type_id =
+            bind_generic_struct_type_for_types(location, struct_id, &applied_types, binder);
         let struct_type = binder.project.types[type_id].as_struct_type().unwrap();
         (
             result,
@@ -4648,6 +4705,7 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
 
 // TODO: Move this to after the binding.
 fn bind_generic_function_for_type(
+    location: TextLocation,
     generic_function: &GenericFunction,
     label: usize,
     function_label_map: &HashMap<usize, usize>,
@@ -4656,28 +4714,29 @@ fn bind_generic_function_for_type(
     name: &str,
     binder: &mut BindingState<'_>,
 ) -> TypeId {
-    let replace: Vec<_> = (0..types.len())
-        .map(|i| {
-            binder
-                .project
-                .types
-                .look_up_or_add_type(Type::GenericType(i))
-        })
-        .collect();
+    let replace: Vec<_> = (binder.project.types[generic_function.function_type]
+        .generic_parameters()
+        .to_vec()
+        .into_iter()
+        .enumerate())
+    .map(|(i, n)| {
+        binder
+            .project
+            .types
+            .look_up_or_add_type(Type::GenericType(i, n))
+    })
+    .collect();
     let function_type = binder.project.types[generic_function.function_type]
         .as_function_type()
         .unwrap();
-    binder
-        .project
-        .types
-        .maybe_print_type_table(binder.project.debug_flags);
     let parameter_types: Vec<_> = function_type
         .parameter_types
         .iter()
         .copied()
-        .map(|t| binder.replace_in_type_for_types(t, &replace, &types))
+        .map(|t| binder.replace_in_type_for_types(location, t, &replace, &types))
         .collect();
-    let return_type = binder.replace_in_type_for_types(function_type.return_type, &replace, &types);
+    let return_type =
+        binder.replace_in_type_for_types(location, function_type.return_type, &replace, &types);
     let parameters = (0..parameter_types.len() as u64
         + if this_type != typeid!(Type::Void) {
             1
@@ -4696,7 +4755,7 @@ fn bind_generic_function_for_type(
             name: Some(name.to_owned().into()),
             is_generic: false,
         }));
-    binder.register_generated_constant(name.into(), Value::LabelPointer(label, function_type));
+    binder.register_constant(name.to_owned(), Value::LabelPointer(label, function_type));
     let mut body = function_call_replacer::replace_function_calls(
         generic_function.body.clone(),
         function_label_map,
@@ -4713,7 +4772,7 @@ fn bind_generic_function_for_type(
         .map(|l| (l, binder.generate_label()))
         .collect();
     body.for_each_child_mut(&mut |n| {
-        n.type_ = binder.replace_in_type_for_types(n.type_, &replace, &types);
+        n.type_ = binder.replace_in_type_for_types(location, n.type_, &replace, &types);
         match &mut n.kind {
             BoundNodeKind::Label(it) if label_relocations.contains_key(it) => {
                 *it = label_relocations[it]
@@ -4722,10 +4781,11 @@ fn bind_generic_function_for_type(
                 *it = label_relocations[it]
             }
             BoundNodeKind::Conversion(it) => {
-                it.type_ = binder.replace_in_type_for_types(it.type_, &replace, &types);
+                it.type_ = binder.replace_in_type_for_types(location, it.type_, &replace, &types);
             }
             BoundNodeKind::ConstructorCall(it) => {
-                it.base_type = binder.replace_in_type_for_types(it.base_type, &replace, &types);
+                it.base_type =
+                    binder.replace_in_type_for_types(location, it.base_type, &replace, &types);
                 it.function = binder.project.types[it.base_type]
                     .as_struct_type()
                     .map(|s| {
@@ -4804,7 +4864,7 @@ fn bind_condition_conversion<'a>(
             bind_conversion(base, typeid!(Type::Boolean), binder),
             SafeNodeInCondition::None,
         ),
-        Type::Library(_) | Type::GenericType(_) => unimplemented!(),
+        Type::Library(_) | Type::GenericType(_, _) => unimplemented!(),
         Type::StructPlaceholder(it) => unreachable!(
             "Internal Compiler error, struct placeholder '{}' should already be resolved.",
             it.name
