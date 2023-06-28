@@ -953,6 +953,10 @@ pub enum ConversionKind {
     Boxing,
     /// Conversion negates previous [`ConversionKind::Boxing`] conversion.
     Unboxing,
+    /// Very similiar to [`ConversionKind::Unboxing`], but this one keeps
+    /// primitives as pointers on the heap. This also means, that this works
+    /// with none values.
+    NoneableToPointer,
     /// Conversion turns value into an any type, with a type identifier.
     TypeBoxing,
     /// Reads the type of an any type and gives also the raw value.
@@ -983,7 +987,12 @@ impl BoundConversionNodeKind {
             .is_some()
             && !matches!(&type_collection[self.type_], Type::Any)
         {
-            return Some(ConversionKind::Unboxing);
+            let noneable_base_type = type_collection.noneable_base_type(self.base.type_).unwrap();
+            if &type_collection[self.type_] == &Type::PointerOf(noneable_base_type) {
+                return Some(ConversionKind::NoneableToPointer);
+            } else {
+                return Some(ConversionKind::Unboxing);
+            }
         }
         match (
             &type_collection[self.type_],

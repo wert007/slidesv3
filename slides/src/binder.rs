@@ -420,32 +420,6 @@ pub struct BoundGenericStructSymbol {
     pub functions: Vec<GenericFunction>,
 }
 
-// impl From<GenericStructSymbol> for BoundGenericStructSymbol<'_> {
-//     fn from(it: GenericStructSymbol) -> Self {
-//         Self {
-//             struct_type: BoundStructSymbol {
-//                 name: it.name.into(),
-//                 fields: it.fields.into_iter().map(Into::into).collect(),
-//                 functions: it
-//                     .functions
-//                     .clone()
-//                     .into_iter()
-//                     .map(|f| BoundStructFieldSymbol {
-//                         name: f.function_name.into(),
-//                         type_: f.function_type,
-//                         offset: 0,
-//                         is_read_only: true,
-//                     })
-//                     .collect(),
-//                 function_table: it.function_table,
-//                 is_generic: true,
-//                 parent: None, // TODO
-//             },
-//             functions: it.functions,
-//         }
-//     }
-// }
-
 /// This is quite similiar to symbols::StructFieldSymbol, the only difference
 /// being, that this version does not need an allocation. They can be easily
 /// converted into each other. This version is only used during binding, while
@@ -1879,12 +1853,6 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                         base_struct: Some(struct_type.into()),
                         struct_function_kind: None,
                     });
-                    // todo!("Do we need to implement this now??");
-                    // TODO:
-
-                    // let function_label = simple_struct_function_table
-                    //     .get(struct_function_kind)
-                    //     .unwrap() as u64;
 
                     struct_function_table.set(
                         struct_function_kind,
@@ -2674,17 +2642,18 @@ fn bind_array_literal<'a, 'b>(
         None
     };
     if array_literal.children.is_empty() {
-        assert!(
-            expected_type.is_some(),
-            "TODO: Add diagnostic for underspecified array literals!"
-        );
-        let type_ = bind_generic_struct_type_for_types(
-            location,
-            array_type,
-            &[expected_type.unwrap()],
-            binder,
-        );
-        return BoundNode::array_literal(location, Vec::new(), type_);
+        return if let Some(expected_type) = expected_type {
+            let type_ = bind_generic_struct_type_for_types(
+                location,
+                array_type,
+                &[expected_type],
+                binder,
+            );
+            BoundNode::array_literal(location, Vec::new(), type_)
+        } else {
+            binder.diagnostic_bag.report_underspecified_generic_struct(location, "Array");
+            BoundNode::error(location)
+        };
     }
     let first_child = array_literal.children.remove(0);
     let (mut type_, mut children) =
@@ -2748,24 +2717,25 @@ fn bind_dictionary_literal<'a, 'b>(
         None
     };
     if dictionary_literal.values.is_empty() {
-        assert!(
-            expected_type.is_some(),
-            "TODO: Add diagnostic for underspecified dictionary literals!"
-        );
-        let type_ = bind_generic_struct_type_for_types(
-            location,
-            dict_type,
-            &[expected_type.unwrap().0, expected_type.unwrap().1],
-            binder,
-        );
-        let function = binder.project.types[type_]
-            .as_struct_type()
-            .unwrap()
-            .function_table
-            .constructor_function
-            .as_ref()
-            .map(|f| f.function_label);
-        return BoundNode::constructor_call(location, Vec::new(), type_, function);
+        return if let Some((key, value)) = expected_type {
+            let type_ = bind_generic_struct_type_for_types(
+                location,
+                dict_type,
+                &[key, value],
+                binder,
+            );
+            let function = binder.project.types[type_]
+                .as_struct_type()
+                .unwrap()
+                .function_table
+                .constructor_function
+                .as_ref()
+                .map(|f| f.function_label);
+            BoundNode::constructor_call(location, Vec::new(), type_, function)
+        } else {
+            binder.diagnostic_bag.report_underspecified_generic_struct(location, "Dict");
+            BoundNode::error(location)
+        };
     }
     let first_child = dictionary_literal.values.remove(0);
     let (mut type_, mut values) =
@@ -2884,8 +2854,13 @@ fn bind_cast_expression<'a>(
     binder: &mut BindingState<'_>,
 ) -> BoundNode {
     let expression = bind_node(*cast_expression.expression, binder);
-    // TODO: Write diagnostic, that it is impossible to cast to generic types!
-    let type_ = bind_type(cast_expression.type_, binder).unwrap_type_id();
+    let type_ = match bind_type(cast_expression.type_, binder) {
+        TypeOrGenericTypeId::Type(it) => it,
+        TypeOrGenericTypeId::GenericType(generic) => {
+            binder.diagnostic_bag.report_expected_type_found_generic(location, generic);
+            return BoundNode::error(location);
+        },
+    };
     // Cast unnecessary and will always return a valid value.
     if binder
         .project
@@ -3849,14 +3824,14 @@ fn bind_binary_operator<'a, 'b>(
         // Special case, where none ?? value is used. This could be optimized
         // away later.
         (Type::None, BoundBinaryOperator::NoneableOrValue, _) => {
-            let input_type = if binder.project.types.noneable_base_type(rhs.type_).is_some() {
-                // TODO: Report error here!
-                panic!("This is all pretty invalid here!");
+            if let Some(noneable_base_type) = binder.project.types.noneable_base_type(rhs.type_) {
+                binder.diagnostic_bag.report_cannot_convert(location, rhs.type_, noneable_base_type);
+                None
             } else {
                 let noneable_type = binder.project.types.look_up_type_by_name("Noneable").expect("Failed to look up type Noneable from stdlib.").unwrap_generic_type_id();
-                bind_generic_struct_type_for_types(location, noneable_type, &[rhs.type_], binder)
-            };
-            Some(BoundBinary::same_input(input_type, result, rhs.type_))
+                let input_type = bind_generic_struct_type_for_types(location, noneable_type, &[rhs.type_], binder);
+                Some(BoundBinary::same_input(input_type, result, rhs.type_))
+            }
         }
         (
             Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral,

@@ -21,7 +21,7 @@ func main() {
     // let error = none;
 
     // Step 3.1 ?? Operator
-    let a = n ?? 13;
+    let e = n ?? 13;
     let foo = none ?? 12;
 
 
@@ -51,7 +51,21 @@ func main() {
         print('Shoud have gotten here as well?!');
     }
 
+    let a: int? = none;
+    let b: Int? = none;
+    let c: int? = 42;
+    let d: Int? = new Int(42);
+    print(a);
+    print(b);
+    print(c);
+    print(d);
+
+
     // // Step 4. ???
 
     // // Step 5. Profit
+}
+
+struct Int {
+    value: int;
 }

@@ -7,4 +7,10 @@ n has sadly no value :/
 Shoud have gotten here?!
 0
 Shoud have gotten here as well?!
+none
+none
+42
+struct Int {
+    value = 42,
+}
 = 0

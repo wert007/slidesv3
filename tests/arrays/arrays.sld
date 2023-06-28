@@ -70,6 +70,8 @@ func arrays() {
 
     let h = [a, c, f[0], f[1], f[2], [843, 43], [321, 32]];
     print(h);
+
+    let i: int[] = [];
 }
 
 struct A {

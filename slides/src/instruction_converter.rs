@@ -562,7 +562,14 @@ fn convert_array_literal(
         element_count.push(Instruction::addition(location).into());
     }
     if element_count.len() == 1 {
-        result.push(Instruction::write_to_heap(const_element_count, location).into());
+        result.push(
+            if const_element_count == 0 {
+                Instruction::load_none_pointer(location)
+            } else {
+                Instruction::write_to_heap(const_element_count, location)
+            }
+            .into(),
+        );
     } else {
         result.extend_from_slice(&element_count);
         result.push(Instruction::write_to_heap_runtime(location).into());
@@ -648,15 +655,27 @@ fn convert_unary(
             result.push(Instruction::twos_complement(span).into())
         }
         BoundUnaryOperator::ArithmeticIdentity => {}
-        BoundUnaryOperator::LogicalNegation if converter.project.types[operand_type].is_pointer() => {
-            if converter.project.types.noneable_base_type(operand_type).is_some() {
+        BoundUnaryOperator::LogicalNegation
+            if converter.project.types[operand_type].is_pointer() =>
+        {
+            if converter
+                .project
+                .types
+                .noneable_base_type(operand_type)
+                .is_some()
+            {
                 result.push(Instruction::read_word_with_offset(0, span).into());
             }
             result.push(Instruction::load_none_pointer(span).into());
             result.push(Instruction::equals(span).into());
         }
         BoundUnaryOperator::LogicalNegation => {
-            if converter.project.types.noneable_base_type(operand_type).is_some() {
+            if converter
+                .project
+                .types
+                .noneable_base_type(operand_type)
+                .is_some()
+            {
                 result.push(Instruction::read_word_with_offset(0, span).into());
             }
             result.push(Instruction::load_immediate(0, span).into());
@@ -1016,13 +1035,26 @@ fn convert_conversion(
             result.push(Instruction::label(end_label, location).into());
         }
         ConversionKind::Boxing => {
-            if base_type != typeid!(Type::None) {
+            if base_type != typeid!(Type::None)
+                && base_type != typeid!(Type::Pointer)
+                && &converter.project.types[base_type]
+                    != &Type::PointerOf(
+                        converter
+                            .project
+                            .types
+                            .noneable_base_type(conversion.type_)
+                            .unwrap(),
+                    )
+            {
                 result.push(Instruction::write_to_heap(1, location).into());
             }
             result.push(Instruction::write_to_heap(1, location).into());
         }
         ConversionKind::Unboxing => {
             result.push(Instruction::read_word_with_offset(0, location).into());
+            result.push(Instruction::read_word_with_offset(0, location).into());
+        }
+        ConversionKind::NoneableToPointer => {
             result.push(Instruction::read_word_with_offset(0, location).into());
         }
         ConversionKind::IntToUint => {

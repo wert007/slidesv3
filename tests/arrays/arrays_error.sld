@@ -3,4 +3,6 @@ func main() {
     print(a[-1]);
     a[-1] = 0;
     print(a);
+
+    let underspecified = [];
 }

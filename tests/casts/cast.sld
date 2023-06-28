@@ -25,4 +25,11 @@ func main() {
     print('c (5) is uint and 5? ' + (cast c : uint == 5));
     c = 0;
     print('c (0) is uint and 0? ' + (cast c : uint == 0));
+
+    let d: int? = 32;
+    print(d);
+    let e: &int = d;
+    print(e);
+    let f: int? = e;
+    print(f);
 }

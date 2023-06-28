@@ -361,6 +361,12 @@ impl TypeCollection {
             (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => {
                 from_integer_type.to_signed() == *to_integer_type
             }
+            (_, Type::PointerOf(ptr)) if self.noneable_base_type(from_id).is_some() => {
+                self.can_be_converted(self.noneable_base_type(from_id).unwrap(), *ptr)
+            }
+            (Type::PointerOf(ptr), _) if self.noneable_base_type(to_id).is_some() => {
+                self.can_be_converted(*ptr, self.noneable_base_type(to_id).unwrap())
+            }
             // Convert noneable to bool (in if condition e.g.)
             (_, Type::Boolean) if self.noneable_base_type(from_id).is_some() => true,
             (Type::Struct(this), _) if self.noneable_base_type(to_id).is_none() => {
@@ -437,6 +443,10 @@ impl TypeCollection {
 
     pub fn name_of_generic_type_id(&self, generic_type_id: GenericTypeId) -> Cow<str> {
         self.name_of_generic_type(&self[generic_type_id])
+    }
+
+    pub fn display_name_of_generic_type_id(&self, generic_type_id: GenericTypeId) -> Cow<str> {
+        self.name_of_generic_type_id(generic_type_id)
     }
 
     pub fn name_of_type_id_debug(&self, type_id: TypeId) -> Cow<str> {
