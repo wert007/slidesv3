@@ -356,8 +356,6 @@ impl TypeCollection {
             (Type::PointerOf(_), Type::Pointer) => true,
             (Type::None, Type::PointerOf(_)) => true,
             (Type::None, Type::Pointer) => true,
-            (Type::None, Type::Noneable(_)) => true,
-            (_, Type::Noneable(other)) => self.can_be_converted(from_id, *other),
             // FIXME: This means that 9999 would be a valid u8?
             (Type::IntegerLiteral, Type::Integer(_)) => true,
             (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => {
@@ -404,10 +402,10 @@ impl TypeCollection {
             (Type::Any, _) => true,
             // FIXME: Can it though?
             // (Type::Pointer, Type::Integer) => true,
-            (Type::PointerOf(inner), Type::Noneable(other)) => {
-                self.can_be_converted(*inner, *other)
-            }
-            (Type::Noneable(base_type), _) => self.can_be_converted(*base_type, to_id),
+            // TODO: Add example of this to test suite!
+            // (Type::PointerOf(inner), Type::Noneable(other)) => {
+            //     self.can_be_converted(*inner, *other)
+            // }
             (_, _) if self.noneable_base_type(from_id).is_some() => {
                 self.can_be_converted(self.noneable_base_type(from_id).unwrap(), to_id)
             }
@@ -471,7 +469,6 @@ impl TypeCollection {
             Type::Boolean => "bool".into(),
             Type::None => "any?".into(),
             Type::SystemCall(call) => format!("{call}").into(),
-            Type::Noneable(inner) => format!("{}?", self.name_of_type_id(*inner)).into(),
             Type::String => "string".into(),
             Type::Function(f) => format!("function {}", f.display(self)).into(),
             Type::Closure(_) => "closure".into(),
@@ -588,7 +585,7 @@ impl TypeCollection {
             }
         }
         match &self[haystack] {
-            Type::Noneable(it) | Type::PointerOf(it) => self.contains_type(*it, needle),
+            Type::PointerOf(it) => self.contains_type(*it, needle),
             Type::Struct(it) => it
                 .applied_types
                 .iter()
@@ -653,10 +650,6 @@ impl TypeCollection {
                 })))
             }
             Type::Closure(_) => todo!(),
-            Type::Noneable(it) => {
-                let it = self.replace_in_type_for_types(*it, replace, replace_with)?;
-                Ok(self.look_up_or_add_type(Type::Noneable(it)))
-            }
             Type::PointerOf(it) => {
                 let it = self.replace_in_type_for_types(*it, replace, replace_with)?;
                 Ok(self.look_up_or_add_type(Type::PointerOf(it)))
@@ -810,7 +803,7 @@ impl TypeCollection {
     }
 
     pub(crate) fn to_type_id(&self, index: usize) -> Option<TypeId> {
-        if self.types.len() < index {
+        if self.types.len() > index {
             Some(TypeId(index as _))
         } else {
             None
@@ -954,7 +947,6 @@ pub enum Type {
     Boolean,
     None,
     SystemCall(SystemCallKind),
-    Noneable(TypeId),
     String,
     Function(FunctionType<TypeId>),
     Closure(Box<ClosureType>),
@@ -976,14 +968,6 @@ impl Type {
             base_function_type,
             included_arguments,
         }))
-    }
-
-    pub fn noneable_base_type(&self) -> Option<TypeId> {
-        if let Self::Noneable(v) = self {
-            Some(*v)
-        } else {
-            None
-        }
     }
 
     pub fn raw_size_in_bytes(&self) -> u64 {
@@ -1010,7 +994,6 @@ impl Type {
             | Type::IntegerLiteral
             | Type::Boolean
             | Type::SystemCall(_)
-            | Type::Noneable(_)
             | Type::Pointer
             | Type::PointerOf(_)
             | Type::GenericType(_, _)
@@ -1046,7 +1029,6 @@ impl Type {
             | Type::Boolean => false,
             // A none Pointer should never be dereferenced.
             Type::None
-            | Type::Noneable(_)
             | Type::String
             | Type::Closure(_)
             | Type::Struct(_)

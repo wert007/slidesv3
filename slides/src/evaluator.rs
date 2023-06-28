@@ -376,8 +376,6 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::NotEquals => evaluate_not_equals(state, instruction),
         OpCode::ArrayEquals => evaluate_array_equals(state, instruction),
         OpCode::ArrayNotEquals => evaluate_array_not_equals(state, instruction),
-        OpCode::NoneableEquals => evaluate_noneable_equals(state, instruction),
-        OpCode::TypeIdentifierEquals => evaluate_type_identifier_equals(state, instruction),
         OpCode::LessThan => evaluate_less_than(state, instruction),
         OpCode::GreaterThan => evaluate_greater_than(state, instruction),
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
@@ -639,47 +637,6 @@ fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
 
 fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
     let result = !array_equals(state);
-    state.stack.push(result as _);
-}
-
-fn evaluate_noneable_equals(state: &mut EvaluatorState, instruction: Instruction) {
-    let rhs = state.stack.pop();
-    let lhs = state.stack.pop();
-    let result = if rhs.unwrap_pointer() == lhs.unwrap_pointer() {
-        true
-    } else if rhs.unwrap_pointer() == 0 || lhs.unwrap_pointer() == 0 {
-        false
-    } else {
-        let size_in_bytes = instruction.arg;
-        let size_in_words = memory::bytes_to_word(size_in_bytes);
-        let mut result = true;
-        for offset in 0..size_in_words {
-            let rhs_address = rhs.unwrap_pointer() + offset * WORD_SIZE_IN_BYTES;
-            let lhs_address = lhs.unwrap_pointer() + offset * WORD_SIZE_IN_BYTES;
-            let rhs_value = state.read_pointer(rhs_address);
-            let lhs_value = state.read_pointer(lhs_address);
-            if rhs_value.value != lhs_value.value {
-                result = false;
-                break;
-            }
-        }
-        result
-    };
-    state.stack.push(result as _);
-}
-
-fn evaluate_type_identifier_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_pointer();
-    let lhs = state.stack.pop().unwrap_pointer();
-    let rhs_type_identifier = state.read_pointer(rhs).unwrap_value();
-    let lhs_type_identifier = state.read_pointer(lhs).unwrap_value();
-    let result = lhs_type_identifier == rhs_type_identifier;
-    if result {
-        let value = state.read_pointer(lhs + memory::WORD_SIZE_IN_BYTES);
-        state.stack.push_flagged_word(value.clone());
-    } else {
-        state.stack.push_pointer(0);
-    }
     state.stack.push(result as _);
 }
 

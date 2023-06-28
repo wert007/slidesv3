@@ -77,16 +77,6 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
             to_string_native(type_, &argument, state)
         }
         Type::None => "none".into(),
-        Type::Noneable(base_type) => {
-            if argument.unwrap_pointer() == 0 {
-                "none".into()
-            } else if state.project.types[*base_type].is_pointer() {
-                to_string_native(*base_type, argument, state)
-            } else {
-                let argument = state.read_pointer(argument.unwrap_pointer()).clone();
-                to_string_native(*base_type, &argument, state)
-            }
-        }
         Type::Struct(struct_type) => {
             let to_string_function = get_to_string_function(type_, state);
             match to_string_function {
@@ -255,7 +245,6 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         Type::Integer(_) | Type::Boolean | Type::None | Type::Enum(_, _) | Type::SystemCall(_) => {
             argument.unwrap_value()
         }
-        Type::Noneable(_) => todo!(),
         Type::String => {
             let ptr = argument.unwrap_pointer();
             let length = state.read_pointer(ptr).unwrap_value();

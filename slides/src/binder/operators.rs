@@ -49,15 +49,6 @@ impl BoundBinary {
             result: type_,
         }
     }
-
-    pub fn new(lhs: TypeId, op: BoundBinaryOperator, rhs: TypeId, result: TypeId) -> BoundBinary {
-        Self {
-            lhs: lhs.clone(),
-            op,
-            rhs: rhs.clone(),
-            result,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

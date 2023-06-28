@@ -31,8 +31,6 @@ pub enum OpCode {
     NotEquals = 33,
     ArrayEquals = 34,
     ArrayNotEquals = 35,
-    NoneableEquals = 36,
-    TypeIdentifierEquals = 37,
     LessThan = 38,
     GreaterThan = 39,
     LessThanEquals = 40,

@@ -994,35 +994,15 @@ impl BoundConversionNodeKind {
             (_, Type::Any) => Some(ConversionKind::TypeUnboxing),
             (Type::Any, _) => Some(ConversionKind::TypeBoxing),
             (Type::Boolean, Type::None)
-            | (Type::Boolean, Type::Noneable(_))
             | (Type::SystemCall(_), Type::None)
-            | (Type::SystemCall(_), Type::Noneable(_))
             | (Type::Function(_), Type::None)
-            | (Type::Function(_), Type::Noneable(_))
             | (Type::Integer(_), Type::None)
-            | (Type::Integer(_), Type::Noneable(_))
-            | (Type::IntegerLiteral, Type::None)
-            | (Type::IntegerLiteral, Type::Noneable(_)) => Some(ConversionKind::Unboxing),
+            | (Type::IntegerLiteral, Type::None) => Some(ConversionKind::Unboxing),
             (Type::None, Type::Integer(_))
             | (Type::None, Type::IntegerLiteral)
             | (Type::None, Type::Boolean)
             | (Type::None, Type::SystemCall(_))
-            | (Type::None, Type::Function(_))
-            | (Type::Noneable(_), Type::IntegerLiteral)
-            | (Type::Noneable(_), Type::Boolean)
-            | (Type::Noneable(_), Type::SystemCall(_))
-            | (Type::Noneable(_), Type::Function(_)) => Some(ConversionKind::Boxing),
-            (Type::Noneable(to), Type::Integer(from)) => {
-                if let Type::Integer(to) = &type_collection[*to] {
-                    if from.is_signed() && !to.is_signed() {
-                        Some(ConversionKind::IntToUint)
-                    } else {
-                        Some(ConversionKind::Boxing)
-                    }
-                } else {
-                    Some(ConversionKind::Boxing)
-                }
-            }
+            | (Type::None, Type::Function(_)) => Some(ConversionKind::Boxing),
             (Type::Struct(_), Type::Struct(from)) => {
                 if from.has_parent(self.type_) {
                     Some(ConversionKind::AbstractTypeBoxing)

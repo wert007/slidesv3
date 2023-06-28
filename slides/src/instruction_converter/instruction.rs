@@ -256,22 +256,6 @@ impl Instruction {
         }
     }
 
-    pub const fn noneable_equals(size_in_bytes: u64, location: TextLocation) -> Self {
-        Self {
-            op_code: OpCode::NoneableEquals,
-            arg: size_in_bytes,
-            location,
-        }
-    }
-
-    pub const fn type_identifier_equals(location: TextLocation) -> Self {
-        Self {
-            op_code: OpCode::TypeIdentifierEquals,
-            arg: 0,
-            location,
-        }
-    }
-
     pub const fn less_than(location: TextLocation, unsigned: bool) -> Self {
         Self {
             op_code: OpCode::LessThan,

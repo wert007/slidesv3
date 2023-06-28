@@ -107,8 +107,6 @@ pub(crate) fn check_stack_usage(
                             OpCode::NotEquals => -1,
                             OpCode::ArrayEquals => -1,
                             OpCode::ArrayNotEquals => -1,
-                            OpCode::NoneableEquals => -1,
-                            OpCode::TypeIdentifierEquals => 0,
                             OpCode::LessThan => -1,
                             OpCode::GreaterThan => -1,
                             OpCode::LessThanEquals => -1,

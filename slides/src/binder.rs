@@ -3681,24 +3681,6 @@ fn bind_binary_operator<'a, 'b>(
             result,
             typeid!(Type::Boolean),
         )),
-        (
-            Type::Noneable(inner),
-            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
-            Type::None,
-        )
-        | (
-            Type::None,
-            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
-            Type::Noneable(inner),
-        ) if *inner != typeid!(Type::Void) => Some(BoundBinary::same_input(
-            binder
-                .project
-                .types
-                .look_up_type(&Type::Noneable(inner.clone()))
-                .expect("This type has been looked up. It should already exist."),
-            result,
-            typeid!(Type::Boolean),
-        )),
         (_, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, _) 
             if binder.project.types.noneable_base_type(lhs.type_).is_some() 
                 || binder.project.types.noneable_base_type(rhs.type_).is_some() => {
@@ -3720,43 +3702,11 @@ fn bind_binary_operator<'a, 'b>(
                 let noneable_type = bind_generic_struct_type_for_types(operator_token.location, noneable_type, &[noneable_base_type], binder);
                 Some(BoundBinary::same_input(noneable_type, result, typeid!(Type::Boolean)))
             } else {
-                dbg!("Got here!");
                 binder.diagnostic_bag.report_no_binary_operator(location, lhs.type_, operator_token.location, rhs.type_);
                 None
             }
         }
-        (
-            Type::Noneable(inner),
-            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
-            outer,
-        )
-        | (
-            outer,
-            BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
-            Type::Noneable(inner),
-        ) => {
-            let noneable_type = binder
-                .project
-                .types
-                .look_up_type(outer)
-                .expect("This type has been looked up. It should already exist");
-            if binder.project.types.can_be_converted(noneable_type, *inner) && outer != &Type::Void
-            {
-                let input = binder
-                    .project
-                    .types
-                    .look_up_or_add_type(Type::Noneable(*inner));
-                Some(BoundBinary::same_input(
-                    input,
-                    result,
-                    typeid!(Type::Boolean),
-                ))
-            } else {
-                todo!("Report error: cannot convert type to type?.");
-                // None
-            }
-        }
-        (
+      (
             Type::Pointer | Type::PointerOf(_),
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
             Type::None,
@@ -3896,16 +3846,6 @@ fn bind_binary_operator<'a, 'b>(
                 None
             }
         }
-        (Type::Noneable(lhs_type), BoundBinaryOperator::NoneableOrValue, _) => {
-            if binder.project.types.can_be_converted(rhs.type_, *lhs_type) {
-                Some(BoundBinary::new(lhs.type_, result, rhs.type_, *lhs_type))
-            } else {
-                binder
-                    .diagnostic_bag
-                    .report_cannot_convert(location, rhs.type_, *lhs_type);
-                None
-            }
-        }
         // Special case, where none ?? value is used. This could be optimized
         // away later.
         (Type::None, BoundBinaryOperator::NoneableOrValue, _) => {
@@ -4011,7 +3951,7 @@ fn bind_unary_operator<'a, 'b>(
                 Some((result, typeid!(Type::IntegerLiteral)))
             }
         }
-        Type::Boolean | Type::Noneable(_) if result == BoundUnaryOperator::LogicalNegation => {
+        Type::Boolean if result == BoundUnaryOperator::LogicalNegation => {
             Some((result, typeid!(Type::Boolean)))
         }
         _ if binder.project.types.noneable_base_type(operand.type_).is_some() 
@@ -4338,8 +4278,7 @@ fn bind_field_access<'a, 'b>(
         | Type::SystemCall(_)
         | Type::Pointer
         | Type::GenericType(_, _)
-        | Type::PointerOf(_)
-        | Type::Noneable(_) => {
+        | Type::PointerOf(_) => {
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base_location, base.type_);
@@ -4494,7 +4433,6 @@ fn bind_field_access_for_assignment<'a>(
         | Type::Boolean
         | Type::None
         | Type::SystemCall(_)
-        | Type::Noneable(_)
         | Type::Function(_)
         | Type::Pointer
         | Type::PointerOf(_)
@@ -4897,11 +4835,6 @@ fn bind_condition_conversion<'a>(
     match &binder.project.types[base.type_] {
         Type::Error => (base, SafeNodeInCondition::None),
         Type::None => (base, SafeNodeInCondition::None),
-        Type::Noneable(base_type) => {
-            let safe_type = *base_type;
-            let node = base.clone();
-            (base, SafeNodeInCondition::IfBody(node, safe_type))
-        }
         Type::Boolean => {
             let safe_node = register_contained_safe_nodes(&base, binder);
             (base, safe_node)
@@ -4951,9 +4884,6 @@ fn register_contained_safe_nodes(
         {
             match &binder.project.types[unary.operand.type_] {
                 Type::Boolean => register_contained_safe_nodes(&unary.operand, binder).negate(),
-                Type::Noneable(base_type) => {
-                    SafeNodeInCondition::ElseBody(*unary.operand.clone(), *base_type)
-                }
                 _ => {
                     if let Some(noneable_base_type) =
                         binder.project.types.noneable_base_type(unary.operand.type_)
@@ -4978,7 +4908,6 @@ fn register_contained_safe_nodes(
                     .noneable_base_type(binary.rhs.type_)
                     .is_some() =>
         {
-            dbg!("Got here!");
             match (&binary.lhs.constant_value, &binary.rhs.constant_value) {
                 (None, Some(constant)) => {
                     if constant.value == Value::None {

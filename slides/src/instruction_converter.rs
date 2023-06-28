@@ -653,7 +653,7 @@ fn convert_unary(
                 result.push(Instruction::read_word_with_offset(0, span).into());
             }
             result.push(Instruction::load_none_pointer(span).into());
-            result.push(Instruction::noneable_equals(1, span).into());
+            result.push(Instruction::equals(span).into());
         }
         BoundUnaryOperator::LogicalNegation => {
             if converter.project.types.noneable_base_type(operand_type).is_some() {
@@ -683,26 +683,6 @@ fn convert_binary(
                 &converter.project.types[binary.rhs.type_],
             ) {
                 (Type::String, Type::String) => Instruction::array_equals(location),
-                (Type::Noneable(base_type), Type::Noneable(_))
-                    if !converter.project.types[*base_type].is_pointer() =>
-                {
-                    Instruction::noneable_equals(
-                        converter.project.types[*base_type].size_in_bytes(),
-                        location,
-                    )
-                }
-                (Type::Noneable(base_type), Type::Noneable(_))
-                    if converter.project.types[*base_type].is_pointer() =>
-                {
-                    todo!(
-                        "Not completely implemented. None must become an actual
-                    pointer, which points to invalid memory. And array_equals
-                    must return false if one of those is the none pointer,
-                    but not the other.
-                    "
-                    );
-                    // Instruction::array_equals()
-                }
                 _ => Instruction::equals(location),
             }
         }
@@ -1006,6 +986,8 @@ fn convert_conversion(
             );
         }
         ConversionKind::TypeUnboxing => {
+            result.push(Instruction::duplicate(location).into());
+            result.push(Instruction::read_word_with_offset(0, location).into());
             convert_type_identifier(
                 converter
                     .project
@@ -1015,21 +997,23 @@ fn convert_conversion(
                 location,
                 &mut result,
             );
-            // Write to heap to keep code simpler. This can be optimized later!
-            result.push(
-                // TypeIdentifier are now always just an u64 number as an index
-                // in a big type array. So we only have 1 word big type ids.
-                Instruction::write_to_heap(1, location).into(),
-            );
-            result.push(Instruction::type_identifier_equals(location).into());
+            result.push(Instruction::equals(location).into());
             let label = converter.generate_label();
             result.push(Instruction::jump_to_label_conditionally(label, false, location).into());
             // If types are equal, the value of the type needs to be converted into a noneable
+            // result.push(Instruction::write_to_heap(1, location).into());
+            result.push(Instruction::read_word_with_offset(WORD_SIZE_IN_BYTES, location).into());
             result.push(Instruction::write_to_heap(1, location).into());
             if !converter.project.types[base_type].is_pointer() {
                 result.push(Instruction::write_to_heap(1, location).into());
             }
+            let end_label = converter.generate_label();
+            result.push(Instruction::jump(end_label as _, location).into());
             result.push(Instruction::label(label, location).into());
+            result.push(Instruction::pop(location).into());
+            result.push(Instruction::load_none_pointer(location).into());
+            result.push(Instruction::write_to_heap(1, location).into());
+            result.push(Instruction::label(end_label, location).into());
         }
         ConversionKind::Boxing => {
             if base_type != typeid!(Type::None) {
