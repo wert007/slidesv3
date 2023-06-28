@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::binder::typing::{SystemCallKind, TypeId, TypeCollection};
+use crate::binder::typing::{SystemCallKind, TypeCollection, TypeId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -66,7 +66,9 @@ impl Value {
             Value::Boolean(it) => it.to_string().into(),
             Value::SystemCall(it) => it.to_string().into(),
             Value::String(it) => format!("'{it}'").into(),
-            Value::LabelPointer(label, type_) => format!("L{:X} : {}", label, types.name_of_type_id(*type_)).into(),
+            Value::LabelPointer(label, type_) => {
+                format!("L{:X} : {}", label, types.name_of_type_id(*type_)).into()
+            }
             Value::EnumType(_, t) => types.name_of_type_id(*t).to_string().into(),
             Value::EnumValue(v, t) => format!("{}.value{v}", types.name_of_type_id(*t)).into(),
         }

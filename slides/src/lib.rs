@@ -53,11 +53,7 @@ impl Project {
         println!("= {}", result);
     }
 
-    pub fn load_library(
-        &mut self,
-        source_text: SourceTextId,
-        import_std_libs: bool,
-    ) -> Library {
+    pub fn load_library(&mut self, source_text: SourceTextId, import_std_libs: bool) -> Library {
         let mut diagnostic_bag = DiagnosticBag::new();
         let mut result = instruction_converter::convert_library_with_project_parameter(
             source_text,
@@ -83,7 +79,9 @@ impl Project {
         }
         let source_code = source_code.unwrap();
         let file_name = path.to_string_lossy();
-        let source_text = self.source_text_collection.add(SourceText::new(source_code, file_name));
+        let source_text = self
+            .source_text_collection
+            .add(SourceText::new(source_code, file_name));
         self.load_library(source_text, import_std_libs)
     }
 

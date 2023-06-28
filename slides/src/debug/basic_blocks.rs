@@ -35,7 +35,12 @@ impl BasicBlockConditionDisplay for () {
 
 impl BasicBlockConditionDisplay for InstructionOrLabelReference {
     fn display(&self, _: &TypeCollection, buffer: &mut String) {
-        writeln!(buffer, "{}", crate::debug::instruction_or_label_to_string(*self)).unwrap();
+        writeln!(
+            buffer,
+            "{}",
+            crate::debug::instruction_or_label_to_string(*self)
+        )
+        .unwrap();
     }
 }
 
@@ -171,5 +176,8 @@ pub fn output_basic_blocks_to_dot<
 }
 
 fn mangle(function_name: String) -> String {
-    function_name.replace("::", "-DOT-DOT-").replace('<', "-LT-").replace('>', "-GT-")
+    function_name
+        .replace("::", "-DOT-DOT-")
+        .replace('<', "-LT-")
+        .replace('>', "-GT-")
 }

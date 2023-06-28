@@ -869,7 +869,6 @@ pub struct ArrayLiteralNodeKind {
     pub rbracket: SyntaxToken,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct DictionaryLiteralNodeKind {
     pub dict_keyword: SyntaxToken,

@@ -163,6 +163,28 @@ impl BoundNode {
                 arguments,
                 has_this_argument,
                 returns_value: type_ != typeid!(Type::Void),
+                is_eq_function: false,
+            }),
+            type_,
+            constant_value: None,
+        }
+    }
+
+    pub fn equals_function_call(
+        span: TextLocation,
+        base: BoundNode,
+        arguments: Vec<BoundNode>,
+        has_this_argument: bool,
+        type_: TypeId,
+    ) -> Self {
+        Self {
+            location: span,
+            kind: BoundNodeKind::FunctionCall(BoundFunctionCallNodeKind {
+                base: Box::new(base),
+                arguments,
+                has_this_argument,
+                returns_value: type_ != typeid!(Type::Void),
+                is_eq_function: true,
             }),
             type_,
             constant_value: None,
@@ -844,6 +866,7 @@ pub struct BoundFunctionCallNodeKind {
     pub arguments: Vec<BoundNode>,
     pub has_this_argument: bool,
     pub returns_value: bool,
+    pub is_eq_function: bool,
 }
 
 impl BoundFunctionCallNodeKind {
@@ -922,7 +945,7 @@ pub struct BoundConversionNodeKind {
     pub type_: TypeId,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ConversionKind {
     /// Conversion only on type level with no implications at runtime.
     None,
@@ -941,16 +964,35 @@ pub enum ConversionKind {
 }
 
 impl BoundConversionNodeKind {
-    pub fn kind(&self, type_collection: &TypeCollection) -> ConversionKind {
+    /// returns none if any of the types are equals to Type::Error.
+    pub fn kind(&self, type_collection: &TypeCollection) -> Option<ConversionKind> {
+        if let Some(base_type) = type_collection.noneable_base_type(self.type_) {
+            if !matches!(&type_collection[self.base.type_], Type::Any) {
+                return Some(
+                    if type_collection[base_type].is_unsigned_int()
+                        && type_collection[self.base.type_].is_signed_int()
+                    {
+                        ConversionKind::IntToUint
+                    } else {
+                        ConversionKind::Boxing
+                    },
+                );
+            }
+        } else if type_collection
+            .noneable_base_type(self.base.type_)
+            .is_some()
+            && !matches!(&type_collection[self.type_], Type::Any)
+        {
+            return Some(ConversionKind::Unboxing);
+        }
         match (
             &type_collection[self.type_],
             &type_collection[self.base.type_],
         ) {
-            (Type::Void, _) | (_, Type::Void) | (_, Type::Error) | (Type::Error, _) => {
-                unreachable!()
-            }
-            (_, Type::Any) => ConversionKind::TypeUnboxing,
-            (Type::Any, _) => ConversionKind::TypeBoxing,
+            (Type::Void, _) | (_, Type::Void) => unreachable!(),
+            (_, Type::Error) | (Type::Error, _) => None,
+            (_, Type::Any) => Some(ConversionKind::TypeUnboxing),
+            (Type::Any, _) => Some(ConversionKind::TypeBoxing),
             (Type::Boolean, Type::None)
             | (Type::Boolean, Type::Noneable(_))
             | (Type::SystemCall(_), Type::None)
@@ -960,7 +1002,7 @@ impl BoundConversionNodeKind {
             | (Type::Integer(_), Type::None)
             | (Type::Integer(_), Type::Noneable(_))
             | (Type::IntegerLiteral, Type::None)
-            | (Type::IntegerLiteral, Type::Noneable(_)) => ConversionKind::Unboxing,
+            | (Type::IntegerLiteral, Type::Noneable(_)) => Some(ConversionKind::Unboxing),
             (Type::None, Type::Integer(_))
             | (Type::None, Type::IntegerLiteral)
             | (Type::None, Type::Boolean)
@@ -969,26 +1011,26 @@ impl BoundConversionNodeKind {
             | (Type::Noneable(_), Type::IntegerLiteral)
             | (Type::Noneable(_), Type::Boolean)
             | (Type::Noneable(_), Type::SystemCall(_))
-            | (Type::Noneable(_), Type::Function(_)) => ConversionKind::Boxing,
+            | (Type::Noneable(_), Type::Function(_)) => Some(ConversionKind::Boxing),
             (Type::Noneable(to), Type::Integer(from)) => {
                 if let Type::Integer(to) = &type_collection[*to] {
                     if from.is_signed() && !to.is_signed() {
-                        ConversionKind::IntToUint
+                        Some(ConversionKind::IntToUint)
                     } else {
-                        ConversionKind::Boxing
+                        Some(ConversionKind::Boxing)
                     }
                 } else {
-                    ConversionKind::Boxing
+                    Some(ConversionKind::Boxing)
                 }
             }
             (Type::Struct(_), Type::Struct(from)) => {
                 if from.has_parent(self.type_) {
-                    ConversionKind::AbstractTypeBoxing
+                    Some(ConversionKind::AbstractTypeBoxing)
                 } else {
-                    ConversionKind::None
+                    Some(ConversionKind::None)
                 }
             }
-            _ => ConversionKind::None,
+            _ => Some(ConversionKind::None),
         }
     }
 

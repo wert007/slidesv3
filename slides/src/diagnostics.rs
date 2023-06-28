@@ -24,7 +24,7 @@ impl Message {
     ) -> String {
         match self {
             Message::String(it) => it.into(),
-            Message::TypeId(type_) => types.name_of_type_id(type_).into_owned(),
+            Message::TypeId(type_) => types.display_name_of_type_id(type_).into_owned(),
             Message::SourceTextSnippet(it) => source_text_collection[it].into(),
             Message::Composition(composition) => composition
                 .into_iter()

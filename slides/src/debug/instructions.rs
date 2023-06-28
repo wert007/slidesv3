@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     binder::typing::SystemCallKind,
-    evaluator::memory::WORD_SIZE_IN_BYTES,
+    evaluator::{memory::{WORD_SIZE_IN_BYTES, self}, EvaluatorState},
     instruction_converter::{
         instruction::{op_codes::OpCode, Instruction},
         InstructionOrLabelReference, LabelReference,
@@ -210,9 +210,98 @@ fn label_reference_to_string(label: LabelReference) -> String {
 
 pub fn instruction_or_label_to_string(instruction_or_label: InstructionOrLabelReference) -> String {
     match instruction_or_label {
-        InstructionOrLabelReference::Instruction(instruction) => instruction_to_string(instruction, true, None),
+        InstructionOrLabelReference::Instruction(instruction) => {
+            instruction_to_string(instruction, true, None)
+        }
         InstructionOrLabelReference::LabelReference(label) => label_reference_to_string(label),
     }
+}
+
+pub fn commented_instruction_to_string(instruction: Instruction,
+state: &EvaluatorState) -> Result<String, std::fmt::Error> {
+    use std::fmt::Write;
+    let mut base = instruction_to_string(instruction, false, None);
+    match instruction.op_code {
+        OpCode::NoOp => {},
+        OpCode::LoadImmediate => {
+            if let Some(type_) = state.project.types.to_type_id(instruction.arg as usize) {
+                write!(base, "; {}", state.project.types.name_of_type_id_debug(type_))?;
+            }
+        },
+        OpCode::LoadPointer => {
+            if let Some(text) = state.read_string_from_memory(instruction.arg as usize) {
+                write!(base, "; {text:?}")?;
+            } else if let Some(symbol) = state.read_symbol_from_memory(instruction.arg as usize) {
+                write!(base, "; {symbol}")?;
+            } else if instruction.arg == 0 {
+                write!(base, "; NONE")?;
+            }
+        },
+        OpCode::DuplicateOver => {},
+        OpCode::Pop => {},
+        OpCode::LoadRegister => {
+            write!(base, "; {}", state.load_register(instruction.arg as usize).unwrap())?;
+        }
+        OpCode::StoreInRegister => {
+            write!(base, "; {}", state.peek_stack(0).unwrap())?;
+        },
+        OpCode::StoreInMemory => {},
+        OpCode::WriteToStack => {},
+        OpCode::WriteToHeap => {
+            let size = if instruction.arg == 0 {
+                state.peek_stack(0).unwrap().unwrap_value()
+            } else {
+                instruction.arg
+            };
+            if let Some(address) = state.next_allocation_address(size * memory::WORD_SIZE_IN_BYTES) {
+                write!(base, "; #{address:X}")?;
+            }
+        },
+        OpCode::Allocate => {},
+        OpCode::ReadWordWithOffset => {
+            if let Some(address) = state.peek_stack(0).map(|v| v.as_pointer()).flatten() {
+                let offset = instruction.arg;
+                let address = address + offset;
+                if let Some(ptr) = state.read_pointer_safe(address) {
+                    write!(base, "; {}", ptr)?;
+                }
+            }
+        
+        },
+        OpCode::MemoryCopy => {},
+        OpCode::TypeIdentifier => todo!(),
+        OpCode::Label => unreachable!("Right now, this only gets called by the evaluator, and there are no labels left!"),
+        OpCode::Rotate => {},
+        OpCode::Unknown => {},
+        OpCode::BitwiseTwosComplement => {},
+        OpCode::BitwiseXor => {},
+        OpCode::BitwiseNxor => {},
+        OpCode::Addition => {},
+        OpCode::Subtraction => {},
+        OpCode::Multiplication => {},
+        OpCode::Division => {},
+        OpCode::Equals => {},
+        OpCode::NotEquals => {},
+        OpCode::ArrayEquals => {},
+        OpCode::ArrayNotEquals => {},
+        OpCode::NoneableEquals => {},
+        OpCode::TypeIdentifierEquals => {},
+        OpCode::LessThan => {},
+        OpCode::GreaterThan => {},
+        OpCode::LessThanEquals => {},
+        OpCode::GreaterThanEquals => {},
+        OpCode::StringConcat => {},
+        OpCode::NoneableOrValue => {},
+        OpCode::Jump => {},
+        OpCode::JumpIfFalse => {},
+        OpCode::JumpIfTrue => {},
+        OpCode::SysCall => {},
+        OpCode::FunctionCall => {},
+        OpCode::Return => {},
+        OpCode::DecodeClosure => {},
+        OpCode::Breakpoint => {},
+    }
+    Ok(base)
 }
 
 pub fn instruction_to_string(

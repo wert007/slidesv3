@@ -843,13 +843,13 @@ impl BindingState<'_> {
         {
             Ok(it) => it,
             Err((struct_type, applied_types)) => {
-                let t = bind_generic_struct_type_for_types(
+                let _t = bind_generic_struct_type_for_types(
                     location,
                     struct_type.generic_base_type.unwrap(),
                     &applied_types,
                     self,
                 );
-                self.replace_in_type_for_types(location, t, replace, replace_with)
+                self.replace_in_type_for_types(location, type_, replace, replace_with)
             }
         }
     }
@@ -1225,10 +1225,7 @@ fn bind_with_project_parameter<'a>(
             .collect();
         generic_function.for_each_child_mut(&mut |n| {
             n.type_ = binder
-                .project
-                .types
-                .replace_in_type_for_types(n.type_, &replace, &unfixed.applied_types)
-                .expect("FUUUUUCK");
+                .replace_in_type_for_types(n.location, n.type_, &replace, &unfixed.applied_types);
             match &mut n.kind {
                 BoundNodeKind::Label(it) if label_relocations.contains_key(it) => {
                     *it = label_relocations[it]
@@ -2514,11 +2511,19 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> TypeOrGenericTypeId 
         }
     }
     if type_.optional_question_mark.is_some() {
-        result = binder
+        let noneable_base_type = binder
             .project
             .types
-            .create_noneable_version(result.unwrap_type_id())
-            .into();
+            .look_up_type_by_name("Noneable")
+            .expect("Failed to load type Nonable from stdlib.")
+            .unwrap_generic_type_id();
+        result = bind_generic_struct_type_for_types(
+            type_location,
+            noneable_base_type,
+            &[result.unwrap_type_id()],
+            binder,
+        )
+        .into();
     }
     if type_.optional_ampersand_token.is_some() {
         result = binder
@@ -2874,7 +2879,7 @@ fn bind_dictionary_literal_first_child<'a>(
 }
 
 fn bind_cast_expression<'a>(
-    span: TextLocation,
+    location: TextLocation,
     cast_expression: CastExpressionNodeKind,
     binder: &mut BindingState<'_>,
 ) -> BoundNode {
@@ -2889,7 +2894,7 @@ fn bind_cast_expression<'a>(
     {
         binder
             .diagnostic_bag
-            .report_unnecessary_cast(span, expression.type_, type_);
+            .report_unnecessary_cast(location, expression.type_, type_);
         return bind_conversion(expression, type_, binder);
     }
     if !binder
@@ -2899,10 +2904,17 @@ fn bind_cast_expression<'a>(
     {
         binder
             .diagnostic_bag
-            .report_impossible_cast(span, expression.type_, type_);
-        return BoundNode::error(span);
+            .report_impossible_cast(location, expression.type_, type_);
+        return BoundNode::error(location);
     }
-    let type_noneable = binder.project.types.create_noneable_version(type_);
+    let noneable_base_type = binder
+        .project
+        .types
+        .look_up_type_by_name("Noneable")
+        .expect("Failed to load type Noneable from stdlib.")
+        .unwrap_generic_type_id();
+    let type_noneable =
+        bind_generic_struct_type_for_types(location, noneable_base_type, &[type_], binder);
     if binder
         .project
         .types
@@ -2910,10 +2922,10 @@ fn bind_cast_expression<'a>(
     {
         binder
             .diagnostic_bag
-            .report_unnecessary_cast(span, expression.type_, type_);
+            .report_unnecessary_cast(location, expression.type_, type_);
         return bind_conversion(expression, type_noneable, binder);
     }
-    BoundNode::conversion(span, expression, type_noneable)
+    BoundNode::conversion(location, expression, type_noneable)
 }
 
 fn bind_constructor_call<'a>(
@@ -3307,11 +3319,7 @@ fn bind_generic_struct_type_for_types_no_lookup(
         .iter()
         .map(|f| {
             let mut new_f = f.clone();
-            new_f.type_ = binder
-                .project
-                .types
-                .replace_in_type_for_types(new_f.type_, &replace, types)
-                .expect("Da fuck?");
+            new_f.type_ = binder.replace_in_type_for_types(location, new_f.type_, &replace, types);
             let label = binder.generate_label();
             let parameters = binder.project.types[new_f.type_]
                 .as_function_type()
@@ -3557,7 +3565,7 @@ fn bind_binary_insertion<'a>(
                                 equals_function.function_label as usize,
                                 equals_function.function_type.clone(),
                             );
-                            BoundNode::function_call(
+                            BoundNode::equals_function_call(
                                 span,
                                 base,
                                 vec![lhs, rhs],
@@ -3583,7 +3591,7 @@ fn bind_binary_insertion<'a>(
                             BoundNode::unary(
                                 span,
                                 BoundUnaryOperator::LogicalNegation,
-                                BoundNode::function_call(
+                                BoundNode::equals_function_call(
                                     span,
                                     base,
                                     vec![lhs, rhs],
@@ -3620,7 +3628,7 @@ fn call_to_string(lhs: BoundNode, binder: &mut BindingState) -> BoundNode {
 }
 
 fn bind_binary_operator<'a, 'b>(
-    span: TextLocation,
+    location: TextLocation,
     lhs: &BoundNode,
     operator_token: SyntaxToken,
     rhs: &BoundNode,
@@ -3691,6 +3699,32 @@ fn bind_binary_operator<'a, 'b>(
             result,
             typeid!(Type::Boolean),
         )),
+        (_, BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals, _) 
+            if binder.project.types.noneable_base_type(lhs.type_).is_some() 
+                || binder.project.types.noneable_base_type(rhs.type_).is_some() => {
+            let (noneable_type, other) = binder
+                .project
+                .types
+                .noneable_base_type(lhs.type_)
+                .map(|_| (lhs.type_, rhs.type_))
+                .or_else(|| binder
+                    .project
+                    .types
+                    .noneable_base_type(rhs.type_)
+                    .map(|_| (rhs.type_, lhs.type_))
+                ).expect("No noneable types found!");
+            
+            if binder.project.types.can_be_converted(other, noneable_type) {
+                let noneable_base_type = binder.project.types.noneable_base_type(noneable_type).unwrap();
+                let noneable_type = binder.project.types.look_up_type_by_name("Noneable").expect("Failed to load type Noneable from stdlib.").unwrap_generic_type_id();
+                let noneable_type = bind_generic_struct_type_for_types(operator_token.location, noneable_type, &[noneable_base_type], binder);
+                Some(BoundBinary::same_input(noneable_type, result, typeid!(Type::Boolean)))
+            } else {
+                dbg!("Got here!");
+                binder.diagnostic_bag.report_no_binary_operator(location, lhs.type_, operator_token.location, rhs.type_);
+                None
+            }
+        }
         (
             Type::Noneable(inner),
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
@@ -3847,24 +3881,43 @@ fn bind_binary_operator<'a, 'b>(
                 typeid!(Type::String),
             ),
         ),
+        (Type::Struct(_), BoundBinaryOperator::NoneableOrValue, _) => {
+            if let Some(base_type) = binder.project.types.noneable_base_type(lhs.type_) {
+                if binder.project.types.can_be_converted(rhs.type_, base_type) {
+                    Some(BoundBinary::same_input(lhs.type_, result, base_type))
+                } else {
+                    binder
+                        .diagnostic_bag
+                        .report_cannot_convert(location, rhs.type_, base_type);
+                    None
+                }
+            } else {
+                binder.diagnostic_bag.report_no_binary_operator(location, lhs.type_, operator_token.location, rhs.type_);
+                None
+            }
+        }
         (Type::Noneable(lhs_type), BoundBinaryOperator::NoneableOrValue, _) => {
             if binder.project.types.can_be_converted(rhs.type_, *lhs_type) {
                 Some(BoundBinary::new(lhs.type_, result, rhs.type_, *lhs_type))
             } else {
                 binder
                     .diagnostic_bag
-                    .report_cannot_convert(span, rhs.type_, *lhs_type);
+                    .report_cannot_convert(location, rhs.type_, *lhs_type);
                 None
             }
         }
         // Special case, where none ?? value is used. This could be optimized
         // away later.
-        (Type::None, BoundBinaryOperator::NoneableOrValue, _) => Some(BoundBinary::new(
-            typeid!(Type::None),
-            result,
-            rhs.type_,
-            rhs.type_.clone(),
-        )),
+        (Type::None, BoundBinaryOperator::NoneableOrValue, _) => {
+            let input_type = if binder.project.types.noneable_base_type(rhs.type_).is_some() {
+                // TODO: Report error here!
+                panic!("This is all pretty invalid here!");
+            } else {
+                let noneable_type = binder.project.types.look_up_type_by_name("Noneable").expect("Failed to look up type Noneable from stdlib.").unwrap_generic_type_id();
+                bind_generic_struct_type_for_types(location, noneable_type, &[rhs.type_], binder)
+            };
+            Some(BoundBinary::same_input(input_type, result, rhs.type_))
+        }
         (
             Type::Integer(IntegerType::Signed64) | Type::IntegerLiteral,
             BoundBinaryOperator::Range,
@@ -3900,7 +3953,7 @@ fn bind_binary_operator<'a, 'b>(
         (Type::Error, _, _) | (_, _, Type::Error) => None,
         _ => {
             binder.diagnostic_bag.report_no_binary_operator(
-                span,
+                location,
                 lhs.type_,
                 operator_token.location,
                 rhs.type_,
@@ -3959,6 +4012,10 @@ fn bind_unary_operator<'a, 'b>(
             }
         }
         Type::Boolean | Type::Noneable(_) if result == BoundUnaryOperator::LogicalNegation => {
+            Some((result, typeid!(Type::Boolean)))
+        }
+        _ if binder.project.types.noneable_base_type(operand.type_).is_some() 
+            && result == BoundUnaryOperator::LogicalNegation => {
             Some((result, typeid!(Type::Boolean)))
         }
         Type::Error => None,
@@ -4849,6 +4906,19 @@ fn bind_condition_conversion<'a>(
             let safe_node = register_contained_safe_nodes(&base, binder);
             (base, safe_node)
         }
+        Type::Struct(_) => {
+            if let Some(noneable_base_type) = binder.project.types.noneable_base_type(base.type_) {
+                (
+                    bind_conversion(base.clone(), typeid!(Type::Boolean), binder),
+                    SafeNodeInCondition::IfBody(base, noneable_base_type),
+                )
+            } else {
+                (
+                    bind_conversion(base, typeid!(Type::Boolean), binder),
+                    SafeNodeInCondition::None,
+                )
+            }
+        }
         Type::Void
         | Type::Any
         | Type::Integer(_)
@@ -4857,7 +4927,6 @@ fn bind_condition_conversion<'a>(
         | Type::String
         | Type::Function(_)
         | Type::Closure(_)
-        | Type::Struct(_)
         | Type::Pointer
         | Type::PointerOf(_)
         | Type::Enum(..) => (
@@ -4885,19 +4954,31 @@ fn register_contained_safe_nodes(
                 Type::Noneable(base_type) => {
                     SafeNodeInCondition::ElseBody(*unary.operand.clone(), *base_type)
                 }
-                _ => SafeNodeInCondition::None,
+                _ => {
+                    if let Some(noneable_base_type) =
+                        binder.project.types.noneable_base_type(unary.operand.type_)
+                    {
+                        SafeNodeInCondition::ElseBody(*unary.operand.clone(), noneable_base_type)
+                    } else {
+                        SafeNodeInCondition::None
+                    }
+                }
             }
         }
         BoundNodeKind::BinaryExpression(binary)
             if binary.operator_token == BoundBinaryOperator::Equals
-                && matches!(
-                    (
-                        &binder.project.types[binary.lhs.type_],
-                        &binder.project.types[binary.rhs.type_]
-                    ),
-                    (Type::Noneable(_), Type::Noneable(_))
-                ) =>
+                && binder
+                    .project
+                    .types
+                    .noneable_base_type(binary.lhs.type_)
+                    .is_some()
+                && binder
+                    .project
+                    .types
+                    .noneable_base_type(binary.rhs.type_)
+                    .is_some() =>
         {
+            dbg!("Got here!");
             match (&binary.lhs.constant_value, &binary.rhs.constant_value) {
                 (None, Some(constant)) => {
                     if constant.value == Value::None {
@@ -4918,13 +4999,16 @@ fn register_contained_safe_nodes(
         }
         BoundNodeKind::BinaryExpression(binary)
             if binary.operator_token == BoundBinaryOperator::NotEquals
-                && matches!(
-                    (
-                        &binder.project.types[binary.lhs.type_],
-                        &binder.project.types[binary.rhs.type_]
-                    ),
-                    (Type::Noneable(_), Type::Noneable(_))
-                ) =>
+                && binder
+                    .project
+                    .types
+                    .noneable_base_type(binary.lhs.type_)
+                    .is_some()
+                && binder
+                    .project
+                    .types
+                    .noneable_base_type(binary.rhs.type_)
+                    .is_some() =>
         {
             match (&binary.lhs.constant_value, &binary.rhs.constant_value) {
                 (None, Some(constant)) => {
@@ -4944,9 +5028,39 @@ fn register_contained_safe_nodes(
                 _ => SafeNodeInCondition::None,
             }
         }
+        BoundNodeKind::FunctionCall(fn_call) => {
+            if fn_call.is_eq_function {
+                assert_eq!(fn_call.arguments.len(), 2);
+                let lhs = &fn_call.arguments[0];
+                let rhs = &fn_call.arguments[1];
+                match (&lhs.constant_value, &rhs.constant_value) {
+                    (None, Some(constant)) => {
+                        if constant.value == Value::None {
+                            register_contained_safe_nodes(&lhs, binder).negate()
+                        } else {
+                            register_contained_safe_nodes(&lhs, binder)
+                        }
+                    }
+                    (Some(constant), None) => {
+                        if constant.value == Value::None {
+                            register_contained_safe_nodes(&rhs, binder).negate()
+                        } else {
+                            register_contained_safe_nodes(&rhs, binder)
+                        }
+                    }
+                    _ => SafeNodeInCondition::None,
+                }
+            } else {
+                if let Some(noneable_base_type) = binder.project.types.noneable_base_type(base.type_) {
+                    SafeNodeInCondition::IfBody(base.clone(), noneable_base_type)
+                } else {
+                    SafeNodeInCondition::None
+                }
+            }
+        }
         _ => {
-            if let Type::Noneable(base_type) = &binder.project.types[base.type_] {
-                SafeNodeInCondition::IfBody(base.clone(), *base_type)
+            if let Some(noneable_base_type) = binder.project.types.noneable_base_type(base.type_) {
+                SafeNodeInCondition::IfBody(base.clone(), noneable_base_type)
             } else {
                 SafeNodeInCondition::None
             }

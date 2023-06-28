@@ -108,17 +108,18 @@ func customDictionary() {
 }
 
 func dictionaryResize() {
-    let a: Dict<string, int> = new Dict();
-    a['tom'] = 4;
-    a['tom1'] = 4;
-    a['tom2'] = 4;
-    a['tom3'] = 4;
-    a['tom4'] = 4;
-    a['tom5'] = 4;
-    a['tom6'] = 4;
-    a['tom7'] = 4;
-    a['tom8'] = 4;
-    a['tom9'] = 4;
-    a['tom10'] = 4;
-    print(a);
+    let count = 10;
+    let d: Dict<string, int> = new Dict();
+    for i in 0..count {
+        d['tom' + i] = i;
+    }
+    for i in 0..count {
+        let value = d.get('tom' + i);
+        if value != i {
+            print('value was ' + value);
+            print('i was ' + i);
+            runtimeError('Resize test: failed');
+        }
+    }
+    print('Resize test: okay');
 }

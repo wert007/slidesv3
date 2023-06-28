@@ -1,14 +1,15 @@
 mod allocator;
 pub mod basic_blocks;
 mod bound_nodes;
-mod syntax_nodes;
 mod instructions;
+mod syntax_nodes;
 
 pub use allocator::output_allocator_to_dot;
 pub use basic_blocks::output_basic_blocks_to_dot;
 pub use bound_nodes::print_bound_node_as_code;
-pub use instructions::instruction_to_string;
 pub use instructions::instruction_or_label_to_string;
+pub use instructions::instruction_to_string;
+pub use instructions::commented_instruction_to_string;
 pub use instructions::output_instructions_or_labels_with_source_code_to_sldasm;
 pub use instructions::output_instructions_with_source_code_to_sldasm;
 pub use instructions::print_instructions_or_labels_with_source_code;

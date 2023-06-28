@@ -1,6 +1,9 @@
 use num_enum::TryFromPrimitive;
 
-use crate::{binder::typing::SystemCallKind, text::{TextLocation, SourceTextId}};
+use crate::{
+    binder::typing::SystemCallKind,
+    text::{SourceTextId, TextLocation},
+};
 
 use self::op_codes::OpCode;
 
@@ -269,34 +272,34 @@ impl Instruction {
         }
     }
 
-    pub const fn less_than(location: TextLocation) -> Self {
+    pub const fn less_than(location: TextLocation, unsigned: bool) -> Self {
         Self {
             op_code: OpCode::LessThan,
-            arg: 0,
+            arg: unsigned as _,
             location,
         }
     }
 
-    pub const fn greater_than(location: TextLocation) -> Self {
+    pub const fn greater_than(location: TextLocation, unsigned: bool) -> Self {
         Self {
             op_code: OpCode::GreaterThan,
-            arg: 0,
+            arg: unsigned as _,
             location,
         }
     }
 
-    pub const fn less_than_equals(location: TextLocation) -> Self {
+    pub const fn less_than_equals(location: TextLocation, unsigned: bool) -> Self {
         Self {
             op_code: OpCode::LessThanEquals,
-            arg: 0,
+            arg: unsigned as _,
             location,
         }
     }
 
-    pub const fn greater_than_equals(location: TextLocation) -> Self {
+    pub const fn greater_than_equals(location: TextLocation, unsigned: bool) -> Self {
         Self {
             op_code: OpCode::GreaterThanEquals,
-            arg: 0,
+            arg: unsigned as _,
             location,
         }
     }
@@ -333,7 +336,11 @@ impl Instruction {
         }
     }
 
-    pub const fn jump_to_label_conditionally(label_index: usize, jump_if_true: bool, location: TextLocation) -> Self {
+    pub const fn jump_to_label_conditionally(
+        label_index: usize,
+        jump_if_true: bool,
+        location: TextLocation,
+    ) -> Self {
         let op_code = if jump_if_true {
             OpCode::JumpIfTrue
         } else {
@@ -371,7 +378,11 @@ impl Instruction {
         }
     }
 
-    pub const fn function_call(location: TextLocation, argument_count: u64, returns_value: bool) -> Self {
+    pub const fn function_call(
+        location: TextLocation,
+        argument_count: u64,
+        returns_value: bool,
+    ) -> Self {
         let arg = argument_count << 1 | if returns_value { 1 } else { 0 };
         Self {
             op_code: OpCode::FunctionCall,
@@ -388,7 +399,11 @@ impl Instruction {
         }
     }
 
-    pub fn return_from_function(returns_value: bool, restores_registers: bool, location: TextLocation) -> Self {
+    pub fn return_from_function(
+        returns_value: bool,
+        restores_registers: bool,
+        location: TextLocation,
+    ) -> Self {
         let mut arg = 0;
         if returns_value {
             arg += 1;
@@ -403,7 +418,11 @@ impl Instruction {
         }
     }
 
-    pub const fn decode_closure(argument_count: u64, has_function_pointer: bool, location: TextLocation) -> Self {
+    pub const fn decode_closure(
+        argument_count: u64,
+        has_function_pointer: bool,
+        location: TextLocation,
+    ) -> Self {
         Self {
             op_code: OpCode::DecodeClosure,
             arg: (argument_count << 1) + has_function_pointer as u64,

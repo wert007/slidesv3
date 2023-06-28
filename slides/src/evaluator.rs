@@ -9,8 +9,9 @@ use crate::{
         instruction::{op_codes::OpCode, Instruction},
         Program,
     },
+    text::{SourceTextId, TextLocation},
     value::Value,
-    DiagnosticBag, Project, text::{TextLocation, SourceTextId},
+    DiagnosticBag, Project,
 };
 use num_enum::TryFromPrimitive;
 
@@ -63,6 +64,14 @@ impl EvaluatorState {
         }
     }
 
+    pub fn read_pointer_safe(&self, address: u64) -> Option<&FlaggedWord> {
+        if memory::is_heap_pointer(address) {
+            self.heap.read_flagged_word_safe(address)
+        } else {
+            self.stack.read_flagged_word_safe(address)
+        }
+    }
+
     fn write_pointer(&mut self, address: u64, value: FlaggedWord) {
         if memory::is_heap_pointer(address) {
             self.heap.write_flagged_word(address, value);
@@ -106,13 +115,63 @@ impl EvaluatorState {
             return;
         }
         let location = self.instructions[self.pc].location;
-        let position = (location.source_text, location.line_index(&self.project.source_text_collection));
+        let position = (
+            location.source_text,
+            location.line_index(&self.project.source_text_collection),
+        );
         if self.last_visible_source_line == position {
             return;
         }
         self.last_visible_source_line = position;
-        let line = self.project.source_text_collection[self.last_visible_source_line.0].line(self.last_visible_source_line.1).trim();
+        let line = self.project.source_text_collection[self.last_visible_source_line.0]
+            .line(self.last_visible_source_line.1)
+            .trim();
         println!("{:4}: {line}", position.1 + 1);
+    }
+
+    pub(crate) fn read_string_from_memory(&self, address: usize) -> Option<String> {
+        let address = address as u64;
+        if address % memory::WORD_SIZE_IN_BYTES != 0 || address == 0 {
+            return None;
+        }
+        let length_in_bytes = self.read_pointer_safe(address)?.as_value()?;
+        let length_in_words = memory::bytes_to_word(length_in_bytes);
+        let mut buffer = Vec::with_capacity(length_in_bytes as _);
+        for w in 0..length_in_words {
+            let Some(word) = self.read_pointer_safe(address + (w + 1) * memory::WORD_SIZE_IN_BYTES)?.as_value() else {
+                break;
+            };
+            let bytes = word.to_be_bytes();
+            buffer.extend_from_slice(&bytes);
+        }
+        while let Some(0) = buffer.last() {
+            buffer.pop();
+        }
+        String::from_utf8(buffer).ok()
+    }
+
+    pub(crate) fn read_symbol_from_memory(&self, _: usize) -> Option<String> {
+        // TODO: Implement
+        None
+    }
+
+    pub fn load_register(&self, index: usize) -> Option<&FlaggedWord> {
+        self.registers.get(index)
+    }
+
+    pub fn peek_stack(&self, offset: usize) -> Option<&FlaggedWord> {
+        self.stack.read_flagged_word_safe(
+            (self.stack.len() as u64 - offset as u64 - 1) * WORD_SIZE_IN_BYTES,
+        )
+    }
+
+    pub(crate) fn next_allocation_address(&self, size_in_bytes: u64) -> Option<u64> {
+        let value = self.heap.dry_reallocate(0, size_in_bytes);
+        if value == 0 {
+            None
+        } else {
+            Some(value)
+        }
     }
 }
 
@@ -162,13 +221,11 @@ pub fn evaluate(
         debugger_state: debugger::DebuggerState::default(),
         protected_pointers: vec![],
         project,
-        last_visible_source_line: (unsafe {SourceTextId::from_raw(0)}, 0),
+        last_visible_source_line: (unsafe { SourceTextId::from_raw(0) }, 0),
     };
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
-        Ok(None) => {
-            Value::Integer(0)
-        }
+        Ok(None) => Value::Integer(0),
         Err(()) => {
             if debug_flags.use_debugger {
                 debugger::create_session(&mut state);
@@ -207,7 +264,8 @@ fn execute_function(
                 "  CI {:X}*{}: {}",
                 pc,
                 nestedness,
-                crate::debug::instruction_to_string(state.instructions[pc], false, None)
+                crate::debug::commented_instruction_to_string(state.instructions[pc], &state)
+                    .unwrap()
             );
         }
         if state.project.debug_flags.slow_mode {
@@ -625,28 +683,76 @@ fn evaluate_type_identifier_equals(state: &mut EvaluatorState, _: Instruction) {
     state.stack.push(result as _);
 }
 
-fn evaluate_less_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value() as i64;
-    let lhs = state.stack.pop().unwrap_value() as i64;
-    state.stack.push((lhs < rhs) as _);
+fn evaluate_less_than(state: &mut EvaluatorState, instruction: Instruction) {
+    match instruction.arg {
+        0 => {
+            let rhs = state.stack.pop().unwrap_value() as i64;
+            let lhs = state.stack.pop().unwrap_value() as i64;
+            state.stack.push((lhs < rhs) as _);
+        }
+        1 => {
+            let rhs = state.stack.pop().unwrap_value();
+            let lhs = state.stack.pop().unwrap_value();
+            state.stack.push((lhs < rhs) as _);
+        }
+        arg => {
+            panic!("unhandled argument {arg:X} to instruction!")
+        }
+    }
 }
 
-fn evaluate_greater_than(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value() as i64;
-    let lhs = state.stack.pop().unwrap_value() as i64;
-    state.stack.push((lhs > rhs) as _);
+fn evaluate_greater_than(state: &mut EvaluatorState, instruction: Instruction) {
+    match instruction.arg {
+        0 => {
+            let rhs = state.stack.pop().unwrap_value() as i64;
+            let lhs = state.stack.pop().unwrap_value() as i64;
+            state.stack.push((lhs > rhs) as _);
+        }
+        1 => {
+            let rhs = state.stack.pop().unwrap_value();
+            let lhs = state.stack.pop().unwrap_value();
+            state.stack.push((lhs > rhs) as _);
+        }
+        arg => {
+            panic!("unhandled argument {arg:X} to instruction!")
+        }
+    }
 }
 
-fn evaluate_less_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value() as i64;
-    let lhs = state.stack.pop().unwrap_value() as i64;
-    state.stack.push((lhs <= rhs) as _);
+fn evaluate_less_than_equals(state: &mut EvaluatorState, instruction: Instruction) {
+    match instruction.arg {
+        0 => {
+            let rhs = state.stack.pop().unwrap_value() as i64;
+            let lhs = state.stack.pop().unwrap_value() as i64;
+            state.stack.push((lhs <= rhs) as _);
+        }
+        1 => {
+            let rhs = state.stack.pop().unwrap_value();
+            let lhs = state.stack.pop().unwrap_value();
+            state.stack.push((lhs <= rhs) as _);
+        }
+        arg => {
+            panic!("unhandled argument {arg:X} to instruction!")
+        }
+    }
 }
 
-fn evaluate_greater_than_equals(state: &mut EvaluatorState, _: Instruction) {
-    let rhs = state.stack.pop().unwrap_value() as i64;
-    let lhs = state.stack.pop().unwrap_value() as i64;
-    state.stack.push((lhs >= rhs) as _);
+fn evaluate_greater_than_equals(state: &mut EvaluatorState, instruction: Instruction) {
+    match instruction.arg {
+        0 => {
+            let rhs = state.stack.pop().unwrap_value() as i64;
+            let lhs = state.stack.pop().unwrap_value() as i64;
+            state.stack.push((lhs >= rhs) as _);
+        }
+        1 => {
+            let rhs = state.stack.pop().unwrap_value();
+            let lhs = state.stack.pop().unwrap_value();
+            state.stack.push((lhs >= rhs) as _);
+        }
+        arg => {
+            panic!("unhandled argument {arg:X} to instruction!")
+        }
+    }
 }
 
 fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) {
@@ -704,10 +810,12 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
+    let rhs = state.read_pointer(rhs.unwrap_pointer());
+    let lhs = state.read_pointer(lhs.unwrap_pointer());
     let is_none = lhs.unwrap_pointer() == 0;
     let needs_dereferencing = instruction.arg != 0;
     let result = if needs_dereferencing && !is_none {
-        state.read_pointer(lhs.unwrap_pointer()).clone()
+        state.read_pointer(lhs.unwrap_pointer())
     } else {
         if is_none {
             rhs
@@ -715,7 +823,7 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
             lhs
         }
     };
-    state.stack.push_flagged_word(result);
+    state.stack.push_flagged_word(result.clone());
 }
 
 fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {

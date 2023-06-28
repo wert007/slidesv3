@@ -107,7 +107,8 @@ fn print_bound_node_as_code_with_indent(
             print_bound_node_while_statement_as_code(while_statement, types, printer, buffer)
         }
         BoundNodeKind::MatchStatement(match_statement) => {
-            print_bound_node_match_statement_as_code(match_statement, types, printer, buffer).unwrap()
+            print_bound_node_match_statement_as_code(match_statement, types, printer, buffer)
+                .unwrap()
         }
         BoundNodeKind::Assignment(assignment) => {
             print_bound_node_assignment_as_code(assignment, types, printer, buffer)
@@ -322,15 +323,20 @@ fn print_bound_node_closure_as_code(
 }
 
 fn print_bound_node_conversion_as_code(
-    closure: &BoundConversionNodeKind,
+    conversion: &BoundConversionNodeKind,
     types: &TypeCollection,
     printer: DebugPrinter,
     buffer: &mut String,
 ) {
     buffer.push('(');
-    print_bound_node_as_code_with_indent(&closure.base, types, printer, buffer);
+    print_bound_node_as_code_with_indent(&conversion.base, types, printer, buffer);
     buffer.push_str(") as ");
-    buffer.push_str(&types.name_of_type_id(closure.type_));
+    buffer.push_str(&types.name_of_type_id(conversion.type_));
+    match conversion.kind(types) {
+        Some(ConversionKind::None) => {}
+        Some(kind) => write!(buffer, "[{kind:?}]").unwrap(),
+        None => write!(buffer, "[ERROR]").unwrap(),
+    }
 }
 
 fn print_bound_node_repetition_node_as_code(

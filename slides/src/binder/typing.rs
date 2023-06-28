@@ -1,7 +1,8 @@
 use std::{
     borrow::Cow,
+    collections::HashMap,
     fmt::{Display, Write},
-    ops::{Index, IndexMut}, collections::HashMap,
+    ops::{Index, IndexMut},
 };
 
 use num_enum::TryFromPrimitive;
@@ -340,10 +341,6 @@ impl TypeCollection {
             })
     }
 
-    pub fn create_noneable_version(&mut self, id: TypeId) -> TypeId {
-        self.look_up_or_add_type(Type::Noneable(id))
-    }
-
     pub fn create_pointer_of_version(&mut self, id: TypeId) -> TypeId {
         self.look_up_or_add_type(Type::PointerOf(id))
     }
@@ -366,16 +363,34 @@ impl TypeCollection {
             (Type::Integer(from_integer_type), Type::Integer(to_integer_type)) => {
                 from_integer_type.to_signed() == *to_integer_type
             }
-            (Type::Struct(this), _) => match this.parent {
-                Some(parent) => self.can_be_converted(parent, to_id),
-                None => false,
-            },
+            // Convert noneable to bool (in if condition e.g.)
+            (_, Type::Boolean) if self.noneable_base_type(from_id).is_some() => true,
+            (Type::Struct(this), _) if self.noneable_base_type(to_id).is_none() => {
+                match this.parent {
+                    Some(parent) => self.can_be_converted(parent, to_id),
+                    None => false,
+                }
+            }
             (this, other)
                 if this.as_function_type().is_some() && other.as_function_type().is_some() =>
             {
                 let this = this.as_function_type().unwrap();
                 let other = other.as_function_type().unwrap();
                 this.can_be_converted_to(other)
+            }
+            // Convert none to noneable
+            (Type::None, Type::Struct(noneable_type))
+                if noneable_type.generic_base_type.is_some() =>
+            {
+                let Some(is_noneable_type) = self[noneable_type.generic_base_type.unwrap()].as_struct_type() else {
+                    return false;
+                };
+                is_noneable_type.name == "Noneable"
+            }
+            // Convert value to a noneable version of itself!
+            (_, _) if self.noneable_base_type(to_id).is_some() => {
+                let noneable_base_type = self.noneable_base_type(to_id).unwrap();
+                self.can_be_converted(from_id, noneable_base_type)
             }
             _ => false,
         }
@@ -393,6 +408,9 @@ impl TypeCollection {
                 self.can_be_converted(*inner, *other)
             }
             (Type::Noneable(base_type), _) => self.can_be_converted(*base_type, to_id),
+            (_, _) if self.noneable_base_type(from_id).is_some() => {
+                self.can_be_converted(self.noneable_base_type(from_id).unwrap(), to_id)
+            }
             (Type::Integer(signed_type), Type::Integer(unsigned_type))
                 if signed_type.is_signed()
                     && !unsigned_type.is_signed()
@@ -415,6 +433,10 @@ impl TypeCollection {
         self.name_of_type(&self[type_id])
     }
 
+    pub fn display_name_of_type_id(&self, type_id: TypeId) -> Cow<str> {
+        self.display_name_of_type(&self[type_id])
+    }
+
     pub fn name_of_generic_type_id(&self, generic_type_id: GenericTypeId) -> Cow<str> {
         self.name_of_generic_type(&self[generic_type_id])
     }
@@ -425,6 +447,18 @@ impl TypeCollection {
 
     pub fn name_of_generic_type_id_debug(&self, generic_type_id: GenericTypeId) -> Cow<str> {
         self.name_of_generic_type_debug(&self[generic_type_id])
+    }
+
+    fn display_name_of_type<'a>(&self, type_: &'a Type) -> Cow<'a, str> {
+        if self.noneable_base_type_from_type(type_).is_some() {
+            format!(
+                "{}?",
+                self.name_of_type_id(self.noneable_base_type_from_type(type_).unwrap())
+            )
+            .into()
+        } else {
+            self.name_of_type(type_)
+        }
     }
 
     fn name_of_type<'a>(&self, type_: &'a Type) -> Cow<'a, str> {
@@ -628,9 +662,9 @@ impl TypeCollection {
                 Ok(self.look_up_or_add_type(Type::PointerOf(it)))
             }
             Type::Struct(struct_type) if !struct_type.applied_types.is_empty() => {
-                let mut name = format!("{}<", struct_type.name.split_once('<').unwrap().0);
                 let mut applied_types = struct_type.applied_types.clone();
                 let struct_type = struct_type.clone();
+                let mut name = format!("{}<", struct_type.name.split_once('<').unwrap().0);
                 for t in &mut applied_types {
                     *t = self.replace_in_type_for_types(*t, replace, replace_with)?;
                 }
@@ -748,6 +782,40 @@ impl TypeCollection {
             cb(ty);
         }
     }
+
+    pub(crate) fn noneable_base_type(&self, type_: TypeId) -> Option<TypeId> {
+        let type_ = self[type_].as_struct_type()?;
+        if self[type_.generic_base_type?].as_struct_type()?.name == "Noneable" {
+            Some(type_.applied_types.first().copied()?)
+        } else {
+            None
+        }
+    }
+
+    fn noneable_base_type_from_type(&self, type_: &Type) -> Option<TypeId> {
+        let type_ = type_.as_struct_type()?;
+        if self[type_.generic_base_type?].as_struct_type()?.name == "Noneable" {
+            Some(type_.applied_types.first().copied()?)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn is_unsigned(&self, type_: TypeId) -> bool {
+        if let Type::Integer(i) = self[type_] {
+            !i.is_signed()
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn to_type_id(&self, index: usize) -> Option<TypeId> {
+        if self.types.len() < index {
+            Some(TypeId(index as _))
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(TryFromPrimitive, PartialEq, Eq, Debug, Clone, Copy)]
@@ -829,7 +897,10 @@ impl GenericStruct {
     }
 
     pub fn function_bodies(&self) -> HashMap<&str, &GenericFunction> {
-        self.functions.iter().map(|f| (f.function_name.as_str(), f)).collect()
+        self.functions
+            .iter()
+            .map(|f| (f.function_name.as_str(), f))
+            .collect()
     }
 }
 
@@ -1017,6 +1088,22 @@ impl Type {
             Some(it)
         } else {
             None
+        }
+    }
+
+    pub(crate) fn is_signed_int(&self) -> bool {
+        if let Type::Integer(i) = self {
+            i.is_signed()
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn is_unsigned_int(&self) -> bool {
+        if let Type::Integer(i) = self {
+            !i.is_signed()
+        } else {
+            false
         }
     }
 }

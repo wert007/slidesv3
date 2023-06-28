@@ -233,7 +233,10 @@ pub fn convert_with_project_parameter<'a>(
         );
     }
     if converter.project.debug_flags.print_static_memory_as_string {
-        println!("{:?}", memory::static_memory::print_static_memory_as_string(&converter.static_memory));
+        println!(
+            "{:?}",
+            memory::static_memory::print_static_memory_as_string(&converter.static_memory)
+        );
     }
     Program {
         startup_instructions: vec![],
@@ -558,8 +561,12 @@ fn convert_array_literal(
         element_count.append(&mut convert_node(count, converter));
         element_count.push(Instruction::addition(location).into());
     }
-    result.extend_from_slice(&element_count);
-    result.push(Instruction::write_to_heap_runtime(location).into());
+    if element_count.len() == 1 {
+        result.push(Instruction::write_to_heap(const_element_count, location).into());
+    } else {
+        result.extend_from_slice(&element_count);
+        result.push(Instruction::write_to_heap_runtime(location).into());
+    }
     result.extend_from_slice(&element_count);
     let array_type = converter.project.types[type_]
         .as_struct_type()
@@ -634,18 +641,24 @@ fn convert_unary(
     unary: BoundUnaryNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let is_pointer = converter.project.types[unary.operand.type_].is_pointer();
+    let operand_type = unary.operand.type_;
     let mut result = convert_node(*unary.operand, converter);
     match unary.operator_token {
         BoundUnaryOperator::ArithmeticNegate => {
             result.push(Instruction::twos_complement(span).into())
         }
         BoundUnaryOperator::ArithmeticIdentity => {}
-        BoundUnaryOperator::LogicalNegation if is_pointer => {
+        BoundUnaryOperator::LogicalNegation if converter.project.types[operand_type].is_pointer() => {
+            if converter.project.types.noneable_base_type(operand_type).is_some() {
+                result.push(Instruction::read_word_with_offset(0, span).into());
+            }
             result.push(Instruction::load_none_pointer(span).into());
             result.push(Instruction::noneable_equals(1, span).into());
         }
         BoundUnaryOperator::LogicalNegation => {
+            if converter.project.types.noneable_base_type(operand_type).is_some() {
+                result.push(Instruction::read_word_with_offset(0, span).into());
+            }
             result.push(Instruction::load_immediate(0, span).into());
             result.push(Instruction::equals(span).into());
         }
@@ -654,27 +667,28 @@ fn convert_unary(
 }
 
 fn convert_binary(
-    span: TextLocation,
+    location: TextLocation,
     binary: BoundBinaryNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
+    let is_unsigned = converter.project.types.is_unsigned(binary.lhs.type_);
     let operator_instruction = match binary.operator_token {
-        BoundBinaryOperator::ArithmeticAddition => Instruction::addition(span),
-        BoundBinaryOperator::ArithmeticSubtraction => Instruction::subtraction(span),
-        BoundBinaryOperator::ArithmeticMultiplication => Instruction::multiplication(span),
-        BoundBinaryOperator::ArithmeticDivision => Instruction::division(span),
+        BoundBinaryOperator::ArithmeticAddition => Instruction::addition(location),
+        BoundBinaryOperator::ArithmeticSubtraction => Instruction::subtraction(location),
+        BoundBinaryOperator::ArithmeticMultiplication => Instruction::multiplication(location),
+        BoundBinaryOperator::ArithmeticDivision => Instruction::division(location),
         BoundBinaryOperator::Equals => {
             match (
                 &converter.project.types[binary.lhs.type_],
                 &converter.project.types[binary.rhs.type_],
             ) {
-                (Type::String, Type::String) => Instruction::array_equals(span),
+                (Type::String, Type::String) => Instruction::array_equals(location),
                 (Type::Noneable(base_type), Type::Noneable(_))
                     if !converter.project.types[*base_type].is_pointer() =>
                 {
                     Instruction::noneable_equals(
                         converter.project.types[*base_type].size_in_bytes(),
-                        span,
+                        location,
                     )
                 }
                 (Type::Noneable(base_type), Type::Noneable(_))
@@ -689,27 +703,42 @@ fn convert_binary(
                     );
                     // Instruction::array_equals()
                 }
-                _ => Instruction::equals(span),
+                _ => Instruction::equals(location),
             }
         }
         BoundBinaryOperator::NotEquals => {
             if binary.lhs.type_ == typeid!(Type::String)
                 && binary.rhs.type_ == typeid!(Type::String)
             {
-                Instruction::array_not_equals(span)
+                Instruction::array_not_equals(location)
             } else {
-                Instruction::not_equals(span)
+                Instruction::not_equals(location)
             }
         }
-        BoundBinaryOperator::LessThan => Instruction::less_than(span),
-        BoundBinaryOperator::GreaterThan => Instruction::greater_than(span),
-        BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(span),
-        BoundBinaryOperator::GreaterThanEquals => Instruction::greater_than_equals(span),
-        BoundBinaryOperator::StringConcat => Instruction::string_concat(span),
-        BoundBinaryOperator::NoneableOrValue => Instruction::noneable_or_value(
-            !converter.project.types[binary.rhs.type_].is_pointer(),
-            span,
-        ),
+        BoundBinaryOperator::LessThan => Instruction::less_than(location, is_unsigned),
+        BoundBinaryOperator::GreaterThan => Instruction::greater_than(location, is_unsigned),
+        BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(location, is_unsigned),
+        BoundBinaryOperator::GreaterThanEquals => {
+            Instruction::greater_than_equals(location, is_unsigned)
+        }
+        BoundBinaryOperator::StringConcat => Instruction::string_concat(location),
+        BoundBinaryOperator::NoneableOrValue => {
+            let needs_dereferencing = !converter.project.types[converter
+                .project
+                .types
+                .noneable_base_type(binary.rhs.type_)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Should have been converted to a noneable! Found {} instead!",
+                        converter
+                            .project
+                            .types
+                            .name_of_type_id_debug(binary.rhs.type_)
+                    )
+                })]
+            .is_pointer();
+            Instruction::noneable_or_value(needs_dereferencing, location)
+        }
         operator @ (BoundBinaryOperator::LogicalAnd
         | BoundBinaryOperator::LogicalOr
         | BoundBinaryOperator::Range) => {
@@ -956,7 +985,9 @@ fn convert_conversion(
     conversion: BoundConversionNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let conversion_kind = conversion.kind(&converter.project.types);
+    let conversion_kind = conversion
+        .kind(&converter.project.types)
+        .expect("Did not report an error during binding!");
     let base_type = conversion.base.type_.clone();
     let base_type = if base_type == typeid!(Type::IntegerLiteral) {
         typeid!(Type::Integer(IntegerType::Signed64))
@@ -976,10 +1007,11 @@ fn convert_conversion(
         }
         ConversionKind::TypeUnboxing => {
             convert_type_identifier(
-                converter.project.types[conversion.type_]
-                    .noneable_base_type()
-                    .unwrap()
-                    .clone(),
+                converter
+                    .project
+                    .types
+                    .noneable_base_type(conversion.type_)
+                    .unwrap(),
                 location,
                 &mut result,
             );
@@ -993,15 +1025,20 @@ fn convert_conversion(
             let label = converter.generate_label();
             result.push(Instruction::jump_to_label_conditionally(label, false, location).into());
             // If types are equal, the value of the type needs to be converted into a noneable
+            result.push(Instruction::write_to_heap(1, location).into());
             if !converter.project.types[base_type].is_pointer() {
                 result.push(Instruction::write_to_heap(1, location).into());
             }
             result.push(Instruction::label(label, location).into());
         }
         ConversionKind::Boxing => {
+            if base_type != typeid!(Type::None) {
+                result.push(Instruction::write_to_heap(1, location).into());
+            }
             result.push(Instruction::write_to_heap(1, location).into());
         }
         ConversionKind::Unboxing => {
+            result.push(Instruction::read_word_with_offset(0, location).into());
             result.push(Instruction::read_word_with_offset(0, location).into());
         }
         ConversionKind::IntToUint => {
@@ -1009,17 +1046,19 @@ fn convert_conversion(
             let label_end_if = converter.generate_label();
             result.push(Instruction::load_immediate(0, location).into());
             result.push(Instruction::duplicate_over(1, location).into());
-            result.push(Instruction::greater_than(location).into());
+            result.push(Instruction::greater_than(location, false).into());
             result.push(
                 Instruction::jump_to_label_conditionally(label_if_is_not_uint, true, location)
                     .into(),
             );
             // If the int is >= 0, it needs to be converted into a noneable
             result.push(Instruction::write_to_heap(1, location).into());
+            result.push(Instruction::write_to_heap(1, location).into());
             result.push(Instruction::jump_to_label(label_end_if, location).into());
             result.push(Instruction::label(label_if_is_not_uint, location).into());
             result.push(Instruction::pop(location).into());
             result.push(Instruction::load_none_pointer(location).into());
+            result.push(Instruction::write_to_heap(1, location).into());
             result.push(Instruction::label(label_end_if, location).into());
         }
         ConversionKind::AbstractTypeBoxing => {
@@ -1054,107 +1093,10 @@ fn convert_conversion(
 
 fn convert_type_identifier(
     base_type: TypeId,
-    span: TextLocation,
+    location: TextLocation,
     result: &mut Vec<InstructionOrLabelReference>,
 ) {
-    // let size_in_words = base_type.type_identifier_size_in_words();
-    // let size_in_bytes = size_in_words * WORD_SIZE_IN_BYTES;
-    // let type_identifier_kind = base_type.type_identifier_kind();
-    // let type_word_count = match base_type {
-    //     Type::Noneable(base_type) => convert_type_identifier(*base_type, span, result) + 2,
-    //     Type::PointerOf(base_type) => convert_type_identifier(*base_type, span, result) + 2,
-    //     Type::Function(function_type) => {
-    //         let mut type_word_count = 3;
-    //         let parameter_count = function_type.parameter_types.len() as u64;
-    //         // ParameterTypes
-    //         for parameter in function_type.parameter_types.into_iter().rev() {
-    //             type_word_count += convert_type_identifier(parameter, span, result);
-    //         }
-    //         // ReturnType
-    //         type_word_count += convert_type_identifier(function_type.return_type, span, result);
-    //         // ThisType or Void
-    //         type_word_count += convert_type_identifier(
-    //             function_type.this_type.unwrap_or(Type::Void),
-    //             span,
-    //             result,
-    //         );
-    //         // ParameterCount + 2
-    //         result.push(
-    //             Instruction::load_immediate(parameter_count + 2)
-    //                 .span(span)
-    //                 .into(),
-    //         );
-    //         type_word_count
-    //     }
-    //     Type::Closure(closure_type) => {
-    //         let mut type_word_count = 3;
-    //         let parameter_count = closure_type.base_function_type.parameter_types.len() as u64;
-    //         // ParameterTypes
-    //         for parameter in closure_type
-    //             .base_function_type
-    //             .parameter_types
-    //             .into_iter()
-    //             .rev()
-    //         {
-    //             type_word_count += convert_type_identifier(parameter, span, result);
-    //         }
-    //         // ReturnType
-    //         type_word_count +=
-    //             convert_type_identifier(closure_type.base_function_type.return_type, span, result);
-    //         // ThisType or Void
-    //         type_word_count += convert_type_identifier(
-    //             closure_type
-    //                 .base_function_type
-    //                 .this_type
-    //                 .unwrap_or(Type::Void),
-    //             span,
-    //             result,
-    //         );
-    //         // ParameterCount + 2
-    //         result.push(
-    //             Instruction::load_immediate(parameter_count + 2)
-    //                 .span(span)
-    //                 .into(),
-    //         );
-    //         type_word_count
-    //     }
-    //     Type::Struct(struct_type) => {
-    //         result.push(match struct_type.function_table.to_string_function {
-    //             Some(function) => LabelReference {
-    //                 label_reference: function.function_label as _,
-    //                 span,
-    //             }
-    //             .into(),
-    //             None => Instruction::load_none_pointer().span(span).into(),
-    //         });
-    //         result.push(
-    //             Instruction::load_immediate(struct_type.id)
-    //                 .span(span)
-    //                 .into(),
-    //         );
-    //         4
-    //     }
-    //     Type::StructReference(id) => {
-    //         result.push(match id.simple_function_table.to_string_function {
-    //             Some(function) => LabelReference {
-    //                 label_reference: function as _,
-    //                 span,
-    //             }
-    //             .into(),
-    //             None => Instruction::load_none_pointer().span(span).into(),
-    //         });
-    //         result.push(Instruction::load_immediate(id.id).span(span).into());
-    //         4
-    //     }
-    //     _ => 2,
-    // };
-    // result.push(
-    //     Instruction::load_immediate(type_identifier_kind)
-    //         .span(span)
-    //         .into(),
-    // );
-    // result.push(Instruction::load_immediate(size_in_bytes).span(span).into());
-    result.push(Instruction::load_immediate(base_type.as_raw(), span).into());
+    result.push(Instruction::load_immediate(base_type.as_raw(), location).into());
 }
 
 fn convert_variable_declaration(

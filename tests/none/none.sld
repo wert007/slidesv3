@@ -45,7 +45,7 @@ func main() {
         print(m - 99);
     }
 
-    // if (n != none) == false {
+    // if (n != none) == false
     if n == none {
         n = 12;
         print('Shoud have gotten here as well?!');

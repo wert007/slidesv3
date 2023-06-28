@@ -1,9 +1,6 @@
 use crate::{binder::bound_nodes::BoundNodeKind, text::TextLocation};
 
-use super::{
-    bound_nodes::*,
-    typing::TypeId,
-};
+use super::{bound_nodes::*, typing::TypeId};
 
 struct Flattener {
     pub label_count: usize,

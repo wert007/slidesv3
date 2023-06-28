@@ -43,7 +43,9 @@ pub(crate) fn replace_labels(
             match i.op_code {
                 OpCode::Label => Instruction::noop(i.location),
                 OpCode::Jump => Instruction::jump(labels[i.arg as usize], i.location),
-                OpCode::JumpIfFalse => Instruction::jump_if_false(labels[i.arg as usize], i.location),
+                OpCode::JumpIfFalse => {
+                    Instruction::jump_if_false(labels[i.arg as usize], i.location)
+                }
                 OpCode::JumpIfTrue => Instruction::jump_if_true(labels[i.arg as usize], i.location),
                 _ => i,
             }

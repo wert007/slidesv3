@@ -61,6 +61,19 @@ impl Allocator {
         result
     }
 
+    fn dry_free_buckets(&self, min_size: u64) -> Vec<&Bucket> {
+        let mut result: Vec<_> = self
+            .buckets
+            .iter()
+            .filter_map(|b| match b {
+                BucketEntry::Bucket(b) if !b.is_used && b.size_in_words >= min_size => Some(b),
+                _ => None,
+            })
+            .collect();
+        result.sort_by_key(|b| b.size_in_words);
+        result
+    }
+
     fn used_buckets_mut(&mut self) -> impl Iterator<Item = &mut Bucket> {
         self.buckets.iter_mut().filter_map(|b| match b {
             BucketEntry::Bucket(b) if b.is_used => Some(b),
@@ -115,6 +128,43 @@ impl Allocator {
             iter.next()
                 .expect("There should have been a fallback at least!"),
         ]
+    }
+
+    pub fn dry_reallocate(&self, address: u64, size_in_bytes: u64) -> u64 {
+        let result = {
+            let size_in_words = bytes_to_word(size_in_bytes);
+            let expected_size = size_in_words.next_power_of_two();
+            let old_bucket;
+            let bucket_index = {
+                let bucket = if address == 0 {
+                    None
+                } else {
+                    old_bucket = self.find_bucket_from_address(address).map(Clone::clone);
+                    // If the user can supply arbitrary values as pointer this
+                    // might not be true, but right now this is not the case.
+                    assert!(old_bucket.is_some(), "address = {:#x}", address);
+                    old_bucket.filter(|b| b.size_in_words >= size_in_words)
+                };
+                match bucket {
+                    Some(bucket) => bucket.index,
+                    None => {
+                        let mut free_buckets = self.dry_free_buckets(expected_size);
+                        if free_buckets.is_empty() {
+                            // eprintln!("No Memory left!!!!");
+                            return 0;
+                        }
+                        // TODO: Performance: Do we really need to remove the
+                        // first element, which might copy over all the other
+                        // elements in the array. especially since we are just
+                        // interested in the index..
+                        free_buckets.remove(0).index
+                    }
+                }
+            };
+            let result_bucket = self.buckets[bucket_index].as_bucket().unwrap();
+            result_bucket.address as u64 * WORD_SIZE_IN_BYTES
+        };
+        result | HEAP_POINTER
     }
 
     pub fn reallocate(&mut self, address: u64, size_in_bytes: u64) -> u64 {

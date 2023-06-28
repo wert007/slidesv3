@@ -421,6 +421,41 @@ struct KeyValuePair<Key, Value> {
     value: $Value;
 }
 
+struct Noneable<Type> {
+    value: &$Type;
+
+    func $constructor() {
+        this.value = none;
+    }
+
+    func set(value: $Type) {
+        if this.value == none {
+            this.value = reallocate(this.value, 8);
+        }
+        this.value[0] = value;
+    }
+
+    func reset() {
+        this.value = none;
+    }
+
+    func $equals(other: Noneable<$Type>) -> bool {
+        if this.value == none || other.value == none {
+            return this.value == other.value;
+        } else {
+            return this.value[0] == other.value[0];
+        }
+    }
+
+    func $toString() -> string {
+        if this.value == none {
+            return 'none';
+        } else {
+            return this.value[0] + '';
+        }
+    }
+}
+
 // generic struct Noneable {
 //     buffer: &$Type;
 

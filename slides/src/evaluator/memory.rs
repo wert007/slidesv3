@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 pub mod allocator;
 pub mod stack;
 pub mod static_memory;
@@ -17,8 +19,9 @@ pub trait Memory {
     fn read_flagged_word_aligned(&self, address: u64) -> &FlaggedWord;
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord);
     fn len(&self) -> usize;
-    fn transform_address(&self, address: u64) -> u64 { address }
-
+    fn transform_address(&self, address: u64) -> u64 {
+        address
+    }
 
     fn read_flagged_word(&self, address: u64) -> &FlaggedWord {
         let address = self.transform_address(address);
@@ -26,6 +29,19 @@ pub trait Memory {
             self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES)
         } else {
             unimplemented!("address = 0x{:x}", address)
+        }
+    }
+
+    fn read_flagged_word_safe(&self, address: u64) -> Option<&FlaggedWord> {
+        let address = self.transform_address(address);
+        if self.len() <= (address / WORD_SIZE_IN_BYTES) as usize {
+            return None;
+        }
+        if address % WORD_SIZE_IN_BYTES == 0 {
+            Some(self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES))
+        } else {
+            // unimplemented!("address = 0x{:x}", address)
+            return None;
         }
     }
 
@@ -105,6 +121,14 @@ impl FlaggedWord {
     pub fn is_pointer(&self) -> bool {
         self.flags.is_pointer
     }
+
+    pub(crate) fn as_value(&self) -> Option<u64> {
+        (!self.flags.is_pointer).then(|| self.value)
+    }
+
+    pub(crate) fn as_pointer(&self) -> Option<u64> {
+        self.flags.is_pointer.then(|| self.value)
+    }
 }
 
 impl std::fmt::Debug for FlaggedWord {
@@ -118,5 +142,15 @@ impl std::fmt::Debug for FlaggedWord {
             .field("value", &value)
             .field("comment", &self.comment)
             .finish()
+    }
+}
+
+impl Display for FlaggedWord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.flags.is_pointer {
+            write!(f, "#{:x}", self.value)
+        } else {
+            write!(f, "{}", self.value as i64)
+        }
     }
 }

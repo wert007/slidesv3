@@ -2,8 +2,6 @@ pub mod syntax_nodes;
 #[cfg(test)]
 mod tests;
 
-use std::collections::VecDeque;
-use either::Either;
 use crate::{
     diagnostics::DiagnosticBag,
     lexer::{
@@ -14,9 +12,12 @@ use crate::{
     text::{SourceTextCollection, SourceTextId, TextLocation},
     DebugFlags,
 };
+use either::Either;
+use std::collections::VecDeque;
 
 use self::syntax_nodes::{
-    ElseClause, EnumBodyNode, EnumValueNode, ParameterNode, StructBodyNode, SyntaxNode, TypeNode, MatchCaseNode,
+    ElseClause, EnumBodyNode, EnumValueNode, MatchCaseNode, ParameterNode, StructBodyNode,
+    SyntaxNode, TypeNode,
 };
 
 struct Parser<'a, 'b> {
@@ -372,7 +373,9 @@ fn parse_type(parser: &mut Parser<'_, '_>) -> TypeNode {
     let generic_type_qualifier = if parser.peek_token().kind == SyntaxTokenKind::LessThan {
         parser.next_token();
         let mut result = Vec::new();
-        while parser.peek_token().kind != SyntaxTokenKind::GreaterThan && parser.peek_token().kind != SyntaxTokenKind::Eoi {
+        while parser.peek_token().kind != SyntaxTokenKind::GreaterThan
+            && parser.peek_token().kind != SyntaxTokenKind::Eoi
+        {
             let token_count = parser.token_count();
 
             result.push(parse_type(parser));
@@ -550,7 +553,9 @@ fn parse_match_statement(parser: &mut Parser) -> SyntaxNode {
     let expression = parse_expression(parser);
     let open_brace = parser.match_token(SyntaxTokenKind::LBrace);
     let mut match_cases = Vec::new();
-    while parser.peek_token().kind != SyntaxTokenKind::Eoi && parser.peek_token().kind != SyntaxTokenKind::RBrace {
+    while parser.peek_token().kind != SyntaxTokenKind::Eoi
+        && parser.peek_token().kind != SyntaxTokenKind::RBrace
+    {
         let token_count = parser.token_count();
         match_cases.push(parse_match_case(parser));
         if parser.token_count() == token_count {
@@ -558,7 +563,13 @@ fn parse_match_statement(parser: &mut Parser) -> SyntaxNode {
         }
     }
     let close_brace = parser.match_token(SyntaxTokenKind::RBrace);
-    SyntaxNode::match_statement(match_keyword, expression, open_brace, match_cases, close_brace)
+    SyntaxNode::match_statement(
+        match_keyword,
+        expression,
+        open_brace,
+        match_cases,
+        close_brace,
+    )
 }
 
 fn parse_match_case(parser: &mut Parser) -> MatchCaseNode {
@@ -720,7 +731,9 @@ fn parse_dictionary_literal(parser: &mut Parser) -> SyntaxNode {
     let dict_keyword = parser.match_token(SyntaxTokenKind::DictKeyword);
     let open_bracket = parser.match_token(SyntaxTokenKind::LBracket);
     let mut values = Vec::new();
-    while parser.peek_token().kind != SyntaxTokenKind::Eoi && parser.peek_token().kind != SyntaxTokenKind::RBracket {
+    while parser.peek_token().kind != SyntaxTokenKind::Eoi
+        && parser.peek_token().kind != SyntaxTokenKind::RBracket
+    {
         let token_count = parser.token_count();
         let key = parse_expression(parser);
         let fat_arrow = parser.match_token(SyntaxTokenKind::FatArrow);

@@ -1,11 +1,11 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{binder::bound_nodes::BoundNodeKind, DebugFlags, debug::basic_blocks::DebugBasicBlock};
+use crate::{binder::bound_nodes::BoundNodeKind, debug::basic_blocks::DebugBasicBlock, DebugFlags};
 
 use super::{bound_nodes::BoundNode, typing::TypeCollection};
 
 #[derive(Debug)]
-pub struct BasicBlock<T, C=()> {
+pub struct BasicBlock<T, C = ()> {
     pub index: usize,
     pub label_indices: Vec<usize>,
     pub kind: BasicBlockKind,
@@ -174,7 +174,9 @@ fn collect_paths_to_end(basic_blocks: &[BasicBlock<&BoundNode, &'static str>]) -
     result
 }
 
-fn collect_basic_blocks<'a>(statements: &[BoundNode]) -> Vec<BasicBlock<&'a BoundNode, &'static str>> {
+fn collect_basic_blocks<'a>(
+    statements: &[BoundNode],
+) -> Vec<BasicBlock<&'a BoundNode, &'static str>> {
     let mut result = vec![BasicBlock::start()];
     let mut current_block = BasicCodeBlock {
         index: 0,
@@ -238,7 +240,10 @@ fn collect_basic_blocks<'a>(statements: &[BoundNode]) -> Vec<BasicBlock<&'a Boun
     result
 }
 
-fn connect_basic_blocks<'a>(basic_blocks: &mut Vec<BasicBlock<&'a BoundNode, &'static str>>, statements: &'a [BoundNode]) {
+fn connect_basic_blocks<'a>(
+    basic_blocks: &mut Vec<BasicBlock<&'a BoundNode, &'static str>>,
+    statements: &'a [BoundNode],
+) {
     let end_index = basic_blocks.last().unwrap().index;
     let mut incoming_connections = vec![];
     let label_index_to_basic_block_index: HashMap<usize, usize> = basic_blocks

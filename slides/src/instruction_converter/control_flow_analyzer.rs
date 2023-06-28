@@ -45,6 +45,7 @@ pub(crate) fn check_stack_usage(
             comment: String::new(),
         })
         .collect();
+    let mut emit_block = false;
     while let Some((block_index, mut stack_value)) = gray_blocks.pop_front() {
         checked_blocks.insert(block_index, stack_value);
         blocks[block_index].comment = Some(stack_value);
@@ -83,7 +84,8 @@ pub(crate) fn check_stack_usage(
                             OpCode::WriteToHeap => {
                                 if instruction.arg == 0 {
                                     eprintln!("WARNING: Cannot determine stack usage for this, since the stack usage is not constant here!");
-                                    return;
+                                    emit_block = true;
+                                    0
                                 } else {
                                     1 - (instruction.arg as i32)
                                 }
@@ -126,10 +128,17 @@ pub(crate) fn check_stack_usage(
                                 } else {
                                     1
                                 };
-                                let this_type = if system_call.this_type.is_some() { 1 } else { 0 };
+                                let this_type = if system_call.this_type.is_some() {
+                                    1
+                                } else {
+                                    0
+                                };
                                 // The -1 is for the argument count which is
                                 // also on the stack
-                                return_value - (system_call.parameter_types.len() as i32) - 1 - this_type
+                                return_value
+                                    - (system_call.parameter_types.len() as i32)
+                                    - 1
+                                    - this_type
                             }
                             OpCode::FunctionCall => {
                                 let argument_count = instruction.arg >> 1;
@@ -190,11 +199,13 @@ pub(crate) fn check_stack_usage(
             .collect();
         gray_blocks.append(&mut append);
     }
-    crate::debug::basic_blocks::output_basic_instruction_blocks_to_dot(
-        function_type.name().as_str(),
-        &blocks,
-        instructions,
-    );
+    if emit_block {
+        crate::debug::basic_blocks::output_basic_instruction_blocks_to_dot(
+            function_type.name().as_str(),
+            &blocks,
+            &commented_instructions,
+        );
+    }
 }
 
 fn collect_basic_blocks(instructions: &[InstructionOrLabelReference]) -> Vec<BasicBlock<(), i32>> {
