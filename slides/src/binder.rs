@@ -1550,6 +1550,7 @@ fn default_statements(binder: &mut BindingState) {
         Value::SystemCall(SystemCallKind::GarbageCollect),
     );
     binder.register_constant("hash".to_owned(), Value::SystemCall(SystemCallKind::Hash));
+    binder.register_constant("byteToChar".to_owned(), Value::SystemCall(SystemCallKind::ByteToChar));
 }
 
 fn std_imports(binder: &mut BindingState, source_text: SourceTextId) {

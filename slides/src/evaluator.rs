@@ -908,9 +908,12 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::Reallocate => sys_calls::reallocate(&arguments[1], &arguments[0], state),
         SystemCallKind::RuntimeError => sys_calls::runtime_error(&arguments[0], state),
         SystemCallKind::AddressOf => sys_calls::address_of(&arguments[0], state),
-        SystemCallKind::GarbageCollect => {state.garbage_collect();},
+        SystemCallKind::GarbageCollect => {
+            state.garbage_collect();
+        }
         SystemCallKind::Break => unreachable!(),
         SystemCallKind::Hash => sys_calls::hash(&arguments[0], state),
+        SystemCallKind::ByteToChar => sys_calls::byte_to_char(&arguments[0], state),
     }
     state.stack_trace.pop();
 }

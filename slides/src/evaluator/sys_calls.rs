@@ -9,9 +9,8 @@ pub fn print(argument: &FlaggedWord, state: &mut EvaluatorState) {
     println!("{}", to_string_native(typeid!(Type::Any), argument, state));
 }
 
-pub fn to_string(argument: &FlaggedWord, state: &mut EvaluatorState) {
-    let string = to_string_native(typeid!(Type::Any), argument, state);
-    let string_length = string.len() as u64;
+fn native_string_to_string(value: String, state: &mut EvaluatorState) -> FlaggedWord {
+    let string_length = value.len() as u64;
     let mut pointer = state.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
     if result == 0 {
@@ -25,20 +24,25 @@ pub fn to_string(argument: &FlaggedWord, state: &mut EvaluatorState) {
             .flush_to_console(&state.project.source_text_collection);
         state.runtime_diagnostics.diagnostics.clear();
         state.runtime_error_happened = true;
-        state.stack.push_pointer(result);
-        return;
+        return FlaggedWord::pointer(result);
     }
     // TODO: Clear bucket maybe?
     state.heap.write_flagged_word(
         pointer,
-        FlaggedWord::value(string_length).with_comment(format!("String length of {string:?}")),
+        FlaggedWord::value(string_length).with_comment(format!("String length of {value:?}")),
     );
     pointer += WORD_SIZE_IN_BYTES;
-    for &byte in string.as_bytes() {
+    for &byte in value.as_bytes() {
         state.heap.write_byte(pointer, byte);
         pointer += 1;
     }
-    state.stack.push_pointer(result);
+    FlaggedWord::pointer(result)
+}
+
+pub fn to_string(argument: &FlaggedWord, state: &mut EvaluatorState) {
+    let string = to_string_native(typeid!(Type::Any), argument, state);
+    let value = native_string_to_string(string, state);
+    state.stack.push_flagged_word(value);
 }
 
 fn get_to_string_function(type_id: TypeId, state: &EvaluatorState) -> Option<u64> {
@@ -276,4 +280,11 @@ fn hash_array(length: u64, pointer: u64, state: &mut EvaluatorState) -> u64 {
             .value
             & ((1 << too_many_bits) - 1));
     hash
+}
+
+pub fn byte_to_char(argument: &FlaggedWord, state: &mut EvaluatorState) {
+    let byte = argument.unwrap_value() as u8;
+    let result = (byte as char).to_string();
+    let value = native_string_to_string(result, state);
+    state.stack.push_flagged_word(value);
 }

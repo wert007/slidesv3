@@ -80,6 +80,7 @@ macro_rules! typeid {
                 SystemCallKind::AddressOf => 18,
                 SystemCallKind::GarbageCollect => 19,
                 SystemCallKind::Hash => 20,
+                SystemCallKind::ByteToChar => 21,
             })
         }
     };
@@ -274,6 +275,7 @@ impl TypeCollection {
                 Type::SystemCall(SystemCallKind::AddressOf),
                 Type::SystemCall(SystemCallKind::GarbageCollect),
                 Type::SystemCall(SystemCallKind::Hash),
+                Type::SystemCall(SystemCallKind::ByteToChar),
             ],
         }
     }
@@ -1171,6 +1173,7 @@ pub enum SystemCallKind {
     AddressOf,
     GarbageCollect,
     Hash,
+    ByteToChar,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -1179,16 +1182,17 @@ impl std::fmt::Display for SystemCallKind {
             f,
             "{}",
             match self {
-                SystemCallKind::Print => "print",
-                SystemCallKind::ToString => "toString",
-                SystemCallKind::ArrayLength => "array$length",
-                SystemCallKind::HeapDump => "heapDump",
-                SystemCallKind::Break => "break",
-                SystemCallKind::Reallocate => "reallocate",
-                SystemCallKind::RuntimeError => "runtimeError",
-                SystemCallKind::AddressOf => "addressOf",
-                SystemCallKind::GarbageCollect => "garbageCollect",
-                SystemCallKind::Hash => "hash",
+                Self::Print => "print",
+                Self::ToString => "toString",
+                Self::ArrayLength => "array$length",
+                Self::HeapDump => "heapDump",
+                Self::Break => "break",
+                Self::Reallocate => "reallocate",
+                Self::RuntimeError => "runtimeError",
+                Self::AddressOf => "addressOf",
+                Self::GarbageCollect => "garbageCollect",
+                Self::Hash => "hash",
+                Self::ByteToChar => "byteToChar",
             }
         )
     }
@@ -1342,6 +1346,14 @@ impl FunctionType<TypeId> {
                 name: None,
                 is_generic: false,
             },
+            SystemCallKind::ByteToChar => Self {
+                parameter_types: vec![typeid!(Type::Integer(IntegerType::Unsigned8))],
+                this_type: None,
+                return_type: typeid!(Type::String),
+                system_call_kind: Some(system_call_kind),
+                name: None,
+                is_generic: false,
+            }
         }
     }
 
