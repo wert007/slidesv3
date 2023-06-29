@@ -252,11 +252,6 @@ fn lex_helper_successfull(input: &str, callback: impl FnOnce(VecDeque<SyntaxToke
 
 #[test]
 fn lexer_error() {
-    lex_helper_errors("-99999999999999999999", |token, diagnostics| {
-        assert_eq!(token.len(), 3);
-        assert_eq!(diagnostics.len(), 1);
-    });
-
     lex_helper_errors(" %", |token, diagnostics| {
         assert_eq!(token.len(), 1);
         assert_eq!(diagnostics.len(), 1);

@@ -99,7 +99,7 @@ impl SyntaxToken {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumIter)]
 pub enum SyntaxTokenKind {
     Eoi,
     NumberLiteral,
@@ -190,11 +190,43 @@ impl SyntaxTokenKind {
         }
     }
 
-    // TODO: Add test, that asserts, that is_keyword covers all of the keyword constructor.
+    /// ```
+    /// # use slides::lexer::syntax_token::SyntaxTokenKind;
+    /// # use strum::IntoEnumIterator;
+    ///
+    /// for value in SyntaxTokenKind::iter() {
+    ///     let name: &str = value.into();
+    ///     if name.ends_with("Keyword") {
+    ///         assert!(value.is_keyword(), "Failed for value {value:?}");
+    ///     }
+    /// }
+    /// ```
     pub fn is_keyword(&self) -> bool {
         matches!(
             self,
-            Self::FalseKeyword | Self::TrueKeyword | Self::LetKeyword
+            Self::FalseKeyword
+                | Self::TrueKeyword
+                | Self::LetKeyword
+                | Self::AbstractKeyword
+                | Self::ConstKeyword
+                | Self::DictKeyword
+                | Self::ElseKeyword
+                | Self::EnumKeyword
+                | Self::ForKeyword
+                | Self::FuncKeyword
+                | Self::GenericKeyword
+                | Self::IfKeyword
+                | Self::ImportKeyword
+                | Self::InKeyword
+                | Self::AsKeyword
+                | Self::CastKeyword
+                | Self::ListKeyword
+                | Self::MatchKeyword
+                | Self::NewKeyword
+                | Self::ReturnKeyword
+                | Self::StructKeyword
+                | Self::WhileKeyword
+                | Self::NoneKeyword
         )
     }
 

@@ -5,7 +5,7 @@ mod debug;
 mod diagnostics;
 mod evaluator;
 mod instruction_converter;
-mod lexer;
+pub mod lexer;
 mod parser;
 mod text;
 mod value;
