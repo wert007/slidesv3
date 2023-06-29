@@ -1,6 +1,6 @@
-[tom => 5, roger => 2, steve => 8, ]
+[steve => 8, tom => 5, roger => 2, ]
+steve is the name of 8 people
 tom is the name of 5 people
 roger is the name of 2 people
-steve is the name of 8 people
 Resize test: okay
 = 0
