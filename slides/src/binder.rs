@@ -150,6 +150,7 @@ pub struct SimpleStructFunctionTable {
     pub set_function: Option<usize>,
     pub element_count_function: Option<usize>,
     pub equals_function: Option<usize>,
+    pub add_function: Option<usize>,
 }
 
 impl SimpleStructFunctionTable {
@@ -161,6 +162,7 @@ impl SimpleStructFunctionTable {
             StructFunctionKind::Set => self.set_function = Some(label),
             StructFunctionKind::ElementCount => self.element_count_function = Some(label),
             StructFunctionKind::Equals => self.equals_function = Some(label),
+            StructFunctionKind::Add => self.add_function = Some(label),
         }
     }
 
@@ -172,6 +174,7 @@ impl SimpleStructFunctionTable {
             StructFunctionKind::Set => self.set_function,
             StructFunctionKind::ElementCount => self.element_count_function,
             StructFunctionKind::Equals => self.equals_function,
+            StructFunctionKind::Add => self.add_function,
         }
     }
 
@@ -190,6 +193,7 @@ impl SimpleStructFunctionTable {
                     .map(|_| StructFunctionKind::ElementCount),
             )
             .chain(self.equals_function.map(|_| StructFunctionKind::Equals))
+            .chain(self.add_function.map(|_| StructFunctionKind::Add))
     }
 }
 
@@ -211,6 +215,7 @@ impl From<&StructFunctionTable> for SimpleStructFunctionTable {
                 .as_ref()
                 .map(|f| f.function_label as _),
             equals_function: it.equals_function.as_ref().map(|f| f.function_label as _),
+            add_function: it.add_function.as_ref().map(|f| f.function_label as _),
         }
     }
 }
@@ -1364,7 +1369,8 @@ fn bind_function_declaration_body<'a>(
             | StructFunctionKind::Get
             | StructFunctionKind::Set
             | StructFunctionKind::ElementCount
-            | StructFunctionKind::Equals,
+            | StructFunctionKind::Equals
+            | StructFunctionKind::Add
         )
         | None => {}
     }
@@ -1488,7 +1494,8 @@ fn bind_generic_function_declaration_body<'a>(
             | StructFunctionKind::Get
             | StructFunctionKind::Set
             | StructFunctionKind::ElementCount
-            | StructFunctionKind::Equals,
+            | StructFunctionKind::Equals
+            | StructFunctionKind::Add
         )
         | None => {}
     }
@@ -2033,6 +2040,15 @@ fn type_check_struct_function_kind(
                     location,
                     function_type.return_type,
                     typeid!(Type::Boolean),
+                );
+            }
+        }
+        StructFunctionKind::Add => {
+            if function_type.parameter_types.len() != 1 {
+                binder.diagnostic_bag.report_unexpected_parameter_count(
+                    location,
+                    function_type.parameter_types.len(),
+                    2,
                 );
             }
         }
@@ -3572,6 +3588,29 @@ fn bind_binary_insertion<'a>(
                         BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
                     }
                 }
+                BoundBinaryOperator::ArithmeticAddition => {
+                    let type_ = &binder.project.types[lhs.type_];
+                    if let Type::Struct(struct_type) = type_ {
+                        if let Some(add_function) = &struct_type.function_table.add_function {
+                            let base = BoundNode::label_reference(
+                                operator_token.location,
+                                add_function.function_label as usize,
+                                add_function.function_type.clone(),
+                            );
+                            BoundNode::function_call(
+                                span,
+                                base,
+                                vec![lhs, rhs],
+                                false,
+                                bound_binary.result,
+                            )
+                        } else {
+                            BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                        }
+                    } else {
+                        BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result)
+                    }
+                }
                 _ => BoundNode::binary(span, lhs, bound_binary.op, rhs, bound_binary.result),
             }
         }
@@ -3671,7 +3710,7 @@ fn bind_binary_operator<'a, 'b>(
                 None
             }
         }
-      (
+        (
             Type::Pointer | Type::PointerOf(_),
             BoundBinaryOperator::Equals | BoundBinaryOperator::NotEquals,
             Type::None,
@@ -3685,6 +3724,21 @@ fn bind_binary_operator<'a, 'b>(
             result,
             typeid!(Type::Boolean),
         )),
+        (Type::Struct(s), BoundBinaryOperator::ArithmeticAddition, _) if s.function_table.add_function.is_some() =>
+        {
+            if let Some(f) = &s.function_table.add_function {
+                let f = binder.project.types[f.function_type].as_function_type().unwrap();
+                Some(BoundBinary::new(lhs.type_, result, f.parameter_types[0], f.return_type))
+            } else {
+                binder.diagnostic_bag.report_no_binary_operator(
+                    location,
+                    lhs.type_,
+                    operator_token.location,
+                    rhs.type_,
+                );
+                None
+            }
+        }
         (
             Type::Integer(lhs_integer_type),
             BoundBinaryOperator::ArithmeticAddition

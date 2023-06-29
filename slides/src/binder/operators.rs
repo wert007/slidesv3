@@ -32,6 +32,14 @@ pub struct BoundBinary {
 }
 
 impl BoundBinary {
+    pub fn new(lhs: TypeId, op: BoundBinaryOperator, rhs: TypeId, result: TypeId) -> BoundBinary {
+        Self {
+            lhs,
+            op,
+            rhs,
+            result,
+        }
+    }
     pub fn same_input(input: TypeId, op: BoundBinaryOperator, result: TypeId) -> BoundBinary {
         Self {
             lhs: input.clone(),
