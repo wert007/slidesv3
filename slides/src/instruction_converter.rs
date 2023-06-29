@@ -613,7 +613,7 @@ fn convert_variable_for_assignment(
 }
 
 fn convert_array_index_for_assignment(
-    span: TextLocation,
+    location: TextLocation,
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -625,21 +625,33 @@ fn convert_array_index_for_assignment(
     let mut result = convert_node(*array_index.base, converter);
     // index
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(Instruction::load_immediate(base_type_size, span).into());
-    result.push(Instruction::multiplication(span).into());
+    result.push(Instruction::load_immediate(base_type_size, location).into());
+    result.push(Instruction::multiplication(location).into());
+    result.push(Instruction::addition(location).into());
 
-    result.push(Instruction::store_in_memory(span).into());
+    match base_type_size {
+        1 => {
+            result.push(Instruction::store_byte_in_memory(location).into());
+        }
+        8 => {
+            result.push(Instruction::store_word_in_memory(location).into());
+        }
+        err => {
+            unimplemented!("Unexpected base type size {err}");
+        }
+    }
     result
 }
 
 fn convert_field_access_for_assignment(
-    span: TextLocation,
+    location: TextLocation,
     field_access: BoundFieldAccessNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
-    result.push(Instruction::load_immediate(field_access.offset, span).into());
-    result.push(Instruction::store_in_memory(span).into());
+    result.push(Instruction::load_immediate(field_access.offset, location).into());
+    result.push(Instruction::addition(location).into());
+    result.push(Instruction::store_word_in_memory(location).into());
     result
 }
 
@@ -836,7 +848,8 @@ fn convert_system_call(
         | SystemCallKind::Reallocate
         | SystemCallKind::AddressOf
         | SystemCallKind::GarbageCollect
-        | SystemCallKind::Hash => {
+        | SystemCallKind::Hash
+        | SystemCallKind::ByteToChar => {
             let mut result = vec![];
             let argument_count = match system_call.base {
                 SystemCallKind::GarbageCollect => 0,
@@ -846,7 +859,8 @@ fn convert_system_call(
                 | SystemCallKind::HeapDump
                 | SystemCallKind::RuntimeError
                 | SystemCallKind::AddressOf
-                | SystemCallKind::Hash => 1,
+                | SystemCallKind::Hash
+                | SystemCallKind::ByteToChar => 1,
                 SystemCallKind::Reallocate => 2,
                 SystemCallKind::Break => unreachable!(),
             };
@@ -887,7 +901,7 @@ fn convert_array_length_system_call(
 }
 
 fn convert_array_index(
-    span: TextLocation,
+    location: TextLocation,
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
@@ -898,8 +912,8 @@ fn convert_array_index(
 
     let mut result = convert_node(*array_index.base, converter);
     result.append(&mut convert_node(*array_index.index, converter));
-    result.push(Instruction::load_immediate(base_type_size, span).into());
-    result.push(Instruction::multiplication(span).into());
+    result.push(Instruction::load_immediate(base_type_size, location).into());
+    result.push(Instruction::multiplication(location).into());
 
     result.push(Instruction::addition(span).into());
     result.push(Instruction::read_word_with_offset(0, span).into());

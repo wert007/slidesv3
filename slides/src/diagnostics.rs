@@ -89,7 +89,7 @@ macro_rules! message_format {
             let message : &[Message] = &[
                 $($entry.into(), )*
             ];
-            message.into()
+            Message::Composition(message.into())
         }
     };
 }
