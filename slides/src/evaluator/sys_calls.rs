@@ -1,6 +1,6 @@
 use crate::{
     binder::typing::{self, Type, TypeId},
-    evaluator::memory::{bytes_to_word, Memory},
+    evaluator::{memory::{bytes_to_word, Memory}, debugger},
 };
 
 use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
@@ -87,6 +87,9 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
                         Ok(it) => to_string_native(typeid!(Type::String), &it.unwrap(), state),
                         Err(()) => {
                             println!("To string function failed!");
+                            if state.project.debug_flags.use_debugger {
+                                debugger::create_session(state);
+                            }
                             String::new()
                         }
                     }

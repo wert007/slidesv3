@@ -1222,6 +1222,7 @@ fn bind_with_project_parameter<'a>(
                         &replace,
                         &unfixed.applied_types,
                     );
+                    let had_function = it.function.is_some();
                     it.function = binder.project.types[it.base_type]
                         .as_struct_type()
                         .map(|s| {
@@ -1238,6 +1239,7 @@ fn bind_with_project_parameter<'a>(
                                 unreachable!("Constructor calls only work for structs!")
                             }
                         });
+                    assert_eq!(had_function, it.function.is_some());
                 }
                 _ => {}
             }
@@ -2994,19 +2996,17 @@ fn bind_constructor_call<'a>(
         }
         None => {
             binder.generic_types.clear();
-            // HACK: We somehow get functions in our fields, if we use generic
-            // structs, so we filter them out, since user can not declare
-            // functions as fields of the time being.
+            let replace = if let TypeOrGenericType::GenericType(g) = &binder.project.types[struct_id].clone() {
+                g.generic_parameters().clone().into_iter().enumerate().map(|(i, n)| binder.project.types.look_up_or_add_type(Type::GenericType(i, n.clone()))).collect()
+            } else {
+                Vec::new()
+            };
+            binder.generic_types = std::iter::repeat(typeid!(Type::Void)).take(replace.len()).collect();
             let fields: Vec<_> = struct_type
                 .fields_for_constructor(&binder.project.types)
                 .into_iter()
                 .cloned()
                 .collect();
-            // let fields: Vec<_> = struct_type
-            //     .fields
-            //     .iter()
-            //     .filter(|f| !matches!(f.type_, Type::Function(_)))
-            //     .collect();
             if constructor_call.arguments.len() != fields.len() {
                 binder.diagnostic_bag.report_unexpected_argument_count(
                     location,
@@ -3026,47 +3026,33 @@ fn bind_constructor_call<'a>(
                 .zip(fields.iter().map(|f| f.type_))
             {
                 let old_expected_type = binder.expected_type.take();
-                binder.expected_type = Some(parameter_type.clone());
+                binder.expected_type = if binder.project.types.contains_generic_type(parameter_type) { None }
+                    else { Some(parameter_type) };
                 let argument = bind_node(argument, binder);
                 binder.expected_type = old_expected_type;
-                // TODO: Make this more general!
                 let parameter_type = if struct_type.is_generic {
-                    if let Type::GenericType(generic_type_index, _name) =
+                    let generic_types = binder.project.types.get_specified_generic_types(parameter_type, argument.type_);
+                    for (parameter_type, argument_type) in generic_types {
+                        if let Type::GenericType(generic_type_index, _name) =
                         &binder.project.types[parameter_type]
-                    {
-                        while binder.generic_types.len() <= *generic_type_index {
-                            binder.generic_types.push(typeid!(Type::Void));
+                        {
+                            if binder.generic_types[*generic_type_index] == typeid!(Type::Void) {
+                                binder.generic_types[*generic_type_index] = if argument_type == typeid!(Type::IntegerLiteral) {
+                                    typeid!(Type::Integer(IntegerType::Signed64))
+                                }
+                                else {
+                                    argument_type
+                                };
+                            }
+                        } else {
+                            unreachable!()
                         }
-                        if binder.generic_types[*generic_type_index] == typeid!(Type::Void) {
-                            binder.generic_types[*generic_type_index] = argument.type_.clone();
-                        }
-                        argument.type_.clone()
-                    // } else if parameter_type
-                    //     == binder
-                    //         .project
-                    //         .types
-                    //         .look_up_or_add_type(Type::PointerOf(typeid!(Type::GenericType)))
-                    // {
-                    //     if binder.generic_type.is_none() {
-                    //         if let Type::PointerOf(type_) = &binder.project.types[argument.type_] {
-                    //             binder.generic_type = Some(*type_);
-                    //             resolved_struct_type = Some(
-                    //                 bind_generic_struct_type_for_type(
-                    //                     struct_id.unwrap_generic_type_id(),
-                    //                     *type_,
-                    //                     binder,
-                    //                 )
-                    //                 .into(),
-                    //             );
-                    //         } else {
-                    //             // We know this is wrong, but hey, im sure there
-                    //             // will be a compile time error somewhere.
-                    //             binder.generic_type = Some(argument.type_.clone());
-                    //         }
-                    //     }
-                    //     argument.type_.clone()
+                    }
+                    if binder.project.types.contains_generic_type(parameter_type) {
+                        let replace_with = binder.generic_types.clone();
+                        binder.replace_in_type_for_types(argument.location, parameter_type, &replace, &replace_with)
                     } else {
-                        parameter_type.clone()
+                        parameter_type
                     }
                 } else {
                     parameter_type.clone()
@@ -3124,7 +3110,10 @@ fn bind_generic_struct_type_for_types(
                     .available_function_kinds()
                     .for_each(|k| struct_function_table.set(k, binder.generate_label()));
             }
-            _ => {}
+            GenericType::Struct(it) => {
+                it.struct_type.function_table.available_struct_function_kinds().into_iter().for_each(|k| struct_function_table.set(k, binder.generate_label()));
+            }
+            _ => {unreachable!()}
         }
         let id = binder
             .register_struct_name(struct_name.clone(), struct_function_table, types.to_vec())
@@ -4756,6 +4745,7 @@ fn bind_generic_function_for_type(
             BoundNodeKind::ConstructorCall(it) => {
                 it.base_type =
                     binder.replace_in_type_for_types(location, it.base_type, &replace, &types);
+                let had_function = it.function.is_some();
                 it.function = binder.project.types[it.base_type]
                     .as_struct_type()
                     .map(|s| {
@@ -4771,6 +4761,7 @@ fn bind_generic_function_for_type(
                             unreachable!("Constructor calls only work for structs!")
                         }
                     });
+                assert_eq!(had_function, it.function.is_some());
             }
             _ => {}
         }

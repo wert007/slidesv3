@@ -122,12 +122,12 @@ impl FlaggedWord {
         self.flags.is_pointer
     }
 
-    pub(crate) fn as_value(&self) -> Option<u64> {
-        (!self.flags.is_pointer).then(|| self.value)
+    pub(crate) fn as_value(&self) -> Result<u64, u64> {
+        (!self.flags.is_pointer).then(|| self.value).ok_or(self.value)
     }
 
-    pub(crate) fn as_pointer(&self) -> Option<u64> {
-        self.flags.is_pointer.then(|| self.value)
+    pub(crate) fn as_pointer(&self) -> Result<u64, u64> {
+        self.flags.is_pointer.then(|| self.value).ok_or(self.value)
     }
 }
 

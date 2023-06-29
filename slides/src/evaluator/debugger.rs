@@ -104,6 +104,29 @@ pub fn create_session(state: &mut EvaluatorState) {
                             println!("  {:14} {}", command.command_name(), command.help_text());
                         }
                     }
+                    Command::ShowCurrentInstruction => {
+                        state.project.debug_flags.print_instructions =
+                            !state.project.debug_flags.print_instructions;
+                        println!(
+                            "Showing current instruction: {}",
+                            state.project.debug_flags.print_instructions
+                        );
+                    }
+                    Command::ShowCurrentLine => {
+                        state.project.debug_flags.print_lines =
+                            !state.project.debug_flags.print_lines;
+                        println!(
+                            "Showing current line: {}",
+                            state.project.debug_flags.print_lines
+                        );
+                    }
+                    Command::GarbageCollect => {
+                        let stats = state.garbage_collect();
+                        println!(
+                            "Freed {} buckets and folded {}",
+                            stats.freed_buckets, stats.folded_buckets
+                        );
+                    }
                 }
             }
             None => {
@@ -195,6 +218,9 @@ enum Command {
     Replace(u64),
     RenameRegister(usize, String),
     Heapdump(String),
+    ShowCurrentInstruction,
+    ShowCurrentLine,
+    GarbageCollect,
     Help,
 }
 
@@ -225,6 +251,13 @@ impl Command {
             Command::RenameRegister(_, _) => "Renames a register to a given name.",
             Command::Heapdump(_) => "Creates a heapdump file with the specified file name.",
             Command::Help => "Prints this help.",
+            Command::ShowCurrentInstruction => {
+                "This enables or disables the --di flag during the runtime."
+            }
+            Command::ShowCurrentLine => {
+                "This enables or disables the --dlines flag during the runtime."
+            }
+            Command::GarbageCollect => "Calls the garbage collector and clears up memory.",
         }
     }
 
@@ -244,6 +277,9 @@ impl Command {
             Command::RenameRegister(_, _) => "rename",
             Command::Heapdump(_) => "heapdump",
             Command::Help => "help|h|?",
+            Command::ShowCurrentInstruction => "di",
+            Command::ShowCurrentLine => "dlines",
+            Command::GarbageCollect => "gc",
         }
     }
 }
@@ -269,6 +305,9 @@ fn parse_command(input: &str) -> Option<Command> {
                 }
             }
             ["stack"] => Some(Command::Stack),
+            ["gc"] => Some(Command::GarbageCollect),
+            ["di"] => Some(Command::ShowCurrentInstruction),
+            ["dlines"] => Some(Command::ShowCurrentLine),
             ["registers"] => Some(Command::Registers),
             ["rename", register, name] => {
                 if let Some(register) = register.strip_prefix("r#") {

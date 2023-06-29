@@ -5,7 +5,10 @@ use std::{
 
 use crate::{
     binder::typing::SystemCallKind,
-    evaluator::{memory::{WORD_SIZE_IN_BYTES, self}, EvaluatorState},
+    evaluator::{
+        memory::{self, WORD_SIZE_IN_BYTES},
+        EvaluatorState,
+    },
     instruction_converter::{
         instruction::{op_codes::OpCode, Instruction},
         InstructionOrLabelReference, LabelReference,
@@ -217,17 +220,23 @@ pub fn instruction_or_label_to_string(instruction_or_label: InstructionOrLabelRe
     }
 }
 
-pub fn commented_instruction_to_string(instruction: Instruction,
-state: &EvaluatorState) -> Result<String, std::fmt::Error> {
+pub fn commented_instruction_to_string(
+    instruction: Instruction,
+    state: &EvaluatorState,
+) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
     let mut base = instruction_to_string(instruction, false, None);
     match instruction.op_code {
-        OpCode::NoOp => {},
+        OpCode::NoOp => {}
         OpCode::LoadImmediate => {
             if let Some(type_) = state.project.types.to_type_id(instruction.arg as usize) {
-                write!(base, "; {}", state.project.types.name_of_type_id_debug(type_))?;
+                write!(
+                    base,
+                    "; {}",
+                    state.project.types.name_of_type_id_debug(type_)
+                )?;
             }
-        },
+        }
         OpCode::LoadPointer => {
             if let Some(text) = state.read_string_from_memory(instruction.arg as usize) {
                 write!(base, "; {text:?}")?;
@@ -236,68 +245,74 @@ state: &EvaluatorState) -> Result<String, std::fmt::Error> {
             } else if instruction.arg == 0 {
                 write!(base, "; NONE")?;
             }
-        },
-        OpCode::DuplicateOver => {},
-        OpCode::Pop => {},
+        }
+        OpCode::DuplicateOver => {}
+        OpCode::Pop => {}
         OpCode::LoadRegister => {
-            write!(base, "; {}", state.load_register(instruction.arg as usize).unwrap())?;
+            write!(
+                base,
+                "; {}",
+                state.load_register(instruction.arg as usize).unwrap()
+            )?;
         }
         OpCode::StoreInRegister => {
             write!(base, "; {}", state.peek_stack(0).unwrap())?;
-        },
-        OpCode::StoreInMemory => {},
-        OpCode::WriteToStack => {},
+        }
+        OpCode::StoreInMemory => {}
+        OpCode::WriteToStack => {}
         OpCode::WriteToHeap => {
             let size = if instruction.arg == 0 {
                 state.peek_stack(0).unwrap().unwrap_value()
             } else {
                 instruction.arg
             };
-            if let Some(address) = state.next_allocation_address(size * memory::WORD_SIZE_IN_BYTES) {
+            if let Some(address) = state.next_allocation_address(size * memory::WORD_SIZE_IN_BYTES)
+            {
                 write!(base, "; #{address:X}")?;
             }
-        },
-        OpCode::Allocate => {},
+        }
+        OpCode::Allocate => {}
         OpCode::ReadWordWithOffset => {
-            if let Some(address) = state.peek_stack(0).map(|v| v.as_pointer()).flatten() {
+            if let Some(address) = state.peek_stack(0).map(|v| v.as_pointer().ok()).flatten() {
                 let offset = instruction.arg;
                 let address = address + offset;
                 if let Some(ptr) = state.read_pointer_safe(address) {
                     write!(base, "; {}", ptr)?;
                 }
             }
-        
-        },
-        OpCode::MemoryCopy => {},
+        }
+        OpCode::MemoryCopy => {}
         OpCode::TypeIdentifier => todo!(),
-        OpCode::Label => unreachable!("Right now, this only gets called by the evaluator, and there are no labels left!"),
-        OpCode::Rotate => {},
-        OpCode::Unknown => {},
-        OpCode::BitwiseTwosComplement => {},
-        OpCode::BitwiseXor => {},
-        OpCode::BitwiseNxor => {},
-        OpCode::Addition => {},
-        OpCode::Subtraction => {},
-        OpCode::Multiplication => {},
-        OpCode::Division => {},
-        OpCode::Equals => {},
-        OpCode::NotEquals => {},
-        OpCode::ArrayEquals => {},
-        OpCode::ArrayNotEquals => {},
-        OpCode::LessThan => {},
-        OpCode::GreaterThan => {},
-        OpCode::LessThanEquals => {},
-        OpCode::GreaterThanEquals => {},
-        OpCode::StringConcat => {},
-        OpCode::NoneableOrValue => {},
-        OpCode::Jump => {},
-        OpCode::JumpIfFalse => {},
-        OpCode::JumpIfTrue => {},
-        OpCode::SysCall => {},
-        OpCode::FunctionCall => {},
-        OpCode::Return => {},
-        OpCode::DecodeClosure => {},
-        OpCode::Breakpoint => {},
+        OpCode::Label => unreachable!(
+            "Right now, this only gets called by the evaluator, and there are no labels left!"
+        ),
+        OpCode::Rotate => {}
+        OpCode::Unknown => {}
+        OpCode::BitwiseTwosComplement => {}
+        OpCode::BitwiseXor => {}
+        OpCode::BitwiseNxor => {}
+        OpCode::Addition => {}
+        OpCode::Subtraction => {}
+        OpCode::Multiplication => {}
+        OpCode::Division => {}
+        OpCode::Equals => {}
+        OpCode::NotEquals => {}
+        OpCode::ArrayEquals => {}
+        OpCode::ArrayNotEquals => {}
+        OpCode::LessThan => {}
+        OpCode::GreaterThan => {}
+        OpCode::LessThanEquals => {}
+        OpCode::GreaterThanEquals => {}
+        OpCode::StringConcat => {}
+        OpCode::NoneableOrValue => {}
+        OpCode::Jump => {}
+        OpCode::JumpIfFalse => {}
+        OpCode::JumpIfTrue => {}
+        OpCode::SysCall => {}
+        OpCode::FunctionCall => {}
+        OpCode::Return => {}
+        OpCode::DecodeClosure => {}
+        OpCode::Breakpoint => {}
     }
     Ok(base)
 }

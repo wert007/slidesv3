@@ -33,22 +33,19 @@ func main() {
     boolVersion.printGreeted();
     stringVersion.printGreeted();
 
-    // // TODO
-    // let a = new TwoLevelGeneric(1, [1, 2, 1, 1]);
-    // a.check();
+    let a = new TwoLevelGeneric(1, [1, 2, 1, 1]);
+    a.check();
 }
 
+struct TwoLevelGeneric<Type> {
+    expected_mean: $Type;
+    values: $Type[];
 
-// generic struct TwoLevelGeneric {
-//     expected_mean: $Type;
-//     // TODO
-//     values: $Type[];
-
-//     func check() {
-//         for index, value in this.values {
-//             if value == this.expected_mean {
-//                 print('Index ' + index + ' passed check!');
-//             }
-//         }
-//     }
-// }
+    func check() {
+        for index, value in this.values {
+            if value == this.expected_mean {
+                print('Index ' + index + ' passed check!');
+            }
+        }
+    }
+}

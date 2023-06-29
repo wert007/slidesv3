@@ -5,7 +5,15 @@ use crate::evaluator::memory::{
 
 use super::Allocator;
 
-pub fn garbage_collect(mut unchecked_pointers: Vec<u64>, heap: &mut Allocator) {
+pub struct GarbageCollectStats {
+    pub freed_buckets: usize,
+    pub folded_buckets: usize,
+}
+
+pub fn garbage_collect(
+    mut unchecked_pointers: Vec<u64>,
+    heap: &mut Allocator,
+) -> GarbageCollectStats {
     let mut checked_pointers = vec![];
 
     while let Some(pointer) = unchecked_pointers.pop() {
@@ -36,6 +44,7 @@ pub fn garbage_collect(mut unchecked_pointers: Vec<u64>, heap: &mut Allocator) {
             address += WORD_SIZE_IN_BYTES;
         }
     }
+    let mut freed_buckets = 0;
     for bucket in heap.used_buckets_mut() {
         let mut is_used = false;
         for pointer in &checked_pointers {
@@ -46,6 +55,13 @@ pub fn garbage_collect(mut unchecked_pointers: Vec<u64>, heap: &mut Allocator) {
             }
         }
         bucket.is_used = is_used;
+        if !is_used {
+            freed_buckets += 1;
+        }
     }
-    heap.fold_free_buckets();
+    let folded_buckets = heap.fold_free_buckets();
+    GarbageCollectStats {
+        freed_buckets,
+        folded_buckets,
+    }
 }

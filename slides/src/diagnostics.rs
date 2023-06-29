@@ -1,6 +1,6 @@
 use crate::{
     binder::{
-        typing::{TypeCollection, TypeId, GenericTypeId},
+        typing::{GenericTypeId, TypeCollection, TypeId},
         SourceCow,
     },
     lexer::syntax_token::SyntaxTokenKind,
@@ -26,7 +26,9 @@ impl Message {
         match self {
             Message::String(it) => it.into(),
             Message::TypeId(type_) => types.display_name_of_type_id(type_).into_owned(),
-            Message::GenericTypeId(type_) => types.display_name_of_generic_type_id(type_).into_owned(),
+            Message::GenericTypeId(type_) => {
+                types.display_name_of_generic_type_id(type_).into_owned()
+            }
             Message::SourceTextSnippet(it) => source_text_collection[it].into(),
             Message::Composition(composition) => composition
                 .into_iter()
@@ -652,8 +654,16 @@ impl DiagnosticBag {
         self.report(message, location);
     }
 
-    pub fn report_expected_type_found_generic(&mut self, location: TextLocation, generic: GenericTypeId) {
-        let message = message_format!("Expected concrete type, found unspecified generic type ", generic, "instead. Are you missing type arguments?");
+    pub fn report_expected_type_found_generic(
+        &mut self,
+        location: TextLocation,
+        generic: GenericTypeId,
+    ) {
+        let message = message_format!(
+            "Expected concrete type, found unspecified generic type ",
+            generic,
+            "instead. Are you missing type arguments?"
+        );
         self.report(message, location);
     }
 

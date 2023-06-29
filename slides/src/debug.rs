@@ -54,26 +54,6 @@ pub struct DebugFlags {
     pub print_lines: bool,
 }
 
-impl DebugFlags {
-    /// Get a reference to the debug flags's print instructions.
-    pub fn print_instructions(&self) -> bool {
-        self.print_instructions
-    }
-    /// Get a reference to the debug flags's print current instruction.
-    pub fn print_current_instruction(&self) -> bool {
-        self.print_instructions
-    }
-    /// Get a reference to the debug flags's print variable table.
-    pub fn print_variable_table(&self) -> bool {
-        self.print_variable_table
-    }
-
-    /// Get a reference to the debug flags's print tokens.
-    pub fn print_tokens(&self) -> bool {
-        self.print_tokens
-    }
-}
-
 #[derive(Clone, Copy, Debug, Default)]
 struct DebugPrinter {
     indent: usize,

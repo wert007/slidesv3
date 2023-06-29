@@ -75,7 +75,9 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
                     if memory::is_heap_pointer(word.value) {
                         let address = word.value & !memory::HEAP_POINTER;
                         let address = address / memory::WORD_SIZE_IN_BYTES;
-                        potential_pointers_to_buckets.push(word_address_to_bucket_index[&address]);
+                        if let Some(bucket) = word_address_to_bucket_index.get(&address) {
+                            potential_pointers_to_buckets.push(*bucket);
+                        }
                     }
                     writeln!(bucket_data).unwrap();
                 }

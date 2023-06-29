@@ -1,2 +1,1 @@
 Error in ..\tests\generics\generic_struct_without_generic_type.sld:1:8: Declared struct A as generic, but generic type $Type was not used. Maybe you forgot it?
-Error in ..\tests\generics\generic_struct_without_generic_type.sld:7:13: Struct A<> is a generic struct, but its generic type is undeclared.

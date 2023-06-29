@@ -103,7 +103,7 @@ impl Display for GenericTypeId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypeOrGenericType {
     Type(Type),
     GenericType(GenericType),
@@ -408,10 +408,6 @@ impl TypeCollection {
             (Type::Any, _) => true,
             // FIXME: Can it though?
             // (Type::Pointer, Type::Integer) => true,
-            // TODO: Add example of this to test suite!
-            // (Type::PointerOf(inner), Type::Noneable(other)) => {
-            //     self.can_be_converted(*inner, *other)
-            // }
             (_, _) if self.noneable_base_type(from_id).is_some() => {
                 self.can_be_converted(self.noneable_base_type(from_id).unwrap(), to_id)
             }
@@ -817,6 +813,48 @@ impl TypeCollection {
             Some(TypeId(index as _))
         } else {
             None
+        }
+    }
+
+    pub(crate) fn contains_generic_type(&self, haystack: TypeId) -> bool {
+        match &self[haystack] {
+            Type::PointerOf(it) => self.contains_generic_type(*it),
+            Type::Struct(it) => it
+                .applied_types
+                .iter()
+                .any(|h| self.contains_generic_type(*h)),
+            Type::StructPlaceholder(it) => it
+                .applied_types
+                .iter()
+                .any(|h| self.contains_generic_type(*h)),
+            Type::GenericType(..) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn get_specified_generic_types(
+        &self,
+        replaceable_type: TypeId,
+        available_type: TypeId,
+    ) -> Vec<(TypeId, TypeId)> {
+        match (&self[replaceable_type], &self[available_type]) {
+            (Type::PointerOf(r), Type::PointerOf(a)) => self.get_specified_generic_types(*r, *a),
+            (Type::Struct(r), Type::Struct(a)) => r
+                .applied_types
+                .iter()
+                .copied()
+                .zip(a.applied_types.iter().copied())
+                .flat_map(|(r, a)| self.get_specified_generic_types(r, a))
+                .collect(),
+            (Type::StructPlaceholder(r), Type::StructPlaceholder(a)) => r
+                .applied_types
+                .iter()
+                .copied()
+                .zip(a.applied_types.iter().copied())
+                .flat_map(|(r, a)| self.get_specified_generic_types(r, a))
+                .collect(),
+            (Type::GenericType(..), _) => vec![(replaceable_type, available_type)],
+            _ => Vec::new(),
         }
     }
 }

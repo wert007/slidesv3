@@ -16,7 +16,7 @@ use crate::{
 use num_enum::TryFromPrimitive;
 
 use self::memory::{
-    allocator::{garbage_collector::garbage_collect, Allocator},
+    allocator::{garbage_collector::{garbage_collect, GarbageCollectStats}, Allocator},
     stack::Stack,
     FlaggedWord, Memory,
 };
@@ -31,6 +31,56 @@ macro_rules! runtime_error {
 }
 
 type ResultType = Value;
+
+#[derive(Debug, Clone, Copy)]
+struct InstructionError {
+    value: u64,
+    is_pointer: bool,
+    line: u32,
+    instruction_location: TextLocation,
+    pc: usize,
+}
+
+impl InstructionError {
+    pub fn pointer(value: u64, line: u32, instruction_location: TextLocation, pc: usize) -> Self {
+        Self {
+            value,
+            is_pointer: true,
+            line,
+            instruction_location,
+            pc,
+        }
+    }
+
+    pub fn value(value: u64, line: u32, instruction_location: TextLocation, pc: usize) -> Self {
+        Self {
+            value,
+            is_pointer: false,
+            line,
+            instruction_location,
+            pc,
+        }
+    }
+
+    fn display(&self, state: &EvaluatorState) {
+        let expected = if self.is_pointer { "value" } else { "pointer" };
+        let actual = if self.is_pointer {
+            format!("#{:X}", self.value)
+        } else {
+            if (self.value as i64) < 0 {
+                format!("{} ({}) {:#x}", self.value, self.value as i64, self.value)
+            } else {
+                format!("{} {:#x}", self.value, self.value)
+            }
+        };
+        println!(
+            "Error in line {}: Expected {expected} but found {actual} while executing Instruction {} from {}.",
+            self.line,
+            crate::debug::commented_instruction_to_string(state.instructions[self.pc], state).unwrap(),
+            &state.project.source_text_collection[self.instruction_location]
+        );
+    }
+}
 
 pub struct EvaluatorState {
     stack: Stack,
@@ -90,7 +140,7 @@ impl EvaluatorState {
         }
     }
 
-    fn garbage_collect(&mut self) {
+    fn garbage_collect(&mut self) -> GarbageCollectStats {
         let mut unchecked_pointers = self.protected_pointers.clone();
         self.protected_pointers = vec![];
         for word in &self.stack.words {
@@ -103,7 +153,7 @@ impl EvaluatorState {
                 unchecked_pointers.push(value.unwrap_pointer());
             }
         }
-        garbage_collect(unchecked_pointers, &mut self.heap);
+        garbage_collect(unchecked_pointers, &mut self.heap)
     }
 
     fn protect_pointer(&mut self, pointer: u64) {
@@ -134,11 +184,11 @@ impl EvaluatorState {
         if address % memory::WORD_SIZE_IN_BYTES != 0 || address == 0 {
             return None;
         }
-        let length_in_bytes = self.read_pointer_safe(address)?.as_value()?;
+        let length_in_bytes = self.read_pointer_safe(address)?.as_value().ok()?;
         let length_in_words = memory::bytes_to_word(length_in_bytes);
         let mut buffer = Vec::with_capacity(length_in_bytes as _);
         for w in 0..length_in_words {
-            let Some(word) = self.read_pointer_safe(address + (w + 1) * memory::WORD_SIZE_IN_BYTES)?.as_value() else {
+            let Ok(word) = self.read_pointer_safe(address + (w + 1) * memory::WORD_SIZE_IN_BYTES)?.as_value() else {
                 break;
             };
             let bytes = word.to_be_bytes();
@@ -259,7 +309,7 @@ fn execute_function(
     while state.pc < state.instructions.len() {
         let pc = state.pc;
         state.maybe_print_source_code_line();
-        if state.project.debug_flags.print_current_instruction() {
+        if state.project.debug_flags.print_instructions {
             println!(
                 "  CI {:X}*{}: {}",
                 pc,
@@ -293,7 +343,7 @@ fn execute_function(
         if nestedness < 0 {
             break;
         }
-        execute_instruction(state, state.instructions[pc]);
+        let instruction_failed = execute_instruction(state, state.instructions[pc]).err();
         match state.debugger_state.session_state {
             debugger::SessionState::Continue => {
                 debugger::create_session(state);
@@ -313,6 +363,10 @@ fn execute_function(
         }
         if state.runtime_error_happened {
             println!("Unusual termination.");
+            return Err(());
+        }
+        if let Some(err) = instruction_failed {
+            err.display(state);
             return Err(());
         }
         assert!(
@@ -346,7 +400,11 @@ fn execute_function(
     )
 }
 
-fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
+#[must_use]
+fn execute_instruction(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
     match instruction.op_code {
         OpCode::Label | OpCode::Unknown => unreachable!(),
         OpCode::NoOp => {}
@@ -376,11 +434,11 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::NotEquals => evaluate_not_equals(state, instruction),
         OpCode::ArrayEquals => evaluate_array_equals(state, instruction),
         OpCode::ArrayNotEquals => evaluate_array_not_equals(state, instruction),
-        OpCode::LessThan => evaluate_less_than(state, instruction),
+        OpCode::LessThan => evaluate_less_than(state, instruction)?,
         OpCode::GreaterThan => evaluate_greater_than(state, instruction),
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
-        OpCode::StringConcat => evaluate_string_concat(state, instruction),
+        OpCode::StringConcat => evaluate_string_concat(state, instruction)?,
         OpCode::NoneableOrValue => evaluate_noneable_or_value(state, instruction),
         OpCode::Jump => evaluate_jump(state, instruction),
         OpCode::JumpIfFalse => evaluate_jump_if_false(state, instruction),
@@ -390,6 +448,7 @@ fn execute_instruction(state: &mut EvaluatorState, instruction: Instruction) {
         OpCode::Return => evaluate_return(state, instruction),
         OpCode::DecodeClosure => evaluate_decode_closure(state, instruction),
     }
+    Ok(())
 }
 
 fn evaluate_breakpoint(state: &mut EvaluatorState, _: Instruction) {
@@ -640,22 +699,35 @@ fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
     state.stack.push(result as _);
 }
 
-fn evaluate_less_than(state: &mut EvaluatorState, instruction: Instruction) {
+#[must_use]
+fn evaluate_less_than(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
     match instruction.arg {
         0 => {
-            let rhs = state.stack.pop().unwrap_value() as i64;
-            let lhs = state.stack.pop().unwrap_value() as i64;
+            let rhs = state.stack.pop().as_value().map_err(|err| {
+                InstructionError::pointer(err, line!(), instruction.location, state.pc)
+            })? as i64;
+            let lhs = state.stack.pop().as_value().map_err(|err| {
+                InstructionError::pointer(err, line!(), instruction.location, state.pc)
+            })? as i64;
             state.stack.push((lhs < rhs) as _);
         }
         1 => {
-            let rhs = state.stack.pop().unwrap_value();
-            let lhs = state.stack.pop().unwrap_value();
+            let rhs = state.stack.pop().as_value().map_err(|err| {
+                InstructionError::pointer(err, line!(), instruction.location, state.pc)
+            })?;
+            let lhs = state.stack.pop().as_value().map_err(|err| {
+                InstructionError::pointer(err, line!(), instruction.location, state.pc)
+            })?;
             state.stack.push((lhs < rhs) as _);
         }
         arg => {
             panic!("unhandled argument {arg:X} to instruction!")
         }
     }
+    Ok(())
 }
 
 fn evaluate_greater_than(state: &mut EvaluatorState, instruction: Instruction) {
@@ -712,12 +784,29 @@ fn evaluate_greater_than_equals(state: &mut EvaluatorState, instruction: Instruc
     }
 }
 
-fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) {
-    let rhs = state.stack.pop().unwrap_pointer();
-    let lhs = state.stack.pop().unwrap_pointer();
+fn evaluate_string_concat(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
+    let rhs = state
+        .stack
+        .pop()
+        .as_pointer()
+        .map_err(|err| InstructionError::value(err, line!(), instruction.location, state.pc))?;
+    let lhs = state
+        .stack
+        .pop()
+        .as_pointer()
+        .map_err(|err| InstructionError::value(err, line!(), instruction.location, state.pc))?;
 
-    let lhs_length = state.read_pointer(lhs).unwrap_value();
-    let rhs_length = state.read_pointer(rhs).unwrap_value();
+    let lhs_length = state
+        .read_pointer(lhs)
+        .as_value()
+        .map_err(|err| InstructionError::pointer(err, line!(), instruction.location, state.pc))?;
+    let rhs_length = state
+        .read_pointer(rhs)
+        .as_value()
+        .map_err(|err| InstructionError::pointer(err, line!(), instruction.location, state.pc))?;
     let result_length = lhs_length + rhs_length;
     // This protects these strings on the heap, since reallocate may call
     // garbage_collect, which otherwise would overwrite the string with itself.
@@ -762,6 +851,7 @@ fn evaluate_string_concat(state: &mut EvaluatorState, instruction: Instruction) 
         }
     }
     state.stack.push_pointer(pointer);
+    Ok(())
 }
 
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
@@ -818,7 +908,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::Reallocate => sys_calls::reallocate(&arguments[1], &arguments[0], state),
         SystemCallKind::RuntimeError => sys_calls::runtime_error(&arguments[0], state),
         SystemCallKind::AddressOf => sys_calls::address_of(&arguments[0], state),
-        SystemCallKind::GarbageCollect => state.garbage_collect(),
+        SystemCallKind::GarbageCollect => {state.garbage_collect();},
         SystemCallKind::Break => unreachable!(),
         SystemCallKind::Hash => sys_calls::hash(&arguments[0], state),
     }

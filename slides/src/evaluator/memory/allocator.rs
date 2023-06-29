@@ -81,7 +81,8 @@ impl Allocator {
         })
     }
 
-    fn fold_free_buckets(&mut self) {
+    fn fold_free_buckets(&mut self) -> usize {
+        let mut folded = 0;
         for index in 0..self.buckets.len() {
             if self.buckets[index].as_bucket().is_none() {
                 continue;
@@ -105,7 +106,9 @@ impl Allocator {
             self.buckets[parent_index] = BucketEntry::Bucket(Bucket::combine(
                 self.buckets[parent_index].as_parent().unwrap(),
             ));
+            folded += 1;
         }
+        folded
     }
 
     fn find_next_two_bucket_indices(&self) -> [usize; 2] {
@@ -145,19 +148,15 @@ impl Allocator {
                     assert!(old_bucket.is_some(), "address = {:#x}", address);
                     old_bucket.filter(|b| b.size_in_words >= size_in_words)
                 };
-                match bucket {
-                    Some(bucket) => bucket.index,
+                match bucket.map(|b| b.index).or_else(|| {
+                    self.dry_free_buckets(expected_size)
+                        .first()
+                        .map(|b| b.index)
+                }) {
+                    Some(it) => it,
                     None => {
-                        let mut free_buckets = self.dry_free_buckets(expected_size);
-                        if free_buckets.is_empty() {
-                            // eprintln!("No Memory left!!!!");
-                            return 0;
-                        }
-                        // TODO: Performance: Do we really need to remove the
-                        // first element, which might copy over all the other
-                        // elements in the array. especially since we are just
-                        // interested in the index..
-                        free_buckets.remove(0).index
+                        // Allocation failed!
+                        return 0;
                     }
                 }
             };
@@ -182,19 +181,15 @@ impl Allocator {
                     assert!(old_bucket.is_some(), "address = {:#x}", address);
                     old_bucket.filter(|b| b.size_in_words >= size_in_words)
                 };
-                match bucket {
-                    Some(bucket) => bucket.index,
+                match bucket.map(|b| b.index).or_else(|| {
+                                    self.free_buckets(expected_size)
+                                        .first()
+                                        .map(|b| b.index)
+                                }) {
+                    Some(it) => it,
                     None => {
-                        let mut free_buckets = self.free_buckets(expected_size);
-                        if free_buckets.is_empty() {
-                            // eprintln!("No Memory left!!!!");
-                            return 0;
-                        }
-                        // TODO: Performance: Do we really need to remove the
-                        // first element, which might copy over all the other
-                        // elements in the array. especially since we are just
-                        // interested in the index..
-                        free_buckets.remove(0).index
+                        // Allocation failed
+                        return 0;
                     }
                 }
             };

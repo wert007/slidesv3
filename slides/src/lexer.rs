@@ -304,7 +304,7 @@ pub fn lex<'a>(
             .report_unterminated_comment(start.char_index, source_text, &text[start.byte_index..]),
     }
     result.push_back(SyntaxToken::eoi(text.len(), source_text));
-    if debug_flags.print_tokens() {
+    if debug_flags.print_tokens {
         for token in &result {
             println!("{:?}", token);
         }

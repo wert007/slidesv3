@@ -39,7 +39,6 @@ pub(crate) fn replace_labels(
             }
         })
         .map(|i| {
-            // TODO: We loose the span here. This is easily fixable.
             match i.op_code {
                 OpCode::Label => Instruction::noop(i.location),
                 OpCode::Jump => Instruction::jump(labels[i.arg as usize], i.location),
