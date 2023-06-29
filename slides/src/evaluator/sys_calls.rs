@@ -59,7 +59,7 @@ fn get_to_string_function(type_id: TypeId, state: &EvaluatorState) -> Option<u64
 
 fn decode_type(address: &FlaggedWord, state: &mut EvaluatorState) -> TypeId {
     let address = address.unwrap_pointer();
-    let type_identifier = state.read_pointer(address).unwrap_value();
+    let type_identifier = state.read_pointer_word(address).unwrap_value();
     // SAFETY: This is actually only as safe as the implementation. If something
     // gets read as TypeId, but it actually isn't, strange things will happen.
     let type_identifier = unsafe { TypeId::from_raw(type_identifier) };
@@ -77,7 +77,7 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
         Type::Any => {
             let type_ = decode_type(argument, state);
             let address = argument.unwrap_pointer() + WORD_SIZE_IN_BYTES;
-            let argument = state.read_pointer(address).clone();
+            let argument = state.read_pointer_word(address).into_owned();
             to_string_native(type_, &argument, state)
         }
         Type::None => "none".into(),
@@ -103,11 +103,11 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
                     let mut result = format!("struct {} {{\n", struct_type.name);
                     for field in struct_type.fields.clone() {
                         let value = state
-                            .read_pointer(
+                            .read_pointer_word(
                                 argument.unwrap_pointer()
                                     + field.offset_or_address.unwrap_offset() as u64,
                             )
-                            .clone();
+                            .into_owned();
                         let value = to_string_native(field.type_, &value, state);
                         let mut value = value.lines();
                         write!(result, "    {} = {}", field.name, value.next().unwrap()).unwrap();
@@ -138,7 +138,7 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
                 let argument = if state.project.types[*base_type].is_pointer() {
                     FlaggedWord::pointer(ptr)
                 } else {
-                    state.read_pointer(ptr).clone()
+                    state.read_pointer_word(ptr).into_owned()
                 };
                 to_string_native(*base_type, &argument, state)
             }
@@ -163,7 +163,7 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
 
 fn string_to_string_native(argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
     let string_start = argument.unwrap_pointer();
-    let pointer = state.read_pointer(string_start).unwrap_value();
+    let pointer = state.read_pointer_word(string_start).unwrap_value();
 
     let string_length_in_bytes = pointer;
     let string_length_in_words = bytes_to_word(string_length_in_bytes);
@@ -184,9 +184,9 @@ fn string_to_string_native(argument: &FlaggedWord, state: &mut EvaluatorState) -
 
 pub fn array_length(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let type_ = decode_type(argument, state);
-    let argument = state.read_pointer(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES);
+    let argument = state.read_pointer_word(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES);
     let array_start = argument.unwrap_pointer();
-    let pointer = state.read_pointer(array_start).unwrap_value();
+    let pointer = state.read_pointer_word(array_start).unwrap_value();
 
     let array_length = pointer / state.project.types[type_].array_element_size_in_bytes();
 
@@ -245,8 +245,8 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         Type::Any => {
             let type_ = decode_type(argument, state);
             let argument = state
-                .read_pointer(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES)
-                .clone();
+                .read_pointer_word(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES)
+                .into_owned();
             hash_value(&argument, type_, state)
         }
         Type::Integer(_) | Type::Boolean | Type::None | Type::Enum(_, _) | Type::SystemCall(_) => {
@@ -254,7 +254,7 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         }
         Type::String => {
             let ptr = argument.unwrap_pointer();
-            let length = state.read_pointer(ptr).unwrap_value();
+            let length = state.read_pointer_word(ptr).unwrap_value();
             hash_array(length, ptr + WORD_SIZE_IN_BYTES, state)
         }
         Type::Function(_) => todo!(),
@@ -262,7 +262,7 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         Type::Struct(s) => hash_array(s.size_in_bytes, argument.unwrap_pointer(), state),
         Type::Pointer => argument.unwrap_value(),
         Type::PointerOf(type_) => {
-            let argument = state.read_pointer(argument.unwrap_pointer()).clone();
+            let argument = state.read_pointer_word(argument.unwrap_pointer()).into_owned();
             hash_value(&argument, *type_, state)
         }
     }
@@ -271,12 +271,12 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
 fn hash_array(length: u64, pointer: u64, state: &mut EvaluatorState) -> u64 {
     let mut hash = 5381;
     for i in 0..length / WORD_SIZE_IN_BYTES {
-        hash = ((hash << 5) + hash) + state.read_pointer(pointer + i * WORD_SIZE_IN_BYTES).value;
+        hash = ((hash << 5) + hash) + state.read_pointer_word(pointer + i * WORD_SIZE_IN_BYTES).value;
     }
     let too_many_bits = length % WORD_SIZE_IN_BYTES;
     hash = ((hash << 5) + hash)
         + (state
-            .read_pointer(pointer + bytes_to_word(length) * WORD_SIZE_IN_BYTES - WORD_SIZE_IN_BYTES)
+            .read_pointer_word(pointer + bytes_to_word(length) * WORD_SIZE_IN_BYTES - WORD_SIZE_IN_BYTES)
             .value
             & ((1 << too_many_bits) - 1));
     hash

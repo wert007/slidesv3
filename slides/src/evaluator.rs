@@ -2,6 +2,8 @@ mod debugger;
 pub mod memory;
 mod sys_calls;
 
+use std::borrow::Cow;
+
 use crate::{
     binder::typing::SystemCallKind,
     evaluator::memory::WORD_SIZE_IN_BYTES,
@@ -16,9 +18,12 @@ use crate::{
 use num_enum::TryFromPrimitive;
 
 use self::memory::{
-    allocator::{garbage_collector::{garbage_collect, GarbageCollectStats}, Allocator},
+    allocator::{
+        garbage_collector::{garbage_collect, GarbageCollectStats},
+        Allocator,
+    },
     stack::Stack,
-    FlaggedWord, Memory,
+    FlaggedWord, Memory, FlaggedByte,
 };
 
 macro_rules! runtime_error {
@@ -74,8 +79,9 @@ impl InstructionError {
             }
         };
         println!(
-            "Error in line {}: Expected {expected} but found {actual} while executing Instruction {} from {}.",
+            "Error in line {}: Expected {expected} but found {actual} while executing Instruction {:X}: {} from {}.",
             self.line,
+            self.pc,
             crate::debug::commented_instruction_to_string(state.instructions[self.pc], state).unwrap(),
             &state.project.source_text_collection[self.instruction_location]
         );
@@ -106,7 +112,7 @@ impl EvaluatorState {
         self.registers[variable] = value;
     }
 
-    fn read_pointer(&self, address: u64) -> &FlaggedWord {
+    fn read_pointer_word(&self, address: u64) -> Cow<FlaggedWord> {
         if memory::is_heap_pointer(address) {
             self.heap.read_flagged_word(address)
         } else {
@@ -114,7 +120,7 @@ impl EvaluatorState {
         }
     }
 
-    pub fn read_pointer_safe(&self, address: u64) -> Option<&FlaggedWord> {
+    pub fn read_pointer_word_safe(&self, address: u64) -> Option<&FlaggedWord> {
         if memory::is_heap_pointer(address) {
             self.heap.read_flagged_word_safe(address)
         } else {
@@ -122,7 +128,23 @@ impl EvaluatorState {
         }
     }
 
-    fn write_pointer(&mut self, address: u64, value: FlaggedWord) {
+    pub fn read_pointer_byte_safe(&self, address: u64) -> Option<FlaggedByte> {
+        if memory::is_heap_pointer(address) {
+            self.heap.read_flagged_byte_safe(address)
+        } else {
+            self.stack.read_flagged_byte_safe(address)
+        }
+    }
+
+    fn write_pointer_byte(&mut self, address: u64, value: FlaggedByte) {
+        if memory::is_heap_pointer(address) {
+            self.heap.write_flagged_byte(address, value);
+        } else {
+            self.stack.write_flagged_byte(address, value);
+        }
+    }
+
+    fn write_pointer_word(&mut self, address: u64, value: FlaggedWord) {
         if memory::is_heap_pointer(address) {
             self.heap.write_flagged_word(address, value);
         } else {
@@ -415,11 +437,13 @@ fn execute_instruction(
         OpCode::Pop => evaluate_pop(state, instruction),
         OpCode::LoadRegister => evaluate_load_register(state, instruction),
         OpCode::StoreInRegister => evaluate_assign_to_variable(state, instruction),
-        OpCode::StoreInMemory => evaluate_write_to_memory(state, instruction),
+        OpCode::StoreByteInMemory => evaluate_store_byte_in_memory(state, instruction),
+        OpCode::StoreWordInMemory => evaluate_store_word_in_memory(state, instruction),
         OpCode::WriteToStack => evaluate_write_to_stack(state, instruction),
         OpCode::WriteToHeap => evaluate_write_to_heap(state, instruction),
         OpCode::Allocate => evaluate_allocate(state, instruction),
-        OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction),
+        OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction)?,
+        OpCode::ReadByteWithOffset => evaluate_read_byte_with_offset(state, instruction)?,
         OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
         OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::Rotate => evaluate_rotate(state, instruction),
@@ -479,7 +503,7 @@ fn evaluate_duplicate_over(state: &mut EvaluatorState, instruction: Instruction)
     let value = state
         .stack
         .read_flagged_word((state.stack.len() as u64 - instruction.arg - 1) * WORD_SIZE_IN_BYTES);
-    state.stack.push_flagged_word(value.clone());
+    state.stack.push_flagged_word(value.into_owned());
 }
 
 fn evaluate_rotate(state: &mut EvaluatorState, instruction: Instruction) {
@@ -502,12 +526,17 @@ fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruct
     state.set_variable(instruction.arg, value);
 }
 
-fn evaluate_write_to_memory(state: &mut EvaluatorState, _: Instruction) {
-    let index = state.stack.pop().unwrap_value();
-    let array = state.stack.pop().unwrap_pointer();
+fn evaluate_store_byte_in_memory(state: &mut EvaluatorState, _: Instruction) {
+    let address = state.stack.pop().unwrap_pointer();
     let value = state.stack.pop();
-    let index = array + index;
-    state.write_pointer(index, value);
+    let value = value.into_flagged_byte().unwrap();
+    state.write_pointer_byte(address, value);
+}
+
+fn evaluate_store_word_in_memory(state: &mut EvaluatorState, _: Instruction) {
+    let address = state.stack.pop().unwrap_pointer();
+    let value = state.stack.pop();
+    state.write_pointer_word(address, value);
 }
 
 fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
@@ -556,12 +585,36 @@ fn evaluate_allocate(state: &mut EvaluatorState, instruction: Instruction) {
     );
 }
 
-fn evaluate_read_word_with_offset(state: &mut EvaluatorState, instruction: Instruction) {
-    let address = state.stack.pop().unwrap_pointer();
+fn evaluate_read_byte_with_offset(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
+    let address = state
+        .stack
+        .pop()
+        .as_pointer()
+        .map_err(|err| InstructionError::value(err, line!(), instruction.location, state.pc))?;
     let offset = instruction.arg;
     let address = address + offset;
-    let value = state.read_pointer(address);
-    state.stack.push_flagged_word(value.clone());
+    let value = state.read_pointer_byte_safe(address).ok_or(InstructionError::value(0, line!(), instruction.location, state.pc))?;
+    state.stack.push_flagged_word(value.into());
+    Ok(())
+}
+
+fn evaluate_read_word_with_offset(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
+    let address = state
+        .stack
+        .pop()
+        .as_pointer()
+        .map_err(|err| InstructionError::value(err, line!(), instruction.location, state.pc))?;
+    let offset = instruction.arg;
+    let address = address + offset;
+    let value = state.read_pointer_word(address);
+    state.stack.push_flagged_word(value.into_owned());
+    Ok(())
 }
 
 fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
@@ -579,8 +632,8 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
     for word_index in 0..size_in_words {
         let src = src + word_index * WORD_SIZE_IN_BYTES;
         let dest = dest + word_index * WORD_SIZE_IN_BYTES;
-        let buffer = state.read_pointer(src);
-        state.write_pointer(dest, buffer.clone());
+        let buffer = state.read_pointer_word(src);
+        state.write_pointer_word(dest, buffer.into_owned());
     }
 }
 
@@ -666,9 +719,9 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     let rhs = state.stack.pop().unwrap_pointer();
     let lhs = state.stack.pop().unwrap_pointer();
 
-    let lhs_length_in_bytes = state.read_pointer(lhs).unwrap_value();
+    let lhs_length_in_bytes = state.read_pointer_word(lhs).unwrap_value();
     let lhs_length_in_words = memory::bytes_to_word(lhs_length_in_bytes);
-    let rhs_length_in_bytes = state.read_pointer(rhs).unwrap_value();
+    let rhs_length_in_bytes = state.read_pointer_word(rhs).unwrap_value();
     let _rhs_length_in_words = memory::bytes_to_word(rhs_length_in_bytes);
     // If two arrays are not equal in length, we don't compare their elements.
     // But when we compare their elements we expect a true result and only
@@ -678,8 +731,8 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
         for i in (0..lhs_length_in_words * WORD_SIZE_IN_BYTES).step_by(WORD_SIZE_IN_BYTES as _) {
             let lhs_index = lhs + i + WORD_SIZE_IN_BYTES;
             let rhs_index = rhs + i + WORD_SIZE_IN_BYTES;
-            let lhs = state.read_pointer(lhs_index).unwrap_value();
-            let rhs = state.read_pointer(rhs_index).unwrap_value();
+            let lhs = state.read_pointer_word(lhs_index).unwrap_value();
+            let rhs = state.read_pointer_word(rhs_index).unwrap_value();
             if lhs != rhs {
                 result = false;
                 break;
@@ -800,11 +853,11 @@ fn evaluate_string_concat(
         .map_err(|err| InstructionError::value(err, line!(), instruction.location, state.pc))?;
 
     let lhs_length = state
-        .read_pointer(lhs)
+        .read_pointer_word(lhs)
         .as_value()
         .map_err(|err| InstructionError::pointer(err, line!(), instruction.location, state.pc))?;
     let rhs_length = state
-        .read_pointer(rhs)
+        .read_pointer_word(rhs)
         .as_value()
         .map_err(|err| InstructionError::pointer(err, line!(), instruction.location, state.pc))?;
     let result_length = lhs_length + rhs_length;
@@ -857,12 +910,12 @@ fn evaluate_string_concat(
 fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let rhs = state.read_pointer(rhs.unwrap_pointer());
-    let lhs = state.read_pointer(lhs.unwrap_pointer());
+    let rhs = state.read_pointer_word(rhs.unwrap_pointer());
+    let lhs = state.read_pointer_word(lhs.unwrap_pointer());
     let is_none = lhs.unwrap_pointer() == 0;
     let needs_dereferencing = instruction.arg != 0;
     let result = if needs_dereferencing && !is_none {
-        state.read_pointer(lhs.unwrap_pointer())
+        state.read_pointer_word(lhs.unwrap_pointer())
     } else {
         if is_none {
             rhs
@@ -870,7 +923,7 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
             lhs
         }
     };
-    state.stack.push_flagged_word(result.clone());
+    state.stack.push_flagged_word(result.into_owned());
 }
 
 fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {
@@ -1004,7 +1057,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
     let argument_count = instruction.arg >> 1;
     let mut closure_pointer = state.stack.pop().unwrap_pointer();
 
-    let closure_length_in_bytes = state.read_pointer(closure_pointer).unwrap_value();
+    let closure_length_in_bytes = state.read_pointer_word(closure_pointer).unwrap_value();
     // let argument_count = memory::bytes_to_word(closure_length_in_bytes) - 1 + argument_count;
     closure_pointer += WORD_SIZE_IN_BYTES;
     let end_address = closure_pointer + closure_length_in_bytes;
@@ -1013,7 +1066,7 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
         closure_pointer += WORD_SIZE_IN_BYTES;
         Some(
             state
-                .read_pointer(closure_pointer - WORD_SIZE_IN_BYTES)
+                .read_pointer_word(closure_pointer - WORD_SIZE_IN_BYTES)
                 .unwrap_pointer(),
         )
     } else {
@@ -1021,8 +1074,8 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
     };
 
     while closure_pointer < end_address {
-        let argument = state.read_pointer(closure_pointer);
-        state.stack.push_flagged_word(argument.clone());
+        let argument = state.read_pointer_word(closure_pointer);
+        state.stack.push_flagged_word(argument.into_owned());
         closure_pointer += WORD_SIZE_IN_BYTES;
     }
     if let Some(function_pointer) = function_pointer {

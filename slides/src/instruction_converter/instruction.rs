@@ -94,9 +94,17 @@ impl Instruction {
         }
     }
 
-    pub const fn store_in_memory(location: TextLocation) -> Self {
+    pub const fn store_byte_in_memory(location: TextLocation) -> Self {
         Self {
-            op_code: OpCode::StoreInMemory,
+            op_code: OpCode::StoreByteInMemory,
+            arg: 0,
+            location,
+        }
+    }
+
+    pub const fn store_word_in_memory(location: TextLocation) -> Self {
+        Self {
+            op_code: OpCode::StoreWordInMemory,
             arg: 0,
             location,
         }
@@ -131,6 +139,14 @@ impl Instruction {
         Self {
             op_code: OpCode::Allocate,
             arg: size_in_bytes,
+            location,
+        }
+    }
+
+    pub const fn read_byte_with_offset(offset: u64, location: TextLocation) -> Self {
+        Self {
+            op_code: OpCode::ReadByteWithOffset,
+            arg: offset,
             location,
         }
     }

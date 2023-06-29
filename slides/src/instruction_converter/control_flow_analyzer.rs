@@ -79,7 +79,8 @@ pub(crate) fn check_stack_usage(
                             OpCode::Pop => -1,
                             OpCode::LoadRegister => 1,
                             OpCode::StoreInRegister => -1,
-                            OpCode::StoreInMemory => -3,
+                            OpCode::StoreWordInMemory => -3,
+                            OpCode::StoreByteInMemory => -3,
                             OpCode::WriteToStack => 0,
                             OpCode::WriteToHeap => {
                                 if instruction.arg == 0 {
@@ -92,6 +93,7 @@ pub(crate) fn check_stack_usage(
                             }
                             OpCode::Allocate => 1,
                             OpCode::ReadWordWithOffset => 0,
+                            OpCode::ReadByteWithOffset => 0,
                             OpCode::MemoryCopy => todo!(),
                             OpCode::TypeIdentifier => 1,
                             OpCode::Label => 0,

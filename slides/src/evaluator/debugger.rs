@@ -153,7 +153,7 @@ fn print_registers(registers: &[FlaggedWord], register_names: &[Option<String>])
 }
 
 fn read_indirect_pointer(state: &EvaluatorState, address: u64) {
-    let value = state.read_pointer(address);
+    let value = state.read_pointer_word(address);
     let ptr = if value.is_pointer() {
         value.unwrap_pointer()
     } else {
@@ -161,7 +161,7 @@ fn read_indirect_pointer(state: &EvaluatorState, address: u64) {
         return;
     };
     print!("{:x}: ", ptr);
-    let value = state.read_pointer(ptr);
+    let value = state.read_pointer_word(ptr);
     if value.is_pointer() {
         println!("#{:x}", value.unwrap_pointer());
     } else {
@@ -170,7 +170,7 @@ fn read_indirect_pointer(state: &EvaluatorState, address: u64) {
 }
 
 fn read_pointer(state: &EvaluatorState, address: u64) {
-    let value = state.read_pointer(address);
+    let value = state.read_pointer_word(address);
     if value.is_pointer() {
         println!("#{:x}", value.unwrap_pointer());
     } else {

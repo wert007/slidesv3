@@ -915,8 +915,18 @@ fn convert_array_index(
     result.push(Instruction::load_immediate(base_type_size, location).into());
     result.push(Instruction::multiplication(location).into());
 
-    result.push(Instruction::addition(span).into());
-    result.push(Instruction::read_word_with_offset(0, span).into());
+    result.push(Instruction::addition(location).into());
+    match base_type_size {
+        1 => {
+            result.push(Instruction::read_byte_with_offset(0, location).into());
+        }
+        8 => {
+            result.push(Instruction::read_word_with_offset(0, location).into());
+        }
+        err => {
+            unreachable!("Unhandled type size {err}!");
+        }
+    }
     result
 }
 

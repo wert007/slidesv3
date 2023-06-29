@@ -258,7 +258,12 @@ pub fn commented_instruction_to_string(
         OpCode::StoreInRegister => {
             write!(base, "; {}", state.peek_stack(0).unwrap())?;
         }
-        OpCode::StoreInMemory => {}
+        OpCode::StoreByteInMemory |
+        OpCode::StoreWordInMemory => {
+            let address = state.peek_stack(0).unwrap().unwrap_pointer();
+            let value = state.peek_stack(1).unwrap();
+            write!(base, "; [#{address:X}] = {value}")?;
+        }
         OpCode::WriteToStack => {}
         OpCode::WriteToHeap => {
             let size = if instruction.arg == 0 {
@@ -276,7 +281,16 @@ pub fn commented_instruction_to_string(
             if let Some(address) = state.peek_stack(0).map(|v| v.as_pointer().ok()).flatten() {
                 let offset = instruction.arg;
                 let address = address + offset;
-                if let Some(ptr) = state.read_pointer_safe(address) {
+                if let Some(ptr) = state.read_pointer_word_safe(address) {
+                    write!(base, "; {}", ptr)?;
+                }
+            }
+        }
+        OpCode::ReadByteWithOffset => {
+            if let Some(address) = state.peek_stack(0).map(|v| v.as_pointer().ok()).flatten() {
+                let offset = instruction.arg;
+                let address = address + offset;
+                if let Some(ptr) = state.read_pointer_byte_safe(address) {
                     write!(base, "; {}", ptr)?;
                 }
             }
@@ -335,12 +349,16 @@ pub fn instruction_to_string(
         OpCode::StoreInRegister => {
             instruction_reg_arg_name_to_string("streg", instruction.arg, reg_name)
         }
-        OpCode::StoreInMemory => instruction_ptr_unsigned_arg_to_string("stm", instruction.arg),
+        OpCode::StoreByteInMemory => instruction_ptr_unsigned_arg_to_string("stbytemem", instruction.arg),
+        OpCode::StoreWordInMemory => instruction_ptr_unsigned_arg_to_string("stwrdmem", instruction.arg),
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
         OpCode::WriteToHeap => instruction_word_count_arg_to_string("wrtheap", instruction.arg),
         OpCode::Allocate => instruction_byte_count_arg_to_string("alloc", instruction.arg),
         OpCode::ReadWordWithOffset => {
             instruction_byte_count_arg_to_string("rdwrdoffset", instruction.arg)
+        }
+        OpCode::ReadByteWithOffset => {
+            instruction_byte_count_arg_to_string("rdbyteoffset", instruction.arg)
         }
         OpCode::MemoryCopy => instruction_no_arg_to_string("memcpy"),
         OpCode::TypeIdentifier => instruction_dec_signed_arg_to_string("ldtyp", instruction.arg),

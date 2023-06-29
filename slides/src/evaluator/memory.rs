@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{borrow::Cow, fmt::Display};
 
 pub mod allocator;
 pub mod stack;
@@ -16,6 +16,16 @@ pub const fn is_heap_pointer(address: u64) -> bool {
 }
 
 pub trait Memory {
+    fn read_flagged_byte(&self, address: u64) -> FlaggedByte {
+        let word = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES);
+        let byte = word.value.to_le_bytes()[(address % WORD_SIZE_IN_BYTES) as usize];
+        FlaggedByte {
+            value: byte,
+            flags: word.flags,
+            comment: word.comment.clone(),
+        }
+    }
+
     fn read_flagged_word_aligned(&self, address: u64) -> &FlaggedWord;
     fn write_flagged_word_aligned(&mut self, address: u64, value: FlaggedWord);
     fn len(&self) -> usize;
@@ -23,12 +33,19 @@ pub trait Memory {
         address
     }
 
-    fn read_flagged_word(&self, address: u64) -> &FlaggedWord {
+    fn read_flagged_word<'a>(&'a self, address: u64) -> Cow<'a, FlaggedWord> {
         let address = self.transform_address(address);
         if address % WORD_SIZE_IN_BYTES == 0 {
-            self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES)
+            Cow::Borrowed(self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES))
         } else {
-            unimplemented!("address = 0x{:x}", address)
+            let a = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES);
+            let b = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES + 1);
+            assert_eq!(a.flags, b.flags);
+            let offset = address & (WORD_SIZE_IN_BYTES - 1);
+            let a_mask = (1 << offset) - 1;
+            let b_mask = u64::MAX - (1 << offset) - 1;
+            let value = (a.value & a_mask) | (b.value & b_mask);
+            Cow::Owned(FlaggedWord::value(value).flags(a.flags))
         }
     }
 
@@ -45,6 +62,14 @@ pub trait Memory {
         }
     }
 
+    fn read_flagged_byte_safe(&self, address: u64) -> Option<FlaggedByte> {
+        let address = self.transform_address(address);
+        if self.len() <= (address / WORD_SIZE_IN_BYTES) as usize {
+            return None;
+        }
+        Some(self.read_flagged_byte(address))
+    }
+
     fn write_flagged_word(&mut self, address: u64, value: FlaggedWord) {
         let address = self.transform_address(address);
         if address % WORD_SIZE_IN_BYTES == 0 {
@@ -52,6 +77,22 @@ pub trait Memory {
         } else {
             unimplemented!("address = 0x{:x}", address);
         }
+    }
+
+    fn write_flagged_byte(&mut self, address: u64, value: FlaggedByte) {
+        let address = self.transform_address(address);
+        let word = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES);
+        let offset = address % WORD_SIZE_IN_BYTES;
+        let mask = 0xff << (offset * 8);
+        assert_eq!(word.flags, value.flags);
+        let flags = value.flags;
+        let old = word.value & !mask;
+        let new = ((value.value as u64) << (offset * 8)) & mask;
+        let value = old | new;
+        self.write_flagged_word_aligned(
+            address / WORD_SIZE_IN_BYTES,
+            FlaggedWord::value(value).flags(flags),
+        );
     }
 }
 
@@ -64,6 +105,23 @@ impl Flags {
     pub fn pointer(mut self) -> Self {
         self.is_pointer = true;
         self
+    }
+}
+
+#[derive(Default, Clone, PartialEq, Eq)]
+pub struct FlaggedByte {
+    pub value: u8,
+    pub flags: Flags,
+    pub comment: String,
+}
+
+impl Display for FlaggedByte {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.flags.is_pointer {
+            write!(f, "#{:x}", self.value)
+        } else {
+            write!(f, "{}", self.value)
+        }
     }
 }
 
@@ -123,11 +181,25 @@ impl FlaggedWord {
     }
 
     pub(crate) fn as_value(&self) -> Result<u64, u64> {
-        (!self.flags.is_pointer).then(|| self.value).ok_or(self.value)
+        (!self.flags.is_pointer)
+            .then(|| self.value)
+            .ok_or(self.value)
     }
 
     pub(crate) fn as_pointer(&self) -> Result<u64, u64> {
         self.flags.is_pointer.then(|| self.value).ok_or(self.value)
+    }
+
+    pub(crate) fn into_flagged_byte(self) -> Option<FlaggedByte> {
+        if self.value <= u8::MAX as _ {
+            Some(FlaggedByte {
+                value: self.value as _,
+                flags: self.flags,
+                comment: self.comment,
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -151,6 +223,16 @@ impl Display for FlaggedWord {
             write!(f, "#{:x}", self.value)
         } else {
             write!(f, "{}", self.value as i64)
+        }
+    }
+}
+
+impl From<FlaggedByte> for FlaggedWord {
+    fn from(value: FlaggedByte) -> Self {
+        Self {
+            value: value.value as _,
+            flags: value.flags,
+            comment: value.comment,
         }
     }
 }
