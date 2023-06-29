@@ -184,14 +184,14 @@ impl EvaluatorState {
         if address % memory::WORD_SIZE_IN_BYTES != 0 || address == 0 {
             return None;
         }
-        let length_in_bytes = self.read_pointer_safe(address)?.as_value().ok()?;
+        let length_in_bytes = self.read_pointer_word_safe(address)?.as_value().ok()?;
         let length_in_words = memory::bytes_to_word(length_in_bytes);
         let mut buffer = Vec::with_capacity(length_in_bytes as _);
         for w in 0..length_in_words {
-            let Ok(word) = self.read_pointer_safe(address + (w + 1) * memory::WORD_SIZE_IN_BYTES)?.as_value() else {
+            let Ok(word) = self.read_pointer_word_safe(address + (w + 1) * memory::WORD_SIZE_IN_BYTES)?.as_value() else {
                 break;
             };
-            let bytes = word.to_be_bytes();
+            let bytes = word.to_le_bytes();
             buffer.extend_from_slice(&bytes);
         }
         while let Some(0) = buffer.last() {
@@ -830,11 +830,11 @@ fn evaluate_string_concat(
                 let address = lhs + i + WORD_SIZE_IN_BYTES;
                 let addr = address & !(WORD_SIZE_IN_BYTES - 1);
                 let address = address as usize;
-                let word = state.read_pointer(addr).unwrap_value();
-                let bytes = word.to_be_bytes();
+                let word = state.read_pointer_word(addr).unwrap_value();
+                let bytes = word.to_le_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
-            state.heap.write_byte(writing_pointer as _, lhs_byte);
+            state.heap.write_byte(writing_pointer, lhs_byte);
             writing_pointer += 1;
         }
         for i in 0..rhs_length {
@@ -842,11 +842,11 @@ fn evaluate_string_concat(
             let address = address as usize;
             let rhs_byte = {
                 let addr = address as u64 & !(WORD_SIZE_IN_BYTES - 1);
-                let word = state.read_pointer(addr).unwrap_value();
-                let bytes = word.to_be_bytes();
+                let word = state.read_pointer_word(addr).unwrap_value();
+                let bytes = word.to_le_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
-            state.heap.write_byte(writing_pointer as _, rhs_byte);
+            state.heap.write_byte(writing_pointer, rhs_byte);
             writing_pointer += 1;
         }
     }

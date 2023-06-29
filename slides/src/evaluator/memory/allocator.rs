@@ -307,9 +307,9 @@ impl Allocator {
         assert!(self.find_bucket_from_address(address).unwrap().is_used);
         let word_address = address & !(WORD_SIZE_IN_BYTES - 1);
         let old_value = self.read_flagged_word(word_address).clone();
-        let mut bytes = old_value.value.to_be_bytes();
+        let mut bytes = old_value.value.to_le_bytes();
         bytes[(address % WORD_SIZE_IN_BYTES) as usize] = value;
-        let value = u64::from_be_bytes(bytes);
+        let value = u64::from_le_bytes(bytes);
         self.write_flagged_word(word_address, FlaggedWord::value(value));
     }
 
@@ -373,7 +373,7 @@ impl Allocator {
         }
         let mut string_buffer = Vec::with_capacity(self.len() * WORD_SIZE_IN_BYTES as usize);
         for word in &self.words {
-            string_buffer.extend_from_slice(&word.value.to_be_bytes());
+            string_buffer.extend_from_slice(&word.value.to_le_bytes());
         }
         // println!("heap = {:x?}", heap);
         println!("= '{}'", String::from_utf8_lossy(&string_buffer));

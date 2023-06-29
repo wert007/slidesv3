@@ -4263,6 +4263,9 @@ fn bind_field_access<'a, 'b>(
                     SystemCallKind::ArrayLength,
                     type_,
                 )
+            } else if binder.lexeme(field) == "bytes" {
+                let type_ = binder.project.types.look_up_or_add_type(Type::PointerOf(typeid!(Type::Integer(IntegerType::Unsigned8))));
+                BoundNode::binary(location, base, BoundBinaryOperator::ArithmeticAddition, BoundNode::literal(location, Value::Integer(8)), type_)
             } else {
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     location,
