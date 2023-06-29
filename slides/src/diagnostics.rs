@@ -667,6 +667,11 @@ impl DiagnosticBag {
         self.report(message, location);
     }
 
+    pub fn report_not_a_function(&mut self, location: TextLocation, base_type: TypeId) {
+        let message = message_format!("Tried calling a function, but type ", base_type, " is not a function.");
+        self.report(message, location);
+    }
+
     // Runtime Errors
     pub fn no_heap_memory_left(&mut self, span: TextLocation, needed_memory_in_bytes: u64) {
         let message = format!(

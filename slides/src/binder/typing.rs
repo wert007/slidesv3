@@ -1362,6 +1362,10 @@ impl FunctionType<TypeId> {
             && self.return_type == other.return_type
             && self.parameter_types == other.parameter_types
     }
+
+    pub(crate) fn is_error(&self) -> bool {
+        self == &Self::error()
+    }
 }
 
 impl FunctionType<GenericTypeId> {

@@ -3949,7 +3949,9 @@ fn function_type(type_: &Type) -> FunctionType<TypeId> {
         Type::Function(result) => result.clone(),
         Type::Closure(closure) => closure.base_function_type.clone(),
         Type::Error => FunctionType::error(),
-        _ => unimplemented!("Not implemented for {:?}", type_),
+        _ => {
+            FunctionType::error()
+        }
     }
 }
 
@@ -3996,6 +3998,10 @@ fn bind_function_call<'a, 'b>(
         return BoundNode::error(location);
     }
     let function_type = function_type(&binder.project.types[function.type_]);
+    if function_type.is_error() {
+        binder.diagnostic_bag.report_not_a_function(location, function.type_);
+        return BoundNode::error(location);
+    }
     if function_type.is_generic {
         todo!("Generic functions are not yet supported!");
         // let old_label = function
