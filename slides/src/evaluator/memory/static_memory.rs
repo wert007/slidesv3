@@ -28,7 +28,7 @@ impl StaticMemory {
                 word.get(6).copied().unwrap_or_default(),
                 word.get(7).copied().unwrap_or_default(),
             ];
-            let word = u64::from_be_bytes(word);
+            let word = u64::from_le_bytes(word);
             self.data.push(word);
         }
         result
@@ -52,7 +52,7 @@ impl StaticMemory {
 pub fn print_static_memory_as_string(static_memory: &StaticMemory) -> String {
     let mut result = Vec::with_capacity(static_memory.size_in_bytes() as _);
     for word in &static_memory.data {
-        result.extend_from_slice(&word.to_be_bytes());
+        result.extend_from_slice(&word.to_le_bytes());
     }
     String::from_utf8_lossy(&result).into_owned()
 }

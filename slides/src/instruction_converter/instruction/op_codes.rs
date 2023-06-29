@@ -9,7 +9,7 @@ pub enum OpCode {
     Pop = 4,
     LoadRegister = 5,
     StoreInRegister = 6,
-    StoreInMemory = 8,
+    StoreWordInMemory = 8,
     WriteToStack = 9,
     WriteToHeap = 10,
     Allocate = 11,
@@ -19,6 +19,8 @@ pub enum OpCode {
     Label = 15,
     Rotate = 16,
     Unknown = 17,
+    ReadByteWithOffset = 18,
+    StoreByteInMemory = 19,
     // Binary Operators
     BitwiseTwosComplement = 25,
     BitwiseXor = 26,

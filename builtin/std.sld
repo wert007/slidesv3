@@ -1,8 +1,13 @@
-/* struct string {
+struct MyString {
     length: uint;
     bytes: &byte;
 
-    func $equals(other: string) -> bool {
+    func $constructor() {
+        this.length = 0;
+        this.bytes = none;
+    }
+
+    func $equals(other: MyString) -> bool {
         if this.length != other.length {
             return false;
         }
@@ -14,17 +19,10 @@
         return true;
     }
 
+/*
     func $addTo(lhs: any) -> string {
         let lhsString = toString(lhs);
         let length = this.length + lhsString.length;
-        // FIXME: Reallocate does not work with stack/static memory pointers. So
-        // we create a new pointer in any case. Even if we are already a heap
-        // pointer...
-        // Note: this might not apply here, since toString probably returns
-        // always a heap allocated string, except for other strings, which
-        // should used as a parameter here.
-        // Then again, you probably do not want to change the byte buffer of one
-        // of the supplied strings.
         let bytes : &byte = reallocate(none, length);
         if bytes == none {
             runtimeError('Could not allocate string!');
@@ -36,15 +34,13 @@
         for j, i in lhsString.length..length {
             bytes[i] = this.bytes[j];
         }
-        return new string(length, bytes);
+        return stringFromRaw(length, bytes);
     }
+*/
 
-    func $add(rhs: any) -> string {
-        let rhsString = toString(rhs);
-        let length = this.length + rhsString.length;
-        // FIXME: Reallocate does not work with stack/static memory pointers. So
-        // we create a new pointer in any case. Even if we are already a heap
-        // pointer...
+    func add(rhs: any) -> MyString {
+        let rhsString = rhs + '';
+        let length = this.length + rhsString.length();
         let bytes : &byte = reallocate(none, length);
         if bytes == none {
             runtimeError('Could not allocate string!');
@@ -56,7 +52,10 @@
         for j, i in this.length..length {
             bytes[i] = rhsString.bytes[j];
         }
-        return new string(length, bytes);
+        let result = new MyString();
+        result.length = length;
+        result.bytes = bytes;
+        return result;
     }
 
     func length() -> uint {
@@ -66,10 +65,13 @@
     }
 
     func $toString() -> string {
-        return this;
+        let result = '';
+        for i in 0..this.length {
+            result = result + byteToChar(this.bytes[i]);
+        }
+        return result;
     }
 }
-*/
 
 struct Range {
     start: int;
