@@ -714,6 +714,7 @@ fn parse_primary(parser: &mut Parser<'_, '_>) -> SyntaxNode {
         SyntaxTokenKind::NoneKeyword => parse_none_literal(parser),
         SyntaxTokenKind::CastKeyword => parse_cast_expression(parser),
         SyntaxTokenKind::NewKeyword => parse_constructor(parser),
+        SyntaxTokenKind::TypeOfKeyword => parse_type_of_expression(parser),
         SyntaxTokenKind::Identifier => parse_identifier(parser),
         unexpected_token => {
             parser.diagnostic_bag.report_unexpected_token_kind(
@@ -872,6 +873,13 @@ fn parse_constructor(parser: &mut Parser<'_, '_>) -> SyntaxNode {
         comma_tokens,
         close_parenthesis_token,
     )
+}
+
+fn parse_type_of_expression(parser: &mut Parser) -> SyntaxNode {
+    let type_of_keyword = parser.match_token(SyntaxTokenKind::TypeOfKeyword);
+    let colon = parser.match_token(SyntaxTokenKind::Colon);
+    let type_ = parse_type(parser);
+    SyntaxNode::type_of_expression(type_of_keyword, colon, type_)
 }
 
 fn parse_identifier(parser: &mut Parser<'_, '_>) -> SyntaxNode {

@@ -111,6 +111,7 @@ fn print_syntax_node_as_code_with_indent(
                 buffer,
             )
         }
+        SyntaxNodeKind::TypeOfExpression(type_of_expression) => print_syntax_node_type_of_expression_as_code_with_indent(type_of_expression, source_text_collection, printer, buffer),
         SyntaxNodeKind::Variable(variable) => print_syntax_node_variable_as_code_with_indent(
             variable,
             source_text_collection,
@@ -583,6 +584,16 @@ fn print_syntax_node_constructor_call_as_code_with_indent(
     Ok(())
 }
 
+fn print_syntax_node_type_of_expression_as_code_with_indent(
+    type_of_expression: &TypeOfExpressionNodeKind,
+    source_text_collection: &SourceTextCollection,
+    printer: DebugPrinter,
+    buffer: &mut String,
+) -> std::fmt::Result {
+    write!(buffer, "typeOf: ")?;
+    print_type_node_as_code_with_indent(&type_of_expression.type_, source_text_collection, printer, buffer)?;
+    Ok(())
+}
 fn print_syntax_node_variable_as_code_with_indent(
     variable: &VariableNodeKind,
     source_text_collection: &SourceTextCollection,

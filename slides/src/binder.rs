@@ -2582,6 +2582,9 @@ fn bind_node<'a, 'b>(node: SyntaxNode, binder: &mut BindingState<'b>) -> BoundNo
         SyntaxNodeKind::ConstructorCall(constructor_call) => {
             bind_constructor_call(node.location, constructor_call, binder)
         }
+        SyntaxNodeKind::TypeOfExpression(type_of_expression) => {
+            bind_type_of_expression(node.location, type_of_expression, binder)
+        }
         SyntaxNodeKind::Variable(variable) => bind_variable(node.location, variable, binder),
         SyntaxNodeKind::Binary(binary) => bind_binary(node.location, binary, binder),
         SyntaxNodeKind::Unary(unary) => bind_unary(node.location, unary, binder),
@@ -3122,6 +3125,16 @@ fn bind_constructor_call<'a>(
     };
 
     BoundNode::constructor_call(location, arguments, struct_type, function)
+}
+
+fn bind_type_of_expression(
+    location: TextLocation,
+    type_of_expression: TypeOfExpressionNodeKind,
+    binder: &mut BindingState<'_>,
+) -> BoundNode {
+    let type_ =
+        bind_type(type_of_expression.type_, binder).convert_to_type_id(&mut binder.project.types);
+    BoundNode::literal(location, Value::TypeId(type_))
 }
 
 fn bind_generic_struct_type_for_types(

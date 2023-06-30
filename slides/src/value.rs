@@ -57,7 +57,7 @@ impl Value {
             Value::None => typeid!(Type::None),
             Value::SystemCall(kind) => typeid!(Type::SystemCall(kind)),
             Value::LabelPointer(_, it) | Value::EnumType(_, it) | Value::EnumValue(_, it) => *it,
-            Value::TypeId(_) => typeid!(Type::Integer(IntegerType::Unsigned64)),
+            Value::TypeId(_) => typeid!(Type::TypeId),
         }
     }
 

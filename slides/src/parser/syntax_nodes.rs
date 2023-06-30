@@ -303,6 +303,23 @@ impl SyntaxNode {
         }
     }
 
+    pub(crate) fn type_of_expression(
+        type_of_keyword: SyntaxToken,
+        colon: SyntaxToken,
+        type_: TypeNode,
+    ) -> SyntaxNode {
+        let location = TextLocation::bounds(type_of_keyword.location, type_.location());
+        Self {
+            location,
+            kind: SyntaxNodeKind::TypeOfExpression(TypeOfExpressionNodeKind {
+                type_of_keyword,
+                colon,
+                type_,
+            }),
+            is_inserted: false,
+        }
+    }
+
     pub fn variable(token: SyntaxToken) -> Self {
         Self {
             location: token.location,
@@ -591,6 +608,7 @@ pub enum SyntaxNodeKind {
     RepetitionNode(RepetitionNodeNodeKind),
     CastExpression(CastExpressionNodeKind),
     ConstructorCall(ConstructorCallNodeKind),
+    TypeOfExpression(TypeOfExpressionNodeKind),
     Variable(VariableNodeKind),
     Binary(BinaryNodeKind),
     Unary(UnaryNodeKind),
@@ -899,6 +917,14 @@ pub struct ConstructorCallNodeKind {
     pub arguments: Vec<SyntaxNode>,
     pub comma_tokens: Vec<SyntaxToken>,
     pub close_parenthesis_token: SyntaxToken,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct TypeOfExpressionNodeKind {
+    pub type_of_keyword: SyntaxToken,
+    pub colon: SyntaxToken,
+    pub type_: TypeNode,
 }
 
 #[derive(Debug, Clone)]

@@ -160,6 +160,7 @@ pub enum SyntaxTokenKind {
     ReturnKeyword,
     StructKeyword,
     TrueKeyword,
+    TypeOfKeyword,
     WhileKeyword,
 }
 
@@ -204,29 +205,30 @@ impl SyntaxTokenKind {
     pub fn is_keyword(&self) -> bool {
         matches!(
             self,
-            Self::FalseKeyword
-                | Self::TrueKeyword
-                | Self::LetKeyword
-                | Self::AbstractKeyword
+                Self::AbstractKeyword
+                | Self::AsKeyword
+                | Self::CastKeyword
                 | Self::ConstKeyword
                 | Self::DictKeyword
                 | Self::ElseKeyword
                 | Self::EnumKeyword
+                | Self::FalseKeyword
                 | Self::ForKeyword
                 | Self::FuncKeyword
                 | Self::GenericKeyword
                 | Self::IfKeyword
                 | Self::ImportKeyword
                 | Self::InKeyword
-                | Self::AsKeyword
-                | Self::CastKeyword
+                | Self::LetKeyword
                 | Self::ListKeyword
                 | Self::MatchKeyword
                 | Self::NewKeyword
+                | Self::NoneKeyword
                 | Self::ReturnKeyword
                 | Self::StructKeyword
+                | Self::TrueKeyword
+                | Self::TypeOfKeyword
                 | Self::WhileKeyword
-                | Self::NoneKeyword
         )
     }
 
@@ -254,6 +256,7 @@ impl SyntaxTokenKind {
             "return" => Some(Self::ReturnKeyword),
             "struct" => Some(Self::StructKeyword),
             "true" => Some(Self::TrueKeyword),
+            "typeOf" => Some(Self::TypeOfKeyword),
             "while" => Some(Self::WhileKeyword),
             _ => None,
         }
@@ -361,6 +364,7 @@ impl std::fmt::Debug for SyntaxTokenKind {
             SyntaxTokenKind::ReturnKeyword => write!(f, "return"),
             SyntaxTokenKind::StructKeyword => write!(f, "struct"),
             SyntaxTokenKind::TrueKeyword => write!(f, "true"),
+            SyntaxTokenKind::TypeOfKeyword => write!(f, "typeOf"),
             SyntaxTokenKind::WhileKeyword => write!(f, "while"),
         }
     }
