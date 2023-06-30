@@ -1168,20 +1168,44 @@ impl BoundMatchStatementNodeKind {
 }
 
 #[derive(Debug, Clone)]
+pub enum BoundMatchCaseExpression {
+    Expression(BoundNode),
+    Type(u64, TypeId),
+}
+
+impl BoundMatchCaseExpression {
+    fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
+        match self {
+            Self::Expression(expression) => {
+                function(expression);
+                expression.for_each_child_mut(function);
+            },
+            _ => {},
+        }
+    }
+
+    pub fn unwrap_expression(self) -> BoundNode {
+        match self {
+            BoundMatchCaseExpression::Expression(it) => it,
+            BoundMatchCaseExpression::Type(_, _) => panic!("Expected expression!"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct BoundMatchCase {
-    pub expression: Box<BoundNode>,
+    pub expression: Box<BoundMatchCaseExpression>,
     pub body: Box<BoundNode>,
 }
 
 impl BoundMatchCase {
     fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
-        function(&mut self.expression);
         self.expression.for_each_child_mut(function);
         function(&mut self.body);
         self.body.for_each_child_mut(function);
     }
 
-    pub fn new(expression: BoundNode, body: BoundNode) -> BoundMatchCase {
+    pub fn new(expression: BoundMatchCaseExpression, body: BoundNode) -> BoundMatchCase {
         Self {
             expression: Box::new(expression),
             body: Box::new(body),

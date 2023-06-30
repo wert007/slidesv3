@@ -39,6 +39,7 @@ use crate::{
     Project,
 };
 
+use self::bound_nodes::BoundMatchCaseExpression;
 use self::{
     bound_nodes::{BoundMatchCase, BoundNode},
     operators::BoundBinaryOperator,
@@ -843,6 +844,18 @@ impl BindingState<'_> {
 
     fn directory(&self) -> &str {
         self.project.source_text_collection[self.source_text].directory()
+    }
+
+    fn generate_temporary_variable(&mut self, prefix: &str, location: TextLocation) -> u64 {
+        let mut state = DefaultHasher::new();
+        self.project.source_text_collection[location].hash(&mut state);
+        let hash = state.finish();
+        self.register_variable(
+            format!("temporary$variable${prefix}${hash}"),
+            typeid!(Type::Error),
+            false,
+        )
+        .expect("Failed to register temporary variable!")
     }
 }
 
@@ -5274,6 +5287,15 @@ fn bind_match_statement(
     binder: &mut BindingState,
 ) -> BoundNode {
     let expression = bind_node(*match_statement.expression, binder);
+    let expression = if expression.type_ == typeid!(Type::IntegerLiteral) {
+        bind_conversion(
+            expression,
+            typeid!(Type::Integer(IntegerType::Signed64)),
+            binder,
+        )
+    } else {
+        expression
+    };
     // Weird stuff we need to do, so the lowerer doesn't have to do them,
     // because I do not know, if he can do them.
     let dictionary = binder
@@ -5295,33 +5317,28 @@ fn bind_match_statement(
         .unwrap()
         .unwrap_generic_type_id();
     bind_generic_struct_type_for_types(location, noneable, &[typeid!(Type::Pointer)], binder);
-    let mut default_case = None;
+    let mut default_case: Option<BoundNode> = None;
     let cases: Vec<_> = match_statement
         .match_cases
         .into_iter()
-        .filter_map(|c| {
-            match bind_match_case(c, expression.type_, binder) {
-                Either::Left(it) => Some(it),
-                Either::Right(default_body) => {
-                    if default_case.is_some() {
-                        unimplemented!("TODO: Write diagnostic, that there can only be one default case. Or maybe we are already doing it in the parser.");
-                    }
+        .filter_map(|c| match bind_match_case(c, expression.type_, binder) {
+            Either::Left(it) => Some(it),
+            Either::Right(default_body) => {
+                if let Some(default_case) = &default_case {
+                    binder.diagnostic_bag.report_found_multiple_else_cases(
+                        default_case.location,
+                        default_body.location,
+                    );
+                } else {
                     default_case = Some(default_body);
-                    None
                 }
+                None
             }
         })
+        .rev()
         .collect();
-    let mut state = DefaultHasher::new();
-    binder.project.source_text_collection[location].hash(&mut state);
-    let hash = state.finish();
-    let temporary_variable = binder
-        .register_variable(
-            format!("temporary$variable{}", hash),
-            typeid!(Type::Error),
-            false,
-        )
-        .expect("Failed to register temporary variable!");
+    if default_case.is_none() {}
+    let temporary_variable = binder.generate_temporary_variable("match", location);
     BoundNode::match_statement(
         location,
         expression,
@@ -5337,12 +5354,34 @@ fn bind_match_case(
     binder: &mut BindingState,
 ) -> either::Either<BoundMatchCase, BoundNode> {
     match case.expression {
-        either::Either::Left(_) => Either::Right(bind_node(case.body, binder)),
-        either::Either::Right(expression) => {
+        MatchCaseExpression::Expression(expression) => {
             let expression = bind_node(expression, binder);
             let expression = bind_conversion(expression, type_, binder);
             let body = bind_node(case.body, binder);
-            Either::Left(BoundMatchCase::new(expression, body))
+            Either::Left(BoundMatchCase::new(
+                BoundMatchCaseExpression::Expression(expression),
+                body,
+            ))
+        }
+        MatchCaseExpression::Else(_) => Either::Right(bind_node(case.body, binder)),
+        MatchCaseExpression::Type(t) => {
+            let (name, expression_type) = bind_parameter(t, binder);
+            let expression_type = expression_type.unwrap_type_id();
+            let v = binder
+                .register_variable(name, expression_type, true)
+                .expect("TODO: Add diagnostic here!");
+            assert!(
+                binder
+                    .project
+                    .types
+                    .can_be_converted(expression_type, type_),
+                "TODO: Add diagnostic here!"
+            );
+            let body = bind_node(case.body, binder);
+            Either::Left(BoundMatchCase::new(
+                BoundMatchCaseExpression::Type(v, expression_type),
+                body,
+            ))
         }
     }
 }

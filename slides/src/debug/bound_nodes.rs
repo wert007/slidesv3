@@ -456,7 +456,12 @@ fn print_bound_node_match_statement_as_code(
     printer.indent += 4;
     for case in &match_statement.cases {
         printer.output_indentation(buffer);
-        print_bound_node_as_code_with_indent(&case.expression, types, printer, buffer)?;
+        print_bound_node_match_case_expression_with_indent(
+            &case.expression,
+            types,
+            printer,
+            buffer,
+        )?;
         write!(buffer, " => ")?;
         printer.indent += 4;
         print_bound_node_as_code_with_indent(&case.body, types, printer, buffer)?;
@@ -475,6 +480,22 @@ fn print_bound_node_match_statement_as_code(
     printer.output_indentation(buffer);
     writeln!(buffer, "}}")?;
     Ok(())
+}
+
+fn print_bound_node_match_case_expression_with_indent(
+    expression: &BoundMatchCaseExpression,
+    types: &TypeCollection,
+    printer: DebugPrinter,
+    buffer: &mut String,
+) -> std::fmt::Result {
+    match expression {
+        BoundMatchCaseExpression::Expression(e) => {
+            print_bound_node_as_code_with_indent(e, types, printer, buffer)
+        }
+        BoundMatchCaseExpression::Type(v, t) => {
+            write!(buffer, "r#{v}: {}", types.name_of_type_id(*t))
+        }
+    }
 }
 
 fn print_bound_node_assignment_as_code(

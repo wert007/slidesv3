@@ -19,26 +19,7 @@ struct MyString {
         return true;
     }
 
-/*
-    func $addTo(lhs: any) -> string {
-        let lhsString = toString(lhs);
-        let length = this.length + lhsString.length;
-        let bytes : &byte = reallocate(none, length);
-        if bytes == none {
-            runtimeError('Could not allocate string!');
-            return lhsString;
-        }
-        for i in 0..this.length {
-            bytes[i] = lhsString.bytes[i];
-        }
-        for j, i in lhsString.length..length {
-            bytes[i] = this.bytes[j];
-        }
-        return stringFromRaw(length, bytes);
-    }
-*/
-
-    func add(rhs: any) -> MyString {
+    func $add(rhs: any) -> MyString {
         let rhsString = rhs + '';
         let length = this.length + rhsString.length();
         let bytes : &byte = reallocate(none, length);

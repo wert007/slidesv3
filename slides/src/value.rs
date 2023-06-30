@@ -12,6 +12,7 @@ pub enum Value {
     LabelPointer(usize, TypeId),
     EnumType(Vec<String>, TypeId),
     EnumValue(usize, TypeId),
+    TypeId(TypeId),
 }
 
 #[allow(dead_code)]
@@ -56,6 +57,7 @@ impl Value {
             Value::None => typeid!(Type::None),
             Value::SystemCall(kind) => typeid!(Type::SystemCall(kind)),
             Value::LabelPointer(_, it) | Value::EnumType(_, it) | Value::EnumValue(_, it) => *it,
+            Value::TypeId(_) => typeid!(Type::Integer(IntegerType::Unsigned64)),
         }
     }
 
@@ -71,6 +73,7 @@ impl Value {
             }
             Value::EnumType(_, t) => types.name_of_type_id(*t).to_string().into(),
             Value::EnumValue(v, t) => format!("{}.value{v}", types.name_of_type_id(*t)).into(),
+            Value::TypeId(t) => format!("typeOf: {}", types.name_of_type_id(*t)).into(),
         }
     }
 }
@@ -104,6 +107,7 @@ impl std::fmt::Display for Value {
             Value::LabelPointer(label, type_) => write!(f, "L{:X} : {}", label, type_),
             Value::EnumType(_, t) => write!(f, "anomynous enum type {t}"),
             Value::EnumValue(v, t) => write!(f, "anomynous enum type {t}.value{v}"),
+            Value::TypeId(t) => write!(f, "{}", t.as_raw()),
         }
     }
 }

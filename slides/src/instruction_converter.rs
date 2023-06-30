@@ -471,6 +471,7 @@ pub fn convert_value(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let value = match value {
+        Value::TypeId(value) => value.as_raw(),
         Value::Integer(value) => value as u64,
         Value::Boolean(value) => {
             if value {

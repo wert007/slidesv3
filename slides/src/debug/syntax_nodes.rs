@@ -1,5 +1,5 @@
 use super::DebugPrinter;
-use crate::{parser::syntax_nodes::*, text::SourceTextCollection};
+use crate::{parser::syntax_nodes::*, text::SourceTextCollection, value::Value};
 use std::fmt::Write;
 
 pub fn print_syntax_node_as_code(node: &SyntaxNode, source_text_collection: &SourceTextCollection) {
@@ -464,14 +464,15 @@ fn print_syntax_node_literal_as_code_with_indent(
     buffer: &mut String,
 ) -> std::fmt::Result {
     match &literal.value {
-        crate::value::Value::None => write!(buffer, "none"),
-        crate::value::Value::Integer(it) => write!(buffer, "{it}"),
-        crate::value::Value::Boolean(it) => write!(buffer, "{it}"),
-        crate::value::Value::SystemCall(it) => write!(buffer, "{it}"),
-        crate::value::Value::String(it) => write!(buffer, "{it:?}"),
-        crate::value::Value::LabelPointer(it, _) => write!(buffer, "L{it:X}"),
-        crate::value::Value::EnumType(..) => write!(buffer, "ENUM TYPE"),
-        crate::value::Value::EnumValue(index, _) => write!(buffer, "ENUM VALUE#{index}"),
+        Value::None => write!(buffer, "none"),
+        Value::Integer(it) => write!(buffer, "{it}"),
+        Value::Boolean(it) => write!(buffer, "{it}"),
+        Value::SystemCall(it) => write!(buffer, "{it}"),
+        Value::String(it) => write!(buffer, "{it:?}"),
+        Value::LabelPointer(it, _) => write!(buffer, "L{it:X}"),
+        Value::EnumType(..) => write!(buffer, "ENUM TYPE"),
+        Value::EnumValue(index, _) => write!(buffer, "ENUM VALUE#{index}"),
+        Value::TypeId(t) => write!(buffer, "{}", t.as_raw()),
     }
 }
 
@@ -896,17 +897,15 @@ fn print_syntax_node_match_statement_as_code_with_indent(
     printer.indent += 4;
     for case in &match_statement.match_cases {
         printer.output_indentation(buffer);
-        match case.expression.as_ref() {
-            either::Either::Left(_) => write!(buffer, "else ")?,
-            either::Either::Right(node) => {
-                print_syntax_node_as_code_with_indent(
-                    node,
-                    source_text_collection,
-                    printer,
-                    buffer,
-                )?;
+        match &case.expression {
+            MatchCaseExpression::Expression(node) => {
+                print_syntax_node_as_code_with_indent(node, source_text_collection, printer, buffer)
             }
-        }
+            MatchCaseExpression::Else(_) => write!(buffer, "else "),
+            MatchCaseExpression::Type(p) => {
+                print_parameter_node_as_code_with_indent(p, source_text_collection, printer, buffer)
+            }
+        }?;
         write!(buffer, " => ")?;
         printer.indent += 4;
         print_syntax_node_as_code_with_indent(&case.body, source_text_collection, printer, buffer)?;

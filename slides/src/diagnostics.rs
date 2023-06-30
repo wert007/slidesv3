@@ -676,6 +676,17 @@ impl DiagnosticBag {
         self.report(message, location);
     }
 
+    pub fn report_found_multiple_else_cases(
+        &mut self,
+        _previous: TextLocation,
+        error: TextLocation,
+    ) {
+        let message = message_format!(
+            "Found multiple else cases in match statement. Only one is allowed though."
+        );
+        self.report(message, error)
+    }
+
     // Runtime Errors
     pub fn no_heap_memory_left(&mut self, span: TextLocation, needed_memory_in_bytes: u64) {
         let message = format!(

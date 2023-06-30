@@ -12,12 +12,11 @@ use crate::{
     text::{SourceTextCollection, SourceTextId, TextLocation},
     DebugFlags,
 };
-use either::Either;
 use std::collections::VecDeque;
 
 use self::syntax_nodes::{
     ElseClause, EnumBodyNode, EnumValueNode, MatchCaseNode, ParameterNode, StructBodyNode,
-    SyntaxNode, TypeNode,
+    SyntaxNode, TypeNode, MatchCaseExpression,
 };
 
 struct Parser<'a, 'b> {
@@ -574,9 +573,11 @@ fn parse_match_statement(parser: &mut Parser) -> SyntaxNode {
 
 fn parse_match_case(parser: &mut Parser) -> MatchCaseNode {
     let expression = if parser.peek_token().kind == SyntaxTokenKind::ElseKeyword {
-        Either::Left(parser.next_token())
+        MatchCaseExpression::Else(parser.next_token())
+    } else if parser.peek_n_token(1).kind == SyntaxTokenKind::Colon {
+        MatchCaseExpression::Type(parse_parameter(parser))
     } else {
-        Either::Right(parse_expression(parser))
+        MatchCaseExpression::Expression(parse_expression(parser))
     };
     let fat_arrow = parser.match_token(SyntaxTokenKind::FatArrow);
     let body = parse_block_statement(parser);

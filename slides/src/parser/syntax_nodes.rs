@@ -1,5 +1,3 @@
-use either::Either;
-
 use crate::{
     diagnostics::DiagnosticBag,
     lexer::syntax_token::{SyntaxToken, SyntaxTokenKind},
@@ -1035,15 +1033,22 @@ pub struct MatchStatementNodeKind {
 }
 
 #[derive(Debug, Clone)]
+pub enum MatchCaseExpression {
+    Expression(SyntaxNode),
+    Else(SyntaxToken),
+    Type(ParameterNode),
+}
+
+#[derive(Debug, Clone)]
 pub struct MatchCaseNode {
-    pub expression: Either<SyntaxToken, SyntaxNode>,
+    pub expression: MatchCaseExpression,
     pub fat_arrow: SyntaxToken,
     pub body: SyntaxNode,
 }
 
 impl MatchCaseNode {
     pub(crate) fn new(
-        expression: Either<SyntaxToken, SyntaxNode>,
+        expression: MatchCaseExpression,
         fat_arrow: SyntaxToken,
         body: SyntaxNode,
     ) -> MatchCaseNode {
