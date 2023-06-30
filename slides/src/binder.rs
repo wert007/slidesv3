@@ -5344,7 +5344,7 @@ fn bind_match_statement(
         .unwrap_generic_type_id();
     bind_generic_struct_type_for_types(location, noneable, &[typeid!(Type::Pointer)], binder);
     let mut default_case: Option<BoundNode> = None;
-    let cases: Vec<_> = match_statement
+    let mut cases: Vec<_> = match_statement
         .match_cases
         .into_iter()
         .filter_map(|c| match bind_match_case(c, expression.type_, binder) {
@@ -5361,8 +5361,8 @@ fn bind_match_statement(
                 None
             }
         })
-        .rev()
         .collect();
+    cases.reverse();
     if default_case.is_none() {}
     let temporary_variable = binder.generate_temporary_variable("match", location);
     BoundNode::match_statement(
