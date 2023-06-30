@@ -526,8 +526,12 @@ fn flatten_match_statement(
         .into_iter()
         .map(|c| {
             let (case_label, case_label_reference) = create_label(location, flattener);
+            let expression = match *c.expression {
+                BoundMatchCaseExpression::Expression(e) => e,
+                BoundMatchCaseExpression::Type(_, _) => todo!(),
+            };
             (
-                (*c.expression, case_label_reference),
+                (expression, case_label_reference),
                 BoundNode::block_statement(
                     location,
                     vec![
