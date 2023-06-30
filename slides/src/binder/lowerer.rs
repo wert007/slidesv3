@@ -1,14 +1,18 @@
-use crate::{binder::bound_nodes::BoundNodeKind, text::TextLocation};
+use crate::{binder::bound_nodes::BoundNodeKind, text::TextLocation, Project};
 
 use super::{bound_nodes::*, typing::TypeId};
 
-struct Flattener {
+struct Flattener<'a> {
     pub label_count: usize,
+    pub project: &'a mut Project,
 }
 
-impl Flattener {
-    pub fn new(label_count: usize) -> Self {
-        Self { label_count }
+impl<'a> Flattener<'a> {
+    pub fn new(label_count: usize, project: &'a mut Project) -> Self {
+        Self {
+            label_count,
+            project,
+        }
     }
     pub fn next_label_index(&mut self) -> usize {
         let label = self.label_count;
@@ -17,8 +21,8 @@ impl Flattener {
     }
 }
 
-pub fn flatten(node: BoundNode, label_count: &mut usize) -> Vec<BoundNode> {
-    let mut flattener = Flattener::new(*label_count);
+pub fn flatten(node: BoundNode, label_count: &mut usize, project: &mut Project) -> Vec<BoundNode> {
+    let mut flattener = Flattener::new(*label_count, project);
     let result = flatten_node(node, &mut flattener);
     *label_count = flattener.label_count;
     result
@@ -140,7 +144,7 @@ fn flatten_node(node: BoundNode, flattener: &mut Flattener) -> Vec<BoundNode> {
             flatten_while_statement(while_statement, flattener)
         }
         BoundNodeKind::MatchStatement(match_statement) => {
-            flatten_match_statement(match_statement, flattener)
+            flatten_match_statement(node.location, match_statement, flattener)
         }
         BoundNodeKind::Jump(_) => unreachable!(),
     }
@@ -512,10 +516,99 @@ fn flatten_while_statement(
 
 #[allow(unused_variables)]
 fn flatten_match_statement(
+    location: TextLocation,
     match_statement: BoundMatchStatementNodeKind,
     flattener: &mut Flattener,
 ) -> Vec<BoundNode> {
-    todo!()
+    let (end_label, end_label_reference) = create_label(location, flattener);
+    let (values, mut bodies): (Vec<(BoundNode, BoundNode)>, Vec<BoundNode>) = match_statement
+        .cases
+        .into_iter()
+        .map(|c| {
+            let (case_label, case_label_reference) = create_label(location, flattener);
+            (
+                (*c.expression, case_label_reference),
+                BoundNode::block_statement(
+                    location,
+                    vec![
+                        case_label,
+                        *c.body,
+                        BoundNode::jump(location, end_label_reference.clone()),
+                    ],
+                ),
+            )
+        })
+        .unzip();
+    let dictionary_type = flattener
+        .project
+        .types
+        .look_up_type_by_name(&format!(
+            "Dict<{}, ptr, >",
+            flattener
+                .project
+                .types
+                .name_of_type_id(match_statement.expression.type_)
+        ))
+        .expect("There needs to exists a Dict<Range, pointer, > for match statements to work...")
+        .unwrap_type_id();
+    let dictionary = BoundNode::dictionary_literal(
+        location,
+        match_statement.temporary_variable,
+        values,
+        dictionary_type,
+        &flattener.project.types,
+    );
+    let dictionary_get_function = flattener.project.types[dictionary_type]
+        .as_struct_type()
+        .unwrap()
+        .member_functions_first("get", &flattener.project.types)
+        .unwrap()
+        .offset_or_address
+        .unwrap_address();
+    let (default_case_label, mut default_case_label_reference) = create_label(location, flattener);
+    default_case_label_reference.type_ = typeid!(Type::Pointer);
+    let mut statements = vec![BoundNode::jump(
+        location,
+        BoundNode::binary(
+            location,
+            BoundNode::function_call(
+                location,
+                BoundNode::label_reference(location, dictionary_get_function, typeid!(Type::Error)),
+                vec![*match_statement.expression, dictionary],
+                false,
+                flattener
+                    .project
+                    .types
+                    .look_up_type_by_name("Noneable<ptr, >")
+                    .unwrap()
+                    .unwrap_type_id(),
+            ),
+            super::operators::BoundBinaryOperator::NoneableOrValue,
+            BoundNode::conversion(
+                location,
+                default_case_label_reference,
+                flattener
+                    .project
+                    .types
+                    .look_up_type_by_name("Noneable<ptr, >")
+                    .unwrap()
+                    .unwrap_type_id(),
+            ),
+            flattener
+                .project
+                .types
+                .look_up_type_by_name("ptr")
+                .unwrap()
+                .unwrap_type_id(),
+        ),
+    )];
+    statements.append(&mut bodies);
+    statements.push(default_case_label);
+    if let Some(default_case) = match_statement.default_case {
+        statements.push(*default_case);
+    }
+    statements.push(end_label);
+    vec![BoundNode::block_statement(location, statements)]
 }
 
 fn create_label(location: TextLocation, flattener: &mut Flattener) -> (BoundNode, BoundNode) {

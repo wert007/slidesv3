@@ -1353,7 +1353,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
-            }
+            },
         }
     }
 

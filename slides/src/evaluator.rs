@@ -23,7 +23,7 @@ use self::memory::{
         Allocator,
     },
     stack::Stack,
-    FlaggedWord, Memory, FlaggedByte,
+    FlaggedByte, FlaggedWord, Memory,
 };
 
 macro_rules! runtime_error {
@@ -38,9 +38,16 @@ macro_rules! runtime_error {
 type ResultType = Value;
 
 #[derive(Debug, Clone, Copy)]
+enum InstructionErrorKind {
+    ExpectedPointer,
+    ExpectedValue,
+    OutOfBounds,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct InstructionError {
     value: u64,
-    is_pointer: bool,
+    kind: InstructionErrorKind,
     line: u32,
     instruction_location: TextLocation,
     pc: usize,
@@ -50,7 +57,7 @@ impl InstructionError {
     pub fn pointer(value: u64, line: u32, instruction_location: TextLocation, pc: usize) -> Self {
         Self {
             value,
-            is_pointer: true,
+            kind: InstructionErrorKind::ExpectedValue,
             line,
             instruction_location,
             pc,
@@ -60,7 +67,8 @@ impl InstructionError {
     pub fn value(value: u64, line: u32, instruction_location: TextLocation, pc: usize) -> Self {
         Self {
             value,
-            is_pointer: false,
+            kind: InstructionErrorKind::ExpectedPointer,
+
             line,
             instruction_location,
             pc,
@@ -68,14 +76,22 @@ impl InstructionError {
     }
 
     fn display(&self, state: &EvaluatorState) {
-        let expected = if self.is_pointer { "value" } else { "pointer" };
-        let actual = if self.is_pointer {
-            format!("#{:X}", self.value)
-        } else {
-            if (self.value as i64) < 0 {
-                format!("{} ({}) {:#x}", self.value, self.value as i64, self.value)
-            } else {
-                format!("{} {:#x}", self.value, self.value)
+        let expected = match self.kind {
+            InstructionErrorKind::ExpectedPointer => "pointer",
+            InstructionErrorKind::ExpectedValue => "value",
+            InstructionErrorKind::OutOfBounds => "valid address",
+        };
+        let actual = match self.kind {
+            InstructionErrorKind::ExpectedPointer => {
+                if (self.value as i64) < 0 {
+                    format!("{} ({}) {:#x}", self.value, self.value as i64, self.value)
+                } else {
+                    format!("{} {:#x}", self.value, self.value)
+                }
+            }
+            InstructionErrorKind::ExpectedValue => format!("#{:X}", self.value),
+            InstructionErrorKind::OutOfBounds => {
+                format!("out of bounds access (#{:X})", self.value)
             }
         };
         println!(
@@ -85,6 +101,16 @@ impl InstructionError {
             crate::debug::commented_instruction_to_string(state.instructions[self.pc], state).unwrap(),
             &state.project.source_text_collection[self.instruction_location]
         );
+    }
+
+    fn out_of_bounds(value: u64, line: u32, location: TextLocation, pc: usize) -> InstructionError {
+        Self {
+            value,
+            kind: InstructionErrorKind::OutOfBounds,
+            line,
+            instruction_location: location,
+            pc,
+        }
     }
 }
 
@@ -120,12 +146,13 @@ impl EvaluatorState {
         }
     }
 
-    pub fn read_pointer_word_safe(&self, address: u64) -> Option<&FlaggedWord> {
+    pub fn read_pointer_word_safe(&self, address: u64) -> Result<&FlaggedWord, u64> {
         if memory::is_heap_pointer(address) {
             self.heap.read_flagged_word_safe(address)
         } else {
             self.stack.read_flagged_word_safe(address)
         }
+        .ok_or(address)
     }
 
     pub fn read_pointer_byte_safe(&self, address: u64) -> Option<FlaggedByte> {
@@ -206,11 +233,11 @@ impl EvaluatorState {
         if address % memory::WORD_SIZE_IN_BYTES != 0 || address == 0 {
             return None;
         }
-        let length_in_bytes = self.read_pointer_word_safe(address)?.as_value().ok()?;
+        let length_in_bytes = self.read_pointer_word_safe(address).ok()?.as_value().ok()?;
         let length_in_words = memory::bytes_to_word(length_in_bytes);
         let mut buffer = Vec::with_capacity(length_in_bytes as _);
         for w in 0..length_in_words {
-            let Ok(word) = self.read_pointer_word_safe(address + (w + 1) * memory::WORD_SIZE_IN_BYTES)?.as_value() else {
+            let Ok(word) = self.read_pointer_word_safe(address + (w + 1) * memory::WORD_SIZE_IN_BYTES).ok()?.as_value() else {
                 break;
             };
             let bytes = word.to_le_bytes();
@@ -463,8 +490,9 @@ fn execute_instruction(
         OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
         OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
         OpCode::StringConcat => evaluate_string_concat(state, instruction)?,
-        OpCode::NoneableOrValue => evaluate_noneable_or_value(state, instruction),
+        OpCode::NoneableOrValue => evaluate_noneable_or_value(state, instruction)?,
         OpCode::Jump => evaluate_jump(state, instruction),
+        OpCode::JumpDynamically => evaluate_jump_dynamically(state, instruction),
         OpCode::JumpIfFalse => evaluate_jump_if_false(state, instruction),
         OpCode::JumpIfTrue => evaluate_jump_if_true(state, instruction),
         OpCode::SysCall => evaluate_sys_call(state, instruction),
@@ -596,7 +624,14 @@ fn evaluate_read_byte_with_offset(
         .map_err(|err| InstructionError::value(err, line!(), instruction.location, state.pc))?;
     let offset = instruction.arg;
     let address = address + offset;
-    let value = state.read_pointer_byte_safe(address).ok_or(InstructionError::value(0, line!(), instruction.location, state.pc))?;
+    let value = state
+        .read_pointer_byte_safe(address)
+        .ok_or(InstructionError::value(
+            0,
+            line!(),
+            instruction.location,
+            state.pc,
+        ))?;
     state.stack.push_flagged_word(value.into());
     Ok(())
 }
@@ -907,15 +942,41 @@ fn evaluate_string_concat(
     Ok(())
 }
 
-fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instruction) {
+fn evaluate_noneable_or_value(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let rhs = state.read_pointer_word(rhs.unwrap_pointer());
-    let lhs = state.read_pointer_word(lhs.unwrap_pointer());
-    let is_none = lhs.unwrap_pointer() == 0;
+    let rhs =
+        state
+            .read_pointer_word_safe(rhs.as_pointer().map_err(|err| {
+                InstructionError::value(err, line!(), instruction.location, state.pc)
+            })?)
+            .map_err(|err| {
+                InstructionError::out_of_bounds(err, line!(), instruction.location, state.pc)
+            })?;
+    let lhs =
+        state
+            .read_pointer_word_safe(lhs.as_pointer().map_err(|err| {
+                InstructionError::value(err, line!(), instruction.location, state.pc)
+            })?)
+            .map_err(|err| {
+                InstructionError::out_of_bounds(err, line!(), instruction.location, state.pc)
+            })?;
+    let is_none = lhs
+        .as_pointer()
+        .map_err(|err| InstructionError::value(err, line!(), instruction.location, state.pc))?
+        == 0;
     let needs_dereferencing = instruction.arg != 0;
     let result = if needs_dereferencing && !is_none {
-        state.read_pointer_word(lhs.unwrap_pointer())
+        state
+            .read_pointer_word_safe(lhs.as_pointer().map_err(|err| {
+                InstructionError::value(err, line!(), instruction.location, state.pc)
+            })?)
+            .map_err(|err| {
+                InstructionError::out_of_bounds(err, line!(), instruction.location, state.pc)
+            })?
     } else {
         if is_none {
             rhs
@@ -923,11 +984,16 @@ fn evaluate_noneable_or_value(state: &mut EvaluatorState, instruction: Instructi
             lhs
         }
     };
-    state.stack.push_flagged_word(result.into_owned());
+    state.stack.push_flagged_word(result.clone());
+    Ok(())
 }
 
 fn evaluate_jump(state: &mut EvaluatorState, instruction: Instruction) {
     state.pc = instruction.arg as _;
+}
+
+fn evaluate_jump_dynamically(state: &mut EvaluatorState, _: Instruction) {
+    state.pc = state.stack.pop().unwrap_pointer() as _;
 }
 
 fn evaluate_jump_if_false(state: &mut EvaluatorState, instruction: Instruction) {

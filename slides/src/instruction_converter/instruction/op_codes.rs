@@ -48,5 +48,6 @@ pub enum OpCode {
     Return = 65,
     DecodeClosure = 66,
     Breakpoint = 67,
+    JumpDynamically = 68,
     // Trivia
 }

@@ -64,6 +64,59 @@ impl BoundNode {
         }
     }
 
+    pub fn dictionary_literal(
+        location: TextLocation,
+        temporary_variable: u64,
+        values: Vec<(BoundNode, BoundNode)>,
+        type_: TypeId,
+        types: &TypeCollection,
+    ) -> BoundNode {
+        let mut expressions = Vec::with_capacity(values.len());
+        let function = types[type_]
+            .as_struct_type()
+            .unwrap()
+            .function_table
+            .constructor_function
+            .as_ref()
+            .map(|f| f.function_label);
+
+        expressions.push(BoundNode::assignment(
+            location,
+            BoundNode::variable(location, temporary_variable, type_),
+            BoundNode::constructor_call(location, Vec::new(), type_, function),
+        ));
+        let set_function = types[type_]
+            .as_struct_type()
+            .unwrap()
+            .function_table
+            .set_function
+            .clone()
+            .unwrap();
+        let set_function = BoundNode::label_reference(
+            location,
+            set_function.function_label as _,
+            set_function.function_type,
+        );
+        for (key, value) in values {
+            expressions.push(BoundNode::expression_statement(
+                location,
+                BoundNode::function_call(
+                    location,
+                    set_function.clone(),
+                    vec![
+                        key,
+                        value,
+                        BoundNode::variable(location, temporary_variable, type_),
+                    ],
+                    false,
+                    typeid!(Type::Void),
+                ),
+            ));
+        }
+        expressions.push(BoundNode::variable(location, temporary_variable, type_));
+        BoundNode::block_expression(location, expressions, type_)
+    }
+
     pub fn constructor_call(
         location: TextLocation,
         arguments: Vec<BoundNode>,
@@ -208,7 +261,12 @@ impl BoundNode {
         }
     }
 
-    pub fn field_access(location: TextLocation, base: BoundNode, offset: u64, type_: TypeId) -> Self {
+    pub fn field_access(
+        location: TextLocation,
+        base: BoundNode,
+        offset: u64,
+        type_: TypeId,
+    ) -> Self {
         Self {
             location,
             kind: BoundNodeKind::FieldAccess(BoundFieldAccessNodeKind {
@@ -221,7 +279,12 @@ impl BoundNode {
         }
     }
 
-    pub fn closure(location: TextLocation, arguments: Vec<BoundNode>, id: u64, type_: TypeId) -> Self {
+    pub fn closure(
+        location: TextLocation,
+        arguments: Vec<BoundNode>,
+        id: u64,
+        type_: TypeId,
+    ) -> Self {
         Self {
             location,
             kind: BoundNodeKind::Closure(BoundClosureNodeKind {
@@ -326,12 +389,16 @@ impl BoundNode {
         location: TextLocation,
         expression: BoundNode,
         cases: Vec<BoundMatchCase>,
+        default_case: Option<BoundNode>,
+        temporary_variable: u64,
     ) -> Self {
         Self {
             location,
             kind: BoundNodeKind::MatchStatement(BoundMatchStatementNodeKind {
                 expression: Box::new(expression),
                 cases,
+                default_case: default_case.map(Box::new),
+                temporary_variable,
             }),
             type_: typeid!(Type::Void),
             constant_value: None,
@@ -1082,6 +1149,8 @@ impl BoundWhileStatementNodeKind {
 pub struct BoundMatchStatementNodeKind {
     pub expression: Box<BoundNode>,
     pub cases: Vec<BoundMatchCase>,
+    pub default_case: Option<Box<BoundNode>>,
+    pub temporary_variable: u64,
 }
 
 impl BoundMatchStatementNodeKind {
@@ -1091,28 +1160,30 @@ impl BoundMatchStatementNodeKind {
         for case in &mut self.cases {
             case.for_each_child_mut(function);
         }
+        if let Some(default_case) = &mut self.default_case {
+            function(default_case);
+            default_case.for_each_child_mut(function);
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct BoundMatchCase {
-    pub expression: Option<Box<BoundNode>>,
+    pub expression: Box<BoundNode>,
     pub body: Box<BoundNode>,
 }
 
 impl BoundMatchCase {
     fn for_each_child_mut(&mut self, function: &mut dyn FnMut(&mut BoundNode)) {
-        if let Some(e) = &mut self.expression {
-            function(e);
-            e.for_each_child_mut(function);
-        }
+        function(&mut self.expression);
+        self.expression.for_each_child_mut(function);
         function(&mut self.body);
         self.body.for_each_child_mut(function);
     }
 
-    pub fn new(expression: Option<BoundNode>, body: BoundNode) -> BoundMatchCase {
+    pub fn new(expression: BoundNode, body: BoundNode) -> BoundMatchCase {
         Self {
-            expression: expression.map(Box::new),
+            expression: Box::new(expression),
             body: Box::new(body),
         }
     }

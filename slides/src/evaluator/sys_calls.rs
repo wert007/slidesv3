@@ -1,6 +1,9 @@
 use crate::{
     binder::typing::{self, Type, TypeId},
-    evaluator::{memory::{bytes_to_word, Memory}, debugger},
+    evaluator::{
+        debugger,
+        memory::{bytes_to_word, Memory},
+    },
 };
 
 use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
@@ -262,7 +265,9 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         Type::Struct(s) => hash_array(s.size_in_bytes, argument.unwrap_pointer(), state),
         Type::Pointer => argument.unwrap_value(),
         Type::PointerOf(type_) => {
-            let argument = state.read_pointer_word(argument.unwrap_pointer()).into_owned();
+            let argument = state
+                .read_pointer_word(argument.unwrap_pointer())
+                .into_owned();
             hash_value(&argument, *type_, state)
         }
     }
@@ -271,12 +276,17 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
 fn hash_array(length: u64, pointer: u64, state: &mut EvaluatorState) -> u64 {
     let mut hash = 5381;
     for i in 0..length / WORD_SIZE_IN_BYTES {
-        hash = ((hash << 5) + hash) + state.read_pointer_word(pointer + i * WORD_SIZE_IN_BYTES).value;
+        hash = ((hash << 5) + hash)
+            + state
+                .read_pointer_word(pointer + i * WORD_SIZE_IN_BYTES)
+                .value;
     }
     let too_many_bits = length % WORD_SIZE_IN_BYTES;
     hash = ((hash << 5) + hash)
         + (state
-            .read_pointer_word(pointer + bytes_to_word(length) * WORD_SIZE_IN_BYTES - WORD_SIZE_IN_BYTES)
+            .read_pointer_word(
+                pointer + bytes_to_word(length) * WORD_SIZE_IN_BYTES - WORD_SIZE_IN_BYTES,
+            )
             .value
             & ((1 << too_many_bits) - 1));
     hash

@@ -181,11 +181,10 @@ impl Allocator {
                     assert!(old_bucket.is_some(), "address = {:#x}", address);
                     old_bucket.filter(|b| b.size_in_words >= size_in_words)
                 };
-                match bucket.map(|b| b.index).or_else(|| {
-                                    self.free_buckets(expected_size)
-                                        .first()
-                                        .map(|b| b.index)
-                                }) {
+                match bucket
+                    .map(|b| b.index)
+                    .or_else(|| self.free_buckets(expected_size).first().map(|b| b.index))
+                {
                     Some(it) => it,
                     None => {
                         // Allocation failed

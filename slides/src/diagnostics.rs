@@ -668,7 +668,11 @@ impl DiagnosticBag {
     }
 
     pub fn report_not_a_function(&mut self, location: TextLocation, base_type: TypeId) {
-        let message = message_format!("Tried calling a function, but type ", base_type, " is not a function.");
+        let message = message_format!(
+            "Tried calling a function, but type ",
+            base_type,
+            " is not a function."
+        );
         self.report(message, location);
     }
 

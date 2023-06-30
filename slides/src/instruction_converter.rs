@@ -1226,25 +1226,30 @@ fn convert_label_reference(
 }
 
 fn convert_jump(
-    span: TextLocation,
+    location: TextLocation,
     jump: BoundJumpNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut label = convert_node(*jump.target, converter);
-    assert_eq!(label.len(), 1);
-    let label = label.pop().unwrap();
-    let label = label
-        .as_label()
-        .unwrap_or_else(|| panic!("{:?}", label))
-        .label_reference;
-    match jump.condition {
-        Some(condition) => {
-            let mut result = convert_node(*condition, converter);
-            result.push(
-                Instruction::jump_to_label_conditionally(label, jump.jump_if_true, span).into(),
-            );
-            result
+    if label.len() == 1 {
+        let label = label.pop().unwrap();
+        let label = label
+            .as_label()
+            .unwrap_or_else(|| panic!("{:?}", label))
+            .label_reference;
+        match jump.condition {
+            Some(condition) => {
+                let mut result = convert_node(*condition, converter);
+                result.push(
+                    Instruction::jump_to_label_conditionally(label, jump.jump_if_true, location)
+                        .into(),
+                );
+                result
+            }
+            None => vec![Instruction::jump_to_label(label, location).into()],
         }
-        None => vec![Instruction::jump_to_label(label, span).into()],
+    } else {
+        label.push(Instruction::jump_dynamically(location).into());
+        label
     }
 }

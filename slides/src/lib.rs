@@ -18,6 +18,8 @@ use binder::{symbols::Library, typing::TypeCollection};
 pub use debug::DebugFlags;
 use text::{SourceTextCollection, SourceTextId};
 
+pub const STRING_CLASS_NAME: &str = "MyString";
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Project {

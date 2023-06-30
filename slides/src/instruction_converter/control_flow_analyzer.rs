@@ -79,8 +79,8 @@ pub(crate) fn check_stack_usage(
                             OpCode::Pop => -1,
                             OpCode::LoadRegister => 1,
                             OpCode::StoreInRegister => -1,
-                            OpCode::StoreWordInMemory => -3,
-                            OpCode::StoreByteInMemory => -3,
+                            OpCode::StoreWordInMemory => -2,
+                            OpCode::StoreByteInMemory => -2,
                             OpCode::WriteToStack => 0,
                             OpCode::WriteToHeap => {
                                 if instruction.arg == 0 {
@@ -116,6 +116,7 @@ pub(crate) fn check_stack_usage(
                             OpCode::StringConcat => -1,
                             OpCode::NoneableOrValue => -1,
                             OpCode::Jump => 0,
+                            OpCode::JumpDynamically => -1,
                             OpCode::JumpIfFalse => -1,
                             OpCode::JumpIfTrue => -1,
                             OpCode::SysCall => {

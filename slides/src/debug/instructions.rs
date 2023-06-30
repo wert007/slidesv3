@@ -258,8 +258,7 @@ pub fn commented_instruction_to_string(
         OpCode::StoreInRegister => {
             write!(base, "; {}", state.peek_stack(0).unwrap())?;
         }
-        OpCode::StoreByteInMemory |
-        OpCode::StoreWordInMemory => {
+        OpCode::StoreByteInMemory | OpCode::StoreWordInMemory => {
             let address = state.peek_stack(0).unwrap().unwrap_pointer();
             let value = state.peek_stack(1).unwrap();
             write!(base, "; [#{address:X}] = {value}")?;
@@ -281,7 +280,7 @@ pub fn commented_instruction_to_string(
             if let Some(address) = state.peek_stack(0).map(|v| v.as_pointer().ok()).flatten() {
                 let offset = instruction.arg;
                 let address = address + offset;
-                if let Some(ptr) = state.read_pointer_word_safe(address) {
+                if let Ok(ptr) = state.read_pointer_word_safe(address) {
                     write!(base, "; {}", ptr)?;
                 }
             }
@@ -320,6 +319,7 @@ pub fn commented_instruction_to_string(
         OpCode::StringConcat => {}
         OpCode::NoneableOrValue => {}
         OpCode::Jump => {}
+        OpCode::JumpDynamically => {}
         OpCode::JumpIfFalse => {}
         OpCode::JumpIfTrue => {}
         OpCode::SysCall => {}
@@ -349,8 +349,12 @@ pub fn instruction_to_string(
         OpCode::StoreInRegister => {
             instruction_reg_arg_name_to_string("streg", instruction.arg, reg_name)
         }
-        OpCode::StoreByteInMemory => instruction_ptr_unsigned_arg_to_string("stbytemem", instruction.arg),
-        OpCode::StoreWordInMemory => instruction_ptr_unsigned_arg_to_string("stwrdmem", instruction.arg),
+        OpCode::StoreByteInMemory => {
+            instruction_ptr_unsigned_arg_to_string("stbytemem", instruction.arg)
+        }
+        OpCode::StoreWordInMemory => {
+            instruction_ptr_unsigned_arg_to_string("stwrdmem", instruction.arg)
+        }
         OpCode::WriteToStack => instruction_ptr_unsigned_arg_to_string("wrtstck", instruction.arg),
         OpCode::WriteToHeap => instruction_word_count_arg_to_string("wrtheap", instruction.arg),
         OpCode::Allocate => instruction_byte_count_arg_to_string("alloc", instruction.arg),
@@ -386,6 +390,7 @@ pub fn instruction_to_string(
         OpCode::Jump if !has_labels => {
             instruction_ptr_unsigned_arg_to_string("jmp", instruction.arg)
         }
+        OpCode::JumpDynamically => instruction_no_arg_to_string("jmpdyn"),
         OpCode::JumpIfFalse if !has_labels => {
             instruction_ptr_unsigned_arg_to_string("jmpfalse", instruction.arg)
         }

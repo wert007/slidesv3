@@ -328,6 +328,14 @@ impl Instruction {
         }
     }
 
+    pub const fn jump_dynamically(location: TextLocation) -> Self {
+        Self {
+            op_code: OpCode::JumpDynamically,
+            arg: 0,
+            location,
+        }
+    }
+
     pub const fn jump(address: u64, location: TextLocation) -> Self {
         Self {
             op_code: OpCode::Jump,
