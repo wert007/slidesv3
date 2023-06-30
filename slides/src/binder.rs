@@ -5330,6 +5330,12 @@ fn bind_match_statement(
         &[expression.type_, typeid!(Type::Pointer)],
         binder,
     );
+    bind_generic_struct_type_for_types(
+        location,
+        dictionary,
+        &[typeid!(Type::TypeId), typeid!(Type::Pointer)],
+        binder,
+    );
     let noneable = binder
         .project
         .types

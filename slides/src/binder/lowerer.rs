@@ -1,4 +1,9 @@
-use crate::{binder::bound_nodes::BoundNodeKind, text::TextLocation, Project};
+use crate::{
+    binder::{bound_nodes::BoundNodeKind, typing::SystemCallKind},
+    text::TextLocation,
+    value::Value,
+    Project,
+};
 
 use super::{bound_nodes::*, typing::TypeId};
 
@@ -146,7 +151,7 @@ fn flatten_node(node: BoundNode, flattener: &mut Flattener) -> Vec<BoundNode> {
         BoundNodeKind::MatchStatement(match_statement) => {
             flatten_match_statement(node.location, match_statement, flattener)
         }
-        BoundNodeKind::Jump(_) => unreachable!(),
+        BoundNodeKind::Jump(jump) => flatten_jump(node.location, jump, flattener),
     }
 }
 
@@ -521,6 +526,7 @@ fn flatten_match_statement(
     flattener: &mut Flattener,
 ) -> Vec<BoundNode> {
     let (end_label, end_label_reference) = create_label(location, flattener);
+    let mut is_type_match = false;
     let (values, mut bodies): (Vec<(BoundNode, BoundNode)>, Vec<BoundNode>) = match_statement
         .cases
         .into_iter()
@@ -528,7 +534,10 @@ fn flatten_match_statement(
             let (case_label, case_label_reference) = create_label(location, flattener);
             let expression = match *c.expression {
                 BoundMatchCaseExpression::Expression(e) => e,
-                BoundMatchCaseExpression::Type(_, _) => todo!(),
+                BoundMatchCaseExpression::Type(_, t) => {
+                    is_type_match = true;
+                    BoundNode::literal(location, Value::TypeId(t))
+                }
             };
             (
                 (expression, case_label_reference),
@@ -548,10 +557,14 @@ fn flatten_match_statement(
         .types
         .look_up_type_by_name(&format!(
             "Dict<{}, ptr, >",
-            flattener
-                .project
-                .types
-                .name_of_type_id(match_statement.expression.type_)
+            if is_type_match {
+                "type".into()
+            } else {
+                flattener
+                    .project
+                    .types
+                    .name_of_type_id(match_statement.expression.type_)
+            }
         ))
         .expect("There needs to exists a Dict<Range, pointer, > for match statements to work...")
         .unwrap_type_id();
@@ -571,6 +584,20 @@ fn flatten_match_statement(
         .unwrap_address();
     let (default_case_label, mut default_case_label_reference) = create_label(location, flattener);
     default_case_label_reference.type_ = typeid!(Type::Pointer);
+    let expression = if is_type_match {
+        BoundNode::system_call(
+            location,
+            SystemCallKind::TypeOfValue,
+            vec![BoundNode::conversion(
+                location,
+                *match_statement.expression,
+                typeid!(Type::Any),
+            )],
+            typeid!(Type::TypeId),
+        )
+    } else {
+        *match_statement.expression
+    };
     let mut statements = vec![BoundNode::jump(
         location,
         BoundNode::binary(
@@ -578,7 +605,7 @@ fn flatten_match_statement(
             BoundNode::function_call(
                 location,
                 BoundNode::label_reference(location, dictionary_get_function, typeid!(Type::Error)),
-                vec![*match_statement.expression, dictionary],
+                vec![expression, dictionary],
                 false,
                 flattener
                     .project
@@ -612,7 +639,25 @@ fn flatten_match_statement(
         statements.push(*default_case);
     }
     statements.push(end_label);
-    vec![BoundNode::block_statement(location, statements)]
+    flatten_node(BoundNode::block_statement(location, statements), flattener)
+}
+
+fn flatten_jump(
+    location: TextLocation,
+    jump: BoundJumpNodeKind,
+    flattener: &mut Flattener<'_>,
+) -> Vec<BoundNode> {
+    let condition = jump.condition.map(|c| flatten_expression(*c, flattener));
+    let target = flatten_expression(*jump.target, flattener);
+    vec![if let Some(condition) = condition {
+        if jump.jump_if_true {
+            BoundNode::jump_if_true(location, condition, target)
+        } else {
+            BoundNode::jump_if_false(location, condition, target)
+        }
+    } else {
+        BoundNode::jump(location, target)
+    }]
 }
 
 fn create_label(location: TextLocation, flattener: &mut Flattener) -> (BoundNode, BoundNode) {
