@@ -77,6 +77,14 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
         | Type::StructPlaceholder(..) => unreachable!("{:#?}", &state.project.types[type_]),
         Type::Error => todo!(),
         Type::Void => todo!(),
+        Type::TypeId => {
+            let type_id = argument.unwrap_value();
+            state
+                .project
+                .types
+                .name_of_type_id(unsafe { TypeId::from_raw(type_id) })
+                .into_owned()
+        }
         Type::Any => {
             let type_ = decode_type(argument, state);
             let address = argument.unwrap_pointer() + WORD_SIZE_IN_BYTES;
@@ -252,9 +260,12 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
                 .into_owned();
             hash_value(&argument, type_, state)
         }
-        Type::Integer(_) | Type::Boolean | Type::None | Type::Enum(_, _) | Type::SystemCall(_) => {
-            argument.unwrap_value()
-        }
+        Type::Integer(_)
+        | Type::Boolean
+        | Type::None
+        | Type::Enum(_, _)
+        | Type::SystemCall(_)
+        | Type::TypeId => argument.unwrap_value(),
         Type::String => {
             let ptr = argument.unwrap_pointer();
             let length = state.read_pointer_word(ptr).unwrap_value();
@@ -297,4 +308,9 @@ pub fn byte_to_char(argument: &FlaggedWord, state: &mut EvaluatorState) {
     let result = (byte as char).to_string();
     let value = native_string_to_string(result, state);
     state.stack.push_flagged_word(value);
+}
+
+pub fn type_of_value(argument: &FlaggedWord, state: &mut EvaluatorState) {
+    let type_ = decode_type(argument, state);
+    state.stack.push(type_.as_raw());
 }

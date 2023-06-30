@@ -1582,6 +1582,10 @@ fn default_statements(binder: &mut BindingState) {
         "byteToChar".to_owned(),
         Value::SystemCall(SystemCallKind::ByteToChar),
     );
+    binder.register_constant(
+        "typeOfValue".to_owned(),
+        Value::SystemCall(SystemCallKind::TypeOfValue),
+    );
 }
 
 fn std_imports(binder: &mut BindingState, source_text: SourceTextId) {
@@ -4325,7 +4329,8 @@ fn bind_field_access<'a, 'b>(
         | Type::SystemCall(_)
         | Type::Pointer
         | Type::GenericType(_, _)
-        | Type::PointerOf(_) => {
+        | Type::PointerOf(_)
+        | Type::TypeId => {
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base_location, base.type_);
@@ -4498,7 +4503,8 @@ fn bind_field_access_for_assignment<'a>(
         | Type::Pointer
         | Type::PointerOf(_)
         | Type::GenericType(_, _)
-        | Type::Closure(_) => {
+        | Type::Closure(_)
+        | Type::TypeId => {
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base.location, base.type_);
@@ -4925,7 +4931,8 @@ fn bind_condition_conversion<'a>(
         | Type::Closure(_)
         | Type::Pointer
         | Type::PointerOf(_)
-        | Type::Enum(..) => (
+        | Type::Enum(..)
+        | Type::TypeId => (
             bind_conversion(base, typeid!(Type::Boolean), binder),
             SafeNodeInCondition::None,
         ),

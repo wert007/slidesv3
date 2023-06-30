@@ -67,20 +67,25 @@ macro_rules! typeid {
     (Type::None) => {
         unsafe { TypeId::from_raw(10) }
     };
+    (Type::TypeId) => {
+        unsafe { TypeId::from_raw(11) }
+    };
     (Type::SystemCall($kind:expr)) => {
         unsafe {
-            TypeId::from_raw(match $kind {
-                SystemCallKind::Print => 11,
-                SystemCallKind::ToString => 12,
-                SystemCallKind::ArrayLength => 13,
-                SystemCallKind::HeapDump => 14,
-                SystemCallKind::Break => 15,
-                SystemCallKind::Reallocate => 16,
-                SystemCallKind::RuntimeError => 17,
-                SystemCallKind::AddressOf => 18,
-                SystemCallKind::GarbageCollect => 19,
-                SystemCallKind::Hash => 20,
-                SystemCallKind::ByteToChar => 21,
+            const BASIS: u64 = 12;
+            TypeId::from_raw(BASIS + match $kind {
+                SystemCallKind::Print => 0,
+                SystemCallKind::ToString => 1,
+                SystemCallKind::ArrayLength => 2,
+                SystemCallKind::HeapDump => 3,
+                SystemCallKind::Break => 4,
+                SystemCallKind::Reallocate => 5,
+                SystemCallKind::RuntimeError => 6,
+                SystemCallKind::AddressOf => 7,
+                SystemCallKind::GarbageCollect => 8,
+                SystemCallKind::Hash => 9,
+                SystemCallKind::ByteToChar => 10,
+                SystemCallKind::TypeOfValue => 11,
             })
         }
     };
@@ -265,6 +270,7 @@ impl TypeCollection {
                 Type::Integer(IntegerType::Unsigned8),
                 Type::Integer(IntegerType::Unsigned64),
                 Type::None,
+                Type::TypeId,
                 Type::SystemCall(SystemCallKind::Print),
                 Type::SystemCall(SystemCallKind::ToString),
                 Type::SystemCall(SystemCallKind::ArrayLength),
@@ -276,6 +282,7 @@ impl TypeCollection {
                 Type::SystemCall(SystemCallKind::GarbageCollect),
                 Type::SystemCall(SystemCallKind::Hash),
                 Type::SystemCall(SystemCallKind::ByteToChar),
+                Type::SystemCall(SystemCallKind::TypeOfValue),
             ],
         }
     }
@@ -487,6 +494,7 @@ impl TypeCollection {
             Type::GenericType(_index, name) => format!("${name}").into(),
             Type::Enum(name, _) => name.into(),
             Type::StructPlaceholder(it) => it.name.clone().into(),
+            Type::TypeId => "type".into(),
         }
     }
 
@@ -1004,6 +1012,7 @@ pub enum Type {
     Library(usize),
     Pointer,
     PointerOf(TypeId),
+    TypeId,
     GenericType(usize, String),
     StructPlaceholder(StructPlaceholderType),
     Enum(String, Vec<String>),
@@ -1047,7 +1056,8 @@ impl Type {
             | Type::Pointer
             | Type::PointerOf(_)
             | Type::GenericType(_, _)
-            | Type::String => WORD_SIZE_IN_BYTES,
+            | Type::String
+            | Type::TypeId => WORD_SIZE_IN_BYTES,
         }
     }
 
@@ -1076,7 +1086,8 @@ impl Type {
             | Type::SystemCall(_)
             | Type::Integer(_)
             | Type::IntegerLiteral
-            | Type::Boolean => false,
+            | Type::Boolean
+            | Type::TypeId => false,
             // A none Pointer should never be dereferenced.
             Type::None
             | Type::String
@@ -1174,6 +1185,7 @@ pub enum SystemCallKind {
     GarbageCollect,
     Hash,
     ByteToChar,
+    TypeOfValue,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -1193,6 +1205,7 @@ impl std::fmt::Display for SystemCallKind {
                 Self::GarbageCollect => "garbageCollect",
                 Self::Hash => "hash",
                 Self::ByteToChar => "byteToChar",
+                Self::TypeOfValue => "typeOfValue",
             }
         )
     }
@@ -1350,6 +1363,14 @@ impl FunctionType<TypeId> {
                 parameter_types: vec![typeid!(Type::Integer(IntegerType::Unsigned8))],
                 this_type: None,
                 return_type: typeid!(Type::String),
+                system_call_kind: Some(system_call_kind),
+                name: None,
+                is_generic: false,
+            },
+            SystemCallKind::TypeOfValue => Self {
+                parameter_types: vec![typeid!(Type::Any)],
+                this_type: None,
+                return_type: typeid!(Type::TypeId),
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,

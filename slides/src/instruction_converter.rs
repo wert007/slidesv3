@@ -842,15 +842,13 @@ fn convert_system_call(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     match system_call.base {
-        SystemCallKind::Print
-        | SystemCallKind::ToString
-        | SystemCallKind::HeapDump
-        | SystemCallKind::RuntimeError
-        | SystemCallKind::Reallocate
-        | SystemCallKind::AddressOf
-        | SystemCallKind::GarbageCollect
-        | SystemCallKind::Hash
-        | SystemCallKind::ByteToChar => {
+        SystemCallKind::ArrayLength => {
+            convert_array_length_system_call(span, system_call, converter)
+        }
+        SystemCallKind::Break => {
+            vec![Instruction::breakpoint(span).into()]
+        }
+        _ => {
             let mut result = vec![];
             let argument_count = match system_call.base {
                 SystemCallKind::GarbageCollect => 0,
@@ -861,7 +859,8 @@ fn convert_system_call(
                 | SystemCallKind::RuntimeError
                 | SystemCallKind::AddressOf
                 | SystemCallKind::Hash
-                | SystemCallKind::ByteToChar => 1,
+                | SystemCallKind::ByteToChar
+                | SystemCallKind::TypeOfValue => 1,
                 SystemCallKind::Reallocate => 2,
                 SystemCallKind::Break => unreachable!(),
             };
@@ -873,12 +872,7 @@ fn convert_system_call(
             result.push(Instruction::system_call(system_call.base, span).into());
             result
         }
-        SystemCallKind::ArrayLength => {
-            convert_array_length_system_call(span, system_call, converter)
-        }
-        SystemCallKind::Break => {
-            vec![Instruction::breakpoint(span).into()]
-        }
+        
     }
 }
 

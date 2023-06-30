@@ -1033,6 +1033,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         SystemCallKind::Break => unreachable!(),
         SystemCallKind::Hash => sys_calls::hash(&arguments[0], state),
         SystemCallKind::ByteToChar => sys_calls::byte_to_char(&arguments[0], state),
+        SystemCallKind::TypeOfValue => sys_calls::type_of_value(&arguments[0], state),
     }
     state.stack_trace.pop();
 }
