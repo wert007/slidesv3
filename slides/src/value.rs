@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::binder::typing::{SystemCallKind, TypeCollection, TypeId};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     None,
     Integer(i64),

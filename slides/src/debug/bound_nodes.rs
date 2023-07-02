@@ -492,7 +492,7 @@ fn print_bound_node_match_case_expression_with_indent(
         BoundMatchCaseExpression::Expression(e) => {
             print_bound_node_as_code_with_indent(e, types, printer, buffer)
         }
-        BoundMatchCaseExpression::Type(v, t) => {
+        BoundMatchCaseExpression::Type(v, t, _) => {
             write!(buffer, "r#{v}: {}", types.name_of_type_id(*t))
         }
     }

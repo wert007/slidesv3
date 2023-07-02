@@ -534,7 +534,7 @@ fn flatten_match_statement(
             let (case_label, case_label_reference) = create_label(location, flattener);
             let expression = match *c.expression {
                 BoundMatchCaseExpression::Expression(e) => e,
-                BoundMatchCaseExpression::Type(_, t) => {
+                BoundMatchCaseExpression::Type(_, t, location) => {
                     is_type_match = true;
                     BoundNode::literal(location, Value::TypeId(t))
                 }

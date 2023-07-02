@@ -1174,7 +1174,7 @@ impl BoundMatchStatementNodeKind {
 #[derive(Debug, Clone)]
 pub enum BoundMatchCaseExpression {
     Expression(BoundNode),
-    Type(u64, TypeId),
+    Type(u64, TypeId, TextLocation),
 }
 
 impl BoundMatchCaseExpression {
@@ -1185,13 +1185,6 @@ impl BoundMatchCaseExpression {
                 expression.for_each_child_mut(function);
             },
             _ => {},
-        }
-    }
-
-    pub fn unwrap_expression(self) -> BoundNode {
-        match self {
-            BoundMatchCaseExpression::Expression(it) => it,
-            BoundMatchCaseExpression::Type(_, _) => panic!("Expected expression!"),
         }
     }
 }
@@ -1213,6 +1206,13 @@ impl BoundMatchCase {
         Self {
             expression: Box::new(expression),
             body: Box::new(body),
+        }
+    }
+
+    pub(crate) fn expression_location(&self) -> TextLocation {
+        match self.expression.as_ref() {
+            BoundMatchCaseExpression::Expression(e) => e.location,
+            BoundMatchCaseExpression::Type(_, _, location) => *location,
         }
     }
 }

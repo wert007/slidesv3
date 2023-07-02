@@ -6,6 +6,7 @@ use crate::{
     lexer::syntax_token::SyntaxTokenKind,
     parser::syntax_nodes::SyntaxNodeKind,
     text::{SourceTextCollection, SourceTextId, TextLocation, TextSpan},
+    value::Value,
 };
 
 #[derive(Debug, Clone)]
@@ -14,6 +15,7 @@ pub enum Message {
     SourceTextSnippet(TextLocation),
     TypeId(TypeId),
     GenericTypeId(GenericTypeId),
+    Value(Value),
     Composition(Vec<Message>),
 }
 
@@ -34,6 +36,7 @@ impl Message {
                 .into_iter()
                 .map(|m| m.into_string_with_struct_table(types, source_text_collection))
                 .collect(),
+            Message::Value(it) => it.display(types).into_owned(),
         }
     }
 }
@@ -41,6 +44,12 @@ impl Message {
 impl From<String> for Message {
     fn from(it: String) -> Self {
         Self::String(it.into())
+    }
+}
+
+impl From<Value> for Message {
+    fn from(it: Value) -> Self {
+        Self::Value(it.into())
     }
 }
 
@@ -494,9 +503,9 @@ impl DiagnosticBag {
         self.report(message, span);
     }
 
-    pub fn report_expected_constant(&mut self, span: TextLocation) {
+    pub fn report_expected_constant(&mut self, location: TextLocation) {
         let message = "Only constant expressions are allowed here.".into();
-        self.report(message, span);
+        self.report(message, location);
     }
 
     pub fn report_only_function_call_in_import_statement(&mut self, span: TextLocation) {
@@ -685,6 +694,43 @@ impl DiagnosticBag {
             "Found multiple else cases in match statement. Only one is allowed though."
         );
         self.report(message, error)
+    }
+
+    pub(crate) fn report_match_case_not_unique(&mut self, location: TextLocation, value: Value) {
+        let message = message_format!(
+            "Multiple statements with the same value (",
+            value,
+            ") found in match statement."
+        );
+        self.report(message, location);
+    }
+
+    pub(crate) fn report_cannot_match(&mut self, location: TextLocation, type_: TypeId) {
+        let message = message_format!("Cannot match on type ", type_, ".");
+        let message = match self.registered_types[type_] {
+            crate::binder::typing::Type::None => message_format!(message, " There are not enough type information about this `none` value. Maybe give it a type before?"),
+            crate::binder::typing::Type::SystemCall(_) |
+            crate::binder::typing::Type::Function(_) |
+            crate::binder::typing::Type::Closure(_) => message_format!(message, " Seems like you forgot a () maybe?"),
+            crate::binder::typing::Type::Struct(_) |
+            crate::binder::typing::Type::StructPlaceholder(_) => message_format!(message, " Note, that the struct is not abstract. You can only match on abstract structs."),
+            crate::binder::typing::Type::AbstractTypeBox(_) => message_format!(message, " This may seem weird, but this struct is the base type or in the abstract struct itself, you cannot match here."),
+            crate::binder::typing::Type::Library(_) |
+            crate::binder::typing::Type::Pointer |
+            crate::binder::typing::Type::PointerOf(_) => message,
+            crate::binder::typing::Type::GenericType(_, _) => unreachable!("It should not be possible to actually get here!"),
+            _ => unreachable!("You actually can match on this type!"),
+        };
+        self.report(message, location);
+    }
+
+    pub(crate) fn report_expected_else_case(&mut self, location: TextLocation, type_: TypeId) {
+        let message = message_format!(
+            "Not all possible values of type ",
+            type_,
+            " are handled. Add an `else` case maybe?"
+        );
+        self.report(message, location);
     }
 
     // Runtime Errors

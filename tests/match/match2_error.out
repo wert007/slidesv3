@@ -1,0 +1,9 @@
+Error in ..\tests\match\match2_error.sld:3:9: Cannot convert type string to type int.
+Error in ..\tests\match\match2_error.sld:6:9: Cannot convert type bool to type int.
+Error in ..\tests\match\match2_error.sld:18:17: Found multiple else cases in match statement. Only one is allowed though.
+Error in ..\tests\match\match2_error.sld:26:9: Only constant expressions are allowed here.
+Error in ..\tests\match\match2_error.sld:38:9: Multiple statements with the same value (5) found in match statement.
+Error in ..\tests\match\match2_error.sld:41:9: Multiple statements with the same value (5) found in match statement.
+Error in ..\tests\match\match2_error.sld:47:11: Not all possible values of type bool are handled. Add an `else` case maybe?
+Error in ..\tests\match\match2_error.sld:53:11: Cannot match on type print. Seems like you forgot a () maybe?
+Error in ..\tests\match\match2_error.sld:59:11: Cannot match on type any?. There are not enough type information about this `none` value. Maybe give it a type before?

@@ -1217,7 +1217,7 @@ impl TypeCollectionIndexOutput<TypeId> for Type {
     }
 }
 
-#[derive(TryFromPrimitive, PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(TryFromPrimitive, PartialEq, Eq, Debug, Clone, Copy, Hash)]
 #[repr(u8)]
 pub enum SystemCallKind {
     Print,

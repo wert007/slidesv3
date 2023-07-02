@@ -1,7 +1,7 @@
-Runtime error happened in std.sld:163:13: Index 99 is out of bounds of array with length 3.
+Runtime error happened in std.sld:144:13: Index 99 is out of bounds of array with length 3.
   ...in ..\tests\arrays\arrays_runtime_error.sld:1:1
   ...in ..\tests\arrays\arrays_runtime_error.sld:4:11
-  ...in std.sld:168:9
-  ...in std.sld:163:13
+  ...in std.sld:149:9
+  ...in std.sld:144:13
 Unusual termination.
 = -1

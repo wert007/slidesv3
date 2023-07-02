@@ -11,6 +11,7 @@ pub mod symbols;
 // mod tests;
 
 use std::collections::hash_map::DefaultHasher;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::{
@@ -5396,11 +5397,19 @@ fn bind_match_statement(
         .unwrap_generic_type_id();
     bind_generic_struct_type_for_types(location, noneable, &[typeid!(Type::Pointer)], binder);
     let mut default_case: Option<BoundNode> = None;
+    let mut value_set = HashSet::new();
     let mut cases: Vec<_> = match_statement
         .match_cases
         .into_iter()
         .filter_map(|c| match bind_match_case(c, expression.type_, binder) {
-            Either::Left(it) => Some(it),
+            Either::Left((it, value)) => {
+                if !value_set.insert(value.clone()) {
+                    binder
+                        .diagnostic_bag
+                        .report_match_case_not_unique(it.expression_location(), value);
+                }
+                Some(it)
+            }
             Either::Right(default_body) => {
                 if let Some(default_case) = &default_case {
                     binder.diagnostic_bag.report_found_multiple_else_cases(
@@ -5415,7 +5424,93 @@ fn bind_match_statement(
         })
         .collect();
     cases.reverse();
-    if default_case.is_none() {}
+    match &binder.project.types[expression.type_] {
+        Type::Error => {}
+        Type::Void
+        | Type::None
+        | Type::SystemCall(_)
+        | Type::Function(_)
+        | Type::Closure(_)
+        | Type::Library(_)
+        | Type::Pointer
+        | Type::PointerOf(_)
+        | Type::AbstractTypeBox(_)
+        | Type::GenericType(_, _) => {
+            binder
+                .diagnostic_bag
+                .report_cannot_match(expression.location, expression.type_);
+        }
+        Type::Integer(integer_type) => {
+            if default_case.is_none() {
+                match integer_type {
+                    IntegerType::Unsigned8 => {
+                        if value_set.len() != u8::MAX as usize {
+                            binder
+                                .diagnostic_bag
+                                .report_expected_else_case(expression.location, expression.type_);
+                        }
+                    }
+                    IntegerType::Signed64 | IntegerType::Unsigned64 => binder
+                        .diagnostic_bag
+                        .report_expected_else_case(expression.location, expression.type_),
+                }
+            }
+        }
+        Type::Boolean => {
+            if value_set.len() != 2 {
+                binder
+                    .diagnostic_bag
+                    .report_expected_else_case(expression.location, expression.type_);
+            }
+        }
+        Type::String => binder
+            .diagnostic_bag
+            .report_expected_else_case(expression.location, expression.type_),
+        Type::Struct(s) => {
+            if s.is_abstract {
+                if default_case.is_none() {
+                    binder
+                        .diagnostic_bag
+                        .report_expected_else_case(expression.location, expression.type_)
+                }
+            } else {
+                binder
+                    .diagnostic_bag
+                    .report_cannot_match(expression.location, expression.type_);
+            }
+        }
+        Type::StructPlaceholder(s) => {
+            if s.is_abstract {
+                if default_case.is_none() {
+                    binder
+                        .diagnostic_bag
+                        .report_expected_else_case(expression.location, expression.type_)
+                }
+            } else {
+                binder
+                    .diagnostic_bag
+                    .report_cannot_match(expression.location, expression.type_);
+            }
+        }
+        Type::TypeId => binder
+            .diagnostic_bag
+            .report_expected_else_case(expression.location, expression.type_),
+        Type::Enum(_, values) => {
+            if values.len() != value_set.len() && default_case.is_none() {
+                binder
+                    .diagnostic_bag
+                    .report_expected_else_case(expression.location, expression.type_)
+            }
+        }
+        Type::Any => {
+            if default_case.is_none() {
+                binder
+                    .diagnostic_bag
+                    .report_expected_else_case(expression.location, expression.type_)
+            }
+        }
+        Type::IntegerLiteral => unreachable!(),
+    }
     let temporary_variable = binder.generate_temporary_variable("match", location);
     BoundNode::match_statement(
         location,
@@ -5430,19 +5525,28 @@ fn bind_match_case(
     case: MatchCaseNode,
     type_: TypeId,
     binder: &mut BindingState,
-) -> either::Either<BoundMatchCase, BoundNode> {
+) -> either::Either<(BoundMatchCase, Value), BoundNode> {
     match case.expression {
         MatchCaseExpression::Expression(expression) => {
             let expression = bind_node(expression, binder);
+            let value = if let Some(value) = &expression.constant_value {
+                value.value.clone()
+            } else {
+                binder
+                    .diagnostic_bag
+                    .report_expected_constant(expression.location);
+                Value::None
+            };
             let expression = bind_conversion(expression, type_, binder);
             let body = bind_node(case.body, binder);
-            Either::Left(BoundMatchCase::new(
-                BoundMatchCaseExpression::Expression(expression),
-                body,
+            Either::Left((
+                BoundMatchCase::new(BoundMatchCaseExpression::Expression(expression), body),
+                value,
             ))
         }
         MatchCaseExpression::Else(_) => Either::Right(bind_node(case.body, binder)),
         MatchCaseExpression::Type(t) => {
+            let location = t.location;
             let (name, expression_type) = bind_parameter(t, binder);
             let expression_type = expression_type.unwrap_type_id();
             let v = binder
@@ -5456,9 +5560,12 @@ fn bind_match_case(
                 "TODO: Add diagnostic here!"
             );
             let body = bind_node(case.body, binder);
-            Either::Left(BoundMatchCase::new(
-                BoundMatchCaseExpression::Type(v, expression_type),
-                body,
+            Either::Left((
+                BoundMatchCase::new(
+                    BoundMatchCaseExpression::Type(v, expression_type, location),
+                    body,
+                ),
+                Value::TypeId(expression_type),
             ))
         }
     }
