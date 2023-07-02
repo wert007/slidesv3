@@ -15,7 +15,6 @@ pub enum OpCode {
     Allocate = 11,
     ReadWordWithOffset = 12,
     MemoryCopy = 13,
-    TypeIdentifier = 14,
     Label = 15,
     Rotate = 16,
     Unknown = 17,

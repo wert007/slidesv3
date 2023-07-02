@@ -544,8 +544,7 @@ fn print_bound_node_jump_as_code(
     buffer: &mut String,
 ) -> std::fmt::Result {
     if let Some(condition) = &jump.condition {
-        buffer.push_str("jump if ");
-        writeln!(buffer, "jump if {{")?;
+        write!(buffer, "jump if ")?;
         printer.indent += 4;
         print_bound_node_as_code_with_indent(condition, types, printer, buffer)?;
         printer.indent -= 4;

@@ -415,17 +415,17 @@ fn convert_node(
 }
 
 fn convert_function_declaration(
-    span: TextLocation,
+    location: TextLocation,
     function_declaration: BoundFunctionDeclarationNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let mut result = vec![Instruction::label(function_declaration.label, span).into()];
+    let mut result = vec![Instruction::label(function_declaration.label, location).into()];
     for parameter in function_declaration.parameters.into_iter().rev() {
-        result.push(Instruction::store_in_register(parameter, span).into());
+        result.push(Instruction::store_in_register(parameter, location).into());
     }
     if let Some(register) = function_declaration.base_register {
-        result.push(Instruction::load_register(0, span).into());
-        result.push(Instruction::store_in_register(register, span).into());
+        result.push(Instruction::load_register(0, location).into());
+        result.push(Instruction::store_in_register(register, location).into());
     }
     result.append(&mut convert_node(*function_declaration.body, converter));
     if converter.project.debug_flags.check_stack_corruption {
@@ -872,7 +872,6 @@ fn convert_system_call(
             result.push(Instruction::system_call(system_call.base, span).into());
             result
         }
-        
     }
 }
 
@@ -926,18 +925,24 @@ fn convert_array_index(
 }
 
 fn convert_field_access(
-    span: TextLocation,
+    location: TextLocation,
     field_access: BoundFieldAccessNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
+    let base_type = field_access.base.type_;
     let mut result = convert_node(*field_access.base, converter);
     match &converter.project.types[field_access.type_] {
         Type::SystemCall(_) => {}
         Type::Function(_) => {
-            result.push(Instruction::load_register(field_access.offset, span).into());
+            result.push(Instruction::load_register(field_access.offset, location).into());
         }
         _ => {
-            result.push(Instruction::read_word_with_offset(field_access.offset, span).into());
+            if converter.project.types.is_abstract_type(base_type) {
+                result.push(
+                    Instruction::read_word_with_offset(2 * WORD_SIZE_IN_BYTES, location).into(),
+                );
+            }
+            result.push(Instruction::read_word_with_offset(field_access.offset, location).into());
         }
     }
     result
@@ -979,7 +984,7 @@ fn convert_closure(
             // Create copy for function pointer and actual pointer to struct.
             result.push(Instruction::duplicate(location).into());
             // Read function pointer
-            result.push(Instruction::read_word_with_offset(0, location).into());
+            result.push(Instruction::read_word_with_offset(WORD_SIZE_IN_BYTES, location).into());
             result.push(
                 Instruction::read_word_with_offset(
                     vtable_index as u64 * WORD_SIZE_IN_BYTES,
@@ -989,7 +994,8 @@ fn convert_closure(
             );
             // Flatten fat pointer
             result.push(Instruction::rotate(1, location).into());
-            result.push(Instruction::read_word_with_offset(WORD_SIZE_IN_BYTES, location).into());
+            result
+                .push(Instruction::read_word_with_offset(2 * WORD_SIZE_IN_BYTES, location).into());
             result.push(Instruction::rotate(1, location).into());
         }
     }
@@ -1016,7 +1022,12 @@ fn convert_conversion(
     match conversion_kind {
         ConversionKind::None => {}
         ConversionKind::TypeBoxing => {
-            convert_type_identifier(base_type, location, &mut result);
+            if converter.project.types.is_abstract_type(base_type) {
+                result.push(Instruction::duplicate(location).into());
+                result.push(Instruction::read_word_with_offset(0, location).into());
+            } else {
+                convert_type_identifier(base_type, location, &mut result);
+            }
             result.push(
                 // The type id is 1 word big and the pointer to the inner value
                 // is also 1 word big.
@@ -1119,8 +1130,41 @@ fn convert_conversion(
                 }
                 .into(),
             );
+            result.push(Instruction::load_immediate(base_type.as_raw(), location).into());
             // Create the fat pointer.
-            result.push(Instruction::write_to_heap(2, location).into());
+            result.push(Instruction::write_to_heap(3, location).into());
+        }
+        ConversionKind::AbstractTypeUnboxing => {
+            result.push(Instruction::duplicate(location).into());
+            result.push(Instruction::read_word_with_offset(0, location).into());
+            result.push(
+                Instruction::load_immediate(
+                    converter
+                        .project
+                        .types
+                        .noneable_base_type(conversion.type_)
+                        .expect("Expected noneable type here!")
+                        .as_raw(),
+                    location,
+                )
+                .into(),
+            );
+            result.push(Instruction::equals(location).into());
+
+            let label = converter.generate_label();
+            result.push(Instruction::jump_to_label_conditionally(label, false, location).into());
+            // If types are equal, the value of the type needs to be converted into a noneable
+            // result.push(Instruction::write_to_heap(1, location).into());
+            result.push(Instruction::read_word_with_offset(16, location).into());
+            result.push(Instruction::write_to_heap(1, location).into());
+            result.push(Instruction::write_to_heap(1, location).into());
+            let end_label = converter.generate_label();
+            result.push(Instruction::jump(end_label as _, location).into());
+            result.push(Instruction::label(label, location).into());
+            result.push(Instruction::pop(location).into());
+            result.push(Instruction::load_none_pointer(location).into());
+            result.push(Instruction::write_to_heap(1, location).into());
+            result.push(Instruction::label(end_label, location).into());
         }
     }
     result

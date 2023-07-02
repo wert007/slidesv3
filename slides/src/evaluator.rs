@@ -472,7 +472,6 @@ fn execute_instruction(
         OpCode::ReadWordWithOffset => evaluate_read_word_with_offset(state, instruction)?,
         OpCode::ReadByteWithOffset => evaluate_read_byte_with_offset(state, instruction)?,
         OpCode::MemoryCopy => evaluate_memory_copy(state, instruction),
-        OpCode::TypeIdentifier => evaluate_load_immediate(state, instruction),
         OpCode::Rotate => evaluate_rotate(state, instruction),
         OpCode::BitwiseTwosComplement => evaluate_bitwise_twos_complement(state, instruction),
         OpCode::BitwiseXor => evaluate_bitwise_xor(state, instruction),

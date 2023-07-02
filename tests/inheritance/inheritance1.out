@@ -1,4 +1,7 @@
 Hello 42
 child42
 Hello 4
+struct Cat {
+    v = 4,
+}
 = 0

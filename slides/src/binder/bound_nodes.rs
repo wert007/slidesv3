@@ -1032,6 +1032,8 @@ pub enum ConversionKind {
     IntToUint,
     /// Conversion turns value into its parent type with a vtable.
     AbstractTypeBoxing,
+    /// Dynamic cast of a value back into its original type.
+    AbstractTypeUnboxing,
 }
 
 impl BoundConversionNodeKind {
@@ -1044,6 +1046,8 @@ impl BoundConversionNodeKind {
                         && type_collection[self.base.type_].is_signed_int()
                     {
                         ConversionKind::IntToUint
+                    } else if type_collection.is_parent_of(base_type, self.base.type_) {
+                        ConversionKind::AbstractTypeUnboxing
                     } else {
                         ConversionKind::Boxing
                     },

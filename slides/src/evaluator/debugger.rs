@@ -127,6 +127,13 @@ pub fn create_session(state: &mut EvaluatorState) {
                             stats.freed_buckets, stats.folded_buckets
                         );
                     }
+                    Command::TypeId(type_id) => {
+                        let type_id = state.project.types.to_type_id((*type_id) as _);
+                        match type_id {
+                            Some(it) => println!("{}", state.project.types.name_of_type_id_debug(it)),
+                            None => println!("Invalid type id!"),
+                        }
+                    }
                 }
             }
             None => {
@@ -221,6 +228,7 @@ enum Command {
     ShowCurrentInstruction,
     ShowCurrentLine,
     GarbageCollect,
+    TypeId(u64),
     Help,
 }
 
@@ -258,6 +266,7 @@ impl Command {
                 "This enables or disables the --dlines flag during the runtime."
             }
             Command::GarbageCollect => "Calls the garbage collector and clears up memory.",
+            Command::TypeId(_) => "Converts an integer into a type id.",
         }
     }
 
@@ -280,6 +289,7 @@ impl Command {
             Command::ShowCurrentInstruction => "di",
             Command::ShowCurrentLine => "dlines",
             Command::GarbageCollect => "gc",
+            Command::TypeId(_) => "typeid",
         }
     }
 }
@@ -303,6 +313,9 @@ fn parse_command(input: &str) -> Option<Command> {
                 } else {
                     Some(Command::Replace(arg.parse().ok()?))
                 }
+            }
+            ["typeid", arg] => {
+                Some(Command::TypeId(arg.parse().ok()?))
             }
             ["stack"] => Some(Command::Stack),
             ["gc"] => Some(Command::GarbageCollect),

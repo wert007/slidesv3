@@ -95,7 +95,6 @@ pub(crate) fn check_stack_usage(
                             OpCode::ReadWordWithOffset => 0,
                             OpCode::ReadByteWithOffset => 0,
                             OpCode::MemoryCopy => todo!(),
-                            OpCode::TypeIdentifier => 1,
                             OpCode::Label => 0,
                             OpCode::Rotate => 0,
                             OpCode::BitwiseTwosComplement => 0,

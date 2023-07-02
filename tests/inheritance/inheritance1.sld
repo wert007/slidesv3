@@ -24,4 +24,14 @@ func main() {
     print(p);
     p.field1 = 4;
     p.sayHello();
+
+    print(new Cat(4));
+}
+
+abstract struct Animal {
+    v: int;
+}
+
+struct Cat: Animal {
+    
 }

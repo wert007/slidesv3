@@ -73,20 +73,23 @@ macro_rules! typeid {
     (Type::SystemCall($kind:expr)) => {
         unsafe {
             const BASIS: u64 = 12;
-            TypeId::from_raw(BASIS + match $kind {
-                SystemCallKind::Print => 0,
-                SystemCallKind::ToString => 1,
-                SystemCallKind::ArrayLength => 2,
-                SystemCallKind::HeapDump => 3,
-                SystemCallKind::Break => 4,
-                SystemCallKind::Reallocate => 5,
-                SystemCallKind::RuntimeError => 6,
-                SystemCallKind::AddressOf => 7,
-                SystemCallKind::GarbageCollect => 8,
-                SystemCallKind::Hash => 9,
-                SystemCallKind::ByteToChar => 10,
-                SystemCallKind::TypeOfValue => 11,
-            })
+            TypeId::from_raw(
+                BASIS
+                    + match $kind {
+                        SystemCallKind::Print => 0,
+                        SystemCallKind::ToString => 1,
+                        SystemCallKind::ArrayLength => 2,
+                        SystemCallKind::HeapDump => 3,
+                        SystemCallKind::Break => 4,
+                        SystemCallKind::Reallocate => 5,
+                        SystemCallKind::RuntimeError => 6,
+                        SystemCallKind::AddressOf => 7,
+                        SystemCallKind::GarbageCollect => 8,
+                        SystemCallKind::Hash => 9,
+                        SystemCallKind::ByteToChar => 10,
+                        SystemCallKind::TypeOfValue => 11,
+                    },
+            )
         }
     };
     ($($ignore:tt)*) => {
@@ -308,6 +311,7 @@ impl TypeCollection {
                 match type_ {
                     Type::Function(_) => {}
                     Type::Closure(_) => {}
+                    Type::AbstractTypeBox(_) => {}
                     _ => {
                         let name = self.name_of_type(&type_);
                         match self.types.iter().position(|t| self.name_of_type(t) == name) {
@@ -427,6 +431,15 @@ impl TypeCollection {
             {
                 true
             }
+            (
+                Type::Struct(StructType {
+                    is_abstract: true, ..
+                }),
+                Type::Struct(StructType {
+                    parent: Some(parent_id),
+                    ..
+                }),
+            ) if *parent_id == from_id => true,
             _ => false,
         }
     }
@@ -488,6 +501,7 @@ impl TypeCollection {
             Type::Function(f) => format!("function {}", f.display(self)).into(),
             Type::Closure(_) => "closure".into(),
             Type::Struct(s) => format!("{}", s.name).into(),
+            Type::AbstractTypeBox(base) => self.name_of_type_id(*base).into_owned().into(),
             Type::Library(_) => "library".into(),
             Type::Pointer => "ptr".into(),
             Type::PointerOf(inner) => format!("&{}", self.name_of_type_id(*inner)).into(),
@@ -501,6 +515,11 @@ impl TypeCollection {
     fn name_of_type_debug<'a>(&self, type_: &'a Type) -> Cow<'a, str> {
         match type_ {
             Type::StructPlaceholder(it) => format!("placeholder {}", it.name).into(),
+            Type::AbstractTypeBox(base) => format!(
+                "thin abstract {}",
+                self.name_of_type_id_debug(*base)
+            )
+            .into(),
             type_ => self.name_of_type(type_),
         }
     }
@@ -724,6 +743,7 @@ impl TypeCollection {
                     name,
                     function_table: it.function_table,
                     applied_types,
+                    is_abstract: false,
                 }))
             }
             GenericType::Struct(generic_struct) => {
@@ -865,6 +885,24 @@ impl TypeCollection {
                 .collect(),
             (Type::GenericType(..), _) => vec![(replaceable_type, available_type)],
             _ => Vec::new(),
+        }
+    }
+
+    pub(crate) fn is_abstract_type(&self, type_: TypeId) -> bool {
+        if let Type::Struct(struct_type) = &self[type_] {
+            struct_type.is_abstract
+        } else if let Type::StructPlaceholder(struct_type) = &self[type_] {
+            struct_type.is_abstract
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn is_parent_of(&self, child_id: TypeId, parent_id: TypeId) -> bool {
+        if let (Type::Struct(child), Type::Struct(parent)) = (&self[child_id], &self[parent_id]) {
+            child.parent == Some(parent_id) && parent.is_abstract
+        } else {
+            false
         }
     }
 }
@@ -1009,6 +1047,12 @@ pub enum Type {
     Function(FunctionType<TypeId>),
     Closure(Box<ClosureType>),
     Struct(StructType),
+    /// Contains an abstract type. Normally an abstract type is a fat pointer,
+    /// containing an actual type, but if you are accessing the `base` variable
+    /// in a child struct of an abstract struct, its type is actually the
+    /// abstract type withoug being a container for another type. This type
+    /// handles that case.
+    AbstractTypeBox(TypeId),
     Library(usize),
     Pointer,
     PointerOf(TypeId),
@@ -1048,6 +1092,7 @@ impl Type {
             | Type::Enum(..)
             | Type::Struct(_)
             | Type::StructPlaceholder(..)
+            | Type::AbstractTypeBox(_)
             | Type::Function(_)
             | Type::Closure(_)
             | Type::IntegerLiteral
@@ -1093,6 +1138,7 @@ impl Type {
             | Type::String
             | Type::Closure(_)
             | Type::Struct(_)
+            | Type::AbstractTypeBox(_)
             | Type::Pointer
             | Type::PointerOf(_) => true,
         }
@@ -1597,6 +1643,7 @@ pub struct StructPlaceholderType {
     pub name: String,
     pub function_table: SimpleStructFunctionTable,
     pub applied_types: Vec<TypeId>,
+    pub is_abstract: bool,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]

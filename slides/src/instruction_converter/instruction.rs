@@ -176,14 +176,6 @@ impl Instruction {
         }
     }
 
-    pub const fn type_identifier(type_identifier: u64, location: TextLocation) -> Self {
-        Self {
-            op_code: OpCode::TypeIdentifier,
-            arg: type_identifier,
-            location,
-        }
-    }
-
     pub const fn twos_complement(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::BitwiseTwosComplement,

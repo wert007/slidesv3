@@ -246,7 +246,11 @@ pub fn commented_instruction_to_string(
                 write!(base, "; NONE")?;
             }
         }
-        OpCode::DuplicateOver => {}
+        OpCode::DuplicateOver => {
+            if let Some(value) = state.peek_stack((instruction.arg / WORD_SIZE_IN_BYTES) as usize) {
+                write!(base, "; {value}")?;
+            }
+        }
         OpCode::Pop => {}
         OpCode::LoadRegister => {
             write!(
@@ -275,7 +279,13 @@ pub fn commented_instruction_to_string(
                 write!(base, "; #{address:X}")?;
             }
         }
-        OpCode::Allocate => {}
+        OpCode::Allocate => {
+            if let Some(address) =
+                state.next_allocation_address(instruction.arg * memory::WORD_SIZE_IN_BYTES)
+            {
+                write!(base, "; #{address:X}")?;
+            }
+        }
         OpCode::ReadWordWithOffset => {
             if let Some(address) = state.peek_stack(0).map(|v| v.as_pointer().ok()).flatten() {
                 let offset = instruction.arg;
@@ -295,7 +305,6 @@ pub fn commented_instruction_to_string(
             }
         }
         OpCode::MemoryCopy => {}
-        OpCode::TypeIdentifier => todo!(),
         OpCode::Label => unreachable!(
             "Right now, this only gets called by the evaluator, and there are no labels left!"
         ),
@@ -365,7 +374,6 @@ pub fn instruction_to_string(
             instruction_byte_count_arg_to_string("rdbyteoffset", instruction.arg)
         }
         OpCode::MemoryCopy => instruction_no_arg_to_string("memcpy"),
-        OpCode::TypeIdentifier => instruction_dec_signed_arg_to_string("ldtyp", instruction.arg),
         OpCode::Label => instruction_label_arg_to_string("lbl", instruction.arg),
         OpCode::Rotate => instruction_word_count_arg_to_string("rotate", instruction.arg),
         OpCode::BitwiseTwosComplement => instruction_no_arg_to_string("btwoscomplement"),

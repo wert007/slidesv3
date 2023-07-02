@@ -773,6 +773,7 @@ impl BindingState<'_> {
         name: impl Into<SourceCow>,
         struct_function_table: SimpleStructFunctionTable,
         applied_types: Vec<TypeId>,
+        is_abstract: bool,
     ) -> Option<TypeId> {
         let name = name.into();
         let result = self
@@ -782,6 +783,7 @@ impl BindingState<'_> {
                 name: name.to_owned(&self.project.source_text_collection),
                 function_table: struct_function_table,
                 applied_types,
+                is_abstract,
             }))
             .ok();
         if let Some(it) = result {
@@ -1348,6 +1350,10 @@ fn bind_function_declaration_body<'a>(
         })
         .flatten()
     {
+        let parent = binder
+            .project
+            .types
+            .look_up_or_add_type(Type::AbstractTypeBox(parent));
         Some(
             binder
                 .register_generated_variable("base".into(), parent, false)
@@ -1471,6 +1477,10 @@ fn bind_generic_function_declaration_body<'a>(
         .map(|id| binder.project.types[id].as_struct_type().unwrap().parent)
         .flatten()
     {
+        let parent = binder
+            .project
+            .types
+            .look_up_or_add_type(Type::AbstractTypeBox(parent));
         Some(
             binder
                 .register_generated_variable("base".into(), parent, false)
@@ -1761,7 +1771,17 @@ fn bind_function_declaration_for_struct<'a, 'b>(
                 function_declaration.function_type,
                 binder,
             );
-            variables.push(("this".to_owned().into(), struct_type));
+            variables.push((
+                "this".to_owned().into(),
+                if binder.project.types.is_abstract_type(struct_type) {
+                    binder
+                        .project
+                        .types
+                        .look_up_or_add_type(Type::AbstractTypeBox(struct_type))
+                } else {
+                    struct_type
+                },
+            ));
             let type_ = binder
                 .project
                 .types
@@ -2087,6 +2107,7 @@ fn bind_struct_declaration<'a, 'b>(
     struct_declaration: StructDeclarationNodeKind,
     binder: &mut BindingState<'b>,
 ) {
+    let is_abstract = struct_declaration.optional_abstract_keyword.is_some();
     let mut struct_function_table = SimpleStructFunctionTable::default();
     for statement in &struct_declaration.body.statements {
         match &statement.kind {
@@ -2130,6 +2151,7 @@ fn bind_struct_declaration<'a, 'b>(
                 struct_declaration.identifier.location,
                 struct_function_table,
                 Vec::new(),
+                is_abstract,
             )
             .map(|_| ())
     };
@@ -2176,7 +2198,7 @@ fn bind_struct_declaration<'a, 'b>(
                 })
                 .collect();
             binder
-                .register_struct_name(name, struct_function_table, applied_types)
+                .register_struct_name(name, struct_function_table, applied_types, is_abstract)
                 .unwrap();
             binder.generic_structs.push(StructDeclarationBody {
                 location: struct_declaration.identifier.location,
@@ -3167,7 +3189,13 @@ fn bind_generic_struct_type_for_types(
             }
         }
         let id = binder
-            .register_struct_name(struct_name.clone(), struct_function_table, types.to_vec())
+            .register_struct_name(
+                struct_name.clone(),
+                struct_function_table,
+                types.to_vec(),
+                // Generic structs cannot be abstract right now!
+                false,
+            )
             .expect("Add diagnostic message here?");
         bind_generic_struct_type_for_types_no_lookup(
             location,
@@ -4283,8 +4311,14 @@ fn bind_field_access<'a, 'b>(
     let base_location = field_access.base.location;
     let field = field_access.field;
     let base = bind_node(*field_access.base, binder);
+    if &binder.project.source_text_collection[base_location] == "this" {
+        assert!(!binder.project.types.is_abstract_type(base.type_));
+    }
     match binder.project.types[base.type_].clone() {
         Type::Error => base,
+        Type::AbstractTypeBox(base_type) => {
+            field_access_in_struct(field, base_type, base, binder, location)
+        }
         Type::Struct(_) => field_access_in_struct(field, base.type_, base, binder, location),
         Type::Library(index) => {
             let library = &binder.libraries[index];
@@ -4404,7 +4438,7 @@ fn field_access_in_struct<'a, 'b>(
     id: TypeId,
     base: BoundNode,
     binder: &mut BindingState<'b>,
-    span: TextLocation,
+    location: TextLocation,
 ) -> BoundNode {
     let field_name = binder.lexeme(field).to_string();
     let bound_struct_type = binder.project.types[id].as_struct_type().unwrap();
@@ -4451,26 +4485,26 @@ fn field_access_in_struct<'a, 'b>(
                             // Probably somebody already reported an error here!
                             None => {
                                 assert!(binder.diagnostic_bag.has_errors(), "{field_name}");
-                                BoundNode::error(span)
+                                BoundNode::error(location)
                             }
                         }
                     }
                     VariableOrConstantKind::Variable(variable_id) => {
-                        BoundNode::closure(span, vec![base], variable_id, type_)
+                        BoundNode::closure(location, vec![base], variable_id, type_)
                     }
                     VariableOrConstantKind::Constant(value) => {
                         if is_abstract && !is_base_variable {
-                            BoundNode::closure_abstract(span, vec![base], index.expect("We found a valid variable kind, so we expect to also have a field on the current type! (Maybe not?)"), type_)
+                            BoundNode::closure_abstract(location, vec![base], index.expect("We found a valid variable kind, so we expect to also have a field on the current type! (Maybe not?)"), type_)
                         } else {
                             let label_index = value.as_label_pointer().unwrap().0;
-                            BoundNode::closure_label(span, vec![base], label_index, type_)
+                            BoundNode::closure_label(location, vec![base], label_index, type_)
                         }
                     }
                 };
             }
         } else {
             BoundNode::field_access(
-                span,
+                location,
                 base,
                 field.offset_or_address.unwrap_offset() as _,
                 field.type_.clone(),
@@ -4487,12 +4521,12 @@ fn field_access_in_struct<'a, 'b>(
         binder
             .diagnostic_bag
             .report_no_field_named_on_struct(field.location, field.location, id);
-        BoundNode::error(span)
+        BoundNode::error(location)
     }
 }
 
 fn bind_field_access_for_assignment<'a>(
-    span: TextLocation,
+    location: TextLocation,
     field_access: FieldAccessNodeKind,
     binder: &mut BindingState<'_>,
 ) -> BoundNode {
@@ -4502,6 +4536,9 @@ fn bind_field_access_for_assignment<'a>(
         false
     };
     let base = bind_node(*field_access.base, binder);
+    if base_is_this {
+        assert!(!binder.project.types.is_abstract_type(base.type_));
+    }
     let field = field_access.field;
     match &binder.project.types[base.type_] {
         Type::Error => base,
@@ -4521,15 +4558,29 @@ fn bind_field_access_for_assignment<'a>(
             binder
                 .diagnostic_bag
                 .report_no_fields_on_type(base.location, base.type_);
-            BoundNode::error(span)
+            BoundNode::error(location)
         }
         Type::String | Type::Library(_) | Type::Enum(..) => {
-            binder.diagnostic_bag.report_cannot_assign_to(span);
-            BoundNode::error(span)
+            binder.diagnostic_bag.report_cannot_assign_to(location);
+            BoundNode::error(location)
         }
-        Type::Struct(_) => {
-            bind_field_in_struct_for_assignment(field, binder, base.type_, span, base_is_this, base)
-        }
+        // NOTE: We could say setting fields on the base type is illegal.
+        Type::AbstractTypeBox(base_type) => bind_field_in_struct_for_assignment(
+            field,
+            binder,
+            *base_type,
+            location,
+            base_is_this,
+            base,
+        ),
+        Type::Struct(_) => bind_field_in_struct_for_assignment(
+            field,
+            binder,
+            base.type_,
+            location,
+            base_is_this,
+            base,
+        ),
         Type::StructPlaceholder(it) => unreachable!(
             "Internal Compiler error, struct placeholder '{}' should already be resolved.",
             it.name
@@ -4945,7 +4996,8 @@ fn bind_condition_conversion<'a>(
         | Type::Pointer
         | Type::PointerOf(_)
         | Type::Enum(..)
-        | Type::TypeId => (
+        | Type::TypeId
+        | Type::AbstractTypeBox(_) => (
             bind_conversion(base, typeid!(Type::Boolean), binder),
             SafeNodeInCondition::None,
         ),

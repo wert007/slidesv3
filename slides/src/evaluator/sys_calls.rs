@@ -92,6 +92,7 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
             to_string_native(type_, &argument, state)
         }
         Type::None => "none".into(),
+        Type::AbstractTypeBox(type_) => to_string_native(*type_, argument, state),
         Type::Struct(struct_type) => {
             let to_string_function = get_to_string_function(type_, state);
             match to_string_function {
@@ -112,7 +113,14 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
                 None => {
                     use std::fmt::Write;
                     let mut result = format!("struct {} {{\n", struct_type.name);
-                    for field in struct_type.fields.clone() {
+                    let mut parents = vec![struct_type];
+                    while let Some(parent) = parents.last().unwrap().parent {
+                        let parent = state.project.types[parent].as_struct_type().unwrap();
+                        parents.push(parent);
+                    }
+                    let fields: Vec<_> =
+                        parents.into_iter().flat_map(|p| p.fields.clone()).collect();
+                    for field in fields {
                         let value = state
                             .read_pointer_word(
                                 argument.unwrap_pointer()
@@ -273,6 +281,7 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         }
         Type::Function(_) => todo!(),
         Type::Closure(_) => todo!(),
+        Type::AbstractTypeBox(type_) => hash_value(argument, *type_, state),
         Type::Struct(s) => hash_array(s.size_in_bytes, argument.unwrap_pointer(), state),
         Type::Pointer => argument.unwrap_value(),
         Type::PointerOf(type_) => {
