@@ -5,4 +5,4 @@ set positional-arguments
 
 @test *args:
     cd ./lang-tests && cargo run --package lang-tests --quiet -- "$@" --directory "../tests"
-    cargo test -q -p slides --message-format short
+#    cargo test -q -p slides --message-format short

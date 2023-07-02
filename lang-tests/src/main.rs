@@ -34,51 +34,66 @@ async fn main() {
         .count();
     let input_files = glob::glob(&format!("{}/**/*.sld", args.directory)).unwrap();
     let files_done = AtomicUsize::new(0);
-    stream::iter(input_files)
-        .for_each_concurrent(100, |file| async {
-            let file = file.unwrap();
-            if let Some(filter) = &args.filter {
-                if !file.to_string_lossy().contains(filter) {
-                    return;
-                }
+    let tests = stream::iter(input_files).for_each_concurrent(100, |file| async {
+        let file = file.unwrap();
+        if let Some(filter) = &args.filter {
+            if !file.to_string_lossy().contains(filter) {
+                return;
             }
-            let output = Command::new("cargo")
-                .arg("run")
-                .arg("--quiet")
-                .arg("--package")
-                .arg("reaktor")
-                .arg(&file)
-                .output()
-                .await
-                .unwrap();
-            let errors_occured = if args.record {
-                let (t1, t2) = join!(
-                    fs::write(file.with_extension("out"), output.stdout),
-                    fs::write(file.with_extension("err"), output.stderr),
-                );
-                t1.unwrap();
-                t2.unwrap();
-                false
-            } else {
-                let (t1, t2) = join!(
-                    ensure_equal(file.with_extension("out"), output.stdout, args.verbose),
-                    ensure_equal(file.with_extension("err"), output.stderr, args.verbose)
-                );
-                t1 || t2
-            };
-            files_done.fetch_add(1, atomic::Ordering::Relaxed);
-            print!(
-                "Completed {:3}/{total_files}: {}",
-                files_done.load(atomic::Ordering::Relaxed),
-                file.file_name().unwrap().to_string_lossy()
+        }
+        let output = Command::new("cargo")
+            .arg("run")
+            .arg("--quiet")
+            .arg("--package")
+            .arg("reaktor")
+            .arg(&file)
+            .output()
+            .await
+            .unwrap();
+        let errors_occured = if args.record {
+            let (t1, t2) = join!(
+                fs::write(file.with_extension("out"), output.stdout),
+                fs::write(file.with_extension("err"), output.stderr),
             );
-            if errors_occured {
-                colorize_println("   FAILED", Colors::RedFg);
-            } else {
-                colorize_println("   PASSED", Colors::BrightGreenFg);
-            }
-        })
-        .await;
+            t1.unwrap();
+            t2.unwrap();
+            false
+        } else {
+            let (t1, t2) = join!(
+                ensure_equal(file.with_extension("out"), output.stdout, args.verbose),
+                ensure_equal(file.with_extension("err"), output.stderr, args.verbose)
+            );
+            t1 || t2
+        };
+        files_done.fetch_add(1, atomic::Ordering::Relaxed);
+        print!(
+            "Completed {:3}/{total_files}: {}",
+            files_done.load(atomic::Ordering::Relaxed),
+            file.file_name().unwrap().to_string_lossy()
+        );
+        if errors_occured {
+            colorize_println("   FAILED", Colors::RedFg);
+        } else {
+            colorize_println("   PASSED", Colors::BrightGreenFg);
+        }
+    });
+    let cargo_tests = Command::new("cargo")
+        .arg("test")
+        .arg("--quiet")
+        .arg("--package")
+        .arg("slides")
+        .output();
+
+    if args.filter.is_some() || args.record {
+        tests.await;
+    } else {
+        let (cargo_tests, ()) = join!(cargo_tests, tests);
+        if cargo_tests.map(|s| s.status.success()).unwrap_or_default() {
+            colorize_println("cargo tests successfull!", Colors::BrightGreenFg);
+        } else {
+            colorize_println("cargo tests failed!", Colors::RedFg);
+        }
+    }
 }
 
 enum Error {
