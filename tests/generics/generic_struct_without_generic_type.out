@@ -1,1 +1,4 @@
-Error in ..\tests\generics\generic_struct_without_generic_type.sld:1:8: Declared struct A as generic, but generic type $Type was not used. Maybe you forgot it?
+Declared struct A as generic, but generic type $Type was not used. Maybe you forgot it?
+  1 | struct [31mA[0m<Type> {
+  2 |     a: int;
+

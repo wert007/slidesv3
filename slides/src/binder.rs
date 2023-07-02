@@ -11,7 +11,6 @@ pub mod symbols;
 // mod tests;
 
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 use std::{
@@ -2473,6 +2472,7 @@ fn bind_struct_body<'a>(
         size_in_bytes,
         applied_types: Vec::new(),
         generic_base_type: None,
+        definition_location: struct_node.location,
     }
 }
 
@@ -2720,9 +2720,14 @@ fn bind_array_literal<'a, 'b>(
                 bind_generic_struct_type_for_types(location, array_type, &[expected_type], binder);
             BoundNode::array_literal(location, Vec::new(), type_)
         } else {
+            let type_id = binder
+                .look_up_type_by_name("Array")
+                .unwrap()
+                .unwrap_generic_type_id();
+            binder.diagnostic_bag.update_registered_types(&binder.project.types);
             binder
                 .diagnostic_bag
-                .report_underspecified_generic_struct(location, "Array");
+                .report_underspecified_generic_struct(location, "Array", type_id);
             BoundNode::error(location)
         };
     }
@@ -2800,9 +2805,13 @@ fn bind_dictionary_literal<'a, 'b>(
                 .map(|f| f.function_label);
             BoundNode::constructor_call(location, Vec::new(), type_, function)
         } else {
+            let type_id = binder
+                .look_up_type_by_name("Dict")
+                .unwrap()
+                .unwrap_generic_type_id();
             binder
                 .diagnostic_bag
-                .report_underspecified_generic_struct(location, "Dict");
+                .report_underspecified_generic_struct(location, "Dict", type_id);
             BoundNode::error(location)
         };
     }
@@ -3233,9 +3242,11 @@ fn bind_generic_struct_type_for_types_no_lookup(
     .collect();
 
     if types.len() != replace.len() {
-        binder
-            .diagnostic_bag
-            .report_underspecified_generic_struct(location, struct_name);
+        binder.diagnostic_bag.report_underspecified_generic_struct(
+            location,
+            struct_name,
+            struct_id,
+        );
         return;
     }
 
@@ -3506,6 +3517,7 @@ fn bind_generic_struct_type_for_types_no_lookup(
             size_in_bytes,
             applied_types: types.to_vec(),
             generic_base_type: Some(struct_id),
+            definition_location: generic_struct.definition_location,
         }),
     );
 }
@@ -4814,6 +4826,7 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
             type_id,
         )
     } else {
+        binder.diagnostic_bag.update_registered_types(&binder.project.types);
         binder.diagnostic_bag.report_underspecified_generic_struct(
             location,
             binder
@@ -4821,6 +4834,7 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
                 .types
                 .name_of_generic_type_id(struct_id)
                 .as_ref(),
+            struct_id,
         );
         (
             result,
@@ -5397,16 +5411,20 @@ fn bind_match_statement(
         .unwrap_generic_type_id();
     bind_generic_struct_type_for_types(location, noneable, &[typeid!(Type::Pointer)], binder);
     let mut default_case: Option<BoundNode> = None;
-    let mut value_set = HashSet::new();
+    let mut value_set = HashMap::new();
     let mut cases: Vec<_> = match_statement
         .match_cases
         .into_iter()
         .filter_map(|c| match bind_match_case(c, expression.type_, binder) {
             Either::Left((it, value)) => {
-                if !value_set.insert(value.clone()) {
-                    binder
-                        .diagnostic_bag
-                        .report_match_case_not_unique(it.expression_location(), value);
+                if let Some(previous_location) =
+                    value_set.insert(value.clone(), it.expression_location())
+                {
+                    binder.diagnostic_bag.report_match_case_not_unique(
+                        it.expression_location(),
+                        value,
+                        previous_location,
+                    );
                 }
                 Some(it)
             }

@@ -1,2 +1,10 @@
-Error in ..\tests\casts\cast_error.sld:4:19: No cast necessary between types int? and int. Remove the unnecessary cast. Note, that cast will return int?.
-Error in ..\tests\casts\cast_error.sld:4:24: Cannot convert type int? to type int.
+No cast necessary between types int? and int. Remove the unnecessary cast. Note, that cast will return int?.
+  3 |     // This could have a better error message
+  4 |     let d : int = [31mcast e : int[0m;
+  5 | }
+
+Cannot convert type int? to type int.
+  3 |     // This could have a better error message
+  4 |     let d : int = cast [31me[0m : int;
+  5 | }
+

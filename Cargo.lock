@@ -555,6 +555,7 @@ name = "slides"
 version = "0.1.0"
 dependencies = [
  "assert_matches",
+ "colorized",
  "either",
  "lazy_static",
  "num_enum",

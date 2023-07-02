@@ -1,3 +1,16 @@
-Error in ..\tests\arrays\arrays_error.sld:3:13: Cannot convert type int to type uint.
-Error in ..\tests\arrays\arrays_error.sld:4:7: Cannot convert type int to type uint.
-Error in ..\tests\arrays\arrays_error.sld:7:26: Struct Array is a generic struct, but its generic type is undeclared.
+Cannot convert type int to type uint.
+  2 |     let a = [1, 2, 3];
+  3 |     print(a[[31m-1[0m]);
+  4 |     a[-1] = 0;
+
+Cannot convert type int to type uint.
+  3 |     print(a[-1]);
+  4 |     a[[31m-1[0m] = 0;
+  5 |     print(a);
+
+Struct Array is a generic struct, but its generic type is undeclared.
+  6 | 
+  7 |     let underspecified = [31m[][0m;
+  8 | }
+Hint: Missing type arguments is <$Type>.
+

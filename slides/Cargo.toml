@@ -12,3 +12,4 @@ lazy_static = "1.4.0"
 num_enum = "0.5"
 once_cell = "1.17.0"
 strum = { version = "0.24.1", features = ["derive"] }
+colorized = "1.0.0"

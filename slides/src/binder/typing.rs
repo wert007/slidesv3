@@ -7,7 +7,7 @@ use std::{
 
 use num_enum::TryFromPrimitive;
 
-use crate::{evaluator::memory::WORD_SIZE_IN_BYTES, DebugFlags};
+use crate::{evaluator::memory::WORD_SIZE_IN_BYTES, DebugFlags, text::TextLocation};
 
 use super::{
     symbols::{GenericFunction, StructFunctionTable},
@@ -1524,6 +1524,7 @@ pub struct StructType {
     /// to this generic struct.
     pub applied_types: Vec<TypeId>,
     pub generic_base_type: Option<GenericTypeId>,
+    pub definition_location: TextLocation,
 }
 
 impl StructType {

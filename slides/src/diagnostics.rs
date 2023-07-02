@@ -1,3 +1,5 @@
+use colorized::{Color, Colors};
+
 use crate::{
     binder::{
         typing::{GenericTypeId, TypeCollection, TypeId},
@@ -104,27 +106,180 @@ macro_rules! message_format {
 }
 
 #[derive(Debug, Clone)]
-pub struct Diagnostic {
+pub struct DiagnosticSimpleKind {
     message: Message,
     location: TextLocation,
 }
 
-impl Diagnostic {
-    pub(self) fn runtime(message: Message, location: TextLocation) -> Self {
-        Self { message, location }
-    }
-
-    pub fn into_string(
+impl DiagnosticSimpleKind {
+    fn flush(
         self,
+        output: &mut impl std::io::Write,
         types: &TypeCollection,
         source_text_collection: &SourceTextCollection,
-    ) -> String {
-        format!(
-            "Error {}: {}",
-            self.location.display(source_text_collection),
+    ) -> std::io::Result<()> {
+        writeln!(
+            output,
+            "{}",
             self.message
                 .into_string_with_struct_table(types, source_text_collection)
-        )
+        )?;
+        let source_text = &source_text_collection[self.location.source_text];
+        let start_line_index = source_text.line_index(self.location.span.start());
+        let end_line_index = source_text.line_index(self.location.span.end());
+        let column_start = source_text.column_index(self.location.span.start());
+        let column_end = source_text.column_index(self.location.span.end());
+        let pre_error_line = &source_text.line(start_line_index)[..column_start];
+        let post_error_line = &source_text.line(end_line_index)[column_end..];
+        const CONTEXT_LINES: usize = 1;
+        for line_index in start_line_index.saturating_sub(CONTEXT_LINES)..start_line_index {
+            writeln!(
+                output,
+                "{:>3} | {}",
+                line_index + 1,
+                source_text.line(line_index)
+            )?;
+        }
+        for line_index in start_line_index..=end_line_index {
+            write!(output, "{:>3} | ", line_index + 1)?;
+            let error_line = if line_index == start_line_index {
+                if line_index != end_line_index {
+                    &source_text.line(line_index)[column_start..]
+                } else {
+                    &source_text.line(line_index)[column_start..column_end]
+                }
+            } else if line_index == end_line_index {
+                &source_text.line(line_index)[..column_end]
+            } else {
+                source_text.line(line_index)
+            };
+            if line_index == start_line_index {
+                write!(output, "{pre_error_line}")?;
+            }
+            write!(output, "{}", error_line.color(Colors::RedFg))?;
+            if line_index == end_line_index {
+                write!(output, "{post_error_line}")?;
+            }
+            writeln!(output)?;
+        }
+        for line_index in end_line_index + 1..end_line_index + 1 + CONTEXT_LINES {
+            writeln!(
+                output,
+                "{:>3} | {}",
+                line_index + 1,
+                source_text.line(line_index)
+            )?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DiagnosticTwoLocationsKind {
+    first: DiagnosticSimpleKind,
+    second: DiagnosticSimpleKind,
+}
+
+impl DiagnosticTwoLocationsKind {
+    fn flush(
+        self,
+        output: &mut impl std::io::Write,
+        types: &TypeCollection,
+        source_text_collection: &SourceTextCollection,
+    ) -> std::io::Result<()> {
+        self.first.flush(output, types, source_text_collection)?;
+        self.second.flush(output, types, source_text_collection)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DiagnosticWithHint {
+    message: Message,
+    location: TextLocation,
+    hint: Message,
+}
+
+impl DiagnosticWithHint {
+    fn flush(
+        self,
+        output: &mut impl std::io::Write,
+        types: &TypeCollection,
+        source_text_collection: &SourceTextCollection,
+    ) -> std::io::Result<()> {
+        DiagnosticSimpleKind {
+            message: self.message,
+            location: self.location,
+        }
+        .flush(output, types, source_text_collection)?;
+        writeln!(
+            output,
+            "Hint: {}",
+            self.hint
+                .into_string_with_struct_table(types, source_text_collection)
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Diagnostic {
+    Error(DiagnosticSimpleKind),
+    ErrorWithTwoLocations(DiagnosticTwoLocationsKind),
+    Runtime(DiagnosticSimpleKind),
+    ErrorWithHint(DiagnosticWithHint),
+}
+
+impl Diagnostic {
+    pub(self) fn runtime(message: Message, location: TextLocation) -> Self {
+        Self::Runtime(DiagnosticSimpleKind { message, location })
+    }
+
+    // pub fn into_string(
+    //     self,
+    //     types: &TypeCollection,
+    //     source_text_collection: &SourceTextCollection,
+    // ) -> String {
+    //     let message = self
+    //         .message
+    //         .into_string_with_struct_table(types, source_text_collection);
+    //     match self.kind {
+    //         DiagnosticKind::Error(location) => {
+    //             format!(
+    //                 "Error {}: {}",
+    //                 location.display(source_text_collection),
+    //                 message,
+    //             )
+    //         }
+    //         DiagnosticKind::ErrorWithReference(location, reference) => {
+    //             format!(
+    //                 "Error {}: {}\nSee also here {}",
+    //                 location.display(source_text_collection),
+    //                 message,
+    //                 reference.display(source_text_collection),
+    //             )
+
+    //         }
+    //     }
+    // }
+
+    fn flush(
+        self,
+        mut output: impl std::io::Write,
+        types: &TypeCollection,
+        source_text_collection: &SourceTextCollection,
+    ) -> std::io::Result<()> {
+        match self {
+            Diagnostic::Error(simple) | Diagnostic::Runtime(simple) => {
+                simple.flush(&mut output, types, source_text_collection)
+            }
+            Diagnostic::ErrorWithTwoLocations(it) => {
+                it.flush(&mut output, types, source_text_collection)
+            }
+            Diagnostic::ErrorWithHint(it) => {
+                it.flush(&mut output, types, source_text_collection)
+            }
+        }
     }
 }
 
@@ -148,16 +303,26 @@ impl DiagnosticBag {
 
     pub fn flush_to_console(self, source_text_collection: &SourceTextCollection) {
         for diagnostic in self.diagnostics {
-            println!(
-                "{}",
-                diagnostic.into_string(&self.registered_types, source_text_collection)
-            );
+            diagnostic
+                .flush(
+                    std::io::stdout().lock(),
+                    &self.registered_types,
+                    source_text_collection,
+                )
+                .unwrap();
+            println!();
         }
     }
 
-    fn report(&mut self, message: Message, location: TextLocation) {
-        let diagnostic = Diagnostic { message, location };
+    fn report(&mut self, diagnostic: Diagnostic) {
         self.diagnostics.push(diagnostic);
+    }
+
+    fn report_error(&mut self, message: Message, location: TextLocation) {
+        self.report(Diagnostic::Error(DiagnosticSimpleKind {
+            message,
+            location,
+        }));
     }
 
     fn report_runtime(&mut self, message: Message, location: TextLocation) {
@@ -169,13 +334,13 @@ impl DiagnosticBag {
         let message = format!("Bad character in input: {}", character);
         let span = TextSpan::new(start, 1, true);
         let location = TextLocation { span, source_text };
-        self.report(message.into(), location)
+        self.report_error(message.into(), location)
     }
     pub fn report_bad_integer(&mut self, start: usize, source_text: SourceTextId, text: &str) {
         let message = format!("'{}' is no valid u64 integer.", text);
         let span = TextSpan::new(start, text.len(), true);
         let location = TextLocation { span, source_text };
-        self.report(message.into(), location)
+        self.report_error(message.into(), location)
     }
 
     pub fn report_unexpected_token_kind(
@@ -188,7 +353,7 @@ impl DiagnosticBag {
             "Expected token kind {:?} but actually found {:?}.",
             expected_token_kind, actual_token_kind
         );
-        self.report(message.into(), location)
+        self.report_error(message.into(), location)
     }
 
     pub fn report_cannot_convert(
@@ -198,12 +363,12 @@ impl DiagnosticBag {
         to_type: TypeId,
     ) {
         let message = message_format!("Cannot convert type ", from_type, " to type ", to_type, ".");
-        self.report(message, location)
+        self.report_error(message, location)
     }
 
     pub fn report_invalid_void_expression(&mut self, location: TextLocation) {
         let message = "Expected value type, but expression is of type void.".into();
-        self.report(message, location)
+        self.report_error(message, location)
     }
 
     pub fn report_no_unary_operator(
@@ -213,7 +378,7 @@ impl DiagnosticBag {
         type_: TypeId,
     ) {
         let message = message_format!("No unary operator ", operator, " for type ", type_, ".");
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_no_binary_operator(
@@ -232,13 +397,13 @@ impl DiagnosticBag {
             rhs_type,
             "."
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     #[allow(dead_code)]
     pub fn report_not_supported(&mut self, location: TextLocation, unsupported: &'static str) {
         let message = format!("Currently {} are not supported!", unsupported);
-        self.report(message.into(), location);
+        self.report_error(message.into(), location);
     }
 
     pub fn report_cannot_declare_variable(
@@ -251,7 +416,7 @@ impl DiagnosticBag {
             variable_name,
             "' cannot be declared here."
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub(crate) fn report_cannot_declare_struct(
@@ -261,7 +426,7 @@ impl DiagnosticBag {
     ) {
         let message = message_format!("A struct named ", struct_name, " was already declared.");
         // FIXME: Reference the first declaration of a struct with that name.
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_cannot_declare_keyword_as_variable(
@@ -274,13 +439,13 @@ impl DiagnosticBag {
             variable_name,
             "' is a keyword and cannot be overwritten.",
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_field_already_declared(&mut self, location: TextLocation, name: &str) {
         let message = message_format!("Field named ", name, " already declared in struct.");
         // FIXME: Reference the first declaration of a field with that name.
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_variable_not_found(
@@ -289,17 +454,17 @@ impl DiagnosticBag {
         variable_name: TextLocation,
     ) {
         let message = message_format!("No variable named '", variable_name, "' could be found.");
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_cannot_assign_to(&mut self, location: TextLocation) {
         let message = "Only variables can be assigned to. Did you mean to use ==?".into();
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_variable_is_read_only(&mut self, location: TextLocation) {
         let message = "Variable cannot be assigned to, it is a read only variable.".into();
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_unexpected_argument_count(
@@ -312,7 +477,7 @@ impl DiagnosticBag {
             "Expected {} arguments, but actually found {}.",
             expected_argument_count, actual_argument_count
         );
-        self.report(message.into(), location)
+        self.report_error(message.into(), location)
     }
 
     pub fn report_unexpected_parameter_count(
@@ -325,7 +490,7 @@ impl DiagnosticBag {
             "Expected {} parameters, but actually found {}.",
             expected_parameter_count, actual_parameter_count
         );
-        self.report(message.into(), location)
+        self.report_error(message.into(), location)
     }
 
     pub fn report_unterminated_comment(
@@ -337,7 +502,7 @@ impl DiagnosticBag {
         let span = TextSpan::new(start, text.len(), true);
         let location = TextLocation { span, source_text };
         let message = "Unterminated comment found here.".into();
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_unterminated_string(&mut self, location: TextLocation, expected_char: char) {
@@ -345,7 +510,7 @@ impl DiagnosticBag {
             "Unterminated string found here. Expected `{}`.",
             expected_char
         );
-        self.report(message.into(), location);
+        self.report_error(message.into(), location);
     }
 
     pub fn report_no_fields_on_type(&mut self, location: TextLocation, type_: TypeId) {
@@ -354,7 +519,7 @@ impl DiagnosticBag {
             type_.into(),
             ".".into(),
         ];
-        self.report(message.into(), location);
+        self.report_error(message.into(), location);
     }
 
     pub fn report_no_field_named_on_type(
@@ -370,7 +535,7 @@ impl DiagnosticBag {
             type_,
             "."
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_no_field_named_on_struct(
@@ -397,7 +562,7 @@ impl DiagnosticBag {
         //         message.push_str(";\n");
         //     }
         // }
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_not_all_fields_have_been_assigned(
@@ -412,7 +577,7 @@ impl DiagnosticBag {
             message.push_str(field);
             message.push('\n');
         }
-        self.report(message.into(), span);
+        self.report_error(message.into(), span);
     }
 
     pub fn report_invalid_top_level_statement(&mut self, span: TextLocation, kind: SyntaxNodeKind) {
@@ -420,7 +585,7 @@ impl DiagnosticBag {
             "{:?} is no valid top level statement. Use functions instead.",
             kind
         );
-        self.report(message.into(), span);
+        self.report_error(message.into(), span);
     }
 
     pub fn report_unknown_type(&mut self, location: TextLocation, type_name: &str) {
@@ -433,7 +598,7 @@ impl DiagnosticBag {
         } else {
             message_format!("Unknown type ", type_name, " found.")
         };
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_missing_return_value(
@@ -446,7 +611,7 @@ impl DiagnosticBag {
             expected_return_type.into(),
             " and needs a value of this type.".into(),
         ];
-        self.report(message.into(), span);
+        self.report_error(message.into(), span);
     }
 
     pub fn report_missing_return_statement(
@@ -459,12 +624,12 @@ impl DiagnosticBag {
             expected_return_type.into(),
             ".".into(),
         ];
-        self.report(message.into(), span);
+        self.report_error(message.into(), span);
     }
 
     pub fn report_invalid_variable_type_none(&mut self, span: TextLocation) {
         let message = "Variables cannot be assigned none, without type information. Try adding a : TypeDeclaration.".into();
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_unnecessary_cast(
@@ -482,7 +647,7 @@ impl DiagnosticBag {
             to_type,
             "?.",
         );
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_impossible_cast(
@@ -500,19 +665,19 @@ impl DiagnosticBag {
             to_type,
             "?."
         );
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_expected_constant(&mut self, location: TextLocation) {
         let message = "Only constant expressions are allowed here.".into();
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_only_function_call_in_import_statement(&mut self, span: TextLocation) {
         let message =
             "Only function calls like lib('path/to/lib.sld') are valid in import statements."
                 .into();
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_unknown_import_function(
@@ -525,7 +690,7 @@ impl DiagnosticBag {
             function_name,
             " found for imports. Use lib('path/to/lib.sld') instead."
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub(crate) fn report_unknown_library(
@@ -538,24 +703,24 @@ impl DiagnosticBag {
             library_name,
             " found. Did you misspell it? Or are you missing an import?",
         );
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_errors_in_referenced_library(&mut self, span: TextLocation, library_name: &str) {
         let message = format!("Errors in {} found. Fix them and recompile.", library_name);
-        self.report(message.into(), span);
+        self.report_error(message.into(), span);
     }
 
     pub fn report_no_main_function_found(&mut self, source_text: SourceTextId) {
         let message =
             "No main() function found in file. Did you forget it? Or maybe this is a library."
                 .into();
-        self.report(message, TextLocation::zero_in_file(source_text));
+        self.report_error(message, TextLocation::zero_in_file(source_text));
     }
 
     pub fn report_invalid_field_name(&mut self, span: TextLocation, field_name: &str) {
         let message = format!("Cannot use $ fields in code. Field was {}.", field_name);
-        self.report(message.into(), span);
+        self.report_error(message.into(), span);
     }
 
     pub fn report_unrecognized_operator_function(
@@ -564,7 +729,7 @@ impl DiagnosticBag {
         identifier: TextLocation,
     ) {
         let message = message_format!("Function name ", identifier, " was not recognized as a valid operator functions. Remove the $ if you want to call this function. Or use a valid name like $constructor.");
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_cannot_index_get(&mut self, span: TextLocation, type_: TypeId) {
@@ -573,7 +738,7 @@ impl DiagnosticBag {
             type_,
             " cannot be accessed with [], maybe it is missing a $get function?"
         );
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_cannot_index_set(&mut self, span: TextLocation, type_: TypeId) {
@@ -582,7 +747,7 @@ impl DiagnosticBag {
             type_,
             " cannot be accessed with [], maybe it is missing a $set function?"
         );
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_cannot_iterate(&mut self, span: TextLocation, type_: TypeId) {
@@ -591,7 +756,7 @@ impl DiagnosticBag {
             type_,
             " cannot be for a `for`-loop, maybe it is missing a $get and $elementCount function?"
         );
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_generic_type_in_ungeneric_struct(
@@ -605,7 +770,7 @@ impl DiagnosticBag {
             " without declaring it as 'generic'."
         );
         // TODO: Add hint to struct declaration.
-        self.report(message, span);
+        self.report_error(message, span);
     }
 
     pub fn report_generic_struct_without_generic_type(
@@ -621,20 +786,43 @@ impl DiagnosticBag {
             type_name,
             " was not used. Maybe you forgot it?"
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_underspecified_generic_struct(
         &mut self,
         location: TextLocation,
         struct_name: impl Into<Message>,
+        type_id: GenericTypeId,
     ) {
         let message = message_format!(
             "Struct ",
             struct_name,
             " is a generic struct, but its generic type is undeclared."
         );
-        self.report(message, location);
+        let parameters = self.registered_types[type_id].generic_parameters();
+        let mut hint_parts = vec![
+            "Missing type arguments ".into(),
+            if parameters.len() == 1 {
+                "is".into()
+            } else {
+                "are".into()
+            },
+            " <$".into(),
+        ];
+        for (i, p) in parameters.iter().enumerate() {
+            if i != 0 {
+                hint_parts.push(", $".into());
+            }
+            hint_parts.push(p.to_owned().into());
+        }
+        hint_parts.push(">.".into());
+        let hint = Message::Composition(hint_parts);
+        self.report(Diagnostic::ErrorWithHint(DiagnosticWithHint {
+            message,
+            location,
+            hint,
+        }));
     }
 
     pub fn report_struct_parent_not_abstract(
@@ -647,7 +835,7 @@ impl DiagnosticBag {
             parent_name,
             " of struct is not abstract. It needs to be abstract to be a parent."
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_expected_struct(
@@ -660,7 +848,7 @@ impl DiagnosticBag {
             parent_name,
             " is not a struct!"
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_expected_type_found_generic(
@@ -673,7 +861,29 @@ impl DiagnosticBag {
             generic,
             "instead. Are you missing type arguments?"
         );
-        self.report(message, location);
+        let parameters = self.registered_types[generic].generic_parameters();
+        let mut hint_parts = vec![
+            "Missing type arguments ".into(),
+            if parameters.len() == 1 {
+                "is".into()
+            } else {
+                "are".into()
+            },
+            " <$".into(),
+        ];
+        for (i, p) in parameters.iter().enumerate() {
+            if i != 0 {
+                hint_parts.push(", $".into());
+            }
+            hint_parts.push(p.to_owned().into());
+        }
+        hint_parts.push(">.".into());
+        let hint = Message::Composition(hint_parts);
+        self.report(Diagnostic::ErrorWithHint(DiagnosticWithHint {
+            message,
+            location,
+            hint,
+        }));
     }
 
     pub fn report_not_a_function(&mut self, location: TextLocation, base_type: TypeId) {
@@ -682,27 +892,53 @@ impl DiagnosticBag {
             base_type,
             " is not a function."
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub fn report_found_multiple_else_cases(
         &mut self,
-        _previous: TextLocation,
+        previous: TextLocation,
         error: TextLocation,
     ) {
         let message = message_format!(
             "Found multiple else cases in match statement. Only one is allowed though."
         );
-        self.report(message, error)
+        let message2 = message_format!("Previous else case was here.");
+        self.report(Diagnostic::ErrorWithTwoLocations(
+            DiagnosticTwoLocationsKind {
+                first: DiagnosticSimpleKind {
+                    message,
+                    location: error,
+                },
+                second: DiagnosticSimpleKind {
+                    message: message2,
+                    location: previous,
+                },
+            },
+        ))
     }
 
-    pub(crate) fn report_match_case_not_unique(&mut self, location: TextLocation, value: Value) {
+    pub(crate) fn report_match_case_not_unique(
+        &mut self,
+        location: TextLocation,
+        value: Value,
+        first_location: TextLocation,
+    ) {
         let message = message_format!(
             "Multiple statements with the same value (",
             value,
             ") found in match statement."
         );
-        self.report(message, location);
+        let message2 = message_format!("Previous case with the same value was here.");
+        self.report(Diagnostic::ErrorWithTwoLocations(
+            DiagnosticTwoLocationsKind {
+                first: DiagnosticSimpleKind { message, location },
+                second: DiagnosticSimpleKind {
+                    message: message2,
+                    location: first_location,
+                },
+            },
+        ))
     }
 
     pub(crate) fn report_cannot_match(&mut self, location: TextLocation, type_: TypeId) {
@@ -721,7 +957,7 @@ impl DiagnosticBag {
             crate::binder::typing::Type::GenericType(_, _) => unreachable!("It should not be possible to actually get here!"),
             _ => unreachable!("You actually can match on this type!"),
         };
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     pub(crate) fn report_expected_else_case(&mut self, location: TextLocation, type_: TypeId) {
@@ -730,7 +966,7 @@ impl DiagnosticBag {
             type_,
             " are handled. Add an `else` case maybe?"
         );
-        self.report(message, location);
+        self.report_error(message, location);
     }
 
     // Runtime Errors
@@ -745,6 +981,10 @@ impl DiagnosticBag {
     pub fn division_by_zero(&mut self, span: TextLocation) {
         let message = "Divison by Zero.".into();
         self.report_runtime(message, span);
+    }
+
+    pub(crate) fn update_registered_types(&mut self, types: &TypeCollection) {
+        self.registered_types = types.clone();
     }
 }
 

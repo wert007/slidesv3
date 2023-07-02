@@ -1,9 +1,61 @@
-Error in ..\tests\match\match2_error.sld:3:9: Cannot convert type string to type int.
-Error in ..\tests\match\match2_error.sld:6:9: Cannot convert type bool to type int.
-Error in ..\tests\match\match2_error.sld:18:17: Found multiple else cases in match statement. Only one is allowed though.
-Error in ..\tests\match\match2_error.sld:26:9: Only constant expressions are allowed here.
-Error in ..\tests\match\match2_error.sld:38:9: Multiple statements with the same value (5) found in match statement.
-Error in ..\tests\match\match2_error.sld:41:9: Multiple statements with the same value (5) found in match statement.
-Error in ..\tests\match\match2_error.sld:47:11: Not all possible values of type bool are handled. Add an `else` case maybe?
-Error in ..\tests\match\match2_error.sld:53:11: Cannot match on type print. Seems like you forgot a () maybe?
-Error in ..\tests\match\match2_error.sld:59:11: Cannot match on type any?. There are not enough type information about this `none` value. Maybe give it a type before?
+Cannot convert type string to type int.
+  2 |     match 5 {
+  3 |         [31m'hello'[0m => {
+  4 |             print('expected a type error!');
+
+Cannot convert type bool to type int.
+  5 |         }
+  6 |         [31mtrue[0m => {
+  7 |             print('expected a type error!');
+
+Found multiple else cases in match statement. Only one is allowed though.
+ 17 |         }
+ 18 |         else => [31m{[0m
+ 19 | [31m            print('but we cannot have multiple of these!');[0m
+ 20 | [31m        }[0m
+ 21 |     }
+Previous else case was here.
+ 14 |     match 5 {
+ 15 |         else => [31m{[0m
+ 16 | [31m            print('all good!');[0m
+ 17 | [31m        }[0m
+ 18 |         else => {
+
+Only constant expressions are allowed here.
+ 25 |     match b {
+ 26 |         [31mb[0m => {
+ 27 |             print('illegal, since b is not a constant!');
+
+Multiple statements with the same value (5) found in match statement.
+ 37 |         }
+ 38 |         [31m5[0m => {
+ 39 |             print('This is also a five');
+Previous case with the same value was here.
+ 34 |     match 5 {
+ 35 |         [31m5[0m => {
+ 36 |             print('This is a five');
+
+Multiple statements with the same value (5) found in match statement.
+ 40 |         }
+ 41 |         [31m5[0m => {
+ 42 |             print('This is still a five');
+Previous case with the same value was here.
+ 37 |         }
+ 38 |         [31m5[0m => {
+ 39 |             print('This is also a five');
+
+Not all possible values of type bool are handled. Add an `else` case maybe?
+ 46 | 
+ 47 |     match [31mfalse[0m {
+ 48 |         true => {
+
+Cannot match on type print. Seems like you forgot a () maybe?
+ 52 | 
+ 53 |     match [31mprint[0m {
+ 54 |         else => {
+
+Cannot match on type any?. There are not enough type information about this `none` value. Maybe give it a type before?
+ 58 | 
+ 59 |     match [31mnone[0m {
+ 60 |         else => {
+

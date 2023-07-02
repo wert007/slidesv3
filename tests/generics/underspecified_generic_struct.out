@@ -1,1 +1,6 @@
-Error in ..\tests\generics\underspecified_generic_struct.sld:2:13: Struct List is a generic struct, but its generic type is undeclared.
+Struct List is a generic struct, but its generic type is undeclared.
+  1 | func main() {
+  2 |     let l = [31mnew List()[0m;
+  3 |     l.add(5);
+Hint: Missing type arguments is <$Type>.
+
