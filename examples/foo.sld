@@ -13,25 +13,19 @@ struct Label : Element {
 }
 
 struct BoldLabel : Element {
-    boldText: string;
+    text: string;
 
     func printAsHtml() {
-        print('<b>' + this.boldText + '</b>');
+        print('<b>' + this.text + '</b>');
     }
 }
 
 func main() {
     let elements: List<Element> = new List();
-    let e: Element = new Label('test');
-    match e {
-        l: Label => {
-            print(l.text);
-        }
-        b: BoldLabel => {
-            print(b.boldText);
-        }
-        else => {
-            runtimeError('Should be unreachable, but the compiler does not check this!');
-        }
+    elements.add(new Label('Hello World!'));
+    elements.add(new Label('test' + ' haha!'));
+    elements.add(new BoldLabel('Hello World!'));
+    for e in elements {
+        e.printAsHtml();
     }
 }
