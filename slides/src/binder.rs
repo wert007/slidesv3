@@ -1139,6 +1139,7 @@ fn bind_with_project_parameter<'a>(
             function_type: node.function_type.unwrap_generic_type_id(),
             body,
             labels,
+            head_location: node.header_location,
         };
 
         if let Some(base_struct) = node.base_struct {
@@ -2262,6 +2263,14 @@ fn bind_function_type<'a>(
         let parameter = (parameter.0.into(), parameter.1);
         parameters.push(parameter);
     }
+    let head_location = TextLocation::bounds(
+        function_type.lparen.location,
+        function_type
+            .return_type
+            .as_ref()
+            .map(|r| r.return_type.location())
+            .unwrap_or(function_type.rparen.location),
+    );
     let return_type = if let Some(it) = function_type.return_type {
         bind_type(it.return_type, binder).unwrap_type_id()
     } else {
@@ -2276,6 +2285,7 @@ fn bind_function_type<'a>(
             system_call_kind: None,
             name: Some(name.into()),
             is_generic: function_type.is_generic,
+            head_location: Some(head_location),
         },
         parameters,
     )
@@ -2301,6 +2311,14 @@ fn bind_generic_function_type<'a>(
         binder.register_variable(parameter_name, variable_type, false);
         parameters.push((parameter_name.into(), parameter_type));
     }
+    let head_location = TextLocation::bounds(
+        function_type.lparen.location,
+        function_type
+            .return_type
+            .as_ref()
+            .map(|r| r.return_type.location())
+            .unwrap_or(function_type.rparen.location),
+    );
     let return_type = if let Some(it) = function_type.return_type {
         bind_type(it.return_type, binder).unwrap_type_id()
     } else {
@@ -2319,6 +2337,7 @@ fn bind_generic_function_type<'a>(
             system_call_kind: None,
             name: Some(name.into()),
             is_generic: function_type.is_generic,
+            head_location: Some(head_location),
         },
         parameters,
     )
@@ -2724,7 +2743,9 @@ fn bind_array_literal<'a, 'b>(
                 .look_up_type_by_name("Array")
                 .unwrap()
                 .unwrap_generic_type_id();
-            binder.diagnostic_bag.update_registered_types(&binder.project.types);
+            binder
+                .diagnostic_bag
+                .update_registered_types(&binder.project.types);
             binder
                 .diagnostic_bag
                 .report_underspecified_generic_struct(location, "Array", type_id);
@@ -3063,11 +3084,19 @@ fn bind_constructor_call<'a>(
                 .cloned()
                 .collect();
             if constructor_call.arguments.len() != fields.len() {
-                binder.diagnostic_bag.report_unexpected_argument_count(
-                    location,
-                    constructor_call.arguments.len(),
-                    fields.len(),
-                );
+                binder
+                    .diagnostic_bag
+                    .report_unexpected_argument_count_with_function_definition(
+                        location,
+                        constructor_call.arguments.len(),
+                        fields.len(),
+                        Some(
+                            binder.project.types[struct_id]
+                                .as_struct_type()
+                                .unwrap()
+                                .definition_location,
+                        ),
+                    );
             }
             let mut arguments = Vec::with_capacity(constructor_call.arguments.len());
             let mut resolved_struct_type = if struct_type.is_generic {
@@ -4348,6 +4377,7 @@ fn bind_field_access<'a, 'b>(
                 BoundNode::field_access(location, base, 0, enum_type)
             } else {
                 dbg!(&library);
+                binder.diagnostic_bag.update_registered_types(&binder.project.types);
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     location,
                     field.location,
@@ -4369,6 +4399,7 @@ fn bind_field_access<'a, 'b>(
                     BoundNode::literal(location, Value::EnumValue(literal_value, base.type_))
                 }
                 None => {
+                    binder.diagnostic_bag.update_registered_types(&binder.project.types);
                     binder.diagnostic_bag.report_no_field_named_on_type(
                         location,
                         field.location,
@@ -4425,6 +4456,7 @@ fn bind_field_access<'a, 'b>(
                     type_,
                 )
             } else {
+                binder.diagnostic_bag.update_registered_types(&binder.project.types);
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     location,
                     field.location,
@@ -4652,11 +4684,17 @@ fn bind_arguments_for_function<'a, 'b>(
         .parameter_types
         .clone();
     if parameter_types.len() != arguments.len() {
-        binder.diagnostic_bag.report_unexpected_argument_count(
-            span,
-            arguments.len(),
-            parameter_types.len(),
-        );
+        binder
+            .diagnostic_bag
+            .report_unexpected_argument_count_with_function_definition(
+                span,
+                arguments.len(),
+                parameter_types.len(),
+                binder.project.types[function_type]
+                    .as_function_type()
+                    .unwrap()
+                    .head_location,
+            );
     }
     for (argument, parameter_type) in arguments.into_iter().zip(parameter_types.iter().copied()) {
         let old_expected_type = binder.expected_type.take();
@@ -4750,11 +4788,18 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
         .parameter_types
         .clone();
     if parameter_types.len() != arguments.len() {
-        binder.diagnostic_bag.report_unexpected_argument_count(
-            location,
-            arguments.len(),
-            parameter_types.len(),
-        );
+        let head_location = binder.project.types[function_type]
+            .as_function_type()
+            .unwrap()
+            .head_location;
+        binder
+            .diagnostic_bag
+            .report_unexpected_argument_count_with_function_definition(
+                location,
+                arguments.len(),
+                parameter_types.len(),
+                head_location,
+            );
     }
 
     let generic_struct_parameters =
@@ -4826,7 +4871,9 @@ fn bind_arguments_for_generic_constructor_on_struct<'a, 'b>(
             type_id,
         )
     } else {
-        binder.diagnostic_bag.update_registered_types(&binder.project.types);
+        binder
+            .diagnostic_bag
+            .update_registered_types(&binder.project.types);
         binder.diagnostic_bag.report_underspecified_generic_struct(
             location,
             binder
@@ -4895,6 +4942,7 @@ fn bind_generic_function_for_type(
             system_call_kind: None,
             name: Some(name.to_owned().into()),
             is_generic: false,
+            head_location: Some(generic_function.head_location),
         }));
     binder.register_constant(name.to_owned(), Value::LabelPointer(label, function_type));
     let mut body = function_call_replacer::replace_function_calls(

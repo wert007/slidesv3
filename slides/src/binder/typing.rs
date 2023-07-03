@@ -682,6 +682,7 @@ impl TypeCollection {
                     system_call_kind: it.system_call_kind,
                     name: it.name,
                     is_generic: it.is_generic,
+                    head_location: it.head_location,
                 })))
             }
             Type::Closure(_) => todo!(),
@@ -794,6 +795,7 @@ impl TypeCollection {
                     // not compile, since the compiler thinks this is a normal
                     // function.
                     is_generic: false,
+                    head_location: function_type.head_location,
                 };
                 self.look_up_or_add_type(Type::Function(function_type))
             }
@@ -1265,6 +1267,7 @@ pub struct FunctionType<T> {
     pub system_call_kind: Option<SystemCallKind>,
     pub name: Option<Cow<'static, str>>,
     pub is_generic: bool,
+    pub head_location: Option<TextLocation>,
 }
 
 impl From<FunctionType<TypeId>> for FunctionType<TypeOrGenericTypeId> {
@@ -1276,6 +1279,7 @@ impl From<FunctionType<TypeId>> for FunctionType<TypeOrGenericTypeId> {
             system_call_kind: value.system_call_kind,
             name: value.name,
             is_generic: value.is_generic,
+            head_location: value.head_location,
         }
     }
 }
@@ -1289,6 +1293,7 @@ impl From<FunctionType<GenericTypeId>> for FunctionType<TypeOrGenericTypeId> {
             system_call_kind: value.system_call_kind,
             name: value.name,
             is_generic: value.is_generic,
+            head_location: value.head_location,
         }
     }
 }
@@ -1329,6 +1334,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::ToString => Self {
                 parameter_types: vec![typeid!(Type::Any)],
@@ -1337,6 +1343,7 @@ impl FunctionType<TypeId> {
                 name: None,
                 system_call_kind: Some(system_call_kind),
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::ArrayLength => Self {
                 parameter_types: vec![],
@@ -1345,6 +1352,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::HeapDump => Self {
                 parameter_types: vec![typeid!(Type::String)],
@@ -1353,6 +1361,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::Break => Self {
                 parameter_types: vec![],
@@ -1361,6 +1370,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::Reallocate => Self {
                 parameter_types: vec![
@@ -1372,6 +1382,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::RuntimeError => Self {
                 parameter_types: vec![typeid!(Type::String)],
@@ -1380,6 +1391,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::AddressOf => Self {
                 parameter_types: vec![typeid!(Type::Pointer)],
@@ -1388,6 +1400,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::GarbageCollect => Self {
                 parameter_types: vec![],
@@ -1396,6 +1409,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::Hash => Self {
                 parameter_types: vec![typeid!(Type::Any)],
@@ -1404,6 +1418,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::ByteToChar => Self {
                 parameter_types: vec![typeid!(Type::Integer(IntegerType::Unsigned8))],
@@ -1412,6 +1427,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
             SystemCallKind::TypeOfValue => Self {
                 parameter_types: vec![typeid!(Type::Any)],
@@ -1420,6 +1436,7 @@ impl FunctionType<TypeId> {
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,
+                head_location: None,
             },
         }
     }
@@ -1444,6 +1461,7 @@ impl FunctionType<GenericTypeId> {
             system_call_kind: self.system_call_kind,
             name: self.name.clone(),
             is_generic: self.is_generic,
+            head_location: self.head_location,
         };
         Cow::Owned(result)
     }
@@ -1458,6 +1476,7 @@ impl<T> FunctionType<T> {
             system_call_kind: None,
             name: Some("undefined function".into()),
             is_generic: false,
+            head_location: None,
         }
     }
 
@@ -1467,6 +1486,7 @@ impl<T> FunctionType<T> {
         name: Cow<'static, str>,
         return_type: TypeId,
         is_generic: bool,
+        location: TextLocation,
     ) -> Self {
         Self {
             parameter_types,
@@ -1475,6 +1495,7 @@ impl<T> FunctionType<T> {
             system_call_kind: None,
             name: Some(name),
             is_generic,
+            head_location: Some(location),
         }
     }
 
@@ -1524,6 +1545,7 @@ pub struct StructType {
     /// to this generic struct.
     pub applied_types: Vec<TypeId>,
     pub generic_base_type: Option<GenericTypeId>,
+    /// Location of just the name.
     pub definition_location: TextLocation,
 }
 

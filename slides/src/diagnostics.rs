@@ -2,7 +2,7 @@ use colorized::{Color, Colors};
 
 use crate::{
     binder::{
-        typing::{GenericTypeId, TypeCollection, TypeId},
+        typing::{GenericTypeId, Type, TypeCollection, TypeId},
         SourceCow,
     },
     lexer::syntax_token::SyntaxTokenKind,
@@ -109,9 +109,31 @@ macro_rules! message_format {
 pub struct DiagnosticSimpleKind {
     message: Message,
     location: TextLocation,
+    context_before: usize,
+    context_after: usize,
 }
 
 impl DiagnosticSimpleKind {
+    fn new(message: Message, location: TextLocation) -> Self {
+        Self {
+            message,
+            location,
+            context_before: 1,
+            context_after: 1,
+        }
+    }
+
+    fn with_context(mut self, context: usize) -> Self {
+        self.context_before = context;
+        self.context_after = context;
+        self
+    }
+
+    fn with_context_after(mut self, context_after: usize) -> Self {
+        self.context_after = context_after;
+        self
+    }
+
     fn flush(
         self,
         output: &mut impl std::io::Write,
@@ -131,8 +153,7 @@ impl DiagnosticSimpleKind {
         let column_end = source_text.column_index(self.location.span.end());
         let pre_error_line = &source_text.line(start_line_index)[..column_start];
         let post_error_line = &source_text.line(end_line_index)[column_end..];
-        const CONTEXT_LINES: usize = 1;
-        for line_index in start_line_index.saturating_sub(CONTEXT_LINES)..start_line_index {
+        for line_index in start_line_index.saturating_sub(self.context_before)..start_line_index {
             writeln!(
                 output,
                 "{:>3} | {}",
@@ -162,7 +183,7 @@ impl DiagnosticSimpleKind {
             }
             writeln!(output)?;
         }
-        for line_index in end_line_index + 1..end_line_index + 1 + CONTEXT_LINES {
+        for line_index in end_line_index + 1..end_line_index + 1 + self.context_after {
             writeln!(
                 output,
                 "{:>3} | {}",
@@ -207,11 +228,11 @@ impl DiagnosticWithHint {
         types: &TypeCollection,
         source_text_collection: &SourceTextCollection,
     ) -> std::io::Result<()> {
-        DiagnosticSimpleKind {
-            message: self.message,
-            location: self.location,
-        }
-        .flush(output, types, source_text_collection)?;
+        DiagnosticSimpleKind::new(self.message, self.location).flush(
+            output,
+            types,
+            source_text_collection,
+        )?;
         writeln!(
             output,
             "Hint: {}",
@@ -232,7 +253,7 @@ pub enum Diagnostic {
 
 impl Diagnostic {
     pub(self) fn runtime(message: Message, location: TextLocation) -> Self {
-        Self::Runtime(DiagnosticSimpleKind { message, location })
+        Self::Runtime(DiagnosticSimpleKind::new(message, location))
     }
 
     // pub fn into_string(
@@ -276,9 +297,7 @@ impl Diagnostic {
             Diagnostic::ErrorWithTwoLocations(it) => {
                 it.flush(&mut output, types, source_text_collection)
             }
-            Diagnostic::ErrorWithHint(it) => {
-                it.flush(&mut output, types, source_text_collection)
-            }
+            Diagnostic::ErrorWithHint(it) => it.flush(&mut output, types, source_text_collection),
         }
     }
 }
@@ -319,10 +338,9 @@ impl DiagnosticBag {
     }
 
     fn report_error(&mut self, message: Message, location: TextLocation) {
-        self.report(Diagnostic::Error(DiagnosticSimpleKind {
-            message,
-            location,
-        }));
+        self.report(Diagnostic::Error(DiagnosticSimpleKind::new(
+            message, location,
+        )));
     }
 
     fn report_runtime(&mut self, message: Message, location: TextLocation) {
@@ -467,17 +485,29 @@ impl DiagnosticBag {
         self.report_error(message, location);
     }
 
-    pub fn report_unexpected_argument_count(
+    pub fn report_unexpected_argument_count_with_function_definition(
         &mut self,
         location: TextLocation,
         actual_argument_count: usize,
         expected_argument_count: usize,
+        function_definition: Option<TextLocation>,
     ) {
         let message = format!(
             "Expected {} arguments, but actually found {}.",
             expected_argument_count, actual_argument_count
         );
-        self.report_error(message.into(), location)
+        let first = DiagnosticSimpleKind::new(message.into(), location);
+        let diagnostic = if let Some(function_definition) = function_definition {
+            let message2 = message_format!("Here is the function definition.");
+            Diagnostic::ErrorWithTwoLocations(DiagnosticTwoLocationsKind {
+                first,
+                second: DiagnosticSimpleKind::new(message2, function_definition)
+                    .with_context_after(expected_argument_count + 2),
+            })
+        } else {
+            Diagnostic::Error(first)
+        };
+        self.report(diagnostic);
     }
 
     pub fn report_unexpected_parameter_count(
@@ -535,7 +565,22 @@ impl DiagnosticBag {
             type_,
             "."
         );
-        self.report_error(message, location);
+        let mut hint = vec!["The available fields are ".into()];
+        if let Type::Enum(_, values) = &self.registered_types[type_] {
+            for (i, v) in values.iter().enumerate() {
+                if i != 0 && i != values.len() - 1 {
+                    hint.push(", ".into());
+                } else if i != 0 {
+                    hint.push(" and ".into());
+                }
+                hint.push(v.to_owned().into());
+            }
+        }
+        self.report(Diagnostic::ErrorWithHint(DiagnosticWithHint {
+            message,
+            location,
+            hint: Message::Composition(hint),
+        }));
     }
 
     pub fn report_no_field_named_on_struct(
@@ -906,14 +951,8 @@ impl DiagnosticBag {
         let message2 = message_format!("Previous else case was here.");
         self.report(Diagnostic::ErrorWithTwoLocations(
             DiagnosticTwoLocationsKind {
-                first: DiagnosticSimpleKind {
-                    message,
-                    location: error,
-                },
-                second: DiagnosticSimpleKind {
-                    message: message2,
-                    location: previous,
-                },
+                first: DiagnosticSimpleKind::new(message, error),
+                second: DiagnosticSimpleKind::new(message2, previous),
             },
         ))
     }
@@ -932,11 +971,8 @@ impl DiagnosticBag {
         let message2 = message_format!("Previous case with the same value was here.");
         self.report(Diagnostic::ErrorWithTwoLocations(
             DiagnosticTwoLocationsKind {
-                first: DiagnosticSimpleKind { message, location },
-                second: DiagnosticSimpleKind {
-                    message: message2,
-                    location: first_location,
-                },
+                first: DiagnosticSimpleKind::new(message, location),
+                second: DiagnosticSimpleKind::new(message2, first_location),
             },
         ))
     }

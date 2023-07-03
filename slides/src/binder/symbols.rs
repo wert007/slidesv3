@@ -3,10 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::instruction_converter::{
+use crate::{instruction_converter::{
     instruction::{op_codes::OpCode, Instruction},
     InstructionOrLabelReference, LabelReference, Program,
-};
+}, text::TextLocation};
 
 use super::{
     bound_nodes::BoundNode,
@@ -313,6 +313,7 @@ pub struct GenericFunction {
     pub function_type: GenericTypeId,
     pub body: BoundNode,
     pub labels: Vec<usize>,
+    pub head_location: TextLocation,
 }
 
 impl PartialEq for GenericFunction {

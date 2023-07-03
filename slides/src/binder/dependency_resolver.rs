@@ -100,7 +100,7 @@ fn bind_import_function<'a>(
                     if path.is_none() {
                         binder
                             .diagnostic_bag
-                            .report_unexpected_argument_count(function_span, 0, 1);
+                            .report_unexpected_argument_count_with_function_definition(function_span, 0, 1, None);
                         return None;
                     }
                     let path = path.unwrap();
