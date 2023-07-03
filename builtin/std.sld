@@ -267,6 +267,9 @@ struct List<Type> {
     }
 
     func $toString() -> string {
+        if this.length == 0 {
+            return '[]';
+        }
         let result = '[ ';
         let isFirst = true;
         for i in 0..this.length {

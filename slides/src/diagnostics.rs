@@ -123,12 +123,6 @@ impl DiagnosticSimpleKind {
         }
     }
 
-    fn with_context(mut self, context: usize) -> Self {
-        self.context_before = context;
-        self.context_after = context;
-        self
-    }
-
     fn with_context_after(mut self, context_after: usize) -> Self {
         self.context_after = context_after;
         self

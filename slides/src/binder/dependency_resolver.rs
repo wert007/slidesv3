@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::VecDeque,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     binder::{
@@ -100,7 +103,12 @@ fn bind_import_function<'a>(
                     if path.is_none() {
                         binder
                             .diagnostic_bag
-                            .report_unexpected_argument_count_with_function_definition(function_span, 0, 1, None);
+                            .report_unexpected_argument_count_with_function_definition(
+                                function_span,
+                                0,
+                                1,
+                                None,
+                            );
                         return None;
                     }
                     let path = path.unwrap();
@@ -258,29 +266,31 @@ fn load_library_into_binder<'a>(
         lib.relocate_labels(binder.label_offset);
         binder.label_offset += lib.program.label_count;
     }
-    for &strct in &lib.structs {
-        match &path {
-            Some(empty) if empty.is_empty() => {
-                assert!(lib.name.is_empty());
-            }
-            Some(_path) => {
-                // let _old_name = format!("{}.{}", path, strct.name);
-                // let _new_name = format!("{}.{}", name, strct.name);
-                todo!("Libraries are not working yet.")
-                // let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
-                // binder.rename_struct_by_id(struct_id, new_name);
-            }
-            None => {
-                let struct_name = if lib.name.is_empty() {
-                    binder.project.types.name_of_type_id(strct)
-                } else {
-                    format!("{}.{}", name, binder.project.types.name_of_type_id(strct)).into()
-                };
-                binder.project.types[strct]
-                    .as_struct_type_mut()
-                    .unwrap()
-                    .name = struct_name.into();
-            }
+    let mut do_later = VecDeque::new();
+    for (i, &strct) in lib.structs.iter().enumerate() {
+        if let Some(error) = fix_name_of_type(
+            &path,
+            &lib,
+            binder,
+            strct,
+            &name,
+            &lib.structs[i..],
+            do_later.as_slices().0,
+        ) {
+            do_later.push_back(error);
+        }
+    }
+    while let Some(struct_id) = do_later.pop_back() {
+        if let Some(error) = fix_name_of_type(
+            &path,
+            &lib,
+            binder,
+            struct_id,
+            &name,
+            &[],
+            do_later.as_slices().0,
+        ) {
+            do_later.push_front(error);
         }
     }
     if name.is_empty() {
@@ -307,4 +317,63 @@ fn load_library_into_binder<'a>(
         }
     }
     binder.libraries.push(lib);
+}
+
+fn fix_name_of_type(
+    path: &Option<String>,
+    lib: &Library,
+    binder: &mut BindingState<'_>,
+    struct_id: TypeId,
+    lib_name: &String,
+    still_to_do: &[TypeId],
+    still_to_do2: &[TypeId],
+) -> Option<TypeId> {
+    match path {
+        Some(empty) if empty.is_empty() => {
+            assert!(lib.name.is_empty());
+        }
+        Some(_path) => {
+            // let _old_name = format!("{}.{}", path, strct.name);
+            // let _new_name = format!("{}.{}", name, strct.name);
+            todo!("Libraries are not working yet.")
+            // let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
+            // binder.rename_struct_by_id(struct_id, new_name);
+        }
+        None => {
+            let struct_name = if lib.name.is_empty() {
+                binder.project.types.name_of_type_id(struct_id)
+            } else {
+                let struct_type = binder.project.types[struct_id].as_struct_type().unwrap();
+                if let Some(generic_base_type) = struct_type.generic_base_type {
+                    // TODO: Right now we kind of only support generic types
+                    // in the std library. We should probably change that in
+                    // the future.
+                    if struct_type
+                        .applied_types
+                        .iter()
+                        .any(|t| still_to_do.contains(t) || still_to_do2.contains(t))
+                    {
+                        return Some(struct_id);
+                    }
+                    binder
+                        .project
+                        .types
+                        .generate_generic_name(generic_base_type, &struct_type.applied_types)
+                        .into()
+                } else {
+                    format!(
+                        "{}.{}",
+                        lib_name,
+                        binder.project.types.name_of_type_id(struct_id)
+                    )
+                    .into()
+                }
+            };
+            binder.project.types[struct_id]
+                .as_struct_type_mut()
+                .unwrap()
+                .name = struct_name.into();
+        }
+    }
+    None
 }
