@@ -135,7 +135,9 @@ pub fn create_session(state: &mut EvaluatorState) {
                     Command::TypeId(type_id) => {
                         let type_id = state.project.types.to_type_id((*type_id) as _);
                         match type_id {
-                            Some(it) => println!("{}", state.project.types.name_of_type_id_debug(it)),
+                            Some(it) => {
+                                println!("{}", state.project.types.name_of_type_id_debug(it))
+                            }
                             None => println!("Invalid type id!"),
                         }
                     }
@@ -334,9 +336,7 @@ fn parse_command(input: &str) -> Option<Command> {
                     Some(Command::Replace(arg.parse().ok()?))
                 }
             }
-            ["typeid", arg] => {
-                Some(Command::TypeId(arg.parse().ok()?))
-            }
+            ["typeid", arg] => Some(Command::TypeId(arg.parse().ok()?)),
             ["stack"] => Some(Command::Stack),
             ["gc"] => Some(Command::GarbageCollect),
             ["di"] => Some(Command::ShowCurrentInstruction),

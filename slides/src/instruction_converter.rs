@@ -900,10 +900,11 @@ fn convert_array_index(
     array_index: BoundArrayIndexNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let base_type_size = match &converter.project.types[array_index.base.type_] {
-        Type::PointerOf(base_type) => converter.project.types[*base_type].size_in_bytes(),
+    let base_type = match &converter.project.types[array_index.base.type_] {
+        Type::PointerOf(base_type) => *base_type,
         error => unreachable!("unexpected access type {:?}", error),
     };
+    let base_type_size = converter.project.types[base_type].size_in_bytes();
 
     let mut result = convert_node(*array_index.base, converter);
     result.append(&mut convert_node(*array_index.index, converter));

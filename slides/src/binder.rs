@@ -4403,7 +4403,9 @@ fn bind_field_access<'a, 'b>(
                 BoundNode::field_access(location, base, 0, enum_type)
             } else {
                 dbg!(&library);
-                binder.diagnostic_bag.update_registered_types(&binder.project.types);
+                binder
+                    .diagnostic_bag
+                    .update_registered_types(&binder.project.types);
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     location,
                     field.location,
@@ -4425,7 +4427,9 @@ fn bind_field_access<'a, 'b>(
                     BoundNode::literal(location, Value::EnumValue(literal_value, base.type_))
                 }
                 None => {
-                    binder.diagnostic_bag.update_registered_types(&binder.project.types);
+                    binder
+                        .diagnostic_bag
+                        .update_registered_types(&binder.project.types);
                     binder.diagnostic_bag.report_no_field_named_on_type(
                         location,
                         field.location,
@@ -4482,7 +4486,9 @@ fn bind_field_access<'a, 'b>(
                     type_,
                 )
             } else {
-                binder.diagnostic_bag.update_registered_types(&binder.project.types);
+                binder
+                    .diagnostic_bag
+                    .update_registered_types(&binder.project.types);
                 binder.diagnostic_bag.report_no_field_named_on_type(
                     location,
                     field.location,
