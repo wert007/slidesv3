@@ -424,7 +424,8 @@ fn convert_function_declaration(
         result.push(Instruction::store_in_register(parameter, location).into());
     }
     if let Some(register) = function_declaration.base_register {
-        result.push(Instruction::load_register(0, location).into());
+        // The last parameter seems to always be the this argument.
+        result.push(Instruction::load_register(register - 1, location).into());
         result.push(Instruction::store_in_register(register, location).into());
     }
     result.append(&mut convert_node(*function_declaration.body, converter));
@@ -1026,6 +1027,11 @@ fn convert_conversion(
             if converter.project.types.is_abstract_type(base_type) {
                 result.push(Instruction::duplicate(location).into());
                 result.push(Instruction::read_word_with_offset(0, location).into());
+                result.push(Instruction::rotate(1, location).into());
+                result.push(
+                    Instruction::read_word_with_offset(2 * WORD_SIZE_IN_BYTES, location).into(),
+                );
+                result.push(Instruction::rotate(1, location).into());
             } else {
                 convert_type_identifier(base_type, location, &mut result);
             }

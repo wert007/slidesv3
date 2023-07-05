@@ -4363,7 +4363,29 @@ fn bind_field_access<'a, 'b>(
     match binder.project.types[base.type_].clone() {
         Type::Error => base,
         Type::AbstractTypeBox(base_type) => {
-            field_access_in_struct(field, base_type, base, binder, location)
+            let field_name = binder.lexeme(field);
+            if field_name == "constructor" {
+                let (label_index, function_type) = binder.project.types[base_type]
+                    .as_struct_type()
+                    .unwrap()
+                    .function_table
+                    .constructor_function
+                    .as_ref()
+                    .map(|f| (f.function_label as usize, f.function_type))
+                    .unwrap_or_else(|| todo!());
+                let mut function_type = binder.project.types[function_type]
+                    .as_function_type()
+                    .unwrap()
+                    .clone();
+                function_type.this_type = None;
+                let function_type = binder
+                    .project
+                    .types
+                    .look_up_or_add_type(Type::closure(function_type, vec![base_type]));
+                BoundNode::closure_label(location, vec![base], label_index, function_type)
+            } else {
+                field_access_in_struct(field, base_type, base, binder, location)
+            }
         }
         Type::Struct(_) => field_access_in_struct(field, base.type_, base, binder, location),
         Type::Library(index) => {
