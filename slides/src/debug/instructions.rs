@@ -6,7 +6,7 @@ use std::{
 use crate::{
     binder::typing::SystemCallKind,
     evaluator::{
-        memory::{self, WORD_SIZE_IN_BYTES},
+        memory::{self, FlaggedWord, WORD_SIZE_IN_BYTES},
         EvaluatorState,
     },
     instruction_converter::{
@@ -247,25 +247,40 @@ pub fn commented_instruction_to_string(
             }
         }
         OpCode::DuplicateOver => {
-            if let Some(value) = state.peek_stack((instruction.arg / WORD_SIZE_IN_BYTES) as usize) {
+            if let Some(value) = state.peek_stack(instruction.arg as usize) {
                 write!(base, "; {value}")?;
+                if let Some(last_written_to_instruction) = value.flags.last_written_from_instruction
+                {
+                    write!(base, " changed in {last_written_to_instruction:X}")?
+                }
             }
         }
         OpCode::Pop => {}
         OpCode::LoadRegister => {
-            write!(
-                base,
-                "; {}",
-                state.load_register(instruction.arg as usize).unwrap()
-            )?;
+            let value = state.load_register(instruction.arg as usize).unwrap();
+            write!(base, "; {}", value)?;
+            if let Some(last_written_to_instruction) = value.flags.last_written_from_instruction {
+                write!(base, " changed in {last_written_to_instruction:X}")?
+            }
         }
         OpCode::StoreInRegister => {
             write!(base, "; {}", state.peek_stack(0).unwrap())?;
         }
         OpCode::StoreByteInMemory | OpCode::StoreWordInMemory => {
-            let address = state.peek_stack(0).unwrap().unwrap_pointer();
-            let value = state.peek_stack(1).unwrap();
-            write!(base, "; [#{address:X}] = {value}")?;
+            let address_and_value = {
+                let address = state.peek_stack(0).map(|a| a.as_pointer().ok()).flatten();
+                let value = state.peek_stack(1);
+                address.and_then(|a| value.map(|v| (a, v)))
+            };
+            if let Some((address, value)) = address_and_value {
+                write!(base, "; [#{address:X}] = {value}")?;
+                if let Some(last_written_to_instruction) = value.flags.last_written_from_instruction
+                {
+                    write!(base, " changed in {last_written_to_instruction:X}")?
+                }
+            } else {
+                write!(base, "; CORRUPTED STACK!")?;
+            }
         }
         OpCode::WriteToStack => {}
         OpCode::WriteToHeap => {
@@ -292,6 +307,11 @@ pub fn commented_instruction_to_string(
                 let address = address + offset;
                 if let Ok(ptr) = state.read_pointer_word_safe(address) {
                     write!(base, "; {}", ptr)?;
+                    if let Some(last_written_to_instruction) =
+                        ptr.flags.last_written_from_instruction
+                    {
+                        write!(base, " changed in {last_written_to_instruction:X}")?
+                    }
                 }
             }
         }
@@ -301,6 +321,11 @@ pub fn commented_instruction_to_string(
                 let address = address + offset;
                 if let Some(ptr) = state.read_pointer_byte_safe(address) {
                     write!(base, "; {}", ptr)?;
+                    if let Some(last_written_to_instruction) =
+                        ptr.flags.last_written_from_instruction
+                    {
+                        write!(base, " changed in {last_written_to_instruction:X}")?
+                    }
                 }
             }
         }
@@ -313,18 +338,98 @@ pub fn commented_instruction_to_string(
         OpCode::BitwiseTwosComplement => {}
         OpCode::BitwiseXor => {}
         OpCode::BitwiseNxor => {}
-        OpCode::Addition => {}
-        OpCode::Subtraction => {}
-        OpCode::Multiplication => {}
-        OpCode::Division => {}
-        OpCode::Equals => {}
-        OpCode::NotEquals => {}
+        OpCode::Addition => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| a + b)
+            } else {
+                do_binary_signed(state, |a, b| a + b)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::Subtraction => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| a - b)
+            } else {
+                do_binary_signed(state, |a, b| a - b)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::Multiplication => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| a * b)
+            } else {
+                do_binary_signed(state, |a, b| a * b)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::Division => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| a / b)
+            } else {
+                do_binary_signed(state, |a, b| a / b)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::Equals => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| (a == b) as _)
+            } else {
+                do_binary_signed(state, |a, b| (a == b) as _)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::NotEquals => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| (a != b) as _)
+            } else {
+                do_binary_signed(state, |a, b| (a != b) as _)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
         OpCode::ArrayEquals => {}
         OpCode::ArrayNotEquals => {}
-        OpCode::LessThan => {}
-        OpCode::GreaterThan => {}
-        OpCode::LessThanEquals => {}
-        OpCode::GreaterThanEquals => {}
+        OpCode::LessThan  => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| (a < b) as _)
+            } else {
+                do_binary_signed(state, |a, b| (a < b) as _)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::GreaterThan  => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| (a > b) as _)
+            } else {
+                do_binary_signed(state, |a, b| (a > b) as _)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::LessThanEquals  => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| (a <= b) as _)
+            } else {
+                do_binary_signed(state, |a, b| (a <= b) as _)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
+        OpCode::GreaterThanEquals  => {
+            if let Some(result) = if instruction.arg == 0 {
+                do_binary_unsigned(state, |a, b| (a >= b) as _)
+            } else {
+                do_binary_signed(state, |a, b| (a >= b) as _)
+            } {
+                write!(base, "; {result}")?;
+            }
+        }
         OpCode::StringConcat => {}
         OpCode::NoneableOrValue => {}
         OpCode::Jump => {}
@@ -338,6 +443,26 @@ pub fn commented_instruction_to_string(
         OpCode::Breakpoint => {}
     }
     Ok(base)
+}
+
+fn do_binary_signed(
+    state: &EvaluatorState,
+    f: impl FnOnce(i64, i64) -> i64,
+) -> Option<FlaggedWord> {
+    let rhs = state.peek_stack(0)?;
+    let lhs = state.peek_stack(1)?;
+    let result = f(lhs.value as _, rhs.value as _) as u64;
+    Some(FlaggedWord::value(result, None, None).flags(lhs.flags))
+}
+
+fn do_binary_unsigned(
+    state: &EvaluatorState,
+    f: impl FnOnce(u64, u64) -> u64,
+) -> Option<FlaggedWord> {
+    let rhs = state.peek_stack(0)?;
+    let lhs = state.peek_stack(1)?;
+    let result = f(lhs.value as _, rhs.value as _) as u64;
+    Some(FlaggedWord::value(result, None, None).flags(lhs.flags))
 }
 
 pub fn instruction_to_string(
