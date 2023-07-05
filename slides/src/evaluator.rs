@@ -126,7 +126,6 @@ pub struct EvaluatorState {
     static_memory_size_in_words: usize,
     heap: Allocator,
     registers: Vec<FlaggedWord>,
-    protected_registers: usize,
     pc: usize,
     instructions: Vec<Instruction>,
     is_main_call: bool,
@@ -290,7 +289,6 @@ impl std::fmt::Debug for EvaluatorState {
                 &self.static_memory_size_in_words,
             )
             .field("registers", &self.registers)
-            .field("protected_registers", &self.protected_registers)
             .field("pc", &self.pc)
             .field("is_main_call", &self.is_main_call)
             .field("runtime_diagnostics", &self.runtime_diagnostics)
@@ -317,7 +315,6 @@ pub fn evaluate(
             .into_iter()
             .map(|i| FlaggedWord::new(None, None).with_comment(format!("Register #{i}")))
             .collect(),
-        protected_registers: program.protected_variables,
         pc: 0,
         stack_trace: Vec::new(),
         instructions: program.instructions,
@@ -348,7 +345,6 @@ fn execute_function(
 ) -> Result<Option<FlaggedWord>, Option<InstructionError>> {
     let old_pc = state.pc;
     let old_registers = state.registers.clone();
-    let old_protected_registers = state.protected_registers;
     state.pc = entry_point;
     state.runtime_error_happened = false;
     let min_stack_count = state.stack.len();
@@ -446,7 +442,6 @@ fn execute_function(
     }
     state.pc = old_pc;
     state.registers = old_registers;
-    state.protected_registers = old_protected_registers;
     Ok(
         if !state.runtime_error_happened && state.stack.len() > min_stack_count {
             Some(state.stack.pop())
@@ -1134,7 +1129,6 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         for register in state
             .registers
             .iter_mut()
-            .skip(state.protected_registers)
             .rev()
         {
             let mut value = state.stack.pop();
@@ -1151,7 +1145,6 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         for register in state
             .registers
             .iter_mut()
-            .skip(state.protected_registers)
             .rev()
         {
             // Protect registers after main function returns, just in case we
