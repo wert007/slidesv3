@@ -60,3 +60,67 @@ struct Position {
 
 struct Style {}
 struct SvgFilterArgs {}
+
+struct Writer {
+    buffer: string;
+
+    func $constructor() {
+        this.buffer = '';
+    }
+
+    func write(value: string) {
+        this.buffer = this.buffer + value;
+    }
+
+    func $toString() -> string {
+        return this.buffer;
+    }
+}
+
+struct HtmlEmitter {
+    presentation: Presentation;
+    writer: Writer;
+
+    func $constructor(presentation: Presentation) {
+        this.presentation = presentation;
+        this.writer = new Writer();
+    }
+
+    func emit() -> string {
+        this.writer.write('<html><body>');
+        for slide in this.presentation.slides {
+            this.emitSlide(slide);
+        }
+        this.writer.write('</body></html>');
+        return this.writer + '';
+    }
+
+    func emitSlide(slide: Slide) {
+        for step in slide.steps {
+            this.emitStep(step);
+        }
+    }
+
+    func emitStep(step: Step) {
+        for element in step.elements {
+            this.emitElement(element);
+        }
+    }
+
+    func emitElement(element: Element) {
+        match element {
+            label: Label => {
+                this.emitElementLabel(label);
+            }
+            else => {
+                runtimeError('Unhandled element kind: ' + typeOfValue(element));
+            }
+        }
+    }
+
+    func emitElementLabel(label: Label) {
+        this.writer.write('<h1>');
+        this.writer.write(label.text);
+        this.writer.write('</h1>');
+    }
+}

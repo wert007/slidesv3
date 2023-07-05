@@ -519,7 +519,6 @@ fn flatten_while_statement(
     result
 }
 
-#[allow(unused_variables)]
 fn flatten_match_statement(
     location: TextLocation,
     match_statement: BoundMatchStatementNodeKind,

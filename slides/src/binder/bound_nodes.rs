@@ -1032,6 +1032,9 @@ pub enum ConversionKind {
     AbstractTypeBoxing,
     /// Dynamic cast of a value back into its original type.
     AbstractTypeUnboxing,
+    /// Dynamic cast of a value back into its original type, knowing already,
+    /// that this will not fail.
+    AbstractTypeUnboxingUnchecked,
 }
 
 impl BoundConversionNodeKind {
@@ -1062,6 +1065,10 @@ impl BoundConversionNodeKind {
             } else {
                 return Some(ConversionKind::Unboxing);
             }
+        }
+        // Used in match statements. Otherwise the noneable version should be used by the compiler!
+        if type_collection.is_parent_of(self.type_, self.base.type_) {
+            return Some(ConversionKind::AbstractTypeUnboxingUnchecked)
         }
         match (
             &type_collection[self.type_],

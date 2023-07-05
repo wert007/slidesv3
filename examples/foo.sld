@@ -16,5 +16,6 @@ func main() {
         list [],
         list []
     );
-    print(p);
+    let emitter = new presentation.HtmlEmitter(p);
+    print(emitter.emit());
 }

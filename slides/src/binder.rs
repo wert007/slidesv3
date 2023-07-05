@@ -2351,7 +2351,12 @@ fn bind_struct_body<'a>(
     let mut functions = vec![];
     let mut function_table = StructFunctionTable::default();
     let mut offset = if let Some(parent) = struct_node.parent_id {
-        binder.project.types[parent].as_struct_type().unwrap().fields.len() as u64 * 8
+        binder.project.types[parent]
+            .as_struct_type()
+            .unwrap()
+            .fields
+            .len() as u64
+            * 8
     } else {
         0
     };
@@ -5495,31 +5500,33 @@ fn bind_match_statement(
     let mut cases: Vec<_> = match_statement
         .match_cases
         .into_iter()
-        .filter_map(|c| match bind_match_case(c, expression.type_, binder) {
-            Either::Left((it, value)) => {
-                if let Some(previous_location) =
-                    value_set.insert(value.clone(), it.expression_location())
-                {
-                    binder.diagnostic_bag.report_match_case_not_unique(
-                        it.expression_location(),
-                        value,
-                        previous_location,
-                    );
+        .filter_map(
+            |c| match bind_match_case(c, &expression, expression.type_, binder) {
+                Either::Left((it, value)) => {
+                    if let Some(previous_location) =
+                        value_set.insert(value.clone(), it.expression_location())
+                    {
+                        binder.diagnostic_bag.report_match_case_not_unique(
+                            it.expression_location(),
+                            value,
+                            previous_location,
+                        );
+                    }
+                    Some(it)
                 }
-                Some(it)
-            }
-            Either::Right(default_body) => {
-                if let Some(default_case) = &default_case {
-                    binder.diagnostic_bag.report_found_multiple_else_cases(
-                        default_case.location,
-                        default_body.location,
-                    );
-                } else {
-                    default_case = Some(default_body);
+                Either::Right(default_body) => {
+                    if let Some(default_case) = &default_case {
+                        binder.diagnostic_bag.report_found_multiple_else_cases(
+                            default_case.location,
+                            default_body.location,
+                        );
+                    } else {
+                        default_case = Some(default_body);
+                    }
+                    None
                 }
-                None
-            }
-        })
+            },
+        )
         .collect();
     cases.reverse();
     match &binder.project.types[expression.type_] {
@@ -5621,6 +5628,7 @@ fn bind_match_statement(
 
 fn bind_match_case(
     case: MatchCaseNode,
+    match_expression: &BoundNode,
     type_: TypeId,
     binder: &mut BindingState,
 ) -> either::Either<(BoundMatchCase, Value), BoundNode> {
@@ -5658,6 +5666,17 @@ fn bind_match_case(
                 "TODO: Add diagnostic here!"
             );
             let body = bind_node(case.body, binder);
+            let body = BoundNode::block_statement(
+                location,
+                vec![
+                    BoundNode::assignment(
+                        location,
+                        BoundNode::variable(location, v, expression_type),
+                        BoundNode::conversion(location, match_expression.clone(), expression_type),
+                    ),
+                    body,
+                ],
+            );
             Either::Left((
                 BoundMatchCase::new(
                     BoundMatchCaseExpression::Type(v, expression_type, location),

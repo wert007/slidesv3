@@ -1151,7 +1151,7 @@ fn convert_conversion(
                         .project
                         .types
                         .noneable_base_type(conversion.type_)
-                        .expect("Expected noneable type here!")
+                        .expect("Expected noneable type!")
                         .as_raw(),
                     location,
                 )
@@ -1173,6 +1173,9 @@ fn convert_conversion(
             result.push(Instruction::load_none_pointer(location).into());
             result.push(Instruction::write_to_heap(1, location).into());
             result.push(Instruction::label(end_label, location).into());
+        }
+        ConversionKind::AbstractTypeUnboxingUnchecked => {
+            result.push(Instruction::read_word_with_offset(16, location).into());
         }
     }
     result
