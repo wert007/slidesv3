@@ -30,6 +30,33 @@ enum PrismSyntaxHighlighting {
     Default,
 }
 
-struct Slide {}
+struct Slide {
+    steps: List<Step>;
+}
+struct Step {
+    elements: List<Element>;
+}
+abstract struct Element {
+    position: Position;
+
+    func $constructor(x: int, y: int) {
+        this.position = new Position(x, y);
+    }
+}
+
+struct Label: Element {
+    text: string;
+
+    func $constructor(text: string) {
+        this.text = text;
+        base.constructor(1, 65);
+    }
+}
+
+struct Position {
+    x: int;
+    y: int;
+}
+
 struct Style {}
 struct SvgFilterArgs {}
