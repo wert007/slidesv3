@@ -232,7 +232,7 @@ pub fn commented_instruction_to_string(
             if let Some(type_) = state.project.types.to_type_id(instruction.arg as usize) {
                 write!(
                     base,
-                    "; {}",
+                    "; type = {}",
                     state.project.types.name_of_type_id_debug(type_)
                 )?;
             }

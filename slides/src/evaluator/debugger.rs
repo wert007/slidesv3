@@ -184,9 +184,17 @@ fn read_indirect_pointer(state: &EvaluatorState, address: u64) {
 fn read_pointer(state: &EvaluatorState, address: u64) {
     let value = state.read_pointer_word(address);
     if value.is_pointer() {
-        println!("#{:x}", value.unwrap_pointer());
+        print!("#{:x}", value.unwrap_pointer());
+        if let Some(string) = state.read_string_from_memory(value.unwrap_pointer() as _) {
+            print!(" ( = {string:?})");
+        }
+        println!();
     } else {
-        println!("{}", value.unwrap_value());
+        print!("{}", value.unwrap_value());
+        if let Some(string) = state.read_string_from_memory(address as _) {
+            print!(" ( = {string:?})");
+        }
+        println!();
     }
 }
 
