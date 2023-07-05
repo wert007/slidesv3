@@ -10,7 +10,7 @@ Log: Hello World!
 Log: fn fib(int) -> int
 Log: Noneable strings work just fine
 Log: struct Person {
-    name = John Doe,
+    name = 'John Doe',
     age = 32,
 }
 Log: Value(42)

@@ -1,4 +1,4 @@
-use crate::DebugFlags;
+use crate::{DebugFlags, text::TextLocation};
 
 use super::{static_memory::StaticMemory, FlaggedWord, Memory};
 
@@ -31,25 +31,25 @@ impl Stack {
         word
     }
 
-    pub fn push(&mut self, value: u64) {
-        self.words.push(FlaggedWord::value(value));
+    pub fn push(&mut self, value: u64, location: impl Into<Option<TextLocation>>, pc: Option<usize>) {
+        self.words.push(FlaggedWord::value(value, location.into(), pc));
         self.print_maybe_stack();
     }
 
-    pub fn push_with_comment(&mut self, value: u64, comment: &'static str) {
+    pub fn push_with_comment(&mut self, value: u64, location: TextLocation, pc: Option<usize>, comment: &'static str) {
         self.words
-            .push(FlaggedWord::value(value).with_comment(comment));
+            .push(FlaggedWord::value(value, location, pc).with_comment(comment));
         self.print_maybe_stack();
     }
 
-    pub fn push_pointer(&mut self, value: u64) {
-        self.words.push(FlaggedWord::pointer(value));
+    pub fn push_pointer(&mut self, value: u64, location: TextLocation, pc: Option<usize>) {
+        self.words.push(FlaggedWord::pointer(value, location, pc));
         self.print_maybe_stack();
     }
 
-    pub fn push_pointer_with_comment(&mut self, value: u64, comment: &'static str) {
+    pub fn push_pointer_with_comment(&mut self, value: u64, location: TextLocation, pc: Option<usize>, comment: &'static str) {
         self.words
-            .push(FlaggedWord::pointer(value).with_comment(comment));
+            .push(FlaggedWord::pointer(value, location, pc).with_comment(comment));
         self.print_maybe_stack();
     }
 
@@ -62,7 +62,7 @@ impl Stack {
         assert_eq!(self.static_memory_size, 0);
         let static_memory_size = static_memory.data.len();
         for word in static_memory.data {
-            self.push(word);
+            self.push(word, None, None);
         }
         self.print_maybe_stack();
         self.static_memory_size = static_memory_size;

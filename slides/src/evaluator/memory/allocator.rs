@@ -1,4 +1,6 @@
-use crate::DebugFlags;
+use crate::{
+    DebugFlags, text::TextLocation,
+};
 
 use super::{bytes_to_word, FlaggedWord, Memory, HEAP_POINTER, WORD_SIZE_IN_BYTES};
 
@@ -17,7 +19,10 @@ impl Allocator {
         let size_in_words = bytes_to_word(size_in_bytes);
         assert!(size_in_words.is_power_of_two());
         Self {
-            words: vec![FlaggedWord::default(); size_in_words as usize],
+            words: vec![
+                FlaggedWord::new(None, None);
+                size_in_words as usize
+            ],
             buckets: vec![BucketEntry::root(size_in_words)],
             debug_heap_as_string: debug_flags.print_heap_as_string,
         }
@@ -300,7 +305,7 @@ impl Allocator {
     //     FlaggedWord::value(self.data[address as usize]).flags(self.flags[address as usize])
     // }
 
-    pub fn write_byte(&mut self, address: u64, value: u8) {
+    pub fn write_byte(&mut self, address: u64, value: u8, location: TextLocation, pc: usize) {
         let address = clear_address(address);
         #[cfg(debug_assertions)]
         assert!(self.find_bucket_from_address(address).unwrap().is_used);
@@ -309,7 +314,10 @@ impl Allocator {
         let mut bytes = old_value.value.to_le_bytes();
         bytes[(address % WORD_SIZE_IN_BYTES) as usize] = value;
         let value = u64::from_le_bytes(bytes);
-        self.write_flagged_word(word_address, FlaggedWord::value(value));
+        self.write_flagged_word(
+            word_address,
+            FlaggedWord::value(value, location, Some(pc)),
+        );
     }
 
     // pub fn write_word(&mut self, address: u64, value: u64) {

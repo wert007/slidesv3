@@ -1,18 +1,28 @@
 use crate::{
     binder::typing::{self, Type, TypeId},
-    evaluator::{
-        debugger,
-        memory::{bytes_to_word, Memory},
-    },
+    evaluator::memory::{bytes_to_word, Memory},
+    text::TextLocation,
 };
 
-use super::{memory::FlaggedWord, EvaluatorState, WORD_SIZE_IN_BYTES};
+use super::{memory::FlaggedWord, EvaluatorState, InstructionError, WORD_SIZE_IN_BYTES};
 
-pub fn print(argument: &FlaggedWord, state: &mut EvaluatorState) {
-    println!("{}", to_string_native(typeid!(Type::Any), argument, state));
+pub fn print(
+    argument: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> Result<(), InstructionError> {
+    println!(
+        "{}",
+        to_string_native(typeid!(Type::Any), argument, location, state)?
+    );
+    Ok(())
 }
 
-fn native_string_to_string(value: String, state: &mut EvaluatorState) -> FlaggedWord {
+fn native_string_to_string(
+    value: String,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> FlaggedWord {
     let string_length = value.len() as u64;
     let mut pointer = state.reallocate(0, WORD_SIZE_IN_BYTES + string_length);
     let result = pointer;
@@ -27,25 +37,31 @@ fn native_string_to_string(value: String, state: &mut EvaluatorState) -> Flagged
             .flush_to_console(&state.project.source_text_collection);
         state.runtime_diagnostics.diagnostics.clear();
         state.runtime_error_happened = true;
-        return FlaggedWord::pointer(result);
+        return FlaggedWord::pointer(result, location, Some(state.pc));
     }
     // TODO: Clear bucket maybe?
     state.heap.write_flagged_word(
         pointer,
-        FlaggedWord::value(string_length).with_comment(format!("String length of {value:?}")),
+        FlaggedWord::value(string_length, location, Some(state.pc))
+            .with_comment(format!("String length of {value:?}")),
     );
     pointer += WORD_SIZE_IN_BYTES;
     for &byte in value.as_bytes() {
-        state.heap.write_byte(pointer, byte);
+        state.heap.write_byte(pointer, byte, location, state.pc);
         pointer += 1;
     }
-    FlaggedWord::pointer(result)
+    FlaggedWord::pointer(result, location, Some(state.pc))
 }
 
-pub fn to_string(argument: &FlaggedWord, state: &mut EvaluatorState) {
-    let string = to_string_native(typeid!(Type::Any), argument, state);
-    let value = native_string_to_string(string, state);
+pub fn to_string(
+    argument: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> Result<(), InstructionError> {
+    let string = to_string_native(typeid!(Type::Any), argument, location, state)?;
+    let value = native_string_to_string(string, location, state);
     state.stack.push_flagged_word(value);
+    Ok(())
 }
 
 fn get_to_string_function(type_id: TypeId, state: &EvaluatorState) -> Option<u64> {
@@ -69,8 +85,13 @@ fn decode_type(address: &FlaggedWord, state: &mut EvaluatorState) -> TypeId {
     type_identifier
 }
 
-fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
-    match &state.project.types[type_] {
+fn to_string_native(
+    type_: TypeId,
+    argument: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> Result<String, InstructionError> {
+    Ok(match &state.project.types[type_] {
         Type::Library(_)
         | Type::GenericType(_, _)
         | Type::IntegerLiteral
@@ -89,26 +110,24 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
             let type_ = decode_type(argument, state);
             let address = argument.unwrap_pointer() + WORD_SIZE_IN_BYTES;
             let argument = state.read_pointer_word(address).into_owned();
-            to_string_native(type_, &argument, state)
+            to_string_native(type_, &argument, location, state)?
         }
         Type::None => "none".into(),
-        Type::AbstractTypeBox(type_) => to_string_native(*type_, argument, state),
+        Type::AbstractTypeBox(type_) => to_string_native(*type_, argument, location, state)?,
         Type::Struct(struct_type) => {
             let to_string_function = get_to_string_function(type_, state);
             match to_string_function {
                 Some(it) => {
                     let return_value =
-                        super::execute_function(state, it as usize, &[argument.clone()]);
-                    match return_value {
-                        Ok(it) => to_string_native(typeid!(Type::String), &it.unwrap(), state),
-                        Err(()) => {
-                            println!("To string function failed!");
-                            if state.project.debug_flags.use_debugger {
-                                debugger::create_session(state);
-                            }
-                            String::new()
-                        }
-                    }
+                        super::execute_function(state, it as usize, &[argument.clone()]).map_err(
+                            |i| i.unwrap_or(InstructionError::unknown(line!(), location, state.pc)),
+                        )?;
+                    to_string_native(
+                        typeid!(Type::String),
+                        &return_value.unwrap(),
+                        location,
+                        state,
+                    )?
                 }
                 None => {
                     use std::fmt::Write;
@@ -123,13 +142,26 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
                     for field in fields {
                         let value = state
                             .read_pointer_word(
-                                argument.unwrap_pointer()
-                                    + field.offset_or_address.unwrap_offset() as u64,
+                                argument.as_pointer().map_err(|err| {
+                                    dbg!(field.offset_or_address.unwrap_offset());
+                                    InstructionError::value(err, line!(), location, state.pc)
+                                })? + field.offset_or_address.unwrap_offset() as u64,
                             )
                             .into_owned();
-                        let value = to_string_native(field.type_, &value, state);
+                        let value = to_string_native(field.type_, &value, location, state)?;
+                        let value = if field.type_ == typeid!(Type::String) {
+                            format!("\'{value}\'")
+                        } else {
+                            value
+                        };
                         let mut value = value.lines();
-                        write!(result, "    {} = {}", field.name, value.next().unwrap()).unwrap();
+                        write!(
+                            result,
+                            "    {} = {}",
+                            field.name,
+                            value.next().unwrap_or_default()
+                        )
+                        .unwrap();
                         for line in value {
                             writeln!(result).unwrap();
                             write!(result, "    {line}").unwrap();
@@ -155,11 +187,11 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
                 "none".into()
             } else {
                 let argument = if state.project.types[*base_type].is_pointer() {
-                    FlaggedWord::pointer(ptr)
+                    FlaggedWord::pointer(ptr, location, Some(state.pc))
                 } else {
                     state.read_pointer_word(ptr).into_owned()
                 };
-                to_string_native(*base_type, &argument, state)
+                to_string_native(*base_type, &argument, location, state)?
             }
         }
         Type::Boolean => {
@@ -177,7 +209,7 @@ fn to_string_native(type_: TypeId, argument: &FlaggedWord, state: &mut Evaluator
             let index = argument.unwrap_value() as usize;
             format!("{a}.{}", b[index])
         }
-    }
+    })
 }
 
 fn string_to_string_native(argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
@@ -201,7 +233,7 @@ fn string_to_string_native(argument: &FlaggedWord, state: &mut EvaluatorState) -
     String::from_utf8_lossy(&string_buffer[..string_length_in_bytes as usize]).into_owned()
 }
 
-pub fn array_length(argument: &FlaggedWord, state: &mut EvaluatorState) {
+pub fn array_length(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
     let type_ = decode_type(argument, state);
     let argument = state.read_pointer_word(argument.unwrap_pointer() + WORD_SIZE_IN_BYTES);
     let array_start = argument.unwrap_pointer();
@@ -209,7 +241,7 @@ pub fn array_length(argument: &FlaggedWord, state: &mut EvaluatorState) {
 
     let array_length = pointer / state.project.types[type_].array_element_size_in_bytes();
 
-    state.stack.push(array_length);
+    state.stack.push(array_length, location, Some(state.pc));
 }
 
 pub fn heap_dump(argument: &FlaggedWord, state: &mut EvaluatorState) {
@@ -218,11 +250,18 @@ pub fn heap_dump(argument: &FlaggedWord, state: &mut EvaluatorState) {
     crate::debug::output_allocator_to_dot(&argument, &state.heap);
 }
 
-pub fn reallocate(pointer: &FlaggedWord, size: &FlaggedWord, state: &mut EvaluatorState) {
+pub fn reallocate(
+    pointer: &FlaggedWord,
+    size: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) {
     let pointer = pointer.unwrap_pointer();
     let size = size.unwrap_value();
     let result = state.reallocate(pointer, size);
-    state.stack.push_flagged_word(FlaggedWord::pointer(result));
+    state
+        .stack
+        .push_flagged_word(FlaggedWord::pointer(result, location, Some(state.pc)));
 }
 
 pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
@@ -244,13 +283,13 @@ pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
     state.runtime_error_happened = true;
 }
 
-pub fn address_of(argument: &FlaggedWord, state: &mut EvaluatorState) {
-    state.stack.push(argument.value);
+pub fn address_of(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
+    state.stack.push(argument.value, location, Some(state.pc));
 }
 
-pub fn hash(argument: &FlaggedWord, state: &mut EvaluatorState) {
+pub fn hash(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
     let hash = hash_value(argument, typeid!(Type::Any), state);
-    state.stack.push(hash);
+    state.stack.push(hash, location, Some(state.pc));
 }
 
 fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState) -> u64 {
@@ -312,14 +351,14 @@ fn hash_array(length: u64, pointer: u64, state: &mut EvaluatorState) -> u64 {
     hash
 }
 
-pub fn byte_to_char(argument: &FlaggedWord, state: &mut EvaluatorState) {
+pub fn byte_to_char(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
     let byte = argument.unwrap_value() as u8;
     let result = (byte as char).to_string();
-    let value = native_string_to_string(result, state);
+    let value = native_string_to_string(result, location, state);
     state.stack.push_flagged_word(value);
 }
 
-pub fn type_of_value(argument: &FlaggedWord, state: &mut EvaluatorState) {
+pub fn type_of_value(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
     let type_ = decode_type(argument, state);
-    state.stack.push(type_.as_raw());
+    state.stack.push(type_.as_raw(), location, Some(state.pc));
 }

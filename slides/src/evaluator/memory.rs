@@ -1,5 +1,7 @@
 use std::{borrow::Cow, fmt::Display};
 
+use crate::text::TextLocation;
+
 pub mod allocator;
 pub mod stack;
 pub mod static_memory;
@@ -45,7 +47,7 @@ pub trait Memory {
             let a_mask = (1 << offset) - 1;
             let b_mask = u64::MAX - (1 << offset) - 1;
             let value = (a.value & a_mask) | (b.value & b_mask);
-            Cow::Owned(FlaggedWord::value(value).flags(a.flags))
+            Cow::Owned(FlaggedWord::value(value, None, None).flags(a.flags))
         }
     }
 
@@ -91,24 +93,35 @@ pub trait Memory {
         let value = old | new;
         self.write_flagged_word_aligned(
             address / WORD_SIZE_IN_BYTES,
-            FlaggedWord::value(value).flags(flags),
+            FlaggedWord::value(value, None, None).flags(flags),
         );
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Flags {
     pub is_pointer: bool,
+    pub last_written_from: Option<TextLocation>,
+    pub last_written_from_instruction: Option<usize>,
 }
 
 impl Flags {
+    pub fn new(location: Option<TextLocation>, pc: Option<usize>) -> Self {
+        Self { is_pointer: false, last_written_from: location, last_written_from_instruction: pc }
+    }
+
+    pub fn update_write_location(&mut self, location: TextLocation, pc: usize) {
+        self.last_written_from = Some(location);
+        self.last_written_from_instruction = Some(pc);
+    }
+
     pub fn pointer(mut self) -> Self {
         self.is_pointer = true;
         self
     }
 }
 
-#[derive(Default, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FlaggedByte {
     pub value: u8,
     pub flags: Flags,
@@ -125,7 +138,7 @@ impl Display for FlaggedByte {
     }
 }
 
-#[derive(Default, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FlaggedWord {
     pub value: u64,
     pub flags: Flags,
@@ -133,6 +146,10 @@ pub struct FlaggedWord {
 }
 
 impl FlaggedWord {
+    pub fn new(location: Option<TextLocation>, pc: Option<usize>) -> Self {
+        Self { value: 0, flags: Flags::new(location, pc), comment: String::default() }
+    }
+
     pub fn with_comment(mut self, comment: impl Into<String>) -> Self {
         self.comment = comment.into();
         self
@@ -155,18 +172,18 @@ impl FlaggedWord {
         self.value
     }
 
-    pub fn value(value: u64) -> Self {
+    pub fn value(value: u64, location: impl Into<Option<TextLocation>>, pc: Option<usize>) -> Self {
         Self {
             value,
-            flags: Flags::default(),
+            flags: Flags::new(location.into(), pc),
             comment: String::new(),
         }
     }
 
-    pub fn pointer(value: u64) -> Self {
+    pub fn pointer(value: u64, location: impl Into<Option<TextLocation>>, pc: Option<usize>) -> Self {
         Self {
             value,
-            flags: Flags::default().pointer(),
+            flags: Flags::new(location.into(), pc).pointer(),
             comment: String::new(),
         }
     }

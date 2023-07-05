@@ -2,7 +2,9 @@ use super::{
     memory::{FlaggedWord, Memory},
     EvaluatorState,
 };
-use crate::{evaluator::memory, instruction_converter::instruction::Instruction};
+use crate::{
+    evaluator::memory, instruction_converter::instruction::Instruction, text::SourceTextCollection,
+};
 use strum::{EnumIter, IntoEnumIterator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,12 +72,14 @@ pub fn create_session(state: &mut EvaluatorState) {
                         state.debugger_state.session_state = SessionState::SkipFunction;
                         return;
                     }
-                    Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words),
+                    Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words, &state.project.source_text_collection),
                     Command::Replace(new_value) => {
                         let flags = state.stack.pop().flags;
-                        state
-                            .stack
-                            .push_flagged_word(FlaggedWord::value(*new_value).flags(flags));
+                        state.stack.push_flagged_word(
+                            FlaggedWord::value(*new_value, current_instruction.location, Some(state.pc))
+                                .flags(flags)
+                                .with_comment("Pushed by debugger!"),
+                        );
                     }
                     Command::Registers => {
                         print_registers(&state.registers, &state.debugger_state.register_names)
@@ -196,7 +200,11 @@ fn _print_heap_at(heap: &memory::allocator::Allocator, address: usize) {
     }
 }
 
-pub fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
+pub fn print_stack(
+    stack: &super::memory::stack::Stack,
+    skip: usize,
+    source_text_collection: &SourceTextCollection,
+) {
     println!("{} Entries in stack:", stack.len() - skip);
     for i in skip..stack.len() {
         let entry = stack.read_flagged_word(i as u64 * memory::WORD_SIZE_IN_BYTES);
@@ -205,7 +213,10 @@ pub fn print_stack(stack: &super::memory::stack::Stack, skip: usize) {
         } else {
             print!("{}", entry.unwrap_value());
         }
-        print!("  {}", entry.comment);
+        if let Some(location) = entry.flags.last_written_from {
+            print!("  from I{:4X} `{}`", entry.flags.last_written_from_instruction.unwrap(), &source_text_collection[location]);
+        }
+        print!("  {:20}", entry.comment);
         println!();
     }
 }

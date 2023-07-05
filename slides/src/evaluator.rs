@@ -308,7 +308,7 @@ pub fn evaluate(
         heap: Allocator::new(64 * 1024, debug_flags),
         registers: (0..program.max_used_variables)
             .into_iter()
-            .map(|i| FlaggedWord::default().with_comment(format!("Register #{i}")))
+            .map(|i| FlaggedWord::new(None, None).with_comment(format!("Register #{i}")))
             .collect(),
         protected_registers: program.protected_variables,
         pc: 0,
@@ -507,23 +507,25 @@ fn evaluate_breakpoint(state: &mut EvaluatorState, _: Instruction) {
 }
 
 fn evaluate_load_immediate(state: &mut EvaluatorState, instruction: Instruction) {
-    state
-        .stack
-        .push_flagged_word(FlaggedWord::value(instruction.arg).with_comment(format!(
+    state.stack.push_flagged_word(
+        FlaggedWord::value(instruction.arg, instruction.location, Some(state.pc)).with_comment(format!(
             "Immediate from line {}",
             state.project.source_text_collection[instruction.location.source_text]
-                .line_index(instruction.location.span.start()) + 1
-        )));
+                .line_index(instruction.location.span.start())
+                + 1
+        )),
+    );
 }
 
 fn evaluate_load_pointer(state: &mut EvaluatorState, instruction: Instruction) {
-    state
-        .stack
-        .push_flagged_word(FlaggedWord::pointer(instruction.arg).with_comment(format!(
+    state.stack.push_flagged_word(
+        FlaggedWord::pointer(instruction.arg, instruction.location, Some(state.pc)).with_comment(format!(
             "Pointer immediate from line {}",
             state.project.source_text_collection[instruction.location.source_text]
-                .line_index(instruction.location.span.start()) + 1
-        )));
+                .line_index(instruction.location.span.start())
+                + 1
+        )),
+    );
 }
 
 fn evaluate_duplicate_over(state: &mut EvaluatorState, instruction: Instruction) {
@@ -549,26 +551,30 @@ fn evaluate_load_register(state: &mut EvaluatorState, instruction: Instruction) 
 }
 
 fn evaluate_assign_to_variable(state: &mut EvaluatorState, instruction: Instruction) {
-    let value = state.stack.pop();
+    let mut value = state.stack.pop();
+    value.flags.update_write_location(instruction.location, state.pc);
     state.set_variable(instruction.arg, value);
 }
 
-fn evaluate_store_byte_in_memory(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_store_byte_in_memory(state: &mut EvaluatorState, instruction: Instruction) {
     let address = state.stack.pop().unwrap_pointer();
     let value = state.stack.pop();
-    let value = value.into_flagged_byte().unwrap();
+    let mut value = value.into_flagged_byte().unwrap();
+    value.flags.update_write_location(instruction.location, state.pc);
     state.write_pointer_byte(address, value);
 }
 
-fn evaluate_store_word_in_memory(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_store_word_in_memory(state: &mut EvaluatorState, instruction: Instruction) {
     let address = state.stack.pop().unwrap_pointer();
-    let value = state.stack.pop();
+    let mut value = state.stack.pop();
+    value.flags.update_write_location(instruction.location, state.pc);
     state.write_pointer_word(address, value);
 }
 
 fn evaluate_write_to_stack(state: &mut EvaluatorState, instruction: Instruction) {
     let address = instruction.arg;
-    let value = state.stack.pop();
+    let mut value = state.stack.pop();
+    value.flags.update_write_location(instruction.location, state.pc);
     state.stack.write_flagged_word(address as _, value);
 }
 
@@ -588,13 +594,15 @@ fn evaluate_write_to_heap(state: &mut EvaluatorState, instruction: Instruction) 
     } else {
         let mut writing_pointer = address;
         for _ in 0..size_in_words {
-            let value = state.stack.pop();
+            let mut value = state.stack.pop();
+            value.flags.update_write_location(instruction.location, state.pc);
             state.heap.write_flagged_word(writing_pointer as _, value);
             writing_pointer += WORD_SIZE_IN_BYTES;
         }
     }
     state.stack.push_flagged_word(
-        FlaggedWord::pointer(address).with_comment(format!("Allocated {size_in_bytes} bytes")),
+        FlaggedWord::pointer(address, instruction.location, Some(state.pc))
+            .with_comment(format!("Allocated {size_in_bytes} bytes")),
     );
 }
 
@@ -608,7 +616,8 @@ fn evaluate_allocate(state: &mut EvaluatorState, instruction: Instruction) {
         );
     }
     state.stack.push_flagged_word(
-        FlaggedWord::pointer(address).with_comment(format!("User allocated {size_in_bytes} bytes")),
+        FlaggedWord::pointer(address, instruction.location, Some(state.pc))
+            .with_comment(format!("User allocated {size_in_bytes} bytes")),
     );
 }
 
@@ -667,57 +676,72 @@ fn evaluate_memory_copy(state: &mut EvaluatorState, instruction: Instruction) {
         let src = src + word_index * WORD_SIZE_IN_BYTES;
         let dest = dest + word_index * WORD_SIZE_IN_BYTES;
         let buffer = state.read_pointer_word(src);
-        state.write_pointer_word(dest, buffer.into_owned());
+        let mut value = buffer.into_owned();
+        value.flags.update_write_location(instruction.location, state.pc);
+        state.write_pointer_word(dest, value);
     }
 }
 
-fn evaluate_bitwise_twos_complement(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_bitwise_twos_complement(state: &mut EvaluatorState, instruction: Instruction) {
     let mut value = state.stack.pop();
     value.value = -(value.unwrap_value() as i64) as u64;
+    value.flags.update_write_location(instruction.location, state.pc);
     state.stack.push_flagged_word(value);
 }
 
-fn evaluate_bitwise_xor(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_bitwise_xor(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop().unwrap_value();
     let lhs = state.stack.pop().unwrap_value();
-    state.stack.push(lhs ^ rhs);
+    state.stack.push(lhs ^ rhs, instruction.location, Some(state.pc));
 }
 
-fn evaluate_bitwise_nxor(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_bitwise_nxor(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
     state.stack.push_flagged_word(
-        FlaggedWord::value(!(lhs.unwrap_value() ^ rhs.unwrap_value()))
-            .with_comment(format!("({}) NXOR ({})", lhs.comment, rhs.comment)),
+        FlaggedWord::value(
+            !(lhs.unwrap_value() ^ rhs.unwrap_value()),
+            instruction.location,
+            Some(state.pc)
+        )
+        .with_comment(format!("({}) NXOR ({})", lhs.comment, rhs.comment)),
     );
 }
 
-fn evaluate_addition(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_addition(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    let result = FlaggedWord {
+    let mut result = FlaggedWord {
         value: lhs.value.wrapping_add(rhs.value),
         flags: lhs.flags,
         comment: format!("({}) + ({})", lhs.comment, rhs.comment),
     };
+    result.flags.update_write_location(instruction.location, state.pc);
     state.stack.push_flagged_word(result);
 }
 
-fn evaluate_subtraction(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_subtraction(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
     state.stack.push_flagged_word(
-        FlaggedWord::value(lhs.unwrap_value().wrapping_sub(rhs.unwrap_value()))
-            .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
+        FlaggedWord::value(
+            lhs.unwrap_value().wrapping_sub(rhs.unwrap_value()),
+            instruction.location,
+            Some(state.pc)
+        )
+        .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
     );
 }
 
-fn evaluate_multiplication(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_multiplication(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
     state.stack.push_flagged_word(
-        FlaggedWord::value(lhs.unwrap_value().wrapping_mul(rhs.unwrap_value()))
-            .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
+        FlaggedWord::value(
+            lhs.unwrap_value().wrapping_mul(rhs.unwrap_value()),
+            instruction.location, Some(state.pc)
+        )
+        .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
     );
 }
 
@@ -726,26 +750,29 @@ fn evaluate_division(state: &mut EvaluatorState, instruction: Instruction) {
     let lhs = state.stack.pop();
     state.stack.push_flagged_word(if rhs.unwrap_value() == 0 {
         runtime_error!(state, division_by_zero(instruction.location));
-        FlaggedWord::value(0).with_comment("Division by zero error!")
+        FlaggedWord::value(0, instruction.location, Some(state.pc)).with_comment("Division by zero error!")
     } else {
-        FlaggedWord::value(lhs.unwrap_value().wrapping_div(rhs.unwrap_value()))
-            .with_comment(format!("({}) / ({})", lhs.comment, rhs.comment))
+        FlaggedWord::value(
+            lhs.unwrap_value().wrapping_div(rhs.unwrap_value()),
+            instruction.location, Some(state.pc)
+        )
+        .with_comment(format!("({}) / ({})", lhs.comment, rhs.comment))
     });
 }
 
-fn evaluate_equals(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_equals(state: &mut EvaluatorState, instruction: Instruction) {
     // FIXME: As soon as their are generic types for many things, you could
     // overwrite $equals, and this will only need to compare primitive value, so
     // that you can use unwrap_value() again.
     let rhs = state.stack.pop().value;
     let lhs = state.stack.pop().value;
-    state.stack.push((lhs == rhs) as _);
+    state.stack.push((lhs == rhs) as _, instruction.location, Some(state.pc));
 }
 
-fn evaluate_not_equals(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_not_equals(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop().value;
     let lhs = state.stack.pop().value;
-    state.stack.push((lhs != rhs) as _);
+    state.stack.push((lhs != rhs) as _, instruction.location, Some(state.pc));
 }
 
 fn array_equals(state: &mut EvaluatorState) -> bool {
@@ -776,14 +803,14 @@ fn array_equals(state: &mut EvaluatorState) -> bool {
     result
 }
 
-fn evaluate_array_equals(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_array_equals(state: &mut EvaluatorState, instruction: Instruction) {
     let result = array_equals(state);
-    state.stack.push(result as _);
+    state.stack.push(result as _, instruction.location, Some(state.pc));
 }
 
-fn evaluate_array_not_equals(state: &mut EvaluatorState, _: Instruction) {
+fn evaluate_array_not_equals(state: &mut EvaluatorState, instruction: Instruction) {
     let result = !array_equals(state);
-    state.stack.push(result as _);
+    state.stack.push(result as _, instruction.location, Some(state.pc));
 }
 
 #[must_use]
@@ -799,7 +826,7 @@ fn evaluate_less_than(
             let lhs = state.stack.pop().as_value().map_err(|err| {
                 InstructionError::pointer(err, line!(), instruction.location, state.pc)
             })? as i64;
-            state.stack.push((lhs < rhs) as _);
+            state.stack.push((lhs < rhs) as _, instruction.location, Some(state.pc));
         }
         1 => {
             let rhs = state.stack.pop().as_value().map_err(|err| {
@@ -808,7 +835,7 @@ fn evaluate_less_than(
             let lhs = state.stack.pop().as_value().map_err(|err| {
                 InstructionError::pointer(err, line!(), instruction.location, state.pc)
             })?;
-            state.stack.push((lhs < rhs) as _);
+            state.stack.push((lhs < rhs) as _, instruction.location, Some(state.pc));
         }
         arg => {
             panic!("unhandled argument {arg:X} to instruction!")
@@ -822,12 +849,12 @@ fn evaluate_greater_than(state: &mut EvaluatorState, instruction: Instruction) {
         0 => {
             let rhs = state.stack.pop().unwrap_value() as i64;
             let lhs = state.stack.pop().unwrap_value() as i64;
-            state.stack.push((lhs > rhs) as _);
+            state.stack.push((lhs > rhs) as _, instruction.location, Some(state.pc));
         }
         1 => {
             let rhs = state.stack.pop().unwrap_value();
             let lhs = state.stack.pop().unwrap_value();
-            state.stack.push((lhs > rhs) as _);
+            state.stack.push((lhs > rhs) as _, instruction.location, Some(state.pc));
         }
         arg => {
             panic!("unhandled argument {arg:X} to instruction!")
@@ -840,12 +867,12 @@ fn evaluate_less_than_equals(state: &mut EvaluatorState, instruction: Instructio
         0 => {
             let rhs = state.stack.pop().unwrap_value() as i64;
             let lhs = state.stack.pop().unwrap_value() as i64;
-            state.stack.push((lhs <= rhs) as _);
+            state.stack.push((lhs <= rhs) as _, instruction.location, Some(state.pc));
         }
         1 => {
             let rhs = state.stack.pop().unwrap_value();
             let lhs = state.stack.pop().unwrap_value();
-            state.stack.push((lhs <= rhs) as _);
+            state.stack.push((lhs <= rhs) as _, instruction.location, Some(state.pc));
         }
         arg => {
             panic!("unhandled argument {arg:X} to instruction!")
@@ -858,12 +885,12 @@ fn evaluate_greater_than_equals(state: &mut EvaluatorState, instruction: Instruc
         0 => {
             let rhs = state.stack.pop().unwrap_value() as i64;
             let lhs = state.stack.pop().unwrap_value() as i64;
-            state.stack.push((lhs >= rhs) as _);
+            state.stack.push((lhs >= rhs) as _, instruction.location, Some(state.pc));
         }
         1 => {
             let rhs = state.stack.pop().unwrap_value();
             let lhs = state.stack.pop().unwrap_value();
-            state.stack.push((lhs >= rhs) as _);
+            state.stack.push((lhs >= rhs) as _, instruction.location, Some(state.pc));
         }
         arg => {
             panic!("unhandled argument {arg:X} to instruction!")
@@ -909,7 +936,8 @@ fn evaluate_string_concat(
         let mut writing_pointer = pointer;
         state.heap.write_flagged_word(
             writing_pointer,
-            FlaggedWord::value(result_length).with_comment("String length from string concat"),
+            FlaggedWord::value(result_length, instruction.location, Some(state.pc))
+                .with_comment("String length from string concat"),
         );
         writing_pointer += WORD_SIZE_IN_BYTES;
         for i in 0..lhs_length {
@@ -921,7 +949,7 @@ fn evaluate_string_concat(
                 let bytes = word.to_le_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
-            state.heap.write_byte(writing_pointer, lhs_byte);
+            state.heap.write_byte(writing_pointer, lhs_byte, instruction.location, state.pc);
             writing_pointer += 1;
         }
         for i in 0..rhs_length {
@@ -933,11 +961,11 @@ fn evaluate_string_concat(
                 let bytes = word.to_le_bytes();
                 bytes[address % WORD_SIZE_IN_BYTES as usize]
             };
-            state.heap.write_byte(writing_pointer, rhs_byte);
+            state.heap.write_byte(writing_pointer, rhs_byte, instruction.location, state.pc);
             writing_pointer += 1;
         }
     }
-    state.stack.push_pointer(pointer);
+    state.stack.push_pointer(pointer, instruction.location, Some(state.pc));
     Ok(())
 }
 
@@ -1019,20 +1047,32 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         arguments.push(state.stack.pop());
     }
     match sys_call_kind {
-        SystemCallKind::Print => sys_calls::print(&arguments[0], state),
-        SystemCallKind::ArrayLength => sys_calls::array_length(&arguments[0], state),
-        SystemCallKind::ToString => sys_calls::to_string(&arguments[0], state),
+        SystemCallKind::Print => sys_calls::print(&arguments[0], instruction.location, state)?,
+        SystemCallKind::ArrayLength => {
+            sys_calls::array_length(&arguments[0], instruction.location, state)
+        }
+        SystemCallKind::ToString => {
+            sys_calls::to_string(&arguments[0], instruction.location, state)?
+        }
         SystemCallKind::HeapDump => sys_calls::heap_dump(&arguments[0], state),
-        SystemCallKind::Reallocate => sys_calls::reallocate(&arguments[1], &arguments[0], state),
+        SystemCallKind::Reallocate => {
+            sys_calls::reallocate(&arguments[1], &arguments[0], instruction.location, state)
+        }
         SystemCallKind::RuntimeError => sys_calls::runtime_error(&arguments[0], state),
-        SystemCallKind::AddressOf => sys_calls::address_of(&arguments[0], state),
+        SystemCallKind::AddressOf => {
+            sys_calls::address_of(&arguments[0], instruction.location, state)
+        }
         SystemCallKind::GarbageCollect => {
             state.garbage_collect();
         }
         SystemCallKind::Break => unreachable!(),
-        SystemCallKind::Hash => sys_calls::hash(&arguments[0], state),
-        SystemCallKind::ByteToChar => sys_calls::byte_to_char(&arguments[0], state),
-        SystemCallKind::TypeOfValue => sys_calls::type_of_value(&arguments[0], state),
+        SystemCallKind::Hash => sys_calls::hash(&arguments[0], instruction.location, state),
+        SystemCallKind::ByteToChar => {
+            sys_calls::byte_to_char(&arguments[0], instruction.location, state)
+        }
+        SystemCallKind::TypeOfValue => {
+            sys_calls::type_of_value(&arguments[0], instruction.location, state)
+        }
     }
     state.stack_trace.pop();
 }
@@ -1055,13 +1095,16 @@ fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) 
         argument_values.push(state.stack.pop());
     }
     state.stack.push_flagged_word(
-        FlaggedWord::pointer(return_address as _).with_comment("Return address"),
+        FlaggedWord::pointer(return_address as _, instruction.location, Some(state.pc))
+            .with_comment("Return address"),
     );
 
-    for register in state.registers.iter().skip(state.protected_registers) {
+    for register in &state.registers {
+        let mut value = register.clone().replace_comment(|c| format!("{c} saved"));
+        value.flags.update_write_location(instruction.location, state.pc);
         state
             .stack
-            .push_flagged_word(register.clone().replace_comment(|c| format!("{c} saved")));
+            .push_flagged_word(value);
     }
 
     for v in argument_values.into_iter().rev() {
@@ -1086,10 +1129,10 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
             .skip(state.protected_registers)
             .rev()
         {
-            if instruction.arg & 0x2 == 0x2 {
-                state.stack.pop();
-            } else {
-                *register = state.stack.pop();
+            let mut value = state.stack.pop();
+            value.flags.update_write_location(instruction.location, state.pc);
+            if instruction.arg & 0x2 != 0x2 {
+                *register = value;
             }
         }
 
@@ -1105,10 +1148,10 @@ fn evaluate_return(state: &mut EvaluatorState, instruction: Instruction) {
         {
             // Protect registers after main function returns, just in case we
             // want to check them later!
-            if instruction.arg & 0x2 == 0x2 {
-                state.stack.pop();
-            } else {
-                *register = state.stack.pop();
+            let mut value = state.stack.pop();
+            value.flags.update_write_location(instruction.location, state.pc);
+            if instruction.arg & 0x2 != 0x2 {
+                *register = value;
             }
         }
 
@@ -1145,11 +1188,14 @@ fn evaluate_decode_closure(state: &mut EvaluatorState, instruction: Instruction)
         closure_pointer += WORD_SIZE_IN_BYTES;
     }
     if let Some(function_pointer) = function_pointer {
-        state
-            .stack
-            .push_pointer_with_comment(function_pointer, "Function Pointer");
+        state.stack.push_pointer_with_comment(
+            function_pointer,
+            instruction.location,
+            Some(state.pc),
+            "Function Pointer",
+        );
     }
     state
         .stack
-        .push_with_comment(argument_count, "Argument count");
+        .push_with_comment(argument_count, instruction.location, Some(state.pc), "Argument count");
 }
