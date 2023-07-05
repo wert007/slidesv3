@@ -272,7 +272,6 @@ impl BoundNode {
             kind: BoundNodeKind::FieldAccess(BoundFieldAccessNodeKind {
                 base: Box::new(base),
                 offset,
-                type_: type_.clone(),
             }),
             type_,
             constant_value: None,
@@ -981,7 +980,6 @@ impl BoundArrayIndexNodeKind {
 pub struct BoundFieldAccessNodeKind {
     pub base: Box<BoundNode>,
     pub offset: u64,
-    pub type_: TypeId,
 }
 
 impl BoundFieldAccessNodeKind {

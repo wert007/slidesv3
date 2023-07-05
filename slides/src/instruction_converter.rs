@@ -385,7 +385,7 @@ fn convert_node(
             convert_array_index(node.location, array_index, converter)
         }
         BoundNodeKind::FieldAccess(field_access) => {
-            convert_field_access(node.location, field_access, converter)
+            convert_field_access(node.type_, node.location, field_access, converter)
         }
         BoundNodeKind::Closure(closure) => convert_closure(node.location, closure, converter),
         BoundNodeKind::Conversion(conversion) => {
@@ -925,13 +925,14 @@ fn convert_array_index(
 }
 
 fn convert_field_access(
+    type_: TypeId,
     location: TextLocation,
     field_access: BoundFieldAccessNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let base_type = field_access.base.type_;
     let mut result = convert_node(*field_access.base, converter);
-    match &converter.project.types[field_access.type_] {
+    match &converter.project.types[type_] {
         Type::SystemCall(_) => {}
         Type::Function(_) => {
             result.push(Instruction::load_register(field_access.offset, location).into());

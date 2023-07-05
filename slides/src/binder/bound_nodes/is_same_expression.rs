@@ -194,7 +194,6 @@ impl IsSameExpression for BoundArrayIndexNodeKind {
 impl IsSameExpression for BoundFieldAccessNodeKind {
     fn is_same_expression(&self, other: &Self) -> bool {
         self.offset == other.offset
-            && self.type_ == other.type_
             && self.base.is_same_expression(&other.base)
     }
 }

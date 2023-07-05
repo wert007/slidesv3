@@ -281,12 +281,12 @@ fn flatten_expression_statement(
 
 fn flatten_field_access(
     span: TextLocation,
-    _type_: TypeId,
+    type_: TypeId,
     field_access: BoundFieldAccessNodeKind,
     flattener: &mut Flattener,
 ) -> BoundNode {
     let base = flatten_expression(*field_access.base, flattener);
-    BoundNode::field_access(span, base, field_access.offset, field_access.type_)
+    BoundNode::field_access(span, base, field_access.offset, type_)
 }
 
 fn flatten_closure(
