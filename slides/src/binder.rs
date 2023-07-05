@@ -2350,7 +2350,11 @@ fn bind_struct_body<'a>(
     let mut fields: Vec<Member> = vec![];
     let mut functions = vec![];
     let mut function_table = StructFunctionTable::default();
-    let mut offset = 0;
+    let mut offset = if let Some(parent) = struct_node.parent_id {
+        binder.project.types[parent].as_struct_type().unwrap().fields.len() as u64 * 8
+    } else {
+        0
+    };
     let struct_is_generic = struct_node.body.is_generic;
     let is_abstract = struct_node.is_abstract;
     let mut used_generic_type = vec![false; struct_node.generic_parameters.len()];
