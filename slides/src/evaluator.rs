@@ -38,14 +38,15 @@ macro_rules! runtime_error {
 type ResultType = Value;
 
 #[derive(Debug, Clone, Copy)]
-enum InstructionErrorKind {
+pub enum InstructionErrorKind {
     ExpectedPointer,
     ExpectedValue,
     OutOfBounds,
+    Unknown,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct InstructionError {
+pub struct InstructionError {
     value: u64,
     kind: InstructionErrorKind,
     line: u32,
@@ -75,11 +76,16 @@ impl InstructionError {
         }
     }
 
+    pub fn unknown(line: u32, location: TextLocation, pc: usize) -> Self {
+        Self { value: 0, kind: InstructionErrorKind::Unknown, line, instruction_location: location, pc }
+    }
+
     fn display(&self, state: &EvaluatorState) {
         let expected = match self.kind {
             InstructionErrorKind::ExpectedPointer => "pointer",
             InstructionErrorKind::ExpectedValue => "value",
             InstructionErrorKind::OutOfBounds => "valid address",
+            InstructionErrorKind::Unknown => "???",
         };
         let actual = match self.kind {
             InstructionErrorKind::ExpectedPointer => {
@@ -93,6 +99,7 @@ impl InstructionError {
             InstructionErrorKind::OutOfBounds => {
                 format!("out of bounds access (#{:X})", self.value)
             }
+            InstructionErrorKind::Unknown => "???".into(),
         };
         println!(
             "Error in line {}: Expected {expected} but found {actual} while executing Instruction {:X}: {} from {}.",
@@ -325,7 +332,7 @@ pub fn evaluate(
     match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
         Ok(None) => Value::Integer(0),
-        Err(()) => {
+        Err(_) => {
             if debug_flags.use_debugger {
                 debugger::create_session(&mut state);
             }
@@ -338,7 +345,7 @@ fn execute_function(
     state: &mut EvaluatorState,
     entry_point: usize,
     arguments: &[FlaggedWord],
-) -> Result<Option<FlaggedWord>, ()> {
+) -> Result<Option<FlaggedWord>, Option<InstructionError>> {
     let old_pc = state.pc;
     let old_registers = state.registers.clone();
     let old_protected_registers = state.protected_registers;
@@ -412,11 +419,11 @@ fn execute_function(
         }
         if state.runtime_error_happened {
             println!("Unusual termination.");
-            return Err(());
+            return Err(None);
         }
         if let Some(err) = instruction_failed {
             err.display(state);
-            return Err(());
+            return Err(Some(err));
         }
         assert!(
             state.stack.len() >= min_stack_count,
@@ -494,7 +501,7 @@ fn execute_instruction(
         OpCode::JumpDynamically => evaluate_jump_dynamically(state, instruction),
         OpCode::JumpIfFalse => evaluate_jump_if_false(state, instruction),
         OpCode::JumpIfTrue => evaluate_jump_if_true(state, instruction),
-        OpCode::SysCall => evaluate_sys_call(state, instruction),
+        OpCode::SysCall => evaluate_sys_call(state, instruction)?,
         OpCode::FunctionCall => evaluate_function_call(state, instruction),
         OpCode::Return => evaluate_return(state, instruction),
         OpCode::DecodeClosure => evaluate_decode_closure(state, instruction),
@@ -1037,7 +1044,7 @@ fn evaluate_jump_if_true(state: &mut EvaluatorState, instruction: Instruction) {
     }
 }
 
-fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
+fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) -> Result<(), InstructionError> {
     state.stack_trace.push(instruction.location);
     let sys_call_kind = SystemCallKind::try_from_primitive(instruction.arg as u8).unwrap();
     let argument_count = state.stack.pop().unwrap_value() as usize;
@@ -1075,6 +1082,7 @@ fn evaluate_sys_call(state: &mut EvaluatorState, instruction: Instruction) {
         }
     }
     state.stack_trace.pop();
+    Ok(())
 }
 
 fn evaluate_function_call(state: &mut EvaluatorState, instruction: Instruction) {
