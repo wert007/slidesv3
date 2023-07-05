@@ -69,7 +69,7 @@ pub fn output_allocator_to_dot(file_name: &str, heap: &Allocator) {
                 let mut potential_pointers_to_buckets = Vec::new();
                 for word in 0..bucket.size_in_words {
                     let word = &heap.words[(bucket.address + word) as usize];
-                    for byte in word.value.to_le_bytes() {
+                    for byte in word.value.to_le_bytes().into_iter().rev() {
                         write!(bucket_data, "{:02X} ", byte).unwrap();
                     }
                     if memory::is_heap_pointer(word.value) {
