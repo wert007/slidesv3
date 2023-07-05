@@ -4,4 +4,11 @@ Hello 4
 struct Cat {
     v = 4,
 }
+struct Label {
+    text = 'hello',
+    position = struct Position {
+        x = 0,
+        y = 0,
+    },
+}
 = 0

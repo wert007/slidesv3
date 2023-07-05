@@ -19,6 +19,29 @@ struct Child: Parent {
 //     }
 // }
 
+
+abstract struct Element {
+    position: Position;
+
+    func $constructor(x: int, y: int) {
+        this.position = new Position(x, y);
+    }
+}
+
+struct Label: Element {
+    text: string;
+
+    func $constructor(text: string) {
+        this.text = text;
+        base.constructor(0, 0);
+    }
+}
+
+struct Position {
+    x: int;
+    y: int;
+}
+
 func main() {
     let p = new Child(42);
     print(p);
@@ -26,6 +49,9 @@ func main() {
     p.sayHello();
 
     print(new Cat(4));
+
+    let l: Element = new Label('hello');
+    print(l);
 }
 
 abstract struct Animal {
