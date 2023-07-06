@@ -30,7 +30,7 @@ pub struct Library {
 }
 
 impl Library {
-    pub fn error() -> Self {
+    pub fn error(referenced_libraries: Vec<Library>) -> Self {
         Self {
             name: "error".into(),
             instructions: vec![],
@@ -42,7 +42,7 @@ impl Library {
             generic_structs: vec![],
             has_errors: true,
             path: PathBuf::new(),
-            referenced_libraries: vec![],
+            referenced_libraries,
             is_already_loaded: false,
         }
     }

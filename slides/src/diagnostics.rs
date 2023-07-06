@@ -436,6 +436,7 @@ impl DiagnosticBag {
         location: TextLocation,
         struct_name: TextLocation,
     ) {
+        // panic!();
         let message = message_format!("A struct named ", struct_name, " was already declared.");
         // FIXME: Reference the first declaration of a struct with that name.
         self.report_error(message, location);

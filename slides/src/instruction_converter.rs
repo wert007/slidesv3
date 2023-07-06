@@ -262,7 +262,7 @@ pub fn convert_library_with_project_parameter<'a>(
         import_std_lib,
     );
     if diagnostic_bag.has_errors() {
-        return Library::error();
+        return Library::error(bound_program.program.referenced_libraries);
     }
     let exported_functions = bound_program.exported_functions;
     let exported_structs = bound_program.exported_structs;

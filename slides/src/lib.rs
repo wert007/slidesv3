@@ -77,7 +77,7 @@ impl Project {
         let path = path.as_ref().to_owned();
         let source_code = std::fs::read_to_string(&path);
         if source_code.is_err() {
-            return Library::error();
+            return Library::error(Vec::new());
         }
         let source_code = source_code.unwrap();
         let file_name = path.to_string_lossy();

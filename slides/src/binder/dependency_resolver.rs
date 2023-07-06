@@ -175,12 +175,14 @@ pub(super) fn load_library_from_source<'a>(
         .libraries
         .iter()
         .find_map(|l| l.find_imported_library_by_path(path))
-        .map(|(s, l)| (Some(s), l))
+        .map(|(s, l)| {
+            (Some(s), l)
+        })
         .unwrap_or_else(|| {
-            let source_text = binder
-                .project
-                .source_text_collection
-                .add(SourceText::new(source, "std.sld"));
+            let source_text = binder.project.source_text_collection.add(SourceText::new(
+                source,
+                path.file_name().unwrap().to_string_lossy(),
+            ));
             (
                 None,
                 binder.project.load_library(source_text, import_std_lib),
@@ -206,7 +208,9 @@ pub(super) fn load_library_from_path<'a>(
         .libraries
         .iter()
         .find_map(|l| l.find_imported_library_by_path(path))
-        .map(|(s, l)| (Some(s), l))
+        .map(|(s, l)| {
+            (Some(s), l)
+        })
         .unwrap_or_else(|| {
             (
                 None,
@@ -236,6 +240,10 @@ fn load_library_into_binder<'a>(
         binder
             .diagnostic_bag
             .report_errors_in_referenced_library(location, &name);
+        // NOTE: This is probably wrong, but this fixes the problem, that the
+        // binder is trying to add the std types twice, when the referenced
+        // library fails.
+        binder.libraries.append(&mut lib.referenced_libraries);
     }
     if !name.is_empty() {
         let index = binder.libraries.len();
