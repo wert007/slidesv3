@@ -314,6 +314,12 @@ struct List<Type> {
         this.capacity = capacity;
     }
 
+    func clear() {
+        // NOTE: We do not clear the old memory. This means, we can only free
+        // everything it points to, once we overwrite it.
+        this.length = 0;
+    }
+
     func add(element: $Type) {
         this.ensureEnoughCapacity(1);
         this.buffer[this.length] = element;
@@ -437,6 +443,17 @@ struct Dict<Key, Value> {
         // Key is not yet in the bucket!
         bucket.add(new KeyValuePair(index, value));
         this.length = this.length + 1;
+    }
+
+    func contains(index: $Key) -> bool {
+        return this.get(index) != none;
+    }
+
+    func clear() {
+        for bucket in this.bucket {
+            bucket.clear();
+        }
+        this.length = 0;
     }
 
     func get(index: $Key) -> $Value? {

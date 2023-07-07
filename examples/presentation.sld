@@ -1,4 +1,5 @@
 import lib('htmlWriter') as html;
+import lib('presentationDatatypes') as pd;
 
 struct Presentation {
     slides: List<Slide>;
@@ -39,19 +40,21 @@ struct Step {
     elements: List<Element>;
 }
 abstract struct Element {
-    position: Position;
+    name: string;
 
-    func $constructor(x: int, y: int) {
-        this.position = new Position(x, y);
+    func $constructor() {
+        this.name = '';
     }
 }
 
 struct Label: Element {
     text: string;
+    fontSize: pd.UnitLiteral?;
 
     func $constructor(text: string) {
         this.text = text;
-        base.constructor(1, 65);
+        this.fontSize = none;
+        base.constructor();
     }
 }
 
@@ -66,19 +69,24 @@ struct SvgFilterArgs {}
 struct HtmlEmitter {
     presentation: Presentation;
     htmlWriter: html.HtmlWriter;
+    cssWriter: html.CssWriter;
 
     func $constructor(presentation: Presentation) {
         this.presentation = presentation;
         this.htmlWriter = new html.HtmlWriter();
+        this.cssWriter = new html.CssWriter();
     }
 
-    func emit(path: string) {
+    func emit(directory: string) {
         this.htmlWriter.openHtmlTag();
+        this.htmlWriter.addCssLink('style.css');
+        this.htmlWriter.writeHead();
         this.htmlWriter.openBodyTag();
         for slide in this.presentation.slides {
             this.emitSlide(slide);
         }
-        writeToFile(path, this.htmlWriter.finish());
+        writeToFile(directory + '/index.html', this.htmlWriter.finish());
+        writeToFile(directory + '/style.css', this.cssWriter.finish());
     }
 
     func emitSlide(slide: Slide) {
@@ -94,6 +102,8 @@ struct HtmlEmitter {
     }
 
     func emitElement(element: Element) {
+        this.htmlWriter.pushIdAttribute(element.name);
+        this.cssWriter.addSelector(new html.IdSelector(element.name));
         match element {
             label: Label => {
                 this.emitElementLabel(label);
@@ -102,9 +112,13 @@ struct HtmlEmitter {
                 runtimeError('Unhandled element kind: ' + typeOfValue(element));
             }
         }
+        this.cssWriter.finishRule();
     }
 
     func emitElementLabel(label: Label) {
         this.htmlWriter.writePTag(label.text);
+        if label.fontSize {
+            this.cssWriter.addField('font-size', label.fontSize);
+        }
     }
 }
