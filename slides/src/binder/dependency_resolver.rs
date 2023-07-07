@@ -175,9 +175,7 @@ pub(super) fn load_library_from_source<'a>(
         .libraries
         .iter()
         .find_map(|l| l.find_imported_library_by_path(path))
-        .map(|(s, l)| {
-            (Some(s), l)
-        })
+        .map(|(s, l)| (Some(s), l))
         .unwrap_or_else(|| {
             let source_text = binder.project.source_text_collection.add(SourceText::new(
                 source,
@@ -208,9 +206,7 @@ pub(super) fn load_library_from_path<'a>(
         .libraries
         .iter()
         .find_map(|l| l.find_imported_library_by_path(path))
-        .map(|(s, l)| {
-            (Some(s), l)
-        })
+        .map(|(s, l)| (Some(s), l))
         .unwrap_or_else(|| {
             (
                 None,
@@ -341,9 +337,11 @@ fn fix_name_of_type(
             assert!(lib.name.is_empty());
         }
         Some(_path) => {
-            // let _old_name = format!("{}.{}", path, strct.name);
-            // let _new_name = format!("{}.{}", name, strct.name);
-            todo!("Libraries are not working yet.")
+            // let struct_name = binder.project.types.name_of_type_id(struct_id);
+            // let old_name = format!("{}.{}", path, struct_name);
+            // let new_name = format!("{}.{}", lib_name, struct_name);
+            // dbg!(old_name, new_name);
+            // todo!("Libraries are not working yet.")
             // let struct_id = binder.look_up_struct_id_by_name(&old_name).unwrap();
             // binder.rename_struct_by_id(struct_id, new_name);
         }

@@ -572,8 +572,8 @@ impl DiagnosticBag {
             type_,
             "."
         );
-        let mut hint = vec!["The available fields are ".into()];
         if let Type::Enum(_, values) = &self.registered_types[type_] {
+            let mut hint = vec!["The available fields are ".into()];
             for (i, v) in values.iter().enumerate() {
                 if i != 0 && i != values.len() - 1 {
                     hint.push(", ".into());
@@ -582,12 +582,16 @@ impl DiagnosticBag {
                 }
                 hint.push(v.to_owned().into());
             }
+            self.report(Diagnostic::ErrorWithHint(DiagnosticWithHint {
+                message,
+                location,
+                hint: Message::Composition(hint),
+            }));
+        } else {
+            self.report(Diagnostic::Error(DiagnosticSimpleKind::new(
+                message, location,
+            )));
         }
-        self.report(Diagnostic::ErrorWithHint(DiagnosticWithHint {
-            message,
-            location,
-            hint: Message::Composition(hint),
-        }));
     }
 
     pub fn report_no_field_named_on_struct(

@@ -322,6 +322,7 @@ impl TypeCollection {
                     Type::Function(_) => {}
                     Type::Closure(_) => {}
                     Type::AbstractTypeBox(_) => {}
+                    Type::Library(_) => {}
                     _ => {
                         let name = self.name_of_type(&type_);
                         match self.types.iter().position(|t| self.name_of_type(t) == name) {

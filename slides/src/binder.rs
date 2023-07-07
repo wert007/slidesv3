@@ -4451,7 +4451,6 @@ fn bind_field_access<'a, 'b>(
             {
                 BoundNode::field_access(location, base, 0, enum_type)
             } else {
-                dbg!(&library);
                 binder
                     .diagnostic_bag
                     .update_registered_types(&binder.project.types);
