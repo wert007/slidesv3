@@ -40,45 +40,48 @@ macro_rules! typeid {
     (Type::Void) => {
         unsafe { TypeId::from_raw(1) }
     };
-    (Type::Any) => {
+    (Type::Never) => {
         unsafe { TypeId::from_raw(2) }
     };
-    (Type::Boolean) => {
+    (Type::Any) => {
         unsafe { TypeId::from_raw(3) }
     };
-    (Type::String) => {
+    (Type::Boolean) => {
         unsafe { TypeId::from_raw(4) }
     };
-    (Type::Pointer) => {
+    (Type::String) => {
         unsafe { TypeId::from_raw(5) }
     };
-    (Type::IntegerLiteral) => {
+    (Type::Pointer) => {
         unsafe { TypeId::from_raw(6) }
     };
-    (Type::Integer(IntegerType::Signed64)) => {
+    (Type::IntegerLiteral) => {
         unsafe { TypeId::from_raw(7) }
     };
-    (Type::Integer(IntegerType::Unsigned8)) => {
+    (Type::Integer(IntegerType::Signed64)) => {
         unsafe { TypeId::from_raw(8) }
     };
-    (Type::Integer(IntegerType::Unsigned64)) => {
+    (Type::Integer(IntegerType::Unsigned8)) => {
         unsafe { TypeId::from_raw(9) }
     };
-    (Type::Float) => {
+    (Type::Integer(IntegerType::Unsigned64)) => {
         unsafe { TypeId::from_raw(10) }
     };
-    (Type::None) => {
+    (Type::Float) => {
         unsafe { TypeId::from_raw(11) }
     };
-    (Type::TypeId) => {
+    (Type::None) => {
         unsafe { TypeId::from_raw(12) }
     };
-    (Type::IgnoreTypeChecking) => {
+    (Type::TypeId) => {
         unsafe { TypeId::from_raw(13) }
+    };
+    (Type::IgnoreTypeChecking) => {
+        unsafe { TypeId::from_raw(14) }
     };
     (Type::SystemCall($kind:expr)) => {
         unsafe {
-            const BASIS: u64 = 14;
+            const BASIS: u64 = 15;
             TypeId::from_raw(
                 BASIS
                     + match $kind {
@@ -271,6 +274,7 @@ impl TypeCollection {
             types: vec![
                 Type::Error,
                 Type::Void,
+                Type::Never,
                 Type::Any,
                 Type::Boolean,
                 Type::String,
@@ -378,6 +382,7 @@ impl TypeCollection {
             (_, Type::Any) => true,
             (_, Type::IgnoreTypeChecking) => true,
             (Type::IgnoreTypeChecking, _) => true,
+            (Type::Never, _) => true,
             (Type::Pointer, Type::PointerOf(_)) => true,
             (Type::PointerOf(_), Type::Pointer) => true,
             (Type::None, Type::PointerOf(_)) => true,
@@ -504,6 +509,7 @@ impl TypeCollection {
         match type_ {
             Type::Error => "error".into(),
             Type::Void => "void".into(),
+            Type::Never => "never".into(),
             Type::Any => "any".into(),
             Type::IntegerLiteral => "integer literal".into(),
             Type::Integer(int_type) => format!("{int_type}").into(),
@@ -1052,6 +1058,7 @@ impl TypeCollectionIndexOutput<GenericTypeId> for GenericType {
 pub enum Type {
     Error,
     Void,
+    Never,
     Any,
     IntegerLiteral,
     Integer(IntegerType),
@@ -1104,6 +1111,7 @@ impl Type {
             Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
+            Type::Never => 0,
             Type::IgnoreTypeChecking => 0,
             Type::Integer(integer_type) => integer_type.size_in_bytes(),
             Type::None
@@ -1144,6 +1152,7 @@ impl Type {
             Type::IgnoreTypeChecking => panic!("This is only a placeholder type!"),
             Type::Error
             | Type::Void
+            | Type::Never
             | Type::Any
             // Technically a pointer. But it does not get dereferenced,
             // instead the value itself is assigned to the program counter.
@@ -1408,7 +1417,7 @@ impl FunctionType<TypeId> {
             SystemCallKind::RuntimeError => Self {
                 parameter_types: vec![typeid!(Type::String)],
                 this_type: None,
-                return_type: typeid!(Type::Void),
+                return_type: typeid!(Type::Never),
                 system_call_kind: Some(system_call_kind),
                 name: None,
                 is_generic: false,

@@ -25,7 +25,6 @@ struct MyString {
         let bytes : &byte = reallocate(none, length);
         if bytes == none {
             runtimeError('Could not allocate string!');
-            return this;
         }
         for i in 0..this.length {
             bytes[i] = this.bytes[i];
@@ -491,7 +490,6 @@ struct Dict<Key, Value> {
             }
         }
         runtimeError('Index out of bounds exception!');
-        return this.bucket[0][0];
     }
 
     func length() -> uint {

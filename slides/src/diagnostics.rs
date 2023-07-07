@@ -177,7 +177,9 @@ impl DiagnosticSimpleKind {
             }
             writeln!(output)?;
         }
-        for line_index in end_line_index + 1..end_line_index + 1 + self.context_after {
+        for line_index in end_line_index + 1
+            ..(end_line_index + 1 + self.context_after).min(source_text.line_count())
+        {
             writeln!(
                 output,
                 "{:>3} | {}",
@@ -676,7 +678,7 @@ impl DiagnosticBag {
         expected_return_type: TypeId,
     ) {
         let message: &[Message] = &[
-            "Not all paths in function return. Every path needs a return value of type".into(),
+            "Not all paths in function return. Every path needs a return value of type ".into(),
             expected_return_type.into(),
             ".".into(),
         ];

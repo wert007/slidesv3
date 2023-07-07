@@ -4489,6 +4489,7 @@ fn bind_field_access<'a, 'b>(
         }
         Type::Any
         | Type::Void
+        | Type::Never
         | Type::Integer(_)
         | Type::IntegerLiteral
         | Type::Float
@@ -4664,6 +4665,7 @@ fn bind_field_access_for_assignment<'a>(
         Type::Error => base,
         Type::Any
         | Type::Void
+        | Type::Never
         | Type::Integer(_)
         | Type::IntegerLiteral
         | Type::Float
@@ -5133,6 +5135,7 @@ fn bind_condition_conversion<'a>(
             }
         }
         Type::Void
+        | Type::Never
         | Type::Any
         | Type::Integer(_)
         | Type::IntegerLiteral
@@ -5581,6 +5584,7 @@ fn bind_match_statement(
     match &binder.project.types[expression.type_] {
         Type::Error => {}
         Type::Void
+        | Type::Never
         | Type::None
         | Type::SystemCall(_)
         | Type::Function(_)

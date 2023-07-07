@@ -610,12 +610,17 @@ impl BoundNode {
     }
 
     pub fn expression_statement(location: TextLocation, expression: BoundNode) -> Self {
+        let type_ = if expression.type_ == typeid!(Type::Never) {
+            typeid!(Type::Never)
+        } else {
+            typeid!(Type::Void)
+        };
         Self {
             location,
             kind: BoundNodeKind::ExpressionStatement(BoundExpressionStatementNodeKind {
                 expression: Box::new(expression),
             }),
-            type_: typeid!(Type::Void),
+            type_,
             constant_value: None,
         }
     }
@@ -1068,7 +1073,7 @@ impl BoundConversionNodeKind {
         }
         // Used in match statements. Otherwise the noneable version should be used by the compiler!
         if type_collection.is_parent_of(self.type_, self.base.type_) {
-            return Some(ConversionKind::AbstractTypeUnboxingUnchecked)
+            return Some(ConversionKind::AbstractTypeUnboxingUnchecked);
         }
         match (
             &type_collection[self.type_],
@@ -1188,8 +1193,8 @@ impl BoundMatchCaseExpression {
             Self::Expression(expression) => {
                 function(expression);
                 expression.for_each_child_mut(function);
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 }

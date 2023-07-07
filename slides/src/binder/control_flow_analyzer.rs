@@ -1,11 +1,12 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{binder::bound_nodes::BoundNodeKind, debug::basic_blocks::DebugBasicBlock, DebugFlags};
-
-use super::{
-    bound_nodes::{BoundConversionNodeKind, BoundNode},
-    typing::TypeCollection,
+use crate::{
+    binder::{bound_nodes::BoundNodeKind, typing::TypeId},
+    debug::basic_blocks::DebugBasicBlock,
+    DebugFlags,
 };
+
+use super::{bound_nodes::BoundNode, typing::TypeCollection};
 
 #[derive(Debug)]
 pub struct BasicBlock<T, C = ()> {
@@ -146,7 +147,9 @@ pub fn check_if_all_paths_return(
         let basic_block = &basic_blocks[incoming];
         if let BasicBlockKind::CodeBlock(code_block) = basic_block.kind {
             let last_statement = &statements[code_block.index + code_block.length - 1];
-            if !matches!(last_statement.kind, BoundNodeKind::ReturnStatement(_)) {
+            if last_statement.type_ != typeid!(Type::Never)
+                && !matches!(last_statement.kind, BoundNodeKind::ReturnStatement(_))
+            {
                 return false;
             }
         } else {
@@ -221,6 +224,21 @@ fn collect_basic_blocks<'a>(
                     length: 0,
                 };
             }
+            _ if statement.type_ == typeid!(Type::Never) => {
+                // Start new Block
+                if current_block.length > 0 {
+                    result.push(BasicBlock::code_block(
+                        result.len(),
+                        current_block,
+                        label_indices,
+                    ));
+                    label_indices = vec![];
+                }
+                current_block = BasicCodeBlock {
+                    index: index + 1,
+                    length: 0,
+                };
+            }
             BoundNodeKind::VariableDeclaration(_)
             | BoundNodeKind::Assignment(_)
             | BoundNodeKind::ExpressionStatement(_) => {}
@@ -263,30 +281,16 @@ fn connect_basic_blocks<'a>(
             }
             BasicBlockKind::End => {}
             BasicBlockKind::CodeBlock(code_block) => {
-                match &statements[code_block.index + code_block.length - 1].kind {
+                let node = &statements[code_block.index + code_block.length - 1];
+                match &node.kind {
                     BoundNodeKind::Jump(jump) => {
                         let then_address = match &jump.target.kind {
                             BoundNodeKind::LabelReference(it) => {
                                 label_index_to_basic_block_index[it]
                             }
-                            BoundNodeKind::BinaryExpression(it) => {
-                                if let BoundNodeKind::Conversion(BoundConversionNodeKind {
-                                    base,
-                                    ..
-                                }) = &it.rhs.kind
-                                {
-                                    if let BoundNodeKind::LabelReference(it) = &base.kind {
-                                        label_index_to_basic_block_index[it]
-                                    } else {
-                                        unreachable!()
-                                    }
-                                } else {
-                                    unreachable!()
-                                }
-                            }
-                            kind => {
-                                dbg!(kind);
-                                panic!()
+                            _match_statement => {
+                                dbg!(jump);
+                                todo!("This should basically just jump to all the blocks, that have no outside connection. Actually that is not true, since dead code would also be that. So jump should just know, what its targets can be..")
                             }
                         };
                         incoming_connections.push((basic_block.index, then_address));
@@ -316,6 +320,10 @@ fn connect_basic_blocks<'a>(
                             };
                     }
                     BoundNodeKind::ReturnStatement(_) => {
+                        basic_block.outgoing_connections = OutgoingConnections::Single(end_index);
+                        incoming_connections.push((basic_block.index, end_index));
+                    }
+                    _ if node.type_ == typeid!(Type::Never) => {
                         basic_block.outgoing_connections = OutgoingConnections::Single(end_index);
                         incoming_connections.push((basic_block.index, end_index));
                     }

@@ -100,6 +100,10 @@ impl SourceText {
         let line = self.lines[index];
         &self.text[line.start..][..line.length]
     }
+
+    pub(crate) fn line_count(&self) -> usize {
+        self.lines.len()
+    }
 }
 
 fn parse_text_lines(text: &str) -> Vec<TextLine> {
