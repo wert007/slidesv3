@@ -97,7 +97,7 @@ async fn main() {
 }
 
 enum Error {
-    FileNotFound(PathBuf, std::io::Error),
+    FileNotFound(String, PathBuf, std::io::Error),
     FileLengthDifferent(String, String),
     FileByteDifferentAt(usize, String, String),
     InvalidUtf8(FromUtf8Error),
@@ -108,7 +108,10 @@ async fn ensure_equal(file: PathBuf, output: Vec<u8>, verbose: bool) -> bool {
     let file = match fs::read(&file).await {
         Ok(it) => it,
         Err(err) => {
-            report_error(Error::FileNotFound(file, err), verbose);
+            report_error(
+                Error::FileNotFound(String::from_utf8_lossy(&output).into_owned(), file, err),
+                verbose,
+            );
             return true;
         }
     };
@@ -150,12 +153,18 @@ fn report_error(err: Error, verbose: bool) {
     }
     colorize_print("ERROR: ", Colors::RedFg);
     match err {
-        Error::FileNotFound(file, err) => {
+        Error::FileNotFound(output, file, err) => {
             println!(
                 "Failed to find file '{}', original error was:",
                 colorize_this(file.to_string_lossy(), Colors::CyanFg)
             );
             println!("{err}");
+            if output.is_empty() {
+                print!("The output was ");
+                colorize_println("empty", Colors::BrightBlackFg);
+            } else {
+                println!("Anyway, output read:\n'{output}'");
+            }
         }
         Error::FileLengthDifferent(file, output) => {
             println!(
