@@ -3,10 +3,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{instruction_converter::{
-    instruction::{op_codes::OpCode, Instruction},
-    InstructionOrLabelReference, LabelReference, Program,
-}, text::TextLocation};
+use crate::{
+    instruction_converter::{
+        instruction::{op_codes::OpCode, Instruction},
+        InstructionOrLabelReference, LabelReference, Program,
+    },
+    text::TextLocation,
+};
 
 use super::{
     bound_nodes::BoundNode,
@@ -101,6 +104,13 @@ impl Library {
                 }
                 _ => {}
             }
+        }
+    }
+
+    pub(crate) fn collect_libraries(&self, libraries: &mut Vec<Library>) {
+        libraries.push(self.clone());
+        for l in &self.referenced_libraries {
+            l.collect_libraries(libraries);
         }
     }
 }

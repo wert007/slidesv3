@@ -32,7 +32,7 @@ use crate::{
     Project,
 };
 
-use self::instruction::{op_codes::OpCode, Instruction};
+use self::instruction::Instruction;
 
 #[derive(Debug, Clone, Copy)]
 pub struct LabelReference {
@@ -92,7 +92,6 @@ impl From<LabelReference> for InstructionOrLabelReference {
 
 #[derive(Debug)]
 pub struct InstructionConverter<'a> {
-    pub static_memory: StaticMemory,
     pub fixed_variable_count: usize,
     project: &'a mut Project,
     next_label_index: usize,
@@ -103,10 +102,26 @@ impl InstructionConverter<'_> {
         self.next_label_index += 1;
         self.next_label_index
     }
+
+    pub fn static_memory(&self) -> &StaticMemory {
+        &self.project.static_memory
+    }
+
+    pub fn static_memory_mut(&mut self) -> &mut StaticMemory {
+        &mut self.project.static_memory
+    }
+
+    fn take_static_memory(&mut self) -> StaticMemory {
+        std::mem::replace(
+            &mut self.project.static_memory,
+            StaticMemory::new(self.project.debug_flags),
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Program {
+    /// If part of a library, this value is invalid, and should not be used!
     pub static_memory: StaticMemory,
     pub startup_instructions: Vec<Instruction>,
     pub instructions: Vec<Instruction>,
@@ -135,80 +150,28 @@ pub fn convert_with_project_parameter<'a>(
     diagnostic_bag: &mut DiagnosticBag,
     project: &'a mut Project,
 ) -> Program {
-    let mut bound_program =
+    let bound_program =
         binder::bind_program_with_project_parameter(source_text, diagnostic_bag, project);
-    if diagnostic_bag.has_errors() {
-        return Program::error();
-    }
-    let bound_node = bound_program.functions;
-    let mut converter = InstructionConverter {
-        static_memory: StaticMemory::new(project.debug_flags),
-        fixed_variable_count: bound_program.fixed_variable_count,
-        next_label_index: bound_program.label_count + 1,
-        project,
-    };
-    converter.static_memory.allocate_null();
-    let minimum_memory_relocation = converter.static_memory.size_in_bytes();
-    for lib in bound_program.referenced_libraries.iter_mut() {
-        let static_memory_size = if lib.is_already_loaded {
-            minimum_memory_relocation
-        } else {
-            converter.static_memory.size_in_bytes()
-        };
-        for inst in lib.instructions.iter_mut() {
-            if let InstructionOrLabelReference::Instruction(Instruction {
-                arg,
-                op_code: OpCode::LoadPointer,
-                ..
-            }) = inst
-            {
-                // None pointers are saved as u64::MAX value to not interfere
-                // with the actual static memory, since none gets "allocated"
-                // way later. This fixes all these pointer to point to none.
-                if *arg == u64::MAX {
-                    *arg = 0
-                } else {
-                    *arg += static_memory_size;
-                }
-            }
-        }
-        if !lib.is_already_loaded {
-            converter
-                .static_memory
-                .insert(&mut lib.program.static_memory);
-        }
-    }
-    let mut instructions = bound_program.startup;
+
     let mut foreign_instructions: Vec<_> = bound_program
-        .referenced_libraries
+        .all_libraries()
         .into_iter()
         .map(|l| l.instructions)
         .flatten()
         .collect();
-    // foreign_instructions.iter_mut().for_each(|i| {
-    //     if let Some(span) = i.span_mut() {
-    //         span.set_is_foreign(true);
-    //     }
-    // });
+    if diagnostic_bag.has_errors() {
+        return Program::error();
+    }
+    let mut converter = InstructionConverter {
+        fixed_variable_count: bound_program.fixed_variable_count,
+        next_label_index: bound_program.label_count + 1,
+        project,
+    };
+    let mut instructions = bound_program.startup;
     instructions.append(&mut foreign_instructions);
     let entry_point = 0;
+    let bound_node = bound_program.functions;
     let mut program_code = convert_node(bound_node, &mut converter);
-    for inst in &mut program_code {
-        if let InstructionOrLabelReference::Instruction(Instruction {
-            op_code: OpCode::LoadPointer,
-            arg,
-            ..
-        }) = inst
-        {
-            // All none pointers are saved as u64::MAX value to not interfere
-            // with the actual static memory, since normally none gets
-            // "allocated" way later. And the converter does not know if none is
-            // allocated or not. This fixes all these pointer to point to none.
-            if *arg == u64::MAX {
-                *arg = 0;
-            }
-        }
-    }
     instructions.append(&mut program_code);
     if converter
         .project
@@ -235,13 +198,13 @@ pub fn convert_with_project_parameter<'a>(
     if converter.project.debug_flags.print_static_memory_as_string {
         println!(
             "{:?}",
-            memory::static_memory::print_static_memory_as_string(&converter.static_memory)
+            memory::static_memory::print_static_memory_as_string(&converter.static_memory())
         );
     }
     Program {
         startup_instructions: vec![],
         instructions,
-        static_memory: converter.static_memory,
+        static_memory: converter.take_static_memory(),
         max_used_variables: bound_program.max_used_variables,
         protected_variables: converter.fixed_variable_count,
         label_count: converter.next_label_index + 1,
@@ -268,41 +231,13 @@ pub fn convert_library_with_project_parameter<'a>(
     let exported_structs = bound_program.exported_structs;
     let exported_enums = bound_program.exported_enums;
     let exported_generic_structs = bound_program.exported_generic_structs;
-    let mut bound_program = bound_program.program;
-    let bound_node = bound_program.functions;
+    let bound_program = bound_program.program;
     let mut converter = InstructionConverter {
-        static_memory: StaticMemory::new(project.debug_flags),
         fixed_variable_count: bound_program.fixed_variable_count,
         next_label_index: bound_program.label_count,
         project,
     };
-    for lib in bound_program
-        .referenced_libraries
-        .iter_mut()
-        .filter(|l| !l.is_already_loaded)
-    {
-        let static_memory_size = converter.static_memory.size_in_bytes();
-        for inst in lib.instructions.iter_mut() {
-            if let InstructionOrLabelReference::Instruction(Instruction {
-                arg,
-                op_code: OpCode::LoadPointer,
-                ..
-            }) = inst
-            {
-                // None pointers are saved as u64::MAX value to not interfere
-                // with the actual static memory, since none gets "allocated"
-                // way later. This fixes all these pointer to point to none.
-                if *arg == u64::MAX {
-                    *arg = 0
-                } else {
-                    *arg += static_memory_size;
-                }
-            }
-        }
-        converter
-            .static_memory
-            .insert(&mut lib.program.static_memory);
-    }
+    let bound_node = bound_program.functions;
     let instructions = convert_node(bound_node, &mut converter);
     if converter.project.debug_flags.print_instructions_and_labels {
         for (i, instruction) in instructions.iter().enumerate() {
@@ -335,7 +270,7 @@ pub fn convert_library_with_project_parameter<'a>(
         program: Program {
             startup_instructions: vec![],
             instructions: vec![],
-            static_memory: converter.static_memory,
+            static_memory: StaticMemory::new(converter.project.debug_flags),
             max_used_variables: bound_program.max_used_variables,
             protected_variables: converter.fixed_variable_count,
             label_count: converter.next_label_index + 1,
@@ -504,7 +439,7 @@ fn convert_string_literal(
     value: String,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
-    let pointer = converter.static_memory.allocate_string(value);
+    let pointer = converter.static_memory_mut().allocate_string(value);
     vec![Instruction::load_pointer(pointer, span).into()]
 }
 
@@ -626,10 +561,19 @@ fn convert_array_index_for_assignment(
     // array
     let mut result = convert_node(*array_index.base, converter);
     // index
-    result.append(&mut convert_node(*array_index.index, converter));
-    result.push(Instruction::load_immediate(base_type_size, location).into());
-    result.push(Instruction::multiplication(location).into());
-    result.push(Instruction::addition(location).into());
+    if let Some(value) = &array_index.index.constant_value {
+        let value = value.value.as_integer().unwrap() as u64;
+        let offset = value * base_type_size;
+        if offset != 0 {
+            result.push(Instruction::load_immediate(offset, location).into());
+            result.push(Instruction::addition(location).into());
+        }
+    } else {
+        result.append(&mut convert_node(*array_index.index, converter));
+        result.push(Instruction::load_immediate(base_type_size, location).into());
+        result.push(Instruction::multiplication(location).into());
+        result.push(Instruction::addition(location).into());
+    }
 
     match base_type_size {
         1 => {
@@ -651,8 +595,10 @@ fn convert_field_access_for_assignment(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let mut result = convert_node(*field_access.base, converter);
-    result.push(Instruction::load_immediate(field_access.offset, location).into());
-    result.push(Instruction::addition(location).into());
+    if field_access.offset != 0 {
+        result.push(Instruction::load_immediate(field_access.offset, location).into());
+        result.push(Instruction::addition(location).into());
+    }
     result.push(Instruction::store_word_in_memory(location).into());
     result
 }
@@ -839,7 +785,7 @@ fn convert_constructor_call(
 
 fn convert_system_call(
     span: TextLocation,
-    system_call: BoundSystemCallNodeKind,
+    mut system_call: BoundSystemCallNodeKind,
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     match system_call.base {
@@ -849,6 +795,10 @@ fn convert_system_call(
         SystemCallKind::Break => {
             vec![Instruction::breakpoint(span).into()]
         }
+        SystemCallKind::IgnoreTypeChecking => convert_node(
+            system_call.arguments.pop().expect("Expected one argument!"),
+            converter,
+        ),
         _ => {
             let mut result = vec![];
             let argument_count = match system_call.base {
@@ -858,12 +808,11 @@ fn convert_system_call(
                 | SystemCallKind::ArrayLength
                 | SystemCallKind::HeapDump
                 | SystemCallKind::RuntimeError
-                | SystemCallKind::AddressOf
                 | SystemCallKind::Hash
                 | SystemCallKind::ByteToChar
                 | SystemCallKind::TypeOfValue => 1,
-                SystemCallKind::Reallocate => 2,
-                SystemCallKind::Break => unreachable!(),
+                SystemCallKind::Reallocate | SystemCallKind::WriteToFile => 2,
+                SystemCallKind::Break | SystemCallKind::IgnoreTypeChecking => unreachable!(),
             };
 
             for argument in system_call.arguments {

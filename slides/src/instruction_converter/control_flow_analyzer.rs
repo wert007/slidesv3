@@ -84,7 +84,7 @@ pub(crate) fn check_stack_usage(
                             OpCode::WriteToStack => 0,
                             OpCode::WriteToHeap => {
                                 if instruction.arg == 0 {
-                                    eprintln!("WARNING: Cannot determine stack usage for this, since the stack usage is not constant here!");
+                                    eprintln!("WARNING: Cannot determine stack usage for this, since the stack usage is not constant here! In {}", function_type.name());
                                     emit_block = true;
                                     0
                                 } else {

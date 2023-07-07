@@ -310,6 +310,10 @@ impl DiagnosticBag {
         }
     }
 
+    pub(crate) fn update_registered_types(&mut self, types: &TypeCollection) {
+        self.registered_types = types.clone();
+    }
+
     pub fn has_errors(&self) -> bool {
         !self.diagnostics.is_empty()
     }
@@ -926,6 +930,15 @@ impl DiagnosticBag {
         }));
     }
 
+    pub fn report_expected_generic_type_found_type(&mut self, location: TextLocation, type_id: TypeId) {
+        let message = message_format!(
+            "Expected generic type, found concrete type ",
+            type_id,
+            "instead."
+        );
+       self.report(Diagnostic::Error(DiagnosticSimpleKind::new(message, location)));
+    }
+
     pub fn report_not_a_function(&mut self, location: TextLocation, base_type: TypeId) {
         let message = message_format!(
             "Tried calling a function, but type ",
@@ -1014,8 +1027,9 @@ impl DiagnosticBag {
         self.report_runtime(message, span);
     }
 
-    pub(crate) fn update_registered_types(&mut self, types: &TypeCollection) {
-        self.registered_types = types.clone();
+    pub(crate) fn write_to_file_failed(&mut self, location: TextLocation, path: &str, err: std::io::Error) {
+        let message = message_format!("Write to file '", path, "' failed. OS error was: ", err.to_string());
+        self.report_runtime(message, location);
     }
 }
 

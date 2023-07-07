@@ -1,3 +1,5 @@
+import lib('htmlWriter') as html;
+
 struct Presentation {
     slides: List<Slide>;
     flags: PresentationFlags;
@@ -61,38 +63,22 @@ struct Position {
 struct Style {}
 struct SvgFilterArgs {}
 
-struct Writer {
-    buffer: string;
-
-    func $constructor() {
-        this.buffer = '';
-    }
-
-    func write(value: string) {
-        this.buffer = this.buffer + value;
-    }
-
-    func $toString() -> string {
-        return this.buffer;
-    }
-}
-
 struct HtmlEmitter {
     presentation: Presentation;
-    writer: Writer;
+    htmlWriter: html.HtmlWriter;
 
     func $constructor(presentation: Presentation) {
         this.presentation = presentation;
-        this.writer = new Writer();
+        this.htmlWriter = new html.HtmlWriter();
     }
 
-    func emit() -> string {
-        this.writer.write('<html><body>');
+    func emit(path: string) {
+        this.htmlWriter.openHtmlTag();
+        this.htmlWriter.openBodyTag();
         for slide in this.presentation.slides {
             this.emitSlide(slide);
         }
-        this.writer.write('</body></html>');
-        return this.writer + '';
+        writeToFile(path, this.htmlWriter.finish());
     }
 
     func emitSlide(slide: Slide) {
@@ -119,8 +105,6 @@ struct HtmlEmitter {
     }
 
     func emitElementLabel(label: Label) {
-        this.writer.write('<h1>');
-        this.writer.write(label.text);
-        this.writer.write('</h1>');
+        this.htmlWriter.writePTag(label.text);
     }
 }

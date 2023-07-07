@@ -916,6 +916,14 @@ impl BoundProgram {
             referenced_libraries: vec![],
         }
     }
+
+    pub(crate) fn all_libraries(&self) -> Vec<Library> {
+        let mut libraries = Vec::new();
+        for l in &self.referenced_libraries {
+            l.collect_libraries(&mut libraries)
+        }
+        libraries
+    }
 }
 
 pub struct BoundLibrary {
@@ -1581,10 +1589,6 @@ fn default_statements(binder: &mut BindingState) {
         Value::SystemCall(SystemCallKind::RuntimeError),
     );
     binder.register_constant(
-        "addressOf".to_owned(),
-        Value::SystemCall(SystemCallKind::AddressOf),
-    );
-    binder.register_constant(
         "garbageCollect".to_owned(),
         Value::SystemCall(SystemCallKind::GarbageCollect),
     );
@@ -1596,6 +1600,14 @@ fn default_statements(binder: &mut BindingState) {
     binder.register_constant(
         "typeOfValue".to_owned(),
         Value::SystemCall(SystemCallKind::TypeOfValue),
+    );
+    binder.register_constant(
+        "writeToFile".to_owned(),
+        Value::SystemCall(SystemCallKind::WriteToFile),
+    );
+    binder.register_constant(
+        "ignoreTypeChecking".to_owned(),
+        Value::SystemCall(SystemCallKind::IgnoreTypeChecking),
     );
 }
 
@@ -2567,13 +2579,22 @@ fn bind_type(type_: TypeNode, binder: &mut BindingState) -> TypeOrGenericTypeId 
                 .to_fake_type_id(result.unwrap_generic_type_id())
                 .into();
         } else {
-            result = bind_generic_struct_type_for_types(
-                type_location,
-                result.unwrap_generic_type_id(),
-                &generic_type_qualifiers,
-                binder,
-            )
-            .into();
+            match result {
+                TypeOrGenericTypeId::Type(err) => {
+                    binder
+                        .diagnostic_bag
+                        .report_expected_generic_type_found_type(type_location, err);
+                }
+                TypeOrGenericTypeId::GenericType(generic_type_id) => {
+                    result = bind_generic_struct_type_for_types(
+                        type_location,
+                        generic_type_id,
+                        &generic_type_qualifiers,
+                        binder,
+                    )
+                    .into();
+                }
+            }
         }
     }
     if type_.optional_question_mark.is_some() {
@@ -4512,6 +4533,7 @@ fn bind_field_access<'a, 'b>(
                 it.name
             )
         }
+        Type::IgnoreTypeChecking => unreachable!(),
     }
 }
 
@@ -4593,13 +4615,6 @@ fn field_access_in_struct<'a, 'b>(
             )
         }
     } else {
-        for f in &bound_struct_type.functions {
-            println!(
-                "  - func {}{}",
-                f.name,
-                binder.project.types.name_of_type_id_debug(f.type_)
-            );
-        }
         binder
             .diagnostic_bag
             .report_no_field_named_on_struct(field.location, field.location, id);
@@ -4667,6 +4682,7 @@ fn bind_field_access_for_assignment<'a>(
             "Internal Compiler error, struct placeholder '{}' should already be resolved.",
             it.name
         ),
+        Type::IgnoreTypeChecking => unreachable!(),
     }
 }
 
@@ -5046,11 +5062,18 @@ fn bind_generic_function_for_type(
     function_type
 }
 
-fn bind_conversion<'a>(base: BoundNode, type_: TypeId, binder: &mut BindingState<'_>) -> BoundNode {
+fn bind_conversion<'a>(
+    mut base: BoundNode,
+    type_: TypeId,
+    binder: &mut BindingState<'_>,
+) -> BoundNode {
     if base.type_ == type_ {
         base
     } else if binder.project.types.can_be_converted(base.type_, type_) {
         BoundNode::conversion(base.location, base, type_)
+    } else if base.type_ == typeid!(Type::IgnoreTypeChecking) {
+        base.type_ = type_;
+        base
     } else if type_ != typeid!(Type::Error) && base.type_ != typeid!(Type::Error) {
         binder
             .diagnostic_bag
@@ -5097,7 +5120,8 @@ fn bind_condition_conversion<'a>(
         | Type::PointerOf(_)
         | Type::Enum(..)
         | Type::TypeId
-        | Type::AbstractTypeBox(_) => (
+        | Type::AbstractTypeBox(_)
+        | Type::IgnoreTypeChecking => (
             bind_conversion(base, typeid!(Type::Boolean), binder),
             SafeNodeInCondition::None,
         ),
@@ -5474,7 +5498,7 @@ fn bind_match_statement(
         .project
         .types
         .look_up_type_by_name("Dict")
-        .unwrap()
+        .expect("Failed to load type Dict from stdlib.")
         .unwrap_generic_type_id();
     bind_generic_struct_type_for_types(
         location,
@@ -5614,6 +5638,7 @@ fn bind_match_statement(
                     .report_expected_else_case(expression.location, expression.type_)
             }
         }
+        Type::IgnoreTypeChecking => unreachable!(),
         Type::IntegerLiteral => unreachable!(),
     }
     let temporary_variable = binder.generate_temporary_variable("match", location);

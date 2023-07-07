@@ -7,7 +7,7 @@ use std::{
 
 use num_enum::TryFromPrimitive;
 
-use crate::{evaluator::memory::WORD_SIZE_IN_BYTES, DebugFlags, text::TextLocation};
+use crate::{evaluator::memory::WORD_SIZE_IN_BYTES, text::TextLocation, DebugFlags};
 
 use super::{
     symbols::{GenericFunction, StructFunctionTable},
@@ -70,9 +70,12 @@ macro_rules! typeid {
     (Type::TypeId) => {
         unsafe { TypeId::from_raw(11) }
     };
+    (Type::IgnoreTypeChecking) => {
+        unsafe { TypeId::from_raw(12) }
+    };
     (Type::SystemCall($kind:expr)) => {
         unsafe {
-            const BASIS: u64 = 12;
+            const BASIS: u64 = 13;
             TypeId::from_raw(
                 BASIS
                     + match $kind {
@@ -83,11 +86,12 @@ macro_rules! typeid {
                         SystemCallKind::Break => 4,
                         SystemCallKind::Reallocate => 5,
                         SystemCallKind::RuntimeError => 6,
-                        SystemCallKind::AddressOf => 7,
-                        SystemCallKind::GarbageCollect => 8,
-                        SystemCallKind::Hash => 9,
-                        SystemCallKind::ByteToChar => 10,
-                        SystemCallKind::TypeOfValue => 11,
+                        SystemCallKind::GarbageCollect => 7,
+                        SystemCallKind::Hash => 8,
+                        SystemCallKind::ByteToChar => 9,
+                        SystemCallKind::TypeOfValue => 10,
+                        SystemCallKind::WriteToFile => 11,
+                        SystemCallKind::IgnoreTypeChecking => 12,
                     },
             )
         }
@@ -274,6 +278,7 @@ impl TypeCollection {
                 Type::Integer(IntegerType::Unsigned64),
                 Type::None,
                 Type::TypeId,
+                Type::IgnoreTypeChecking,
                 Type::SystemCall(SystemCallKind::Print),
                 Type::SystemCall(SystemCallKind::ToString),
                 Type::SystemCall(SystemCallKind::ArrayLength),
@@ -281,11 +286,12 @@ impl TypeCollection {
                 Type::SystemCall(SystemCallKind::Break),
                 Type::SystemCall(SystemCallKind::Reallocate),
                 Type::SystemCall(SystemCallKind::RuntimeError),
-                Type::SystemCall(SystemCallKind::AddressOf),
                 Type::SystemCall(SystemCallKind::GarbageCollect),
                 Type::SystemCall(SystemCallKind::Hash),
                 Type::SystemCall(SystemCallKind::ByteToChar),
                 Type::SystemCall(SystemCallKind::TypeOfValue),
+                Type::SystemCall(SystemCallKind::WriteToFile),
+                Type::SystemCall(SystemCallKind::IgnoreTypeChecking),
             ],
         }
     }
@@ -365,6 +371,8 @@ impl TypeCollection {
             (Type::Library(_), _) | (_, Type::Library(_)) => false,
             _ if from_id == to_id => true,
             (_, Type::Any) => true,
+            (_, Type::IgnoreTypeChecking) => true,
+            (Type::IgnoreTypeChecking, _) => true,
             (Type::Pointer, Type::PointerOf(_)) => true,
             (Type::PointerOf(_), Type::Pointer) => true,
             (Type::None, Type::PointerOf(_)) => true,
@@ -509,17 +517,16 @@ impl TypeCollection {
             Type::Enum(name, _) => name.into(),
             Type::StructPlaceholder(it) => it.name.clone().into(),
             Type::TypeId => "type".into(),
+            Type::IgnoreTypeChecking => "ignoreTypeChecking".into(),
         }
     }
 
     fn name_of_type_debug<'a>(&self, type_: &'a Type) -> Cow<'a, str> {
         match type_ {
             Type::StructPlaceholder(it) => format!("placeholder {}", it.name).into(),
-            Type::AbstractTypeBox(base) => format!(
-                "thin abstract {}",
-                self.name_of_type_id_debug(*base)
-            )
-            .into(),
+            Type::AbstractTypeBox(base) => {
+                format!("thin abstract {}", self.name_of_type_id_debug(*base)).into()
+            }
             type_ => self.name_of_type(type_),
         }
     }
@@ -1062,6 +1069,7 @@ pub enum Type {
     GenericType(usize, String),
     StructPlaceholder(StructPlaceholderType),
     Enum(String, Vec<String>),
+    IgnoreTypeChecking,
 }
 
 impl Type {
@@ -1089,6 +1097,7 @@ impl Type {
             Type::Any => unreachable!(),
             Type::Error => 0,
             Type::Void => 0,
+            Type::IgnoreTypeChecking => 0,
             Type::Integer(integer_type) => integer_type.size_in_bytes(),
             Type::None
             | Type::Enum(..)
@@ -1124,6 +1133,7 @@ impl Type {
             Type::GenericType(_, _) => panic!("Generic Types should only be accessed during binding!"),
             Type::Enum(..) => todo!("Implement enums at runtime"),
             Type::StructPlaceholder(..) => panic!("This is only a placeholder type!"),
+            Type::IgnoreTypeChecking => panic!("This is only a placeholder type!"),
             Type::Error
             | Type::Void
             | Type::Any
@@ -1229,11 +1239,12 @@ pub enum SystemCallKind {
     Break,
     Reallocate,
     RuntimeError,
-    AddressOf,
     GarbageCollect,
     Hash,
     ByteToChar,
     TypeOfValue,
+    WriteToFile,
+    IgnoreTypeChecking,
 }
 
 impl std::fmt::Display for SystemCallKind {
@@ -1249,11 +1260,12 @@ impl std::fmt::Display for SystemCallKind {
                 Self::Break => "break",
                 Self::Reallocate => "reallocate",
                 Self::RuntimeError => "runtimeError",
-                Self::AddressOf => "addressOf",
                 Self::GarbageCollect => "garbageCollect",
                 Self::Hash => "hash",
                 Self::ByteToChar => "byteToChar",
                 Self::TypeOfValue => "typeOfValue",
+                Self::WriteToFile => "writeToFile",
+                Self::IgnoreTypeChecking => "ignoreTypeChecking",
             }
         )
     }
@@ -1393,15 +1405,6 @@ impl FunctionType<TypeId> {
                 is_generic: false,
                 head_location: None,
             },
-            SystemCallKind::AddressOf => Self {
-                parameter_types: vec![typeid!(Type::Pointer)],
-                this_type: None,
-                return_type: typeid!(Type::Integer(IntegerType::Unsigned64)),
-                system_call_kind: Some(system_call_kind),
-                name: None,
-                is_generic: false,
-                head_location: None,
-            },
             SystemCallKind::GarbageCollect => Self {
                 parameter_types: vec![],
                 this_type: None,
@@ -1438,6 +1441,24 @@ impl FunctionType<TypeId> {
                 is_generic: false,
                 head_location: None,
             },
+            SystemCallKind::WriteToFile => Self {
+                parameter_types: vec![typeid!(Type::String), typeid!(Type::String)],
+                this_type: None,
+                return_type: typeid!(Type::Void),
+                system_call_kind: Some(system_call_kind),
+                name: None,
+                is_generic: false,
+                head_location: None,
+            },
+            SystemCallKind::IgnoreTypeChecking => Self {
+                parameter_types: vec![typeid!(Type::IgnoreTypeChecking)],
+                this_type: None,
+                return_type: typeid!(Type::IgnoreTypeChecking),
+                system_call_kind: Some(system_call_kind),
+                name: None,
+                is_generic: false,
+                head_location: None,
+            }
         }
     }
 

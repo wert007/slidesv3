@@ -72,6 +72,9 @@ args:
   - print-lines:
       help: Prints the current line of the source code, that is executed. Similiar to --di but less details.
       long: dlines
+  - show-stats:
+      help: Prints stats about the execution at the end.
+      long: stats
 author: Pablo H.
 name: Slides
 version: '0.1'

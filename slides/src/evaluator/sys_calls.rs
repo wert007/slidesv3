@@ -95,7 +95,8 @@ fn to_string_native(
         Type::Library(_)
         | Type::GenericType(_, _)
         | Type::IntegerLiteral
-        | Type::StructPlaceholder(..) => unreachable!("{:#?}", &state.project.types[type_]),
+        | Type::StructPlaceholder(..)
+        | Type::IgnoreTypeChecking => unreachable!("{:#?}", &state.project.types[type_]),
         Type::Error => todo!(),
         Type::Void => todo!(),
         Type::TypeId => {
@@ -204,7 +205,7 @@ fn to_string_native(
         Type::SystemCall(kind) => format!("system call {}", kind),
         Type::Function(kind) => format!("fn {}", kind.display(&state.project.types)),
         Type::Closure(closure) => format!("fn {}", closure.base_function_type),
-        Type::String => string_to_string_native(argument, state),
+        Type::String => string_to_string_native(argument, location, state)?,
         Type::Enum(a, b) => {
             let index = argument.unwrap_value() as usize;
             format!("{a}.{}", b[index])
@@ -212,9 +213,18 @@ fn to_string_native(
     })
 }
 
-fn string_to_string_native(argument: &FlaggedWord, state: &mut EvaluatorState) -> String {
-    let string_start = argument.unwrap_pointer();
-    let pointer = state.read_pointer_word(string_start).unwrap_value();
+fn string_to_string_native(
+    argument: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> Result<String, InstructionError> {
+    let string_start = argument
+        .as_pointer()
+        .map_err(|err| InstructionError::value(err, line!(), location, state.pc))?;
+    let pointer = state
+        .read_pointer_word(string_start)
+        .as_value()
+        .map_err(|err| InstructionError::pointer(err, line!(), location, state.pc))?;
 
     let string_length_in_bytes = pointer;
     let string_length_in_words = bytes_to_word(string_length_in_bytes);
@@ -226,11 +236,14 @@ fn string_to_string_native(argument: &FlaggedWord, state: &mut EvaluatorState) -
         .step_by(WORD_SIZE_IN_BYTES as _);
 
     for i in range {
-        let word = state.read_pointer_word(i).unwrap_value();
+        let word = state
+            .read_pointer_word(i)
+            .as_value()
+            .map_err(|err| InstructionError::pointer(err, line!(), location, state.pc))?;
         let bytes = word.to_le_bytes();
         string_buffer.extend_from_slice(&bytes);
     }
-    String::from_utf8_lossy(&string_buffer[..string_length_in_bytes as usize]).into_owned()
+    Ok(String::from_utf8_lossy(&string_buffer[..string_length_in_bytes as usize]).into_owned())
 }
 
 pub fn array_length(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
@@ -244,10 +257,15 @@ pub fn array_length(argument: &FlaggedWord, location: TextLocation, state: &mut 
     state.stack.push(array_length, location, Some(state.pc));
 }
 
-pub fn heap_dump(argument: &FlaggedWord, state: &mut EvaluatorState) {
-    let argument = string_to_string_native(argument, state);
+pub fn heap_dump(
+    argument: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> Result<(), InstructionError> {
+    let argument = string_to_string_native(argument, location, state)?;
     let argument = argument.replace('\0', "");
     crate::debug::output_allocator_to_dot(&argument, &state.heap);
+    Ok(())
 }
 
 pub fn reallocate(
@@ -264,8 +282,12 @@ pub fn reallocate(
         .push_flagged_word(FlaggedWord::pointer(result, location, Some(state.pc)));
 }
 
-pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
-    let argument = string_to_string_native(argument, state);
+pub fn runtime_error(
+    argument: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> Result<(), InstructionError> {
+    let argument = string_to_string_native(argument, location, state)?;
     let argument = argument.replace('\0', "");
     println!(
         "Runtime error happened {}: {}",
@@ -281,10 +303,7 @@ pub fn runtime_error(argument: &FlaggedWord, state: &mut EvaluatorState) {
         );
     }
     state.runtime_error_happened = true;
-}
-
-pub fn address_of(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
-    state.stack.push(argument.value, location, Some(state.pc));
+    Ok(())
 }
 
 pub fn hash(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
@@ -299,7 +318,8 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         | Type::IntegerLiteral
         | Type::Library(_)
         | Type::GenericType(_, _)
-        | Type::StructPlaceholder(_) => unreachable!(),
+        | Type::StructPlaceholder(_)
+        | Type::IgnoreTypeChecking => unreachable!(),
         Type::Any => {
             let type_ = decode_type(argument, state);
             let argument = state
@@ -361,4 +381,31 @@ pub fn byte_to_char(argument: &FlaggedWord, location: TextLocation, state: &mut 
 pub fn type_of_value(argument: &FlaggedWord, location: TextLocation, state: &mut EvaluatorState) {
     let type_ = decode_type(argument, state);
     state.stack.push(type_.as_raw(), location, Some(state.pc));
+}
+
+pub(crate) fn write_to_file(
+    path: &FlaggedWord,
+    content: &FlaggedWord,
+    location: TextLocation,
+    state: &mut EvaluatorState,
+) -> Result<(), InstructionError> {
+    let path = to_string_native(typeid!(Type::String), path, location, state)?;
+    let content = to_string_native(typeid!(Type::String), content, location, state)?;
+    match std::fs::write(&path, content) {
+        Ok(_) => {}
+        Err(err) => {
+            state.runtime_diagnostics.write_to_file_failed(
+                state.instructions[state.pc].location,
+                &path,
+                err,
+            );
+            state
+                .runtime_diagnostics
+                .clone()
+                .flush_to_console(&state.project.source_text_collection);
+            state.runtime_diagnostics.diagnostics.clear();
+            state.runtime_error_happened = true;
+        }
+    }
+    Ok(())
 }

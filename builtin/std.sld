@@ -54,6 +54,78 @@ struct MyString {
     }
 }
 
+struct StringBuilder {
+    capacity: uint;
+    length: uint;
+    bytes: &byte;
+
+    func $constructor(capacity: uint) {
+        this.length = 0;
+        this.capacity = capacity;
+        this.bytes = reallocate(none, capacity);
+    }
+
+    func ensureEnoughCapacity(addedElements: uint) {
+        if this.capacity >= this.length + addedElements {
+            return;
+        }
+        let capacity = 2 * this.capacity + 1;
+
+        let placeholder: &byte = reallocate(this.bytes, capacity);
+        if placeholder == none {
+            runtimeError('Could not allocate enough space for more elements!');
+        }
+        this.bytes = placeholder;
+        this.capacity = capacity;
+    }
+
+    func write(value: any) {
+        let valueString = value + '';
+        this.ensureEnoughCapacity(valueString.length());
+        for i, j in this.length..this.length + valueString.length() {
+            this.bytes[j] = valueString.bytes[i];
+        }
+        this.length = this.length + valueString.length();
+    }
+
+    func length() -> uint {
+        return this.length;
+    }
+
+    func $toString() -> string {
+        let result = createEmptyStringWithLength(this.length);
+        for i in 0..this.length {
+            result.bytes[i] = this.bytes[i];
+        }
+        return result;
+    }
+}
+
+func createEmptyStringWithLength(length: uint) -> string {
+    let result: &uint = reallocate(none, length + 8);
+    result[0] = length;
+    return ignoreTypeChecking(result);
+}
+
+func repeat(char: byte, length: uint) -> string {
+    let result = createEmptyStringWithLength(length);
+    for i in 0..length {
+        result.bytes[i] = char;
+    }
+    return result;
+}
+
+func addressOf(pointer: ptr) -> uint {
+    return ignoreTypeChecking(pointer);
+}
+
+func charToByte(char: string) -> byte {
+    if char.length() != 1 {
+        runtimeError('char needs to have a length of 1! Length was ' + char.length() + 'instead!');
+    }
+    return char.bytes[0];
+}
+
 struct Range {
     start: int;
     end: int;
@@ -246,6 +318,14 @@ struct List<Type> {
         this.ensureEnoughCapacity(1);
         this.buffer[this.length] = element;
         this.length = this.length + 1;
+    }
+
+    func pop() -> $Type? {
+        if this.length == 0 {
+            return none;
+        }
+        this.length = this.length - 1;
+        return this.buffer[this.length];
     }
 
     func $get(index: uint) -> $Type {
@@ -474,7 +554,7 @@ struct Noneable<Type> {
 
 //     func $cast<Type>() -> $Type {
 //         if this.type_identifier == typeOf : $Type {
-//             return ignoreTypechecking(this.value);
+//             return ignoreTypeChecking(this.value);
 //         } else {
 //             return none;
 //         }
@@ -484,7 +564,7 @@ struct Noneable<Type> {
 // generic cast any : $Type? {
 //     if this.type_identifier == typeOf : $Type {
 //         // Trust me bro...
-//         return this.value[0];
+//         return ifnoreTypeChecking(this.value[0]);
 //     } else {
 //         return none;
 //     }

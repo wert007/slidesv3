@@ -74,6 +74,12 @@ pub fn create_session(state: &mut EvaluatorState) {
                         return;
                     }
                     Command::Stack => print_stack(&state.stack, state.static_memory_size_in_words, &state.project.source_text_collection),
+                    Command::Stacktrace => {
+                        println!("Currently in ...");
+                        for &location in &state.stack_trace {
+                            println!("  ... {}", location.display(&state.project.source_text_collection));
+                        }
+                    }
                     Command::Replace(new_value) => {
                         let flags = state.stack.pop().flags;
                         state.stack.push_flagged_word(
@@ -250,6 +256,7 @@ enum Command {
     ShowCurrentInstruction,
     ShowCurrentLine,
     GarbageCollect,
+    Stacktrace,
     TypeId(u64),
     Help,
 }
@@ -289,6 +296,7 @@ impl Command {
             }
             Command::GarbageCollect => "Calls the garbage collector and clears up memory.",
             Command::TypeId(_) => "Converts an integer into a type id.",
+            Command::Stacktrace => "Prints the current stacktrace.",
         }
     }
 
@@ -312,6 +320,7 @@ impl Command {
             Command::ShowCurrentLine => "dlines",
             Command::GarbageCollect => "gc",
             Command::TypeId(_) => "typeid",
+            Command::Stacktrace => "stacktrace",
         }
     }
 }
@@ -338,6 +347,7 @@ fn parse_command(input: &str) -> Option<Command> {
             }
             ["typeid", arg] => Some(Command::TypeId(arg.parse().ok()?)),
             ["stack"] => Some(Command::Stack),
+            ["stacktrace"] => Some(Command::Stacktrace),
             ["gc"] => Some(Command::GarbageCollect),
             ["di"] => Some(Command::ShowCurrentInstruction),
             ["dlines"] => Some(Command::ShowCurrentLine),

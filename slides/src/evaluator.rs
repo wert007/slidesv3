@@ -2,7 +2,7 @@ mod debugger;
 pub mod memory;
 mod sys_calls;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, time::Instant};
 
 use crate::{
     binder::typing::SystemCallKind,
@@ -127,6 +127,39 @@ impl InstructionError {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct Stats {
+    executed_instructions: usize,
+    start_time: Instant,
+    end_time: Instant,
+}
+
+impl Stats {
+    pub fn new() -> Self {
+        Self {
+            executed_instructions: 0,
+            start_time: Instant::now(),
+            end_time: Instant::now(),
+        }
+    }
+
+    pub fn stop(&mut self) {
+        self.end_time = Instant::now();
+    }
+
+    pub fn display(self) {
+        let duration = self.end_time - self.start_time;
+        println!(
+            "Executed {} instructions in {:?}",
+            self.executed_instructions, duration
+        );
+        println!(
+            "That is {:?} spent per instruction",
+            duration / self.executed_instructions as u32
+        );
+    }
+}
+
 pub struct EvaluatorState {
     stack: Stack,
     static_memory_size_in_words: usize,
@@ -142,6 +175,7 @@ pub struct EvaluatorState {
     pub project: Project,
     stack_trace: Vec<TextLocation>,
     last_visible_source_line: (SourceTextId, usize),
+    stats: Stats,
 }
 
 impl EvaluatorState {
@@ -331,8 +365,9 @@ pub fn evaluate(
         protected_pointers: vec![],
         project,
         last_visible_source_line: (unsafe { SourceTextId::from_raw(0) }, 0),
+        stats: Stats::new(),
     };
-    match execute_function(&mut state, program.entry_point, &[]) {
+    let result = match execute_function(&mut state, program.entry_point, &[]) {
         Ok(Some(exit_code)) => (exit_code.unwrap_value() as i64).into(),
         Ok(None) => Value::Integer(0),
         Err(_) => {
@@ -341,7 +376,12 @@ pub fn evaluate(
             }
             Value::Integer(-1)
         }
+    };
+    state.stats.stop();
+    if debug_flags.show_stats {
+        state.stats.display();
     }
+    result
 }
 
 fn execute_function(
@@ -462,6 +502,7 @@ fn execute_instruction(
     state: &mut EvaluatorState,
     instruction: Instruction,
 ) -> Result<(), InstructionError> {
+    state.stats.executed_instructions += 1;
     match instruction.op_code {
         OpCode::Label | OpCode::Unknown => unreachable!(),
         OpCode::NoOp => {}
@@ -1114,6 +1155,7 @@ fn evaluate_sys_call(
     for _ in 0..argument_count {
         arguments.push(state.stack.pop());
     }
+    arguments.reverse();
     match sys_call_kind {
         SystemCallKind::Print => sys_calls::print(&arguments[0], instruction.location, state)?,
         SystemCallKind::ArrayLength => {
@@ -1122,13 +1164,14 @@ fn evaluate_sys_call(
         SystemCallKind::ToString => {
             sys_calls::to_string(&arguments[0], instruction.location, state)?
         }
-        SystemCallKind::HeapDump => sys_calls::heap_dump(&arguments[0], state),
-        SystemCallKind::Reallocate => {
-            sys_calls::reallocate(&arguments[1], &arguments[0], instruction.location, state)
+        SystemCallKind::HeapDump => {
+            sys_calls::heap_dump(&arguments[0], instruction.location, state)?
         }
-        SystemCallKind::RuntimeError => sys_calls::runtime_error(&arguments[0], state),
-        SystemCallKind::AddressOf => {
-            sys_calls::address_of(&arguments[0], instruction.location, state)
+        SystemCallKind::Reallocate => {
+            sys_calls::reallocate(&arguments[0], &arguments[1], instruction.location, state)
+        }
+        SystemCallKind::RuntimeError => {
+            sys_calls::runtime_error(&arguments[0], instruction.location, state)?
         }
         SystemCallKind::GarbageCollect => {
             state.garbage_collect();
@@ -1140,6 +1183,12 @@ fn evaluate_sys_call(
         }
         SystemCallKind::TypeOfValue => {
             sys_calls::type_of_value(&arguments[0], instruction.location, state)
+        }
+        SystemCallKind::WriteToFile => {
+            sys_calls::write_to_file(&arguments[0], &arguments[1], instruction.location, state)?
+        }
+        SystemCallKind::IgnoreTypeChecking => {
+            unreachable!();
         }
     }
     state.stack_trace.pop();

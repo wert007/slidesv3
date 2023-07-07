@@ -17,5 +17,5 @@ func main() {
         list []
     );
     let emitter = new presentation.HtmlEmitter(p);
-    print(emitter.emit());
+    emitter.emit('index-foo.html');
 }

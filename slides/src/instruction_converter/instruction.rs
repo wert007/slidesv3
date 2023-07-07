@@ -53,7 +53,7 @@ impl Instruction {
     pub const fn load_none_pointer(location: TextLocation) -> Self {
         Self {
             op_code: OpCode::LoadPointer,
-            arg: u64::MAX,
+            arg: 0,
             location,
         }
     }

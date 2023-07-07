@@ -52,6 +52,7 @@ pub struct DebugFlags {
     pub slow_mode: bool,
     pub use_debugger: bool,
     pub print_lines: bool,
+    pub show_stats: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]

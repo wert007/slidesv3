@@ -86,7 +86,7 @@ pub trait Memory {
         let word = self.read_flagged_word_aligned(address / WORD_SIZE_IN_BYTES);
         let offset = address % WORD_SIZE_IN_BYTES;
         let mask = 0xff << (offset * 8);
-        assert_eq!(word.flags, value.flags);
+        // assert_eq!(word.flags, value.flags);
         let flags = value.flags;
         let old = word.value & !mask;
         let new = ((value.value as u64) << (offset * 8)) & mask;

@@ -16,6 +16,7 @@ use crate::{diagnostics::DiagnosticBag, text::SourceText};
 
 use binder::{symbols::Library, typing::TypeCollection};
 pub use debug::DebugFlags;
+use evaluator::memory::static_memory::StaticMemory;
 use text::{SourceTextCollection, SourceTextId};
 
 pub const STRING_CLASS_NAME: &str = "MyString";
@@ -26,14 +27,18 @@ pub struct Project {
     types: TypeCollection,
     debug_flags: DebugFlags,
     source_text_collection: SourceTextCollection,
+    static_memory: StaticMemory,
 }
 
 impl Project {
     pub fn new(debug_flags: DebugFlags) -> Self {
+        let mut static_memory = StaticMemory::new(debug_flags);
+        static_memory.allocate_null();
         Self {
             types: TypeCollection::new(),
             debug_flags,
             source_text_collection: SourceTextCollection::default(),
+            static_memory,
         }
     }
 
