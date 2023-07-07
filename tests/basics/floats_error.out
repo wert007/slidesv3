@@ -1,0 +1,5 @@
+'3.0000000000000001' is no valid float.
+  1 | func main() {
+  2 |     let f = [31m3.0000000000000001[0m;
+  3 |     print(f);
+

@@ -394,7 +394,7 @@ pub fn commented_instruction_to_string(
         }
         OpCode::ArrayEquals => {}
         OpCode::ArrayNotEquals => {}
-        OpCode::LessThan  => {
+        OpCode::LessThan => {
             if let Some(result) = if instruction.arg == 0 {
                 do_binary_unsigned(state, |a, b| (a < b) as _)
             } else {
@@ -403,7 +403,7 @@ pub fn commented_instruction_to_string(
                 write!(base, "; {result}")?;
             }
         }
-        OpCode::GreaterThan  => {
+        OpCode::GreaterThan => {
             if let Some(result) = if instruction.arg == 0 {
                 do_binary_unsigned(state, |a, b| (a > b) as _)
             } else {
@@ -412,7 +412,7 @@ pub fn commented_instruction_to_string(
                 write!(base, "; {result}")?;
             }
         }
-        OpCode::LessThanEquals  => {
+        OpCode::LessThanEquals => {
             if let Some(result) = if instruction.arg == 0 {
                 do_binary_unsigned(state, |a, b| (a <= b) as _)
             } else {
@@ -421,7 +421,7 @@ pub fn commented_instruction_to_string(
                 write!(base, "; {result}")?;
             }
         }
-        OpCode::GreaterThanEquals  => {
+        OpCode::GreaterThanEquals => {
             if let Some(result) = if instruction.arg == 0 {
                 do_binary_unsigned(state, |a, b| (a >= b) as _)
             } else {
@@ -504,10 +504,21 @@ pub fn instruction_to_string(
         OpCode::BitwiseTwosComplement => instruction_no_arg_to_string("btwoscomplement"),
         OpCode::BitwiseXor => instruction_no_arg_to_string("bxor"),
         OpCode::BitwiseNxor => instruction_no_arg_to_string("bnxor"),
-        OpCode::Addition => instruction_no_arg_to_string("add"),
-        OpCode::Subtraction => instruction_no_arg_to_string("sub"),
-        OpCode::Multiplication => instruction_no_arg_to_string("mul"),
-        OpCode::Division => instruction_no_arg_to_string("div"),
+        OpCode::Addition if instruction.arg == 0 => instruction_no_arg_to_string("add"),
+        OpCode::Addition if instruction.arg == 1 => instruction_no_arg_to_string("addf"),
+        OpCode::Addition if instruction.arg == 2 => instruction_no_arg_to_string("addu"),
+        OpCode::Subtraction if instruction.arg == 0 => instruction_no_arg_to_string("sub"),
+        OpCode::Subtraction if instruction.arg == 1 => instruction_no_arg_to_string("subf"),
+        OpCode::Subtraction if instruction.arg == 2 => instruction_no_arg_to_string("subu"),
+        OpCode::Multiplication if instruction.arg == 0 => instruction_no_arg_to_string("mul"),
+        OpCode::Multiplication if instruction.arg == 1 => instruction_no_arg_to_string("mulf"),
+        OpCode::Multiplication if instruction.arg == 2 => instruction_no_arg_to_string("mulu"),
+        OpCode::Division if instruction.arg == 0 => instruction_no_arg_to_string("div"),
+        OpCode::Division if instruction.arg == 1 => instruction_no_arg_to_string("divf"),
+        OpCode::Division if instruction.arg == 2 => instruction_no_arg_to_string("divu"),
+        OpCode::Addition | OpCode::Subtraction | OpCode::Multiplication | OpCode::Division => {
+            unreachable!("unhandled binary operator kind! {:X}", instruction.arg)
+        }
         OpCode::Equals => instruction_no_arg_to_string("eq"),
         OpCode::NotEquals => instruction_no_arg_to_string("neq"),
         OpCode::ArrayEquals => instruction_no_arg_to_string("eqa"),

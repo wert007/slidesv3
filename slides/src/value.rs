@@ -6,6 +6,8 @@ use crate::binder::typing::{SystemCallKind, TypeCollection, TypeId};
 pub enum Value {
     None,
     Integer(i64),
+    /// Saves a float as u64, since that makes a lot of things easier!
+    Float(u64),
     Boolean(bool),
     SystemCall(SystemCallKind),
     String(String),
@@ -52,6 +54,7 @@ impl Value {
     pub fn infer_type(&self) -> TypeId {
         match self {
             Value::Integer(_) => typeid!(Type::IntegerLiteral),
+            Value::Float(_) => typeid!(Type::Float),
             Value::Boolean(_) => typeid!(Type::Boolean),
             Value::String(_) => typeid!(Type::String),
             Value::None => typeid!(Type::None),
@@ -65,6 +68,7 @@ impl Value {
         match self {
             Value::None => "none".into(),
             Value::Integer(it) => it.to_string().into(),
+            Value::Float(it) => it.to_string().into(),
             Value::Boolean(it) => it.to_string().into(),
             Value::SystemCall(it) => it.to_string().into(),
             Value::String(it) => format!("'{it}'").into(),
@@ -84,6 +88,12 @@ impl From<i64> for Value {
     }
 }
 
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Self::Float(value.to_bits())
+    }
+}
+
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Self::Boolean(value)
@@ -100,6 +110,7 @@ impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Integer(value) => write!(f, "{}", value),
+            Value::Float(value) => write!(f, "{}", value),
             Value::Boolean(value) => write!(f, "{}", value),
             Value::SystemCall(value) => write!(f, "system call {}", value),
             Value::String(value) => write!(f, "'{}'", value),

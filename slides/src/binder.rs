@@ -3928,6 +3928,17 @@ fn bind_binary_operator<'a, 'b>(
             typeid!(Type::IntegerLiteral),
         )),
         (
+            Type::Float,
+            BoundBinaryOperator::ArithmeticAddition
+            | BoundBinaryOperator::ArithmeticSubtraction
+            | BoundBinaryOperator::ArithmeticMultiplication
+            | BoundBinaryOperator::ArithmeticDivision,
+            Type::Float,
+        ) => Some(BoundBinary::same_output(
+            result,
+            typeid!(Type::Float),
+        )),
+        (
             Type::Integer(_),
             BoundBinaryOperator::LessThan
             | BoundBinaryOperator::GreaterThan
@@ -3960,6 +3971,18 @@ fn bind_binary_operator<'a, 'b>(
             Type::IntegerLiteral,
         ) => Some(BoundBinary::same_input(
             typeid!(Type::IntegerLiteral),
+            result,
+            typeid!(Type::Boolean),
+        )),
+        (
+            Type::Float,
+            BoundBinaryOperator::LessThan
+            | BoundBinaryOperator::GreaterThan
+            | BoundBinaryOperator::LessThanEquals
+            | BoundBinaryOperator::GreaterThanEquals,
+            Type::Float,
+        ) => Some(BoundBinary::same_input(
+            typeid!(Type::Float),
             result,
             typeid!(Type::Boolean),
         )),
@@ -4469,6 +4492,7 @@ fn bind_field_access<'a, 'b>(
         | Type::Void
         | Type::Integer(_)
         | Type::IntegerLiteral
+        | Type::Float
         | Type::Boolean
         | Type::None
         | Type::Function(_)
@@ -4643,6 +4667,7 @@ fn bind_field_access_for_assignment<'a>(
         | Type::Void
         | Type::Integer(_)
         | Type::IntegerLiteral
+        | Type::Float
         | Type::Boolean
         | Type::None
         | Type::SystemCall(_)
@@ -5112,6 +5137,7 @@ fn bind_condition_conversion<'a>(
         | Type::Any
         | Type::Integer(_)
         | Type::IntegerLiteral
+        | Type::Float
         | Type::SystemCall(_)
         | Type::String
         | Type::Function(_)
@@ -5592,7 +5618,7 @@ fn bind_match_statement(
                     .report_expected_else_case(expression.location, expression.type_);
             }
         }
-        Type::String => binder
+        Type::String | Type::Float => binder
             .diagnostic_bag
             .report_expected_else_case(expression.location, expression.type_),
         Type::Struct(s) => {

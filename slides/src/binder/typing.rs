@@ -64,18 +64,21 @@ macro_rules! typeid {
     (Type::Integer(IntegerType::Unsigned64)) => {
         unsafe { TypeId::from_raw(9) }
     };
-    (Type::None) => {
+    (Type::Float) => {
         unsafe { TypeId::from_raw(10) }
     };
-    (Type::TypeId) => {
+    (Type::None) => {
         unsafe { TypeId::from_raw(11) }
     };
-    (Type::IgnoreTypeChecking) => {
+    (Type::TypeId) => {
         unsafe { TypeId::from_raw(12) }
+    };
+    (Type::IgnoreTypeChecking) => {
+        unsafe { TypeId::from_raw(13) }
     };
     (Type::SystemCall($kind:expr)) => {
         unsafe {
-            const BASIS: u64 = 13;
+            const BASIS: u64 = 14;
             TypeId::from_raw(
                 BASIS
                     + match $kind {
@@ -276,6 +279,7 @@ impl TypeCollection {
                 Type::Integer(IntegerType::Signed64),
                 Type::Integer(IntegerType::Unsigned8),
                 Type::Integer(IntegerType::Unsigned64),
+                Type::Float,
                 Type::None,
                 Type::TypeId,
                 Type::IgnoreTypeChecking,
@@ -502,6 +506,7 @@ impl TypeCollection {
             Type::Any => "any".into(),
             Type::IntegerLiteral => "integer literal".into(),
             Type::Integer(int_type) => format!("{int_type}").into(),
+            Type::Float => "float".into(),
             Type::Boolean => "bool".into(),
             Type::None => "any?".into(),
             Type::SystemCall(call) => format!("{call}").into(),
@@ -1049,6 +1054,7 @@ pub enum Type {
     Any,
     IntegerLiteral,
     Integer(IntegerType),
+    Float,
     Boolean,
     None,
     SystemCall(SystemCallKind),
@@ -1107,6 +1113,7 @@ impl Type {
             | Type::Function(_)
             | Type::Closure(_)
             | Type::IntegerLiteral
+            | Type::Float
             | Type::Boolean
             | Type::SystemCall(_)
             | Type::Pointer
@@ -1143,6 +1150,7 @@ impl Type {
             | Type::SystemCall(_)
             | Type::Integer(_)
             | Type::IntegerLiteral
+            | Type::Float
             | Type::Boolean
             | Type::TypeId => false,
             // A none Pointer should never be dereferenced.
@@ -1458,7 +1466,7 @@ impl FunctionType<TypeId> {
                 name: None,
                 is_generic: false,
                 head_location: None,
-            }
+            },
         }
     }
 

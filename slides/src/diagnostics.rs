@@ -352,8 +352,16 @@ impl DiagnosticBag {
         let location = TextLocation { span, source_text };
         self.report_error(message.into(), location)
     }
+
     pub fn report_bad_integer(&mut self, start: usize, source_text: SourceTextId, text: &str) {
         let message = format!("'{}' is no valid u64 integer.", text);
+        let span = TextSpan::new(start, text.len(), true);
+        let location = TextLocation { span, source_text };
+        self.report_error(message.into(), location)
+    }
+
+    pub fn report_bad_float(&mut self, start: usize, source_text: SourceTextId, text: &str) {
+        let message = format!("'{}' is no valid float.", text);
         let span = TextSpan::new(start, text.len(), true);
         let location = TextLocation { span, source_text };
         self.report_error(message.into(), location)
@@ -930,13 +938,19 @@ impl DiagnosticBag {
         }));
     }
 
-    pub fn report_expected_generic_type_found_type(&mut self, location: TextLocation, type_id: TypeId) {
+    pub fn report_expected_generic_type_found_type(
+        &mut self,
+        location: TextLocation,
+        type_id: TypeId,
+    ) {
         let message = message_format!(
             "Expected generic type, found concrete type ",
             type_id,
             "instead."
         );
-       self.report(Diagnostic::Error(DiagnosticSimpleKind::new(message, location)));
+        self.report(Diagnostic::Error(DiagnosticSimpleKind::new(
+            message, location,
+        )));
     }
 
     pub fn report_not_a_function(&mut self, location: TextLocation, base_type: TypeId) {
@@ -1027,8 +1041,18 @@ impl DiagnosticBag {
         self.report_runtime(message, span);
     }
 
-    pub(crate) fn write_to_file_failed(&mut self, location: TextLocation, path: &str, err: std::io::Error) {
-        let message = message_format!("Write to file '", path, "' failed. OS error was: ", err.to_string());
+    pub(crate) fn write_to_file_failed(
+        &mut self,
+        location: TextLocation,
+        path: &str,
+        err: std::io::Error,
+    ) {
+        let message = message_format!(
+            "Write to file '",
+            path,
+            "' failed. OS error was: ",
+            err.to_string()
+        );
         self.report_runtime(message, location);
     }
 }

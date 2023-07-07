@@ -147,16 +147,30 @@ impl SyntaxNode {
         let lexeme = &source_text_collection[token.location];
         let value = match &token.kind {
             SyntaxTokenKind::NumberLiteral => {
-                match lexeme.parse::<u64>() {
-                    Ok(value) => (value as i64).into(),
-                    // TODO: Someday ParseIntError::kind() might allow to differentiate more
-                    Err(_) => {
-                        diagnostic_bag.report_bad_integer(
-                            token.location.span.start(),
-                            token.location.source_text,
-                            lexeme,
-                        );
-                        Value::None
+                if lexeme.contains('.') {
+                    match parse_f64(lexeme) {
+                        Ok(value) => value.into(),
+                        Err(()) => {
+                            diagnostic_bag.report_bad_float(
+                                token.location.span.start(),
+                                token.location.source_text,
+                                lexeme,
+                            );
+                            Value::None
+                        }
+                    }
+                } else {
+                    match lexeme.parse::<u64>() {
+                        Ok(value) => (value as i64).into(),
+                        // TODO: Someday ParseIntError::kind() might allow to differentiate more
+                        Err(_) => {
+                            diagnostic_bag.report_bad_integer(
+                                token.location.span.start(),
+                                token.location.source_text,
+                                lexeme,
+                            );
+                            Value::None
+                        }
                     }
                 }
             }
@@ -591,6 +605,34 @@ impl SyntaxNode {
     }
 }
 
+fn parse_f64(lexeme: &str) -> Result<f64, ()> {
+    let mut result = 0.0;
+    let mut found_decimal_point = false;
+    let mut decimal_digit_count = 0;
+    for c in lexeme.chars() {
+        if c == '.' {
+            found_decimal_point = true;
+            continue;
+        }
+        let digit = c.to_digit(10).ok_or(())? as f64;
+        if !found_decimal_point {
+            result = result * 10.0 + digit;
+        } else {
+            decimal_digit_count += 1;
+            let factor = 1.0 / 10f64.powf(decimal_digit_count as f64);
+            if factor == 0.0 {
+                return Err(());
+            }
+            let old_result = result;
+            result += digit * factor;
+            if result == old_result && digit != 0.0 {
+                return Err(());
+            }
+        }
+    }
+    Ok(result)
+}
+
 #[derive(Debug, Clone)]
 pub enum SyntaxNodeKind {
     // Top Level Statements
@@ -918,7 +960,6 @@ pub struct ConstructorCallNodeKind {
     pub comma_tokens: Vec<SyntaxToken>,
     pub close_parenthesis_token: SyntaxToken,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct TypeOfExpressionNodeKind {

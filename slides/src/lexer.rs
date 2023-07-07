@@ -21,6 +21,7 @@ enum State {
     /// This is a simple decimal integer number right now. It checks, that the
     /// value fits into an i64 and only consumes chars 0..9
     DecimalNumber(TextIndex),
+    FloatNumber(TextIndex, bool),
     /// This is a simple string starting with ' and ending with the same
     /// character. StrintState stores the character which started the string and
     /// may in the future hold flags like formatted strings, math strings and
@@ -161,7 +162,37 @@ pub fn lex<'a>(
                 (State::MaybeCloseMultiLineComment(start), _) => {
                     state = State::MultiLineComment(start);
                 }
+                (State::DecimalNumber(start), '.') => {
+                    state = State::FloatNumber(start, true);
+                }
                 (State::DecimalNumber(start), d) => {
+                    if !d.is_digit(10) {
+                        state = State::Default;
+                        result.push_back(SyntaxToken::number_literal(
+                            start.char_index,
+                            &text[start.byte_index..byte_index],
+                            source_text,
+                        ));
+                        continue 'start;
+                    }
+                }
+                (State::FloatNumber(start, true), d) => {
+                    if !d.is_digit(10) {
+                        result.push_back(SyntaxToken::number_literal(
+                            start.char_index,
+                            &text[start.byte_index..byte_index - 1],
+                            source_text,
+                        ));
+                        state = State::MultiCharOperator(TextIndex {
+                            byte_index: byte_index - 1,
+                            char_index: char_index - 1,
+                        });
+                        continue 'start;
+                    } else {
+                        state = State::FloatNumber(start, false);
+                    }
+                }
+                (State::FloatNumber(start, false), d) => {
                     if !d.is_digit(10) {
                         state = State::Default;
                         result.push_back(SyntaxToken::number_literal(
@@ -249,12 +280,20 @@ pub fn lex<'a>(
     }
     match state {
         State::Default => {}
-        State::DecimalNumber(start) => {
+        State::DecimalNumber(start) | State::FloatNumber(start, false) => {
             result.push_back(SyntaxToken::number_literal(
                 start.char_index,
                 &text[start.byte_index..],
                 source_text,
             ));
+        }
+        State::FloatNumber(start, true) => {
+            result.push_back(SyntaxToken::number_literal(
+                start.char_index,
+                &text[start.byte_index..text.len() - 2],
+                source_text,
+            ));
+            result.push_back(SyntaxToken::operator(text.len() - 1, ".", source_text));
         }
         State::String(start, string_state) => {
             let span = TextSpan::new(start.char_index, char_len - start.char_index, false);

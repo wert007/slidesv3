@@ -111,7 +111,14 @@ fn print_syntax_node_as_code_with_indent(
                 buffer,
             )
         }
-        SyntaxNodeKind::TypeOfExpression(type_of_expression) => print_syntax_node_type_of_expression_as_code_with_indent(type_of_expression, source_text_collection, printer, buffer),
+        SyntaxNodeKind::TypeOfExpression(type_of_expression) => {
+            print_syntax_node_type_of_expression_as_code_with_indent(
+                type_of_expression,
+                source_text_collection,
+                printer,
+                buffer,
+            )
+        }
         SyntaxNodeKind::Variable(variable) => print_syntax_node_variable_as_code_with_indent(
             variable,
             source_text_collection,
@@ -467,6 +474,7 @@ fn print_syntax_node_literal_as_code_with_indent(
     match &literal.value {
         Value::None => write!(buffer, "none"),
         Value::Integer(it) => write!(buffer, "{it}"),
+        Value::Float(it) => write!(buffer, "{it}"),
         Value::Boolean(it) => write!(buffer, "{it}"),
         Value::SystemCall(it) => write!(buffer, "{it}"),
         Value::String(it) => write!(buffer, "{it:?}"),
@@ -591,7 +599,12 @@ fn print_syntax_node_type_of_expression_as_code_with_indent(
     buffer: &mut String,
 ) -> std::fmt::Result {
     write!(buffer, "typeOf: ")?;
-    print_type_node_as_code_with_indent(&type_of_expression.type_, source_text_collection, printer, buffer)?;
+    print_type_node_as_code_with_indent(
+        &type_of_expression.type_,
+        source_text_collection,
+        printer,
+        buffer,
+    )?;
     Ok(())
 }
 fn print_syntax_node_variable_as_code_with_indent(

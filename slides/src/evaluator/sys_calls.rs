@@ -179,6 +179,14 @@ fn to_string_native(
             typing::IntegerType::Unsigned8 => format!("{}", argument.unwrap_value() as u8),
             typing::IntegerType::Unsigned64 => format!("{}", argument.unwrap_value() as u64),
         },
+        Type::Float => {
+            let value = f64::from_bits(argument.unwrap_value());
+            if value.fract() == 0.0 {
+                format!("{value:.1}")
+            } else {
+                format!("{value:}")
+            }
+        }
         Type::Pointer => {
             format!("0x{:x}", argument.unwrap_pointer())
         }
@@ -340,6 +348,7 @@ fn hash_value(argument: &FlaggedWord, type_: TypeId, state: &mut EvaluatorState)
         }
         Type::Function(_) => todo!(),
         Type::Closure(_) => todo!(),
+        Type::Float => todo!(),
         Type::AbstractTypeBox(type_) => hash_value(argument, *type_, state),
         Type::Struct(s) => hash_array(s.size_in_bytes, argument.unwrap_pointer(), state),
         Type::Pointer => argument.unwrap_value(),

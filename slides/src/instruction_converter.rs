@@ -409,6 +409,7 @@ pub fn convert_value(
     let value = match value {
         Value::TypeId(value) => value.as_raw(),
         Value::Integer(value) => value as u64,
+        Value::Float(value) => value,
         Value::Boolean(value) => {
             if value {
                 1
@@ -481,7 +482,7 @@ fn convert_array_literal(
                     Instruction::load_register(repetition.counting_variable, location).into(),
                 );
                 result.push(Instruction::load_immediate(1, location).into());
-                result.push(Instruction::subtraction(location).into());
+                result.push(Instruction::subtraction(location, false).into());
                 result.push(Instruction::jump(start_label as _, location).into());
                 result.push(Instruction::label(end_label, location).into());
                 variable_element_count.push(*repetition.repetition);
@@ -496,7 +497,7 @@ fn convert_array_literal(
     for count in variable_element_count {
         let location = count.location;
         element_count.append(&mut convert_node(count, converter));
-        element_count.push(Instruction::addition(location).into());
+        element_count.push(Instruction::addition(location, false).into());
     }
     if element_count.len() == 1 {
         result.push(
@@ -566,13 +567,13 @@ fn convert_array_index_for_assignment(
         let offset = value * base_type_size;
         if offset != 0 {
             result.push(Instruction::load_immediate(offset, location).into());
-            result.push(Instruction::addition(location).into());
+            result.push(Instruction::addition(location, false).into());
         }
     } else {
         result.append(&mut convert_node(*array_index.index, converter));
         result.push(Instruction::load_immediate(base_type_size, location).into());
-        result.push(Instruction::multiplication(location).into());
-        result.push(Instruction::addition(location).into());
+        result.push(Instruction::multiplication(location, false).into());
+        result.push(Instruction::addition(location, false).into());
     }
 
     match base_type_size {
@@ -597,7 +598,7 @@ fn convert_field_access_for_assignment(
     let mut result = convert_node(*field_access.base, converter);
     if field_access.offset != 0 {
         result.push(Instruction::load_immediate(field_access.offset, location).into());
-        result.push(Instruction::addition(location).into());
+        result.push(Instruction::addition(location, false).into());
     }
     result.push(Instruction::store_word_in_memory(location).into());
     result
@@ -651,11 +652,20 @@ fn convert_binary(
     converter: &mut InstructionConverter,
 ) -> Vec<InstructionOrLabelReference> {
     let is_unsigned = converter.project.types.is_unsigned(binary.lhs.type_);
+    let is_floating_type = binary.lhs.type_ == typeid!(Type::Float);
     let operator_instruction = match binary.operator_token {
-        BoundBinaryOperator::ArithmeticAddition => Instruction::addition(location),
-        BoundBinaryOperator::ArithmeticSubtraction => Instruction::subtraction(location),
-        BoundBinaryOperator::ArithmeticMultiplication => Instruction::multiplication(location),
-        BoundBinaryOperator::ArithmeticDivision => Instruction::division(location),
+        BoundBinaryOperator::ArithmeticAddition => {
+            Instruction::addition(location, is_floating_type)
+        }
+        BoundBinaryOperator::ArithmeticSubtraction => {
+            Instruction::subtraction(location, is_floating_type)
+        }
+        BoundBinaryOperator::ArithmeticMultiplication => {
+            Instruction::multiplication(location, is_floating_type)
+        }
+        BoundBinaryOperator::ArithmeticDivision => {
+            Instruction::division(location, is_floating_type)
+        }
         BoundBinaryOperator::Equals => {
             match (
                 &converter.project.types[binary.lhs.type_],
@@ -674,11 +684,17 @@ fn convert_binary(
                 Instruction::not_equals(location)
             }
         }
-        BoundBinaryOperator::LessThan => Instruction::less_than(location, is_unsigned),
-        BoundBinaryOperator::GreaterThan => Instruction::greater_than(location, is_unsigned),
-        BoundBinaryOperator::LessThanEquals => Instruction::less_than_equals(location, is_unsigned),
+        BoundBinaryOperator::LessThan => {
+            Instruction::less_than(location, is_unsigned, is_floating_type)
+        }
+        BoundBinaryOperator::GreaterThan => {
+            Instruction::greater_than(location, is_unsigned, is_floating_type)
+        }
+        BoundBinaryOperator::LessThanEquals => {
+            Instruction::less_than_equals(location, is_unsigned, is_floating_type)
+        }
         BoundBinaryOperator::GreaterThanEquals => {
-            Instruction::greater_than_equals(location, is_unsigned)
+            Instruction::greater_than_equals(location, is_unsigned, is_floating_type)
         }
         BoundBinaryOperator::StringConcat => Instruction::string_concat(location),
         BoundBinaryOperator::NoneableOrValue => {
@@ -858,9 +874,9 @@ fn convert_array_index(
     let mut result = convert_node(*array_index.base, converter);
     result.append(&mut convert_node(*array_index.index, converter));
     result.push(Instruction::load_immediate(base_type_size, location).into());
-    result.push(Instruction::multiplication(location).into());
+    result.push(Instruction::multiplication(location, false).into());
 
-    result.push(Instruction::addition(location).into());
+    result.push(Instruction::addition(location, false).into());
     match base_type_size {
         1 => {
             result.push(Instruction::read_byte_with_offset(0, location).into());
@@ -1049,7 +1065,7 @@ fn convert_conversion(
             let label_end_if = converter.generate_label();
             result.push(Instruction::load_immediate(0, location).into());
             result.push(Instruction::duplicate_over(1, location).into());
-            result.push(Instruction::greater_than(location, false).into());
+            result.push(Instruction::greater_than(location, false, false).into());
             result.push(
                 Instruction::jump_to_label_conditionally(label_if_is_not_uint, true, location)
                     .into(),

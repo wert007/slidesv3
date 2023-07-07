@@ -534,9 +534,9 @@ fn execute_instruction(
         OpCode::ArrayEquals => evaluate_array_equals(state, instruction),
         OpCode::ArrayNotEquals => evaluate_array_not_equals(state, instruction),
         OpCode::LessThan => evaluate_less_than(state, instruction)?,
-        OpCode::GreaterThan => evaluate_greater_than(state, instruction),
-        OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction),
-        OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction),
+        OpCode::GreaterThan => evaluate_greater_than(state, instruction)?,
+        OpCode::LessThanEquals => evaluate_less_than_equals(state, instruction)?,
+        OpCode::GreaterThanEquals => evaluate_greater_than_equals(state, instruction)?,
         OpCode::StringConcat => evaluate_string_concat(state, instruction)?,
         OpCode::NoneableOrValue => evaluate_noneable_or_value(state, instruction)?,
         OpCode::Jump => evaluate_jump(state, instruction),
@@ -782,8 +782,13 @@ fn evaluate_bitwise_nxor(state: &mut EvaluatorState, instruction: Instruction) {
 fn evaluate_addition(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
+    let value = if instruction.arg == 1 {
+        (f64::from_bits(rhs.value) + f64::from_bits(lhs.value)).to_bits()
+    } else {
+        lhs.value.wrapping_add(rhs.value)
+    };
     let mut result = FlaggedWord {
-        value: lhs.value.wrapping_add(rhs.value),
+        value,
         flags: lhs.flags,
         comment: format!("({}) + ({})", lhs.comment, rhs.comment),
     };
@@ -796,44 +801,49 @@ fn evaluate_addition(state: &mut EvaluatorState, instruction: Instruction) {
 fn evaluate_subtraction(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
+    let value = if instruction.arg == 1 {
+        (f64::from_bits(rhs.value) - f64::from_bits(lhs.value)).to_bits()
+    } else {
+        lhs.value.wrapping_sub(rhs.value)
+    };
     state.stack.push_flagged_word(
-        FlaggedWord::value(
-            lhs.unwrap_value().wrapping_sub(rhs.unwrap_value()),
-            instruction.location,
-            Some(state.pc),
-        )
-        .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
+        FlaggedWord::value(value, instruction.location, Some(state.pc))
+            .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
     );
 }
 
 fn evaluate_multiplication(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
+    let value = if instruction.arg == 1 {
+        (f64::from_bits(rhs.value) * f64::from_bits(lhs.value)).to_bits()
+    } else {
+        lhs.value.wrapping_mul(rhs.value)
+    };
     state.stack.push_flagged_word(
-        FlaggedWord::value(
-            lhs.unwrap_value().wrapping_mul(rhs.unwrap_value()),
-            instruction.location,
-            Some(state.pc),
-        )
-        .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
+        FlaggedWord::value(value, instruction.location, Some(state.pc))
+            .with_comment(format!("({}) - ({})", lhs.comment, rhs.comment)),
     );
 }
 
 fn evaluate_division(state: &mut EvaluatorState, instruction: Instruction) {
     let rhs = state.stack.pop();
     let lhs = state.stack.pop();
-    state.stack.push_flagged_word(if rhs.unwrap_value() == 0 {
-        runtime_error!(state, division_by_zero(instruction.location));
-        FlaggedWord::value(0, instruction.location, Some(state.pc))
-            .with_comment("Division by zero error!")
-    } else {
-        FlaggedWord::value(
-            lhs.unwrap_value().wrapping_div(rhs.unwrap_value()),
-            instruction.location,
-            Some(state.pc),
-        )
-        .with_comment(format!("({}) / ({})", lhs.comment, rhs.comment))
-    });
+    state
+        .stack
+        .push_flagged_word(if rhs.unwrap_value() == 0 && instruction.arg == 0 {
+            runtime_error!(state, division_by_zero(instruction.location));
+            FlaggedWord::value(0, instruction.location, Some(state.pc))
+                .with_comment("Division by zero error!")
+        } else {
+            let value = if instruction.arg == 1 {
+                (f64::from_bits(rhs.value) / f64::from_bits(lhs.value)).to_bits()
+            } else {
+                lhs.value.wrapping_div(rhs.value)
+            };
+            FlaggedWord::value(value, instruction.location, Some(state.pc))
+                .with_comment(format!("({}) / ({})", lhs.comment, rhs.comment))
+        });
 }
 
 fn evaluate_equals(state: &mut EvaluatorState, instruction: Instruction) {
@@ -897,105 +907,112 @@ fn evaluate_array_not_equals(state: &mut EvaluatorState, instruction: Instructio
         .push(result as _, instruction.location, Some(state.pc));
 }
 
-#[must_use]
 fn evaluate_less_than(
     state: &mut EvaluatorState,
     instruction: Instruction,
 ) -> Result<(), InstructionError> {
-    match instruction.arg {
-        0 => {
-            let rhs = state.stack.pop().as_value().map_err(|err| {
-                InstructionError::pointer(err, line!(), instruction.location, state.pc)
-            })? as i64;
-            let lhs = state.stack.pop().as_value().map_err(|err| {
-                InstructionError::pointer(err, line!(), instruction.location, state.pc)
-            })? as i64;
-            state
-                .stack
-                .push((lhs < rhs) as _, instruction.location, Some(state.pc));
-        }
-        1 => {
-            let rhs = state.stack.pop().as_value().map_err(|err| {
-                InstructionError::pointer(err, line!(), instruction.location, state.pc)
-            })?;
-            let lhs = state.stack.pop().as_value().map_err(|err| {
-                InstructionError::pointer(err, line!(), instruction.location, state.pc)
-            })?;
-            state
-                .stack
-                .push((lhs < rhs) as _, instruction.location, Some(state.pc));
-        }
-        arg => {
-            panic!("unhandled argument {arg:X} to instruction!")
-        }
-    }
+    let (unsigned, is_floating_type) = Instruction::arg_to_unsigned_and_floating(instruction.arg);
+    let rhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let lhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let value = if unsigned {
+        assert!(!is_floating_type);
+        lhs < rhs
+    } else if is_floating_type {
+        f64::from_bits(lhs) < f64::from_bits(rhs)
+    } else {
+        (lhs as i64) < (rhs as i64)
+    };
+    state
+        .stack
+        .push(value as _, instruction.location, Some(state.pc));
     Ok(())
 }
 
-fn evaluate_greater_than(state: &mut EvaluatorState, instruction: Instruction) {
-    match instruction.arg {
-        0 => {
-            let rhs = state.stack.pop().unwrap_value() as i64;
-            let lhs = state.stack.pop().unwrap_value() as i64;
-            state
-                .stack
-                .push((lhs > rhs) as _, instruction.location, Some(state.pc));
-        }
-        1 => {
-            let rhs = state.stack.pop().unwrap_value();
-            let lhs = state.stack.pop().unwrap_value();
-            state
-                .stack
-                .push((lhs > rhs) as _, instruction.location, Some(state.pc));
-        }
-        arg => {
-            panic!("unhandled argument {arg:X} to instruction!")
-        }
-    }
+fn evaluate_greater_than(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
+    let (unsigned, is_floating_type) = Instruction::arg_to_unsigned_and_floating(instruction.arg);
+    let rhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let lhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let value = if unsigned {
+        assert!(!is_floating_type);
+        lhs > rhs
+    } else if is_floating_type {
+        f64::from_bits(lhs) > f64::from_bits(rhs)
+    } else {
+        (lhs as i64) > (rhs as i64)
+    };
+    state
+        .stack
+        .push(value as _, instruction.location, Some(state.pc));
+    Ok(())
 }
 
-fn evaluate_less_than_equals(state: &mut EvaluatorState, instruction: Instruction) {
-    match instruction.arg {
-        0 => {
-            let rhs = state.stack.pop().unwrap_value() as i64;
-            let lhs = state.stack.pop().unwrap_value() as i64;
-            state
-                .stack
-                .push((lhs <= rhs) as _, instruction.location, Some(state.pc));
-        }
-        1 => {
-            let rhs = state.stack.pop().unwrap_value();
-            let lhs = state.stack.pop().unwrap_value();
-            state
-                .stack
-                .push((lhs <= rhs) as _, instruction.location, Some(state.pc));
-        }
-        arg => {
-            panic!("unhandled argument {arg:X} to instruction!")
-        }
-    }
+fn evaluate_less_than_equals(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
+    let (unsigned, is_floating_type) = Instruction::arg_to_unsigned_and_floating(instruction.arg);
+    let rhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let lhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let value = if unsigned {
+        assert!(!is_floating_type);
+        lhs <= rhs
+    } else if is_floating_type {
+        f64::from_bits(lhs) <= f64::from_bits(rhs)
+    } else {
+        (lhs as i64) <= (rhs as i64)
+    };
+    state
+        .stack
+        .push(value as _, instruction.location, Some(state.pc));
+    Ok(())
 }
 
-fn evaluate_greater_than_equals(state: &mut EvaluatorState, instruction: Instruction) {
-    match instruction.arg {
-        0 => {
-            let rhs = state.stack.pop().unwrap_value() as i64;
-            let lhs = state.stack.pop().unwrap_value() as i64;
-            state
-                .stack
-                .push((lhs >= rhs) as _, instruction.location, Some(state.pc));
-        }
-        1 => {
-            let rhs = state.stack.pop().unwrap_value();
-            let lhs = state.stack.pop().unwrap_value();
-            state
-                .stack
-                .push((lhs >= rhs) as _, instruction.location, Some(state.pc));
-        }
-        arg => {
-            panic!("unhandled argument {arg:X} to instruction!")
-        }
-    }
+fn evaluate_greater_than_equals(
+    state: &mut EvaluatorState,
+    instruction: Instruction,
+) -> Result<(), InstructionError> {
+    let (unsigned, is_floating_type) = Instruction::arg_to_unsigned_and_floating(instruction.arg);
+    let rhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let lhs =
+        state.stack.pop().as_value().map_err(|err| {
+            InstructionError::pointer(err, line!(), instruction.location, state.pc)
+        })?;
+    let value = if unsigned {
+        assert!(!is_floating_type);
+        lhs >= rhs
+    } else if is_floating_type {
+        f64::from_bits(lhs) >= f64::from_bits(rhs)
+    } else {
+        (lhs as i64) >= (rhs as i64)
+    };
+    state
+        .stack
+        .push(value as _, instruction.location, Some(state.pc));
+    Ok(())
 }
 
 fn evaluate_string_concat(

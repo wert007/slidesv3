@@ -200,34 +200,34 @@ impl Instruction {
         }
     }
 
-    pub const fn addition(location: TextLocation) -> Self {
+    pub const fn addition(location: TextLocation, is_floating_type: bool) -> Self {
         Self {
             op_code: OpCode::Addition,
-            arg: 0,
+            arg: is_floating_type as _,
             location,
         }
     }
 
-    pub const fn subtraction(location: TextLocation) -> Self {
+    pub const fn subtraction(location: TextLocation, is_floating_type: bool) -> Self {
         Self {
             op_code: OpCode::Subtraction,
-            arg: 0,
+            arg: is_floating_type as _,
             location,
         }
     }
 
-    pub const fn multiplication(location: TextLocation) -> Self {
+    pub const fn multiplication(location: TextLocation, is_floating_type: bool) -> Self {
         Self {
             op_code: OpCode::Multiplication,
-            arg: 0,
+            arg: is_floating_type as _,
             location,
         }
     }
 
-    pub const fn division(location: TextLocation) -> Self {
+    pub const fn division(location: TextLocation, is_floating_type: bool) -> Self {
         Self {
             op_code: OpCode::Division,
-            arg: 0,
+            arg: is_floating_type as _,
             location,
         }
     }
@@ -264,34 +264,50 @@ impl Instruction {
         }
     }
 
-    pub const fn less_than(location: TextLocation, unsigned: bool) -> Self {
+    pub const fn less_than(location: TextLocation, unsigned: bool, is_floating_type: bool) -> Self {
+        let arg = Self::unsigned_and_floating_to_arg(unsigned, is_floating_type);
         Self {
             op_code: OpCode::LessThan,
-            arg: unsigned as _,
+            arg,
             location,
         }
     }
 
-    pub const fn greater_than(location: TextLocation, unsigned: bool) -> Self {
+    pub const fn greater_than(
+        location: TextLocation,
+        unsigned: bool,
+        is_floating_type: bool,
+    ) -> Self {
+        let arg = Self::unsigned_and_floating_to_arg(unsigned, is_floating_type);
         Self {
             op_code: OpCode::GreaterThan,
-            arg: unsigned as _,
+            arg,
             location,
         }
     }
 
-    pub const fn less_than_equals(location: TextLocation, unsigned: bool) -> Self {
+    pub const fn less_than_equals(
+        location: TextLocation,
+        unsigned: bool,
+        is_floating_type: bool,
+    ) -> Self {
+        let arg = Self::unsigned_and_floating_to_arg(unsigned, is_floating_type);
         Self {
             op_code: OpCode::LessThanEquals,
-            arg: unsigned as _,
+            arg,
             location,
         }
     }
 
-    pub const fn greater_than_equals(location: TextLocation, unsigned: bool) -> Self {
+    pub const fn greater_than_equals(
+        location: TextLocation,
+        unsigned: bool,
+        is_floating_type: bool,
+    ) -> Self {
+        let arg = Self::unsigned_and_floating_to_arg(unsigned, is_floating_type);
         Self {
             op_code: OpCode::GreaterThanEquals,
-            arg: unsigned as _,
+            arg,
             location,
         }
     }
@@ -444,6 +460,14 @@ impl Instruction {
             arg: offset,
             location,
         }
+    }
+
+    const fn unsigned_and_floating_to_arg(unsigned: bool, is_floating_type: bool) -> u64 {
+        ((unsigned as u64) << 1) | (is_floating_type as u64)
+    }
+
+    pub const fn arg_to_unsigned_and_floating(arg: u64) -> (bool, bool) {
+        ((arg & 0x2) != 0, (arg & 0x1) != 0)
     }
 }
 

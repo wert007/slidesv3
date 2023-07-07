@@ -205,7 +205,7 @@ impl SyntaxTokenKind {
     pub fn is_keyword(&self) -> bool {
         matches!(
             self,
-                Self::AbstractKeyword
+            Self::AbstractKeyword
                 | Self::AsKeyword
                 | Self::CastKeyword
                 | Self::ConstKeyword
