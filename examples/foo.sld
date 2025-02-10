@@ -1,39 +1,13 @@
 func main() {
-    print('Im a literal!');
+    print(foo(2));
+    print(foo(1));
+}
 
-    let h = 'Hello World!';
-    print(h);
-
-    print(h + ' != "Hello World!"? ' + (h != 'Hello World!'));
-
-    let array_test = ['Hello', 'World', '!'];
-    print(array_test);
-
-    let a = 'Hewwo';
-    let b = ' Meowrld! o//';
-    let c = a + b;
-    print(c);
-
-    let d = a + ' :3';
-    print(d);
-
-    print(c);
-
-    print('uWu' + b);
-
-    print('lol' + 'lal');
-
-    let e = 'ha' + 'he';
-    print(e);
-
-    let f = [a, b, c, d, e];
-    print(f);
-
-    let g = [ 'maybe' + 'this', 'works' + 'maybe??', 'literal', 'heap' + 'allocated'];
-    print(g);
-    let len = h.length();
-    print('Len was ' + len);
-
-    let len_fn = 'This is interesting'.length;
-    print(len_fn());
+func foo(value: uint) -> string {
+    if mod(value, 2) == 0 {
+        return value + '';
+    } else {
+        runtimeError('ERROR!');
+    }
+    print('I am unreachable, but does the program now that?');
 }

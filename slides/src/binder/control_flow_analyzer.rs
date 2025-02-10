@@ -63,7 +63,7 @@ impl<T: Copy, C: Display + Copy> DebugBasicBlock<T, C> for BasicBlock<T, C> {
     }
 
     fn outgoing_connections(&self) -> OutgoingConnections<T> {
-        self.outgoing_connections
+        self.outgoing_connections.clone()
     }
 
     fn comment(&self) -> Option<C> {
@@ -101,6 +101,7 @@ pub enum OutgoingConnections<T> {
     Single(usize),
     IfTrue(T, usize, usize),
     IfFalse(T, usize, usize),
+    Dynamic(Vec<usize>),
 }
 
 impl<T> OutgoingConnections<T> {
@@ -112,11 +113,10 @@ impl<T> OutgoingConnections<T> {
             | OutgoingConnections::IfFalse(_, then_value, else_value) => {
                 vec![*then_value, *else_value]
             }
+            OutgoingConnections::Dynamic(value) => value.clone(),
         }
     }
 }
-
-impl<T: Copy> Copy for OutgoingConnections<T> {}
 
 #[derive(Debug, Clone, Copy)]
 pub struct BasicCodeBlock {
@@ -284,16 +284,12 @@ fn connect_basic_blocks<'a>(
                 let node = &statements[code_block.index + code_block.length - 1];
                 match &node.kind {
                     BoundNodeKind::Jump(jump) => {
-                        let then_address = match &jump.target.kind {
-                            BoundNodeKind::LabelReference(it) => {
-                                label_index_to_basic_block_index[it]
-                            }
-                            _match_statement => {
-                                dbg!(jump);
-                                todo!("This should basically just jump to all the blocks, that have no outside connection. Actually that is not true, since dead code would also be that. So jump should just know, what its targets can be..")
-                            }
-                        };
-                        incoming_connections.push((basic_block.index, then_address));
+                        for target in &jump.target_const {
+                            incoming_connections.push((
+                                basic_block.index,
+                                label_index_to_basic_block_index[target],
+                            ));
+                        }
                         basic_block.outgoing_connections =
                             match (jump.jump_if_true, &jump.condition) {
                                 (true, Some(condition)) => {
@@ -301,19 +297,30 @@ fn connect_basic_blocks<'a>(
                                         .push((basic_block.index, basic_block.index + 1));
                                     OutgoingConnections::IfTrue(
                                         condition,
-                                        then_address,
+                                        label_index_to_basic_block_index[&jump.target_const[0]],
                                         basic_block.index + 1,
                                     )
                                 }
-                                (true, None) | (false, None) => {
-                                    OutgoingConnections::Single(then_address)
-                                }
+                                (true, None) | (false, None) => match jump.target_const.len() {
+                                    0 => {
+                                        unreachable!()
+                                    }
+                                    1 => OutgoingConnections::Single(
+                                        label_index_to_basic_block_index[&jump.target_const[0]],
+                                    ),
+                                    _ => OutgoingConnections::Dynamic(
+                                        jump.target_const
+                                            .iter()
+                                            .map(|t| label_index_to_basic_block_index[t])
+                                            .collect(),
+                                    ),
+                                },
                                 (false, Some(condition)) => {
                                     incoming_connections
                                         .push((basic_block.index, basic_block.index + 1));
                                     OutgoingConnections::IfFalse(
                                         condition,
-                                        then_address,
+                                        label_index_to_basic_block_index[&jump.target_const[0]],
                                         basic_block.index + 1,
                                     )
                                 }

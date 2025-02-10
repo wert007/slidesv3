@@ -136,6 +136,11 @@ pub fn output_basic_blocks_to_dot<
             crate::binder::control_flow_analyzer::OutgoingConnections::Single(target) => {
                 add_connection(block_index, target, "");
             }
+            crate::binder::control_flow_analyzer::OutgoingConnections::Dynamic(targets) => {
+                for target in targets {
+                    add_connection(block_index, target, "");
+                }
+            }
             crate::binder::control_flow_analyzer::OutgoingConnections::IfTrue(
                 condition,
                 then_target,

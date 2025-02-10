@@ -38,5 +38,4 @@ func cssName(unitKind: UnitKind) -> string {
             return 'pt';
         }
     }
-    return 'unreachable!';
 }

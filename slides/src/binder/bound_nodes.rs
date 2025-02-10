@@ -654,7 +654,9 @@ impl BoundNode {
             location,
             kind: BoundNodeKind::LabelReference(index),
             type_,
-            constant_value: None,
+            constant_value: Some(BoundConstant {
+                value: Value::LabelPointer(index, type_),
+            }),
         }
     }
 
@@ -667,11 +669,58 @@ impl BoundNode {
         }
     }
 
+    pub fn jump_raw(
+        location: TextLocation,
+        condition: Option<BoundNode>,
+        target: BoundNode,
+        target_const: impl Into<Vec<usize>>,
+    ) -> Self {
+        Self {
+            location,
+            kind: BoundNodeKind::Jump(BoundJumpNodeKind {
+                condition: condition.map(Box::new),
+                target_const: target_const.into(),
+                target: Box::new(target),
+                jump_if_true: true,
+            }),
+            type_: typeid!(Type::Void),
+            constant_value: None,
+        }
+    }
+
+    pub fn jump_dynamic(
+        location: TextLocation,
+        target: BoundNode,
+        target_const: impl Into<Vec<usize>>,
+    ) -> Self {
+        Self {
+            location,
+            kind: BoundNodeKind::Jump(BoundJumpNodeKind {
+                condition: None,
+                target_const: target_const.into(),
+                target: Box::new(target),
+                jump_if_true: true,
+            }),
+            type_: typeid!(Type::Void),
+            constant_value: None,
+        }
+    }
+
     pub fn jump(location: TextLocation, target: BoundNode) -> Self {
         Self {
             location,
             kind: BoundNodeKind::Jump(BoundJumpNodeKind {
                 condition: None,
+                target_const: vec![
+                    target
+                        .constant_value
+                        .as_ref()
+                        .unwrap()
+                        .value
+                        .as_label_pointer()
+                        .unwrap()
+                        .0,
+                ],
                 target: Box::new(target),
                 jump_if_true: true,
             }),
@@ -685,6 +734,16 @@ impl BoundNode {
             location,
             kind: BoundNodeKind::Jump(BoundJumpNodeKind {
                 condition: Some(Box::new(condition)),
+                target_const: vec![
+                    target
+                        .constant_value
+                        .as_ref()
+                        .unwrap()
+                        .value
+                        .as_label_pointer()
+                        .unwrap()
+                        .0,
+                ],
                 target: Box::new(target),
                 jump_if_true: true,
             }),
@@ -698,6 +757,16 @@ impl BoundNode {
             location,
             kind: BoundNodeKind::Jump(BoundJumpNodeKind {
                 condition: Some(Box::new(condition)),
+                target_const: vec![
+                    target
+                        .constant_value
+                        .as_ref()
+                        .unwrap()
+                        .value
+                        .as_label_pointer()
+                        .unwrap()
+                        .0,
+                ],
                 target: Box::new(target),
                 jump_if_true: false,
             }),
@@ -833,6 +902,7 @@ impl BoundFunctionDeclarationNodeKind {
 pub struct BoundJumpNodeKind {
     pub condition: Option<Box<BoundNode>>,
     pub target: Box<BoundNode>,
+    pub target_const: Vec<usize>,
     pub jump_if_true: bool,
 }
 

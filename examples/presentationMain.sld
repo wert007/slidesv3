@@ -5,8 +5,7 @@ func main() {
     let lbl = new presentation.Label('Hello World!');
     lbl.name = 'lbl';
     lbl.fontSize = pd.pixel(99.0);
-    let l: List<presentation.Element> = list [ lbl ];
-    let slide1 = new presentation.Slide(list [new presentation.Step(l)]);
+    let slide1 = new presentation.Slide(list [new presentation.Step(list [lbl])]);
     let p = new presentation.Presentation(
         list [slide1],
         new presentation.PresentationFlags(

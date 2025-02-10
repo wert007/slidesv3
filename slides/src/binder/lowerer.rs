@@ -526,11 +526,22 @@ fn flatten_match_statement(
 ) -> Vec<BoundNode> {
     let (end_label, end_label_reference) = create_label(location, flattener);
     let mut is_type_match = false;
+    let mut targets = Vec::with_capacity(match_statement.cases.len());
     let (values, mut bodies): (Vec<(BoundNode, BoundNode)>, Vec<BoundNode>) = match_statement
         .cases
         .into_iter()
         .map(|c| {
             let (case_label, case_label_reference) = create_label(location, flattener);
+            targets.push(
+                case_label_reference
+                    .constant_value
+                    .as_ref()
+                    .unwrap()
+                    .value
+                    .as_label_pointer()
+                    .unwrap()
+                    .0,
+            );
             let expression = match *c.expression {
                 BoundMatchCaseExpression::Expression(e) => e,
                 BoundMatchCaseExpression::Type(_, t, location) => {
@@ -597,7 +608,7 @@ fn flatten_match_statement(
     } else {
         *match_statement.expression
     };
-    let mut statements = vec![BoundNode::jump(
+    let mut statements = vec![BoundNode::jump_dynamic(
         location,
         BoundNode::binary(
             location,
@@ -631,6 +642,7 @@ fn flatten_match_statement(
                 .unwrap()
                 .unwrap_type_id(),
         ),
+        targets,
     )];
     statements.append(&mut bodies);
     statements.push(default_case_label);
@@ -648,15 +660,12 @@ fn flatten_jump(
 ) -> Vec<BoundNode> {
     let condition = jump.condition.map(|c| flatten_expression(*c, flattener));
     let target = flatten_expression(*jump.target, flattener);
-    vec![if let Some(condition) = condition {
-        if jump.jump_if_true {
-            BoundNode::jump_if_true(location, condition, target)
-        } else {
-            BoundNode::jump_if_false(location, condition, target)
-        }
-    } else {
-        BoundNode::jump(location, target)
-    }]
+    vec![BoundNode::jump_raw(
+        location,
+        condition,
+        target,
+        jump.target_const,
+    )]
 }
 
 fn create_label(location: TextLocation, flattener: &mut Flattener) -> (BoundNode, BoundNode) {
